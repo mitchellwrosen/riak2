@@ -1,0 +1,26 @@
+name: riak-but-better
+version: 0.1.0
+build-type: Custom
+cabal-version: >= 1.2
+
+custom-setup
+  setup-depends:
+      base
+    , Cabal == 2.2.0.1
+    , proto-lens-protoc == 0.3.1.0
+
+library
+  autogen-modules:
+    Proto.Riak
+    Proto.Riak_Fields
+  build-depends:
+      base
+    , proto-lens-protoc == 0.3.1.0
+  exposed-modules:
+    Riak.Internal.Protobuf
+    -- Temporarily exposed just to see them. These should be other-modules
+    -- eventually
+    Proto.Riak
+    Proto.Riak_Fields
+  hs-source-dirs:
+    src
