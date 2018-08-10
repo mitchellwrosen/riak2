@@ -1,6 +1,6 @@
 {-# language NoImplicitPrelude #-}
 
-module Riak.Protobuf
+module Riak.Internal.Protobuf
   ( -- * Data types
     -- ** CounterOp
     CounterOp(..)
