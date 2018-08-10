@@ -1,3 +1,5 @@
+{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables #-}
+
 module Riak.Internal.Connection
   ( Connection
   , withConnection
