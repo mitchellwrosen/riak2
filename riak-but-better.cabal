@@ -24,6 +24,10 @@ library
     , text ^>= 1.2.3
     , unliftio ^>= 0.2.7
     , unliftio-core ^>= 0.1.1
+  default-extensions:
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
   default-language:
     Haskell2010
   exposed-modules:
@@ -39,4 +43,6 @@ library
   hs-source-dirs:
     src
   other-modules:
+    Riak.Internal.Connection
+    Riak.Internal.Message
     Riak.Internal.Panic
