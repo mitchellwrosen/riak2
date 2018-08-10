@@ -24,9 +24,9 @@ import qualified Data.ByteString                as ByteString
 import qualified Data.ByteString.Builder        as Builder
 import qualified Data.ByteString.Lazy           as Lazy (ByteString)
 import qualified Data.ByteString.Streaming      as Q
-import qualified Network.Socket                 as Network hiding (recv)
-import qualified Network.Socket.ByteString      as Network (recv)
-import qualified Network.Socket.ByteString.Lazy as Network (sendAll)
+import qualified Network.Socket                 as Socket hiding (recv)
+import qualified Network.Socket.ByteString      as Socket (recv)
+import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 
 import Riak.Internal.Message
 import Riak.Internal.Panic
@@ -58,14 +58,16 @@ connect host port = liftIO $ do
       getAddrInfo (Just hints) (Just host) (Just (show port))
 
   socket :: Socket <-
-    Network.socket (addrFamily info) (addrSocketType info) (addrProtocol info)
+    Socket.socket (addrFamily info) (addrSocketType info) (addrProtocol info)
+
+  Socket.connect socket (addrAddress info)
 
   let
     source :: Q.ByteString IO Void
     source =
       forever $ do
         bytes :: ByteString <-
-          liftIO (Network.recv socket 4096)
+          liftIO (Socket.recv socket 4096)
         if ByteString.null bytes
           -- TODO Properly handle Riak closing connection
           then error "Riak closed the connection"
@@ -77,13 +79,13 @@ connect host port = liftIO $ do
   let
     sink :: Lazy.ByteString -> IO ()
     sink =
-      Network.sendAll socket
+      Socket.sendAll socket
 
   pure (Connection socket sourceRef sink)
 
 disconnect :: MonadIO m => Connection -> m ()
 disconnect (Connection socket _ _) =
-  liftIO (Network.close socket)
+  liftIO (Socket.close socket)
 
 -- | Send a 'Message' on a 'Connection'.
 send :: Connection -> Message -> IO ()
@@ -109,12 +111,19 @@ recv (Connection _ sourceRef _) = do
   (code, source2) <-
     parsePanic Atto.anyWord8 source1
 
-  (bytes, source3) <-
-    parsePanic (Atto.take (fromIntegral len)) source2
+  if len > 1
+    then do
+      (bytes, source3) <-
+        parsePanic (Atto.take (fromIntegral (len-1))) source2
 
-  writeIORef sourceRef source3
+      writeIORef sourceRef source3
 
-  pure (Message code bytes)
+      pure (Message code bytes)
+
+    else do
+      writeIORef sourceRef source2
+
+      pure (Message code mempty)
 
 parsePanic
   :: Atto.Parser a
