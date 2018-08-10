@@ -1,4 +1,4 @@
-{-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables #-}
 
 module Riak
   ( Handle
@@ -10,7 +10,6 @@ import Control.Monad.IO.Class  (MonadIO, liftIO)
 import Control.Monad.IO.Unlift
 import Data.Bits               (shiftL, (.|.))
 import Data.ByteString         (ByteString)
-import Data.ByteString.Builder (Builder)
 import Data.Int
 import Data.IORef
 import Data.Void
@@ -24,10 +23,11 @@ import qualified Data.ByteString                as ByteString
 import qualified Data.ByteString.Builder        as Builder
 import qualified Data.ByteString.Lazy           as Lazy (ByteString)
 import qualified Data.ByteString.Streaming      as Q
-import qualified Network.Socket                 as Network hiding (recv,
-                                                            sendAll)
+import qualified Network.Socket                 as Network hiding (recv)
 import qualified Network.Socket.ByteString      as Network (recv)
 import qualified Network.Socket.ByteString.Lazy as Network (sendAll)
+
+import Riak.Internal.Panic
 
 -- | A non-thread-safe handle to Riak.
 data Handle
@@ -103,45 +103,81 @@ send (Handle _ _ sink) (Message code bytes) =
 -- | Receive a 'Message' on a 'Handle'.
 recv :: Handle -> IO Message
 recv (Handle _ sourceRef _) = do
-  source :: Q.ByteString IO Void <-
+  source0 :: Q.ByteString IO Void <-
     readIORef sourceRef
 
-  -- TODO Finish recv implementation
+  (len, source1) <-
+    parsePanic int32be source0
 
-  undefined
+  (code, source2) <-
+    parsePanic Atto.anyWord8 source1
+
+  (bytes, source3) <-
+    parsePanic (Atto.take (fromIntegral len)) source2
+
+  writeIORef sourceRef source3
+
+  pure (Message code bytes)
+
+parsePanic
+  :: Atto.Parser a
+  -> Q.ByteString IO Void
+  -> IO (a, Q.ByteString IO Void)
+parsePanic parser bytes =
+  parse parser bytes >>= \case
+    EndOfInput v ->
+      absurd v
+
+    FailedParse _unconsumed context reason ->
+      panic "Riak parse failure"
+        ( ("context", context)
+        , ("reason", reason)
+        )
+
+    SuccessfulParse x bytes' ->
+      pure (x, bytes')
+
+-- | Throwaway 'parse' result type.
+data ParseResult a r
+  = EndOfInput r
+  | FailedParse !ByteString  ![String] !String
+  | SuccessfulParse a (Q.ByteString IO r)
 
 -- | Apply an attoparsec parser to a streaming bytestring. Return the parsed
 -- value and the remaining stream.
---
--- TODO: Make this work for streaming bytestrings with returh values
 parse
-  :: forall a.
+  :: forall a r.
      Atto.Parser a
-  -> Q.ByteString IO Void
-  -> IO (Maybe (a, Q.ByteString IO Void))
-parse parser bytes0 = do
-  Right (chunk0, bytes1) <-
-    Q.nextChunk bytes0
+  -> Q.ByteString IO r
+  -> IO (ParseResult a r)
+parse parser bytes0 =
+  Q.nextChunk bytes0 >>= \case
+    Left r ->
+      pure (EndOfInput r)
 
-  let
-    loop
-      :: Atto.Result a
-      -> Q.ByteString IO Void
-      -> IO (Maybe (a, Q.ByteString IO Void))
-    loop result bytes =
-      case result of
-        Atto.Fail _ _ _ ->
-          undefined -- TODO Handle parse failure
+    Right (chunk0, bytes1) ->
+      let
+        loop
+          :: Atto.Result a
+          -> Q.ByteString IO r
+          -> IO (ParseResult a r)
+        loop result bytes =
+          case result of
+            Atto.Fail unconsumed context reason ->
+              pure (FailedParse unconsumed context reason)
 
-        Atto.Partial k -> do
-          Right (chunk, bytes') <-
-            Q.nextChunk bytes
-          loop (k chunk) bytes'
+            Atto.Partial k ->
+              Q.nextChunk bytes >>= \case
+                Left r ->
+                  pure (EndOfInput r)
 
-        Atto.Done leftover x ->
-          pure (Just (x, Q.chunk leftover *> bytes))
+                Right (chunk, bytes') ->
+                  loop (k chunk) bytes'
 
-  loop (Atto.parse parser chunk0) bytes1
+            Atto.Done leftover x ->
+              pure (SuccessfulParse x (Q.chunk leftover *> bytes))
+      in
+        loop (Atto.parse parser chunk0) bytes1
 
 -- | Attoparsec parser for a 32-bit big-endian integer.
 int32be :: Atto.Parser Int32

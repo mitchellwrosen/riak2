@@ -21,8 +21,11 @@ library
     , network ^>= 2.7.0
     , proto-lens-protoc == 0.3.1.0
     , streaming-bytestring ^>= 0.1.6
+    , text ^>= 1.2.3
     , unliftio ^>= 0.2.7
     , unliftio-core ^>= 0.1.1
+  default-language:
+    Haskell2010
   exposed-modules:
     Riak
     Riak.Internal.Protobuf
@@ -30,5 +33,10 @@ library
     -- eventually
     Proto.Riak
     Proto.Riak_Fields
+  ghc-options:
+    -Wall
+    -- TODO more warnings
   hs-source-dirs:
     src
+  other-modules:
+    Riak.Internal.Panic
