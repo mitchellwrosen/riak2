@@ -15,7 +15,8 @@ library
     Proto.Riak
     Proto.Riak_Fields
   build-depends:
-      base
+      attoparsec ^>= 0.13.2
+    , base
     , bytestring ^>= 0.10.8
     , network ^>= 2.7.0
     , proto-lens-protoc == 0.3.1.0
