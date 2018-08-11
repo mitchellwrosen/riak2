@@ -7,6 +7,7 @@ module Riak
   , getServerInfo
   , listBuckets
   , listKeys
+  , getBucketProps
   ) where
 
 import Control.Monad.IO.Unlift
@@ -80,3 +81,11 @@ listKeys (Handle conn) req = liftIO $ do
         else ((resp ^. keys) ++) <$> loop
 
   runExceptT loop
+
+getBucketProps
+  :: MonadIO m
+  => Handle
+  -> RpbGetBucketReq
+  -> m (Either RpbErrorResp RpbGetBucketResp)
+getBucketProps (Handle conn) req = liftIO $
+  exchange1 conn (Message 19 (Proto.encodeMessage req))
