@@ -103,6 +103,7 @@ withHandle host port f = do
 
   withConnection host port (\conn -> f (Handle conn vclockCacheRef))
 
+-- TODO fetchObject: better return type
 fetchObject
   :: MonadIO m
   => Handle
@@ -160,11 +161,11 @@ fetchObject
     RpbGetReq
       { _RpbGetReq'_unknownFields = []
       , _RpbGetReq'basicQuorum    = basic_quorum
-      , _RpbGetReq'bucket         = unBucket bucket
+      , _RpbGetReq'bucket         = coerce bucket
       , _RpbGetReq'deletedvclock  = Just True
       , _RpbGetReq'head           = head
       , _RpbGetReq'ifModified     = if_modified
-      , _RpbGetReq'key            = unKey key
+      , _RpbGetReq'key            = coerce key
       , _RpbGetReq'nVal           = n_val
       , _RpbGetReq'notfoundOk     = notfound_ok
       , _RpbGetReq'pr             = pr
@@ -174,38 +175,116 @@ fetchObject
       , _RpbGetReq'type'          = coerce type'
       }
 
+-- TODO storeObject: nicer input type than RpbContent
+-- TODO storeObject: better return type
 storeObject
   :: MonadIO m
   => Handle
-  -> RpbPutReq
+  -> Bucket
+  -> RpbContent
+  -> ( "asis"            := Bool
+     , "dw"              := Word32
+     , "if_none_match"   := Bool
+     , "if_not_modified" := Bool
+     , "key"             := Key
+     , "n_val"           := Word32
+     , "pw"              := Word32
+     , "return_body"     := Bool
+     , "return_head"     := Bool
+     , "sloppy_quorum"   := Bool
+     , "timeout"         := Word32
+     , "type'"           := BucketType
+     , "w"               := Word32
+     )
   -> m (Either RpbErrorResp RpbPutResp)
-storeObject handle req =
-  liftIO (runExceptT (storeObject_ handle req))
+storeObject handle bucket content params =
+  liftIO (runExceptT (storeObject_ handle bucket content params))
 
 storeObject_
   :: Handle
-  -> RpbPutReq
+  -> Bucket
+  -> RpbContent
+  -> ( "asis"            := Bool
+     , "dw"              := Word32
+     , "if_none_match"   := Bool
+     , "if_not_modified" := Bool
+     , "key"             := Key
+     , "n_val"           := Word32
+     , "pw"              := Word32
+     , "return_body"     := Bool
+     , "return_head"     := Bool
+     , "sloppy_quorum"   := Bool
+     , "timeout"         := Word32
+     , "type'"           := BucketType
+     , "w"               := Word32
+     )
   -> ExceptT RpbErrorResp IO RpbPutResp
-storeObject_ handle@(Handle conn vclockCacheRef) req = do
+storeObject_
+    handle@(Handle conn vclockCacheRef) bucket content
+    ( _ := asis
+    , _ := dw
+    , _ := if_none_match
+    , _ := if_not_modified
+    , _ := key
+    , _ := n_val
+    , _ := pw
+    , _ := return_body
+    , _ := return_head
+    , _ := sloppy_quorum
+    , _ := timeout
+    , _ := type'
+    , _ := w
+    ) = do
+
   -- Get the cached vclock of this object to pass in the put request. If we
   -- don't have it, first perform a head-fetch, which caches it. If it's still
   -- not there, then this must be the very first store.
   vclock :: Maybe ByteString <-
-    lift lookupVclock >>= \case
-      Nothing -> do
-        _ <- ExceptT (fetchObject handle (Bucket bucket) (Key key) params)
-        lift lookupVclock
-      Just vclock ->
-        pure (Just vclock)
+    case key of
+      Nothing ->
+        pure Nothing
 
-  ExceptT (exchange conn (req & L.maybe'vclock .~ vclock))
+      Just key' ->
+        let
+          lookupVclock :: IO (Maybe ByteString)
+          lookupVclock =
+            HashMap.lookup (coerce type', bucket, key') <$>
+              readIORef vclockCacheRef
+        in
+          lift lookupVclock >>= \case
+            Nothing -> do
+              _ <- ExceptT (fetchObject handle bucket key' params)
+              lift lookupVclock
+
+            Just vclock ->
+              pure (Just vclock)
+
+  let
+    request :: RpbPutReq
+    request =
+      RpbPutReq
+        { _RpbPutReq'_unknownFields = []
+        , _RpbPutReq'asis           = asis
+        , _RpbPutReq'bucket         = coerce bucket
+        , _RpbPutReq'content        = content
+        , _RpbPutReq'dw             = dw
+        , _RpbPutReq'ifNoneMatch    = if_none_match
+        , _RpbPutReq'ifNotModified  = if_not_modified
+        , _RpbPutReq'key            = coerce key
+        , _RpbPutReq'nVal           = n_val
+        , _RpbPutReq'pw             = pw
+        , _RpbPutReq'returnBody     = return_body
+        , _RpbPutReq'returnHead     = return_head
+        , _RpbPutReq'sloppyQuorum   = sloppy_quorum
+        , _RpbPutReq'timeout        = timeout
+        , _RpbPutReq'type'          = coerce type'
+        , _RpbPutReq'vclock         = vclock
+        , _RpbPutReq'w              = w
+        }
+
+  ExceptT (exchange conn request)
 
  where
-  lookupVclock :: IO (Maybe ByteString)
-  lookupVclock =
-    HashMap.lookup (coerce type', Bucket bucket, Key key) <$>
-      readIORef vclockCacheRef
-
   params
     :: ( "basic_quorum"  := Bool
        , "head"          := Bool
@@ -225,11 +304,7 @@ storeObject_ handle@(Handle conn vclockCacheRef) req = do
           Nothing ->
             id
           Just type'' ->
-            param (Proxy @"type") (BucketType type'')
-
-  type'  = req ^. L.maybe'type'
-  bucket = req ^. L.bucket
-  key    = req ^. L.key
+            param (Proxy @"type") type''
 
 deleteObject
   :: MonadIO m
