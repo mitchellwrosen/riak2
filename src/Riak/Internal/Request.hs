@@ -36,6 +36,7 @@ instance Request RpbResetBucketReq       where requestCode = 29
 instance Request RpbSetBucketReq         where requestCode = 21
 instance Request RpbSetBucketTypeReq     where requestCode = 31
 instance Request RpbYokozunaSchemaGetReq where requestCode = 58
+instance Request RpbYokozunaSchemaPutReq where requestCode = 60
 
 requestToMessage :: forall a. Request a => a -> Message
 requestToMessage req =

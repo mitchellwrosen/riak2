@@ -10,6 +10,7 @@ module Riak.Internal.Response
   , RpbResetBucketResp(..)
   , RpbSetBucketResp(..)
   , RpbSetBucketTypeResp(..)
+  , RpbYokozunaSchemaPutResp(..)
   ) where
 
 import Data.ByteString (ByteString)
@@ -74,6 +75,13 @@ data RpbSetBucketTypeResp
 instance Response RpbSetBucketTypeResp where
   responseCode = 32
   responseDecode _ = pure RpbSetBucketTypeResp
+
+data RpbYokozunaSchemaPutResp
+  = RpbYokozunaSchemaPutResp
+
+instance Response RpbYokozunaSchemaPutResp where
+  responseCode = 12
+  responseDecode _ = pure RpbYokozunaSchemaPutResp
 
 parseResponse :: forall a. Response a => Message -> IO (Either RpbErrorResp a)
 parseResponse (Message actual bytes)

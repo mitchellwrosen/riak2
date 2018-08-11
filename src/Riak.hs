@@ -25,6 +25,7 @@ module Riak
     -- * Secondary indexes (2i)
     -- * Search 2.0
   , getSchema
+  , putSchema
     -- * Server info
   , ping
   , getServerInfo
@@ -196,6 +197,14 @@ getSchema
   -> RpbYokozunaSchemaGetReq
   -> m (Either RpbErrorResp RpbYokozunaSchemaGetResp)
 getSchema (Handle conn) req =
+  liftIO (exchange conn req)
+
+putSchema
+  :: MonadIO m
+  => Handle
+  -> RpbYokozunaSchemaPutReq
+  -> m (Either RpbErrorResp RpbYokozunaSchemaPutResp)
+putSchema (Handle conn) req =
   liftIO (exchange conn req)
 
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())

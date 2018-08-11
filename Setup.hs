@@ -9,5 +9,3 @@ main =
       (\_ -> pure ["riak.proto"])
       simpleUserHooks)
     { sDistHook = sDistHook simpleUserHooks })
-
-

@@ -46,4 +46,3 @@ instance {-# OVERLAPPABLE #-}
 panic :: (MonadIO m, Panicked a) => Text -> a -> m void
 panic s x =
   throwIO (Panic s x)
-
