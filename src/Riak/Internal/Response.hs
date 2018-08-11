@@ -27,6 +27,7 @@ class Response a where
 instance Response RpbErrorResp         where responseCode = 0
 instance Response RpbGetServerInfoResp where responseCode = 8
 instance Response RpbListBucketsResp   where responseCode = 16
+instance Response RpbListKeysResp      where responseCode = 18
 
 newtype Code a
   = Code { unCode :: Word8 }

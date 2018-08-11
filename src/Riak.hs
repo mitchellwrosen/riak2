@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables #-}
 
 module Riak
   ( Handle
@@ -6,17 +6,22 @@ module Riak
   , ping
   , getServerInfo
   , listBuckets
+  , listKeys
   ) where
 
 import Control.Monad.IO.Unlift
-import Network.Socket          (HostName, PortNumber)
+import Control.Monad.Trans.Except
+import Data.ByteString            (ByteString)
+import Lens.Family2
+import Network.Socket             (HostName, PortNumber)
 
 import qualified Data.ProtoLens.Encoding as Proto (encodeMessage)
 
 import Proto.Riak
+import Proto.Riak_Fields        (done, keys)
 import Riak.Internal.Connection
 import Riak.Internal.Message
-import Riak.Internal.Response   (RpbPingResp)
+import Riak.Internal.Response   (RpbPingResp, parseResponse)
 
 -- | A non-thread-safe handle to Riak.
 data Handle
@@ -53,3 +58,25 @@ listBuckets
   -> m (Either RpbErrorResp RpbListBucketsResp)
 listBuckets (Handle conn) req = liftIO $
   exchange1 conn (Message 15 (Proto.encodeMessage req))
+
+-- TODO streaming listKeys
+-- TODO key newtype
+listKeys
+  :: MonadIO m
+  => Handle
+  -> RpbListKeysReq
+  -> m (Either RpbErrorResp [ByteString])
+listKeys (Handle conn) req = liftIO $ do
+  send conn (Message 17 (Proto.encodeMessage req))
+
+  let
+    loop :: ExceptT RpbErrorResp IO [ByteString]
+    loop = do
+      resp :: RpbListKeysResp <-
+        ExceptT (recv conn >>= parseResponse)
+
+      if resp ^. done
+        then pure (resp ^. keys)
+        else ((resp ^. keys) ++) <$> loop
+
+  runExceptT loop

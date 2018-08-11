@@ -1,4 +1,5 @@
 .ghc.environment.*
+.ghci
 .ghcid
 cabal.project.local
 dist/

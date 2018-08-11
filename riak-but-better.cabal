@@ -18,11 +18,13 @@ library
       attoparsec ^>= 0.13.2
     , base
     , bytestring ^>= 0.10.8
+    , lens-family ^>= 1.2.2
     , network ^>= 2.7.0
     , proto-lens ^>= 0.3.1
     , proto-lens-protoc == 0.3.1.0
     , streaming-bytestring ^>= 0.1.6
     , text ^>= 1.2.3
+    , transformers
     , unliftio ^>= 0.2.7
     , unliftio-core ^>= 0.1.1
   default-language:
