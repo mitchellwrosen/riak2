@@ -12,6 +12,8 @@ module Riak
   , setBucketProps
   , resetBucketProps
   , fetchObject
+  , storeObject
+  , deleteObject
 
     -- ** Re-exports
   , def
@@ -114,6 +116,22 @@ fetchObject
   -> RpbGetReq
   -> m (Either RpbErrorResp RpbGetResp)
 fetchObject (Handle conn) req =
+  liftIO (exchange1 conn req)
+
+storeObject
+  :: MonadIO m
+  => Handle
+  -> RpbPutReq
+  -> m (Either RpbErrorResp RpbPutResp)
+storeObject (Handle conn) req =
+  liftIO (exchange1 conn req)
+
+deleteObject
+  :: MonadIO m
+  => Handle
+  -> RpbDelReq
+  -> m (Either RpbErrorResp RpbDelResp)
+deleteObject (Handle conn) req =
   liftIO (exchange1 conn req)
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())

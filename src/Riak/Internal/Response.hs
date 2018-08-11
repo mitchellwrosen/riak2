@@ -1,12 +1,14 @@
-{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables,
+             TypeApplications #-}
 
 module Riak.Internal.Response
   ( Response
   , parseResponse
 
+  , RpbDelResp(..)
   , RpbPingResp(..)
-  , RpbSetBucketResp(..)
   , RpbResetBucketResp(..)
+  , RpbSetBucketResp(..)
   ) where
 
 import Data.ByteString (ByteString)
@@ -25,12 +27,20 @@ class Response a where
   default responseDecode :: Proto.Message a => ByteString -> Either String a
   responseDecode = Proto.decodeMessage
 
-instance Response RpbErrorResp         where responseCode = 0
+instance Response RpbErrorResp         where responseCode =  0
 instance Response RpbGetBucketResp     where responseCode = 20
 instance Response RpbGetResp           where responseCode = 10
-instance Response RpbGetServerInfoResp where responseCode = 8
+instance Response RpbGetServerInfoResp where responseCode =  8
 instance Response RpbListBucketsResp   where responseCode = 16
 instance Response RpbListKeysResp      where responseCode = 18
+instance Response RpbPutResp           where responseCode = 12
+
+data RpbDelResp
+  = RpbDelResp
+
+instance Response RpbDelResp where
+  responseCode = 14
+  responseDecode _ = pure RpbDelResp
 
 data RpbPingResp
   = RpbPingResp
@@ -39,19 +49,19 @@ instance Response RpbPingResp where
   responseCode = 2
   responseDecode _ = pure RpbPingResp
 
-data RpbSetBucketResp
-  = RpbSetBucketResp
-
-instance Response RpbSetBucketResp where
-  responseCode = 22
-  responseDecode _ = pure RpbSetBucketResp
-
 data RpbResetBucketResp
   = RpbResetBucketResp
 
 instance Response RpbResetBucketResp where
   responseCode = 30
   responseDecode _ = pure RpbResetBucketResp
+
+data RpbSetBucketResp
+  = RpbSetBucketResp
+
+instance Response RpbSetBucketResp where
+  responseCode = 22
+  responseDecode _ = pure RpbSetBucketResp
 
 parseResponse :: forall a. Response a => Message -> IO (Either RpbErrorResp a)
 parseResponse (Message actual bytes)
