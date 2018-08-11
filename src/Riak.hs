@@ -27,6 +27,8 @@ module Riak
   , getSchema
   , putSchema
   , getIndex
+  , putIndex
+  , deleteIndex
     -- * Server info
   , ping
   , getServerInfo
@@ -204,7 +206,7 @@ putSchema
   :: MonadIO m
   => Handle
   -> RpbYokozunaSchemaPutReq
-  -> m (Either RpbErrorResp RpbYokozunaSchemaPutResp)
+  -> m (Either RpbErrorResp RpbEmptyPutResp)
 putSchema (Handle conn) req =
   liftIO (exchange conn req)
 
@@ -214,6 +216,22 @@ getIndex
   -> RpbYokozunaIndexGetReq
   -> m (Either RpbErrorResp RpbYokozunaIndexGetResp)
 getIndex (Handle conn) req =
+  liftIO (exchange conn req)
+
+putIndex
+  :: MonadIO m
+  => Handle
+  -> RpbYokozunaIndexPutReq
+  -> m (Either RpbErrorResp RpbEmptyPutResp)
+putIndex (Handle conn) req =
+  liftIO (exchange conn req)
+
+deleteIndex
+  :: MonadIO m
+  => Handle
+  -> RpbYokozunaIndexDeleteReq
+  -> m (Either RpbErrorResp RpbDelResp)
+deleteIndex (Handle conn) req =
   liftIO (exchange conn req)
 
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
