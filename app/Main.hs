@@ -2,15 +2,19 @@
 
 import Control.Monad
 import Data.ByteString     (ByteString)
+import Data.Text           (Text)
+import Data.Text.Encoding  (encodeUtf8)
 import Data.Word
+import Lens.Family2
 import Options.Applicative
 
 import qualified Data.ByteString.Base16 as Base16
 
-import Riak                   (Proxy(..), (&), (:=)(..), def, param)
-import Riak.Internal.Protobuf
+import Riak                   ((:=)(..), Proxy(..), def, param, (&))
+import Riak.Internal.Protobuf ()
 
 import qualified Riak
+import qualified Riak.Internal.Protobuf as L (value)
 
 main :: IO ()
 main =
@@ -26,16 +30,12 @@ parser =
       "fetch-object"
       (info
         (doFetchObject
-          <$> switch
+          <$> bucketOption
+          <*> keyOption
+          <*> switch
                 (mconcat
                   [ long "basic-quorum"
                   , help "Basic quorum"
-                  ])
-          <*> (fmap Riak.Bucket . strOption)
-                (mconcat
-                  [ long "bucket"
-                  , help "Bucket"
-                  , metavar "BUCKET"
                   ])
           <*> switch
                 (mconcat
@@ -52,12 +52,6 @@ parser =
                   [ long "if-modified"
                   , help "If modified"
                   , metavar "VCLOCK"
-                  ])
-          <*> (fmap Riak.Key . strOption)
-                (mconcat
-                  [ long "key"
-                  , help "Key"
-                  , metavar "KEY"
                   ])
           <*> switch
                 (mconcat
@@ -93,21 +87,30 @@ parser =
                   , help "Timeout"
                   , metavar "MILLISECONDS"
                   ])
-          <*> (optional . fmap Riak.BucketType . strOption)
-                (mconcat
-                  [ long "type"
-                  , help "Bucket type"
-                  , metavar "TYPE"
-                  ]))
+          <*> optional bucketTypeOption
         (progDesc "Fetch an object")))
+  <|>
+  hsubparser
+    (command
+      "store-object"
+      (info
+        (doStoreObject
+          <$> bucketOption
+          <*> strOption
+                (mconcat
+                  [ long "content"
+                  , help "Content"
+                  ]))
+          -- TODO cli store-object optional params
+        (progDesc "Store an object")))
 
 doFetchObject
-  :: Bool
-  -> Riak.Bucket
+  :: Riak.Bucket
+  -> Riak.Key
+  -> Bool
   -> Bool
   -> Bool
   -> Maybe ByteString -- vclock
-  -> Riak.Key
   -> Bool
   -> Maybe Word32
   -> Maybe Word32
@@ -117,7 +120,7 @@ doFetchObject
   -> Maybe Riak.BucketType
   -> IO ()
 doFetchObject
-    basic_quorum bucket deletedvclock head if_modified key no_notfound_ok n_val
+    bucket key basic_quorum deletedvclock head if_modified no_notfound_ok n_val
     pr r sloppy_quorum timeout type' =
   Riak.withHandle "localhost" 8087 $ \h ->
     print =<<
@@ -135,3 +138,39 @@ doFetchObject
         , Proxy := timeout
         , Proxy := type'
         )
+
+doStoreObject
+  :: Riak.Bucket
+  -> Text
+  -> IO ()
+doStoreObject bucket content =
+  Riak.withHandle "localhost" 8087 $ \h ->
+    print =<<
+      Riak.storeObject h
+        bucket
+        (def & L.value .~ encodeUtf8 content)
+        def
+
+bucketOption =
+  (fmap Riak.Bucket . strOption)
+    (mconcat
+      [ long "bucket"
+      , help "Bucket"
+      , metavar "BUCKET"
+      ])
+
+bucketTypeOption =
+  fmap Riak.BucketType . strOption
+    (mconcat
+      [ long "type"
+      , help "Bucket type"
+      , metavar "TYPE"
+      ])
+
+keyOption =
+  (fmap Riak.Key . strOption)
+    (mconcat
+      [ long "key"
+      , help "Key"
+      , metavar "KEY"
+      ])

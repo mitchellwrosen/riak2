@@ -56,13 +56,15 @@ library
     Riak.Internal.Request
     Riak.Internal.Response
 
-executable riak-but-better-cli
+executable riak-cli
   build-depends:
       base
     , base16-bytestring
     , bytestring
+    , lens-family
     , optparse-applicative
     , riak-but-better
+    , text
   buildable:
     True
   default-language:

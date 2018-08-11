@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, DerivingStrategies, GeneralizedNewtypeDeriving,
-             LambdaCase, ScopedTypeVariables, TypeApplications,
+             InstanceSigs, LambdaCase, ScopedTypeVariables, TypeApplications,
              TypeOperators #-}
 
 module Riak
@@ -56,12 +56,14 @@ import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.IORef
 import Data.Proxy                 (Proxy(Proxy))
+import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
 import Lens.Family2
 import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head)
 
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Text           as Text
 
 import           Proto.Riak
 import qualified Proto.Riak_Fields        as L
@@ -85,6 +87,11 @@ newtype Bucket
   = Bucket { unBucket :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
+
+instance Show Bucket where
+  show :: Bucket -> String
+  show =
+    Text.unpack . decodeUtf8 . unBucket
 
 newtype Key
   = Key { unKey :: ByteString }
