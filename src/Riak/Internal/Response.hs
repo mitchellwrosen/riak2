@@ -28,16 +28,17 @@ class Response a where
   default responseDecode :: Proto.Message a => ByteString -> Either String a
   responseDecode = Proto.decodeMessage
 
-instance Response DtFetchResp          where responseCode = 81
-instance Response DtUpdateResp         where responseCode = 83
-instance Response RpbErrorResp         where responseCode =  0
-instance Response RpbGetBucketResp     where responseCode = 20
-instance Response RpbGetResp           where responseCode = 10
-instance Response RpbGetServerInfoResp where responseCode =  8
-instance Response RpbListBucketsResp   where responseCode = 16
-instance Response RpbListKeysResp      where responseCode = 18
-instance Response RpbMapRedResp        where responseCode = 24
-instance Response RpbPutResp           where responseCode = 12
+instance Response DtFetchResp              where responseCode = 81
+instance Response DtUpdateResp             where responseCode = 83
+instance Response RpbErrorResp             where responseCode =  0
+instance Response RpbGetBucketResp         where responseCode = 20
+instance Response RpbGetResp               where responseCode = 10
+instance Response RpbGetServerInfoResp     where responseCode =  8
+instance Response RpbListBucketsResp       where responseCode = 16
+instance Response RpbListKeysResp          where responseCode = 18
+instance Response RpbMapRedResp            where responseCode = 24
+instance Response RpbPutResp               where responseCode = 12
+instance Response RpbYokozunaSchemaGetResp where responseCode = 59
 
 data RpbDelResp
   = RpbDelResp

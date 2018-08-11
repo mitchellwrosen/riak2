@@ -2,29 +2,32 @@
              TypeApplications #-}
 
 module Riak
-  ( Handle
+  ( -- * Riak handle
+    Handle
   , withHandle
-    -- ** Basic server info
-  , ping
-  , getServerInfo
-    -- ** Key/value object storage
+    -- * Key/value object operations
   , fetchObject
   , storeObject
   , deleteObject
-    -- ** Data type storage
+    -- * Data type operations
   , fetchDataType
   , updateDataType
-    -- ** Bucket metadata
+    -- * Bucket operations
   , getBucketTypeProps
   , setBucketTypeProps
   , getBucketProps
   , setBucketProps
   , resetBucketProps
-    -- ** Aggregration and search
   , listBuckets
   , listKeys
+    -- * MapReduce
   , mapReduce
-
+    -- * Secondary indexes (2i)
+    -- * Search 2.0
+  , getSchema
+    -- * Server info
+  , ping
+  , getServerInfo
     -- ** Re-exports
   , def
   ) where
@@ -54,57 +57,6 @@ withHandle
   -> m a
 withHandle host port f =
   withConnection host port (f . Handle)
-
-ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
-ping (Handle conn) =
-  liftIO (emptyResponse @RpbPingResp (exchange conn RpbPingReq))
-
-getServerInfo
-  :: MonadIO m
-  => Handle
-  -> m (Either RpbErrorResp RpbGetServerInfoResp)
-getServerInfo (Handle conn) =
-  liftIO (exchange conn RpbGetServerInfoReq)
-
-getBucketTypeProps
-  :: MonadIO m
-  => Handle
-  -> RpbGetBucketTypeReq
-  -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketTypeProps (Handle conn) req =
-  liftIO (exchange conn req)
-
-setBucketTypeProps
-  :: MonadIO m
-  => Handle
-  -> RpbSetBucketTypeReq
-  -> m (Either RpbErrorResp ())
-setBucketTypeProps (Handle conn) req =
-  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn req))
-
-getBucketProps
-  :: MonadIO m
-  => Handle
-  -> RpbGetBucketReq
-  -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketProps (Handle conn) req =
-  liftIO (exchange conn req)
-
-setBucketProps
-  :: MonadIO m
-  => Handle
-  -> RpbSetBucketReq
-  -> m (Either RpbErrorResp ())
-setBucketProps (Handle conn) req =
-  liftIO (emptyResponse @RpbSetBucketResp (exchange conn req))
-
-resetBucketProps
-  :: MonadIO m
-  => Handle
-  -> RpbResetBucketReq
-  -> m (Either RpbErrorResp ())
-resetBucketProps (Handle conn) req =
-  liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
 
 fetchObject
   :: MonadIO m
@@ -146,6 +98,47 @@ updateDataType
 updateDataType (Handle conn) req =
   liftIO (exchange conn req)
 
+getBucketTypeProps
+  :: MonadIO m
+  => Handle
+  -> RpbGetBucketTypeReq
+  -> m (Either RpbErrorResp RpbGetBucketResp)
+getBucketTypeProps (Handle conn) req =
+  liftIO (exchange conn req)
+
+setBucketTypeProps
+  :: MonadIO m
+  => Handle
+  -> RpbSetBucketTypeReq
+  -> m (Either RpbErrorResp ())
+setBucketTypeProps (Handle conn) req =
+  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn req))
+
+getBucketProps
+  :: MonadIO m
+  => Handle
+  -> RpbGetBucketReq
+  -> m (Either RpbErrorResp RpbGetBucketResp)
+getBucketProps (Handle conn) req =
+  liftIO (exchange conn req)
+
+setBucketProps
+  :: MonadIO m
+  => Handle
+  -> RpbSetBucketReq
+  -> m (Either RpbErrorResp ())
+setBucketProps (Handle conn) req =
+  liftIO (emptyResponse @RpbSetBucketResp (exchange conn req))
+
+resetBucketProps
+  :: MonadIO m
+  => Handle
+  -> RpbResetBucketReq
+  -> m (Either RpbErrorResp ())
+resetBucketProps (Handle conn) req =
+  liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
+
+
 listBuckets
   :: MonadIO m
   => Handle
@@ -176,6 +169,7 @@ listKeys (Handle conn) req = liftIO $ do
 
   runExceptT loop
 
+
 mapReduce
   :: MonadIO m
   => Handle
@@ -195,6 +189,25 @@ mapReduce (Handle conn) req = liftIO $ do
         else (resp :) <$> loop
 
   runExceptT loop
+
+getSchema
+  :: MonadIO m
+  => Handle
+  -> RpbYokozunaSchemaGetReq
+  -> m (Either RpbErrorResp RpbYokozunaSchemaGetResp)
+getSchema (Handle conn) req =
+  liftIO (exchange conn req)
+
+ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
+ping (Handle conn) =
+  liftIO (emptyResponse @RpbPingResp (exchange conn RpbPingReq))
+
+getServerInfo
+  :: MonadIO m
+  => Handle
+  -> m (Either RpbErrorResp RpbGetServerInfoResp)
+getServerInfo (Handle conn) =
+  liftIO (exchange conn RpbGetServerInfoReq)
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
 emptyResponse =
