@@ -10,6 +10,7 @@ module Riak
   , listKeys
   , getBucketProps
   , setBucketProps
+  , resetBucketProps
 
     -- ** Re-exports
   , def
@@ -97,6 +98,14 @@ setBucketProps
   -> m (Either RpbErrorResp ())
 setBucketProps (Handle conn) req =
   liftIO (emptyResponse @RpbSetBucketResp (exchange1 conn req))
+
+resetBucketProps
+  :: MonadIO m
+  => Handle
+  -> RpbResetBucketReq
+  -> m (Either RpbErrorResp ())
+resetBucketProps (Handle conn) req =
+  liftIO (emptyResponse @RpbResetBucketResp (exchange1 conn req))
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
 emptyResponse =

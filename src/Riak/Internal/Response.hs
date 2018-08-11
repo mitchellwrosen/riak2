@@ -6,6 +6,7 @@ module Riak.Internal.Response
 
   , RpbPingResp(..)
   , RpbSetBucketResp(..)
+  , RpbResetBucketResp(..)
   ) where
 
 import Data.ByteString (ByteString)
@@ -43,6 +44,13 @@ data RpbSetBucketResp
 instance Response RpbSetBucketResp where
   responseCode = 22
   responseDecode _ = pure RpbSetBucketResp
+
+data RpbResetBucketResp
+  = RpbResetBucketResp
+
+instance Response RpbResetBucketResp where
+  responseCode = 30
+  responseDecode _ = pure RpbResetBucketResp
 
 parseResponse :: forall a. Response a => Message -> IO (Either RpbErrorResp a)
 parseResponse (Message actual bytes)
