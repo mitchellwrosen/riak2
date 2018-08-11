@@ -23,6 +23,7 @@ class Request a where
   requestEncode = Proto.encodeMessage
 
 instance Request DtFetchReq          where requestCode = 80
+instance Request DtUpdateReq         where requestCode = 82
 instance Request RpbDelReq           where requestCode = 13
 instance Request RpbGetBucketReq     where requestCode = 19
 instance Request RpbGetBucketTypeReq where requestCode = 31

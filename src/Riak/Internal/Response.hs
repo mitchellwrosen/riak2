@@ -29,6 +29,7 @@ class Response a where
   responseDecode = Proto.decodeMessage
 
 instance Response DtFetchResp          where responseCode = 81
+instance Response DtUpdateResp         where responseCode = 83
 instance Response RpbErrorResp         where responseCode =  0
 instance Response RpbGetBucketResp     where responseCode = 20
 instance Response RpbGetResp           where responseCode = 10

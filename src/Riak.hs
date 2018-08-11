@@ -13,6 +13,7 @@ module Riak
   , deleteObject
     -- ** Data type storage
   , fetchDataType
+  , updateDataType
     -- ** Bucket metadata
   , getBucketTypeProps
   , setBucketTypeProps
@@ -56,14 +57,14 @@ withHandle host port f =
 
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
 ping (Handle conn) =
-  liftIO (emptyResponse @RpbPingResp (exchange1 conn RpbPingReq))
+  liftIO (emptyResponse @RpbPingResp (exchange conn RpbPingReq))
 
 getServerInfo
   :: MonadIO m
   => Handle
   -> m (Either RpbErrorResp RpbGetServerInfoResp)
 getServerInfo (Handle conn) =
-  liftIO (exchange1 conn RpbGetServerInfoReq)
+  liftIO (exchange conn RpbGetServerInfoReq)
 
 getBucketTypeProps
   :: MonadIO m
@@ -71,7 +72,7 @@ getBucketTypeProps
   -> RpbGetBucketTypeReq
   -> m (Either RpbErrorResp RpbGetBucketResp)
 getBucketTypeProps (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
 
 setBucketTypeProps
   :: MonadIO m
@@ -79,7 +80,7 @@ setBucketTypeProps
   -> RpbSetBucketTypeReq
   -> m (Either RpbErrorResp ())
 setBucketTypeProps (Handle conn) req =
-  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange1 conn req))
+  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn req))
 
 getBucketProps
   :: MonadIO m
@@ -87,7 +88,7 @@ getBucketProps
   -> RpbGetBucketReq
   -> m (Either RpbErrorResp RpbGetBucketResp)
 getBucketProps (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
 
 setBucketProps
   :: MonadIO m
@@ -95,7 +96,7 @@ setBucketProps
   -> RpbSetBucketReq
   -> m (Either RpbErrorResp ())
 setBucketProps (Handle conn) req =
-  liftIO (emptyResponse @RpbSetBucketResp (exchange1 conn req))
+  liftIO (emptyResponse @RpbSetBucketResp (exchange conn req))
 
 resetBucketProps
   :: MonadIO m
@@ -103,7 +104,7 @@ resetBucketProps
   -> RpbResetBucketReq
   -> m (Either RpbErrorResp ())
 resetBucketProps (Handle conn) req =
-  liftIO (emptyResponse @RpbResetBucketResp (exchange1 conn req))
+  liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
 
 fetchObject
   :: MonadIO m
@@ -111,7 +112,7 @@ fetchObject
   -> RpbGetReq
   -> m (Either RpbErrorResp RpbGetResp)
 fetchObject (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
 
 storeObject
   :: MonadIO m
@@ -119,7 +120,7 @@ storeObject
   -> RpbPutReq
   -> m (Either RpbErrorResp RpbPutResp)
 storeObject (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
 
 deleteObject
   :: MonadIO m
@@ -127,7 +128,7 @@ deleteObject
   -> RpbDelReq
   -> m (Either RpbErrorResp RpbDelResp)
 deleteObject (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
 
 fetchDataType
   :: MonadIO m
@@ -135,7 +136,15 @@ fetchDataType
   -> DtFetchReq
   -> m (Either RpbErrorResp DtFetchResp)
 fetchDataType (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
+
+updateDataType
+  :: MonadIO m
+  => Handle
+  -> DtUpdateReq
+  -> m (Either RpbErrorResp DtUpdateResp)
+updateDataType (Handle conn) req =
+  liftIO (exchange conn req)
 
 listBuckets
   :: MonadIO m
@@ -143,7 +152,7 @@ listBuckets
   -> RpbListBucketsReq
   -> m (Either RpbErrorResp RpbListBucketsResp)
 listBuckets (Handle conn) req =
-  liftIO (exchange1 conn req)
+  liftIO (exchange conn req)
 
 -- TODO streaming listKeys
 -- TODO key newtype

@@ -6,7 +6,7 @@ module Riak.Internal.Connection
   , withConnection
   , send
   , recv
-  , exchange1
+  , exchange
   ) where
 
 import Control.Monad
@@ -130,12 +130,12 @@ recv (Connection _ sourceRef _) = do
 
       pure (Message code mempty)
 
-exchange1
+exchange
   :: (Request a, Response b)
   => Connection
   -> a
   -> IO (Either RpbErrorResp b)
-exchange1 conn req = do
+exchange conn req = do
   send conn req
   recv conn >>= parseResponse
 
