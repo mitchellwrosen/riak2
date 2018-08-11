@@ -1,6 +1,9 @@
 {-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving #-}
 
-module Riak.Internal.Message where
+module Riak.Internal.Message
+  ( Message(..)
+  , MessageCode(..)
+  ) where
 
 import Data.ByteString (ByteString)
 import Data.Word
