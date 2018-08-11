@@ -28,6 +28,7 @@ class Response a where
   default responseDecode :: Proto.Message a => ByteString -> Either String a
   responseDecode = Proto.decodeMessage
 
+instance Response DtFetchResp          where responseCode = 81
 instance Response RpbErrorResp         where responseCode =  0
 instance Response RpbGetBucketResp     where responseCode = 20
 instance Response RpbGetResp           where responseCode = 10

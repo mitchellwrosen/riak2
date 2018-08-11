@@ -11,6 +11,8 @@ module Riak
   , fetchObject
   , storeObject
   , deleteObject
+    -- ** Data type storage
+  , fetchDataType
     -- ** Bucket metadata
   , getBucketTypeProps
   , setBucketTypeProps
@@ -125,6 +127,14 @@ deleteObject
   -> RpbDelReq
   -> m (Either RpbErrorResp RpbDelResp)
 deleteObject (Handle conn) req =
+  liftIO (exchange1 conn req)
+
+fetchDataType
+  :: MonadIO m
+  => Handle
+  -> DtFetchReq
+  -> m (Either RpbErrorResp DtFetchResp)
+fetchDataType (Handle conn) req =
   liftIO (exchange1 conn req)
 
 listBuckets
