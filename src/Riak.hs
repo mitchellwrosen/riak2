@@ -32,7 +32,7 @@ module Riak
     -- * Server info
   , ping
   , getServerInfo
-    -- ** Re-exports
+    -- * Re-exports
   , def
   ) where
 
@@ -40,18 +40,24 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
 import Data.Default.Class         (def)
+import Data.HashMap.Strict        (HashMap)
+import Data.IORef
 import Lens.Family2
 import Network.Socket             (HostName, PortNumber)
 
+import qualified Data.HashMap.Strict as HashMap
+
 import Proto.Riak
-import Proto.Riak_Fields        (done, keys)
+import qualified Proto.Riak_Fields as L
 import Riak.Internal.Connection
 import Riak.Internal.Request
 import Riak.Internal.Response
 
 -- | A non-thread-safe handle to Riak.
 data Handle
-  = Handle !Connection
+  = Handle
+      !Connection
+      !(IORef (HashMap (Maybe ByteString, ByteString, ByteString) ByteString))
 
 withHandle
   :: MonadUnliftIO m
@@ -59,23 +65,47 @@ withHandle
   -> PortNumber
   -> (Handle -> m a)
   -> m a
-withHandle host port f =
-  withConnection host port (f . Handle)
+withHandle host port f = do
+  vclockCacheRef <-
+    liftIO (newIORef mempty)
+
+  withConnection host port (\conn -> f (Handle conn vclockCacheRef))
 
 fetchObject
   :: MonadIO m
   => Handle
   -> RpbGetReq
-  -> m (Either RpbErrorResp RpbGetResp)
-fetchObject (Handle conn) req =
-  liftIO (exchange conn req)
+  -> m (Either RpbErrorResp (Maybe RpbGetResp))
+fetchObject (Handle conn vclockCacheRef) req = liftIO $
+  exchange conn (req & L.deletedvclock .~ True) >>= \case
+    Left err ->
+      pure (Left err)
+
+    Right resp -> do
+      modifyIORef'
+        vclockCacheRef
+        (maybe
+          (HashMap.delete (type', bucket, key))
+          (HashMap.insert (type', bucket, key))
+          (resp ^. L.maybe'vclock))
+
+      case resp ^. L.content of
+        [] ->
+          pure (Right Nothing)
+        _ ->
+          pure (Right (Just resp))
+
+ where
+  type'  = req ^. L.maybe'type'
+  bucket = req ^. L.bucket
+  key    = req ^. L.key
 
 storeObject
   :: MonadIO m
   => Handle
   -> RpbPutReq
   -> m (Either RpbErrorResp RpbPutResp)
-storeObject (Handle conn) req =
+storeObject (Handle conn _) req =
   liftIO (exchange conn req)
 
 deleteObject
@@ -83,7 +113,7 @@ deleteObject
   => Handle
   -> RpbDelReq
   -> m (Either RpbErrorResp RpbDelResp)
-deleteObject (Handle conn) req =
+deleteObject (Handle conn _) req =
   liftIO (exchange conn req)
 
 fetchDataType
@@ -91,7 +121,7 @@ fetchDataType
   => Handle
   -> DtFetchReq
   -> m (Either RpbErrorResp DtFetchResp)
-fetchDataType (Handle conn) req =
+fetchDataType (Handle conn _) req =
   liftIO (exchange conn req)
 
 updateDataType
@@ -99,7 +129,7 @@ updateDataType
   => Handle
   -> DtUpdateReq
   -> m (Either RpbErrorResp DtUpdateResp)
-updateDataType (Handle conn) req =
+updateDataType (Handle conn _) req =
   liftIO (exchange conn req)
 
 getBucketTypeProps
@@ -107,7 +137,7 @@ getBucketTypeProps
   => Handle
   -> RpbGetBucketTypeReq
   -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketTypeProps (Handle conn) req =
+getBucketTypeProps (Handle conn _) req =
   liftIO (exchange conn req)
 
 setBucketTypeProps
@@ -115,7 +145,7 @@ setBucketTypeProps
   => Handle
   -> RpbSetBucketTypeReq
   -> m (Either RpbErrorResp ())
-setBucketTypeProps (Handle conn) req =
+setBucketTypeProps (Handle conn _) req =
   liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn req))
 
 getBucketProps
@@ -123,7 +153,7 @@ getBucketProps
   => Handle
   -> RpbGetBucketReq
   -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketProps (Handle conn) req =
+getBucketProps (Handle conn _) req =
   liftIO (exchange conn req)
 
 setBucketProps
@@ -131,7 +161,7 @@ setBucketProps
   => Handle
   -> RpbSetBucketReq
   -> m (Either RpbErrorResp ())
-setBucketProps (Handle conn) req =
+setBucketProps (Handle conn _) req =
   liftIO (emptyResponse @RpbSetBucketResp (exchange conn req))
 
 resetBucketProps
@@ -139,7 +169,7 @@ resetBucketProps
   => Handle
   -> RpbResetBucketReq
   -> m (Either RpbErrorResp ())
-resetBucketProps (Handle conn) req =
+resetBucketProps (Handle conn _) req =
   liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
 
 
@@ -148,7 +178,7 @@ listBuckets
   => Handle
   -> RpbListBucketsReq
   -> m (Either RpbErrorResp RpbListBucketsResp)
-listBuckets (Handle conn) req =
+listBuckets (Handle conn _) req =
   liftIO (exchange conn req)
 
 -- TODO streaming listKeys
@@ -158,7 +188,7 @@ listKeys
   => Handle
   -> RpbListKeysReq
   -> m (Either RpbErrorResp [ByteString])
-listKeys (Handle conn) req = liftIO $ do
+listKeys (Handle conn _) req = liftIO $ do
   send conn req
 
   let
@@ -167,9 +197,9 @@ listKeys (Handle conn) req = liftIO $ do
       resp :: RpbListKeysResp <-
         ExceptT (recv conn >>= parseResponse)
 
-      if resp ^. done
-        then pure (resp ^. keys)
-        else ((resp ^. keys) ++) <$> loop
+      if resp ^. L.done
+        then pure (resp ^. L.keys)
+        else ((resp ^. L.keys) ++) <$> loop
 
   runExceptT loop
 
@@ -179,7 +209,7 @@ mapReduce
   => Handle
   -> RpbMapRedReq
   -> m (Either RpbErrorResp [RpbMapRedResp])
-mapReduce (Handle conn) req = liftIO $ do
+mapReduce (Handle conn _) req = liftIO $ do
   send conn req
 
   let
@@ -188,7 +218,7 @@ mapReduce (Handle conn) req = liftIO $ do
       resp :: RpbMapRedResp <-
         ExceptT (recv conn >>= parseResponse)
 
-      if resp ^. done
+      if resp ^. L.done
         then pure [resp]
         else (resp :) <$> loop
 
@@ -199,7 +229,7 @@ getSchema
   => Handle
   -> RpbYokozunaSchemaGetReq
   -> m (Either RpbErrorResp RpbYokozunaSchemaGetResp)
-getSchema (Handle conn) req =
+getSchema (Handle conn _) req =
   liftIO (exchange conn req)
 
 putSchema
@@ -207,7 +237,7 @@ putSchema
   => Handle
   -> RpbYokozunaSchemaPutReq
   -> m (Either RpbErrorResp RpbEmptyPutResp)
-putSchema (Handle conn) req =
+putSchema (Handle conn _) req =
   liftIO (exchange conn req)
 
 getIndex
@@ -215,7 +245,7 @@ getIndex
   => Handle
   -> RpbYokozunaIndexGetReq
   -> m (Either RpbErrorResp RpbYokozunaIndexGetResp)
-getIndex (Handle conn) req =
+getIndex (Handle conn _) req =
   liftIO (exchange conn req)
 
 putIndex
@@ -223,7 +253,7 @@ putIndex
   => Handle
   -> RpbYokozunaIndexPutReq
   -> m (Either RpbErrorResp RpbEmptyPutResp)
-putIndex (Handle conn) req =
+putIndex (Handle conn _) req =
   liftIO (exchange conn req)
 
 deleteIndex
@@ -231,18 +261,18 @@ deleteIndex
   => Handle
   -> RpbYokozunaIndexDeleteReq
   -> m (Either RpbErrorResp RpbDelResp)
-deleteIndex (Handle conn) req =
+deleteIndex (Handle conn _) req =
   liftIO (exchange conn req)
 
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
-ping (Handle conn) =
+ping (Handle conn _) =
   liftIO (emptyResponse @RpbPingResp (exchange conn RpbPingReq))
 
 getServerInfo
   :: MonadIO m
   => Handle
   -> m (Either RpbErrorResp RpbGetServerInfoResp)
-getServerInfo (Handle conn) =
+getServerInfo (Handle conn _) =
   liftIO (exchange conn RpbGetServerInfoReq)
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
