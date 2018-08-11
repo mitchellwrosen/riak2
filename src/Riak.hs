@@ -76,7 +76,7 @@ import           Riak.Internal.Response
 data Handle
   = Handle
       !Connection
-      !(IORef (HashMap (Maybe BucketType, Bucket, Key) ByteString))
+      !(IORef (HashMap (Maybe BucketType, Bucket, Key) Vclock))
 
 newtype BucketType
   = BucketType { unBucketType :: ByteString }
@@ -97,6 +97,9 @@ newtype Key
   = Key { unKey :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
+
+newtype Vclock
+  = Vclock { unVclock :: ByteString }
 
 withHandle
   :: MonadUnliftIO m
@@ -154,7 +157,7 @@ fetchObject
         (maybe
           (HashMap.delete (type', bucket, key))
           (HashMap.insert (type', bucket, key))
-          (resp ^. L.maybe'vclock))
+          (coerce (resp ^. L.maybe'vclock)))
 
       case resp ^. L.content of
         [] ->
@@ -246,21 +249,22 @@ storeObject_
   -- Get the cached vclock of this object to pass in the put request. If we
   -- don't have it, first perform a head-fetch, which caches it. If it's still
   -- not there, then this must be the very first store.
-  vclock :: Maybe ByteString <-
+  vclock :: Maybe Vclock <-
     case key of
+      -- Riak will randomly generate a key for us. No vclock.
       Nothing ->
         pure Nothing
 
       Just key' ->
         let
-          lookupVclock :: IO (Maybe ByteString)
+          lookupVclock :: IO (Maybe Vclock)
           lookupVclock =
             HashMap.lookup (coerce type', bucket, key') <$>
               readIORef vclockCacheRef
         in
           lift lookupVclock >>= \case
             Nothing -> do
-              _ <- ExceptT (fetchObject handle bucket key' params)
+              _ <- ExceptT (fetchObject handle bucket key' params) -- cache it
               lift lookupVclock
 
             Just vclock ->
@@ -285,7 +289,7 @@ storeObject_
         , _RpbPutReq'sloppyQuorum   = sloppy_quorum
         , _RpbPutReq'timeout        = timeout
         , _RpbPutReq'type'          = coerce type'
-        , _RpbPutReq'vclock         = vclock
+        , _RpbPutReq'vclock         = coerce vclock
         , _RpbPutReq'w              = w
         }
 
