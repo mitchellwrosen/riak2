@@ -6,14 +6,15 @@ module Riak
   , withHandle
   , ping
   , getServerInfo
-  , listBuckets
-  , listKeys
+  , getBucketTypeProps
   , getBucketProps
   , setBucketProps
   , resetBucketProps
   , fetchObject
   , storeObject
   , deleteObject
+  , listBuckets
+  , listKeys
   , mapReduce
 
     -- ** Re-exports
@@ -57,35 +58,13 @@ getServerInfo
 getServerInfo (Handle conn) =
   liftIO (exchange1 conn RpbGetServerInfoReq)
 
-listBuckets
+getBucketTypeProps
   :: MonadIO m
   => Handle
-  -> RpbListBucketsReq
-  -> m (Either RpbErrorResp RpbListBucketsResp)
-listBuckets (Handle conn) req =
+  -> RpbGetBucketTypeReq
+  -> m (Either RpbErrorResp RpbGetBucketResp)
+getBucketTypeProps (Handle conn) req =
   liftIO (exchange1 conn req)
-
--- TODO streaming listKeys
--- TODO key newtype
-listKeys
-  :: MonadIO m
-  => Handle
-  -> RpbListKeysReq
-  -> m (Either RpbErrorResp [ByteString])
-listKeys (Handle conn) req = liftIO $ do
-  send conn req
-
-  let
-    loop :: ExceptT RpbErrorResp IO [ByteString]
-    loop = do
-      resp :: RpbListKeysResp <-
-        ExceptT (recv conn >>= parseResponse)
-
-      if resp ^. done
-        then pure (resp ^. keys)
-        else ((resp ^. keys) ++) <$> loop
-
-  runExceptT loop
 
 getBucketProps
   :: MonadIO m
@@ -134,6 +113,36 @@ deleteObject
   -> m (Either RpbErrorResp RpbDelResp)
 deleteObject (Handle conn) req =
   liftIO (exchange1 conn req)
+
+listBuckets
+  :: MonadIO m
+  => Handle
+  -> RpbListBucketsReq
+  -> m (Either RpbErrorResp RpbListBucketsResp)
+listBuckets (Handle conn) req =
+  liftIO (exchange1 conn req)
+
+-- TODO streaming listKeys
+-- TODO key newtype
+listKeys
+  :: MonadIO m
+  => Handle
+  -> RpbListKeysReq
+  -> m (Either RpbErrorResp [ByteString])
+listKeys (Handle conn) req = liftIO $ do
+  send conn req
+
+  let
+    loop :: ExceptT RpbErrorResp IO [ByteString]
+    loop = do
+      resp :: RpbListKeysResp <-
+        ExceptT (recv conn >>= parseResponse)
+
+      if resp ^. done
+        then pure (resp ^. keys)
+        else ((resp ^. keys) ++) <$> loop
+
+  runExceptT loop
 
 mapReduce
   :: MonadIO m
