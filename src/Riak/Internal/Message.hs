@@ -12,16 +12,3 @@ data Message
   = Message
       !Word8      -- Message code
       !ByteString -- Message payload
-
--- http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/#message-codes
-
-pattern CodeRpbErrorResp :: Word8
-pattern CodeRpbErrorResp = 0
-
-pattern CodeRpbPingReq :: Word8
-pattern CodeRpbPingReq = 1
-
-pattern CodeRpbPingResp :: Word8
-pattern CodeRpbPingResp = 2
-
--- TODO The rest of the message codes

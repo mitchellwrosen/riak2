@@ -43,3 +43,4 @@ library
     Riak.Internal.Connection
     Riak.Internal.Message
     Riak.Internal.Panic
+    Riak.Internal.Response

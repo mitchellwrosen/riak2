@@ -5,6 +5,7 @@ module Riak.Internal.Connection
   , withConnection
   , send
   , recv
+  , exchange1
   ) where
 
 import Control.Monad
@@ -28,8 +29,10 @@ import qualified Network.Socket                 as Socket hiding (recv)
 import qualified Network.Socket.ByteString      as Socket (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 
+import Proto.Riak
 import Riak.Internal.Message
 import Riak.Internal.Panic
+import Riak.Internal.Response (Response, parseResponse)
 
 -- | A non-thread-safe connection to Riak.
 data Connection
@@ -124,6 +127,11 @@ recv (Connection _ sourceRef _) = do
       writeIORef sourceRef source2
 
       pure (Message code mempty)
+
+exchange1 :: Response a => Connection -> Message -> IO (Either RpbErrorResp a)
+exchange1 conn req = do
+  send conn req
+  recv conn >>= parseResponse
 
 parsePanic
   :: Atto.Parser a
