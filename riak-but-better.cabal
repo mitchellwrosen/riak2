@@ -19,6 +19,7 @@ library
     , base
     , bytestring ^>= 0.10.8
     , data-default-class
+    , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
     , network ^>= 2.7.0
     , proto-lens ^>= 0.3.1
@@ -51,6 +52,7 @@ library
     Riak.Internal.Connection
     Riak.Internal.Message
     Riak.Internal.Panic
+    Riak.Internal.Param
     Riak.Internal.Request
     Riak.Internal.Response
 

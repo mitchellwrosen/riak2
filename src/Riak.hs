@@ -1,5 +1,6 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables,
-             TypeApplications #-}
+{-# LANGUAGE DataKinds, DerivingStrategies, GeneralizedNewtypeDeriving,
+             LambdaCase, ScopedTypeVariables, TypeApplications,
+             TypeOperators #-}
 
 module Riak
   ( -- * Riak handle
@@ -32,25 +33,40 @@ module Riak
     -- * Server info
   , ping
   , getServerInfo
+    -- * Optional parameters
+  , (:=)((:=))
+  , param
+    -- * Types
+  , Bucket(..)
+  , BucketType(..)
+  , Key(..)
     -- * Re-exports
+  , Proxy(..)
   , def
+  , (&)
   ) where
 
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
+import Data.Coerce                (coerce)
 import Data.Default.Class         (def)
+import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.IORef
+import Data.Proxy                 (Proxy(Proxy))
+import Data.Word
 import Lens.Family2
 import Network.Socket             (HostName, PortNumber)
+import Prelude                    hiding (head)
 
 import qualified Data.HashMap.Strict as HashMap
 
 import           Proto.Riak
 import qualified Proto.Riak_Fields        as L
 import           Riak.Internal.Connection
+import           Riak.Internal.Param
 import           Riak.Internal.Request
 import           Riak.Internal.Response
 
@@ -58,7 +74,22 @@ import           Riak.Internal.Response
 data Handle
   = Handle
       !Connection
-      !(IORef (HashMap (Maybe ByteString, ByteString, ByteString) ByteString))
+      !(IORef (HashMap (Maybe BucketType, Bucket, Key) ByteString))
+
+newtype BucketType
+  = BucketType { unBucketType :: ByteString }
+  deriving stock (Eq)
+  deriving newtype (Hashable)
+
+newtype Bucket
+  = Bucket { unBucket :: ByteString }
+  deriving stock (Eq)
+  deriving newtype (Hashable)
+
+newtype Key
+  = Key { unKey :: ByteString }
+  deriving stock (Eq)
+  deriving newtype (Hashable)
 
 withHandle
   :: MonadUnliftIO m
@@ -75,10 +106,34 @@ withHandle host port f = do
 fetchObject
   :: MonadIO m
   => Handle
-  -> RpbGetReq
+  -> Bucket
+  -> Key
+  -> ( "basic_quorum"  := Bool
+     , "head"          := Bool
+     , "if_modified"   := ByteString
+     , "n_val"         := Word32
+     , "notfound_ok"   := Bool
+     , "pr"            := Word32
+     , "r"             := Word32
+     , "sloppy_quorum" := Bool
+     , "timeout"       := Word32
+     , "type"          := BucketType
+     )
   -> m (Either RpbErrorResp (Maybe RpbGetResp))
-fetchObject (Handle conn vclockCacheRef) req = liftIO $
-  exchange conn (req & L.deletedvclock .~ True) >>= \case
+fetchObject
+    (Handle conn vclockCacheRef) bucket key
+    ( _ := basic_quorum
+    , _ := head
+    , _ := if_modified
+    , _ := n_val
+    , _ := notfound_ok
+    , _ := pr
+    , _ := r
+    , _ := sloppy_quorum
+    , _ := timeout
+    , _ := type'
+    ) = liftIO $
+  exchange conn request >>= \case
     Left err ->
       pure (Left err)
 
@@ -100,9 +155,24 @@ fetchObject (Handle conn vclockCacheRef) req = liftIO $
           pure (Right (Just resp))
 
  where
-  type'  = req ^. L.maybe'type'
-  bucket = req ^. L.bucket
-  key    = req ^. L.key
+  request :: RpbGetReq
+  request =
+    RpbGetReq
+      { _RpbGetReq'_unknownFields = []
+      , _RpbGetReq'basicQuorum    = basic_quorum
+      , _RpbGetReq'bucket         = unBucket bucket
+      , _RpbGetReq'deletedvclock  = Just True
+      , _RpbGetReq'head           = head
+      , _RpbGetReq'ifModified     = if_modified
+      , _RpbGetReq'key            = unKey key
+      , _RpbGetReq'nVal           = n_val
+      , _RpbGetReq'notfoundOk     = notfound_ok
+      , _RpbGetReq'pr             = pr
+      , _RpbGetReq'r              = r
+      , _RpbGetReq'sloppyQuorum   = sloppy_quorum
+      , _RpbGetReq'timeout        = timeout
+      , _RpbGetReq'type'          = coerce type'
+      }
 
 storeObject
   :: MonadIO m
@@ -123,7 +193,7 @@ storeObject_ handle@(Handle conn vclockCacheRef) req = do
   vclock :: Maybe ByteString <-
     lift lookupVclock >>= \case
       Nothing -> do
-        _ <- ExceptT (fetchObject handle getreq)
+        _ <- ExceptT (fetchObject handle (Bucket bucket) (Key key) params)
         lift lookupVclock
       Just vclock ->
         pure (Just vclock)
@@ -133,17 +203,29 @@ storeObject_ handle@(Handle conn vclockCacheRef) req = do
  where
   lookupVclock :: IO (Maybe ByteString)
   lookupVclock =
-    HashMap.lookup (type', bucket, key) <$> readIORef vclockCacheRef
+    HashMap.lookup (coerce type', Bucket bucket, Key key) <$>
+      readIORef vclockCacheRef
 
-  getreq :: RpbGetReq
-  getreq =
+  params
+    :: ( "basic_quorum"  := Bool
+       , "head"          := Bool
+       , "if_modified"   := ByteString
+       , "n_val"         := Word32
+       , "notfound_ok"   := Bool
+       , "pr"            := Word32
+       , "r"             := Word32
+       , "sloppy_quorum" := Bool
+       , "timeout"       := Word32
+       , "type"          := BucketType
+       )
+  params =
     def
-      { _RpbGetReq'bucket        = bucket
-      , _RpbGetReq'deletedvclock = Just True
-      , _RpbGetReq'head          = Just True
-      , _RpbGetReq'key           = key
-      , _RpbGetReq'type'         = type'
-      }
+      & param (Proxy @"head") True
+      & case type' of
+          Nothing ->
+            id
+          Just type'' ->
+            param (Proxy @"type") (BucketType type'')
 
   type'  = req ^. L.maybe'type'
   bucket = req ^. L.bucket

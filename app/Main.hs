@@ -1,3 +1,5 @@
+{-# LANGUAGE DataKinds, TypeApplications #-}
+
 import Control.Monad
 import Data.ByteString     (ByteString)
 import Data.Word
@@ -5,6 +7,7 @@ import Options.Applicative
 
 import qualified Data.ByteString.Base16 as Base16
 
+import Riak                   (Proxy(..), (&), (:=)(..), def, param)
 import Riak.Internal.Protobuf
 
 import qualified Riak
@@ -28,7 +31,7 @@ parser =
                   [ long "basic-quorum"
                   , help "Basic quorum"
                   ])
-          <*> strOption
+          <*> (fmap Riak.Bucket . strOption)
                 (mconcat
                   [ long "bucket"
                   , help "Bucket"
@@ -50,7 +53,7 @@ parser =
                   , help "If modified"
                   , metavar "VCLOCK"
                   ])
-          <*> strOption
+          <*> (fmap Riak.Key . strOption)
                 (mconcat
                   [ long "key"
                   , help "Key"
@@ -90,7 +93,7 @@ parser =
                   , help "Timeout"
                   , metavar "MILLISECONDS"
                   ])
-          <*> (optional . strOption)
+          <*> (optional . fmap Riak.BucketType . strOption)
                 (mconcat
                   [ long "type"
                   , help "Bucket type"
@@ -100,38 +103,35 @@ parser =
 
 doFetchObject
   :: Bool
-  -> ByteString
+  -> Riak.Bucket
   -> Bool
   -> Bool
-  -> Maybe ByteString
-  -> ByteString
+  -> Maybe ByteString -- vclock
+  -> Riak.Key
   -> Bool
   -> Maybe Word32
   -> Maybe Word32
   -> Maybe Word32
   -> Bool
   -> Maybe Word32
-  -> Maybe ByteString
+  -> Maybe Riak.BucketType
   -> IO ()
 doFetchObject
-    basicQuorum bucket deletedvclock head ifModified key noNotfoundOk nVal pr r
-    sloppyQuorum timeout type' =
+    basic_quorum bucket deletedvclock head if_modified key no_notfound_ok n_val
+    pr r sloppy_quorum timeout type' =
   Riak.withHandle "localhost" 8087 $ \h ->
     print =<<
       Riak.fetchObject h
-        RpbGetReq
-          { _RpbGetReq'_unknownFields = mempty
-          , _RpbGetReq'basicQuorum = if basicQuorum then Just True else Nothing
-          , _RpbGetReq'bucket = bucket
-          , _RpbGetReq'deletedvclock = if deletedvclock then Just True else Nothing
-          , _RpbGetReq'head = if head then Just True else Nothing
-          , _RpbGetReq'ifModified = Base16.encode <$> ifModified
-          , _RpbGetReq'key = key
-          , _RpbGetReq'notfoundOk = if noNotfoundOk then Just False else Nothing
-          , _RpbGetReq'nVal = nVal
-          , _RpbGetReq'pr = pr
-          , _RpbGetReq'r = r
-          , _RpbGetReq'sloppyQuorum = if sloppyQuorum then Just True else Nothing
-          , _RpbGetReq'timeout = timeout
-          , _RpbGetReq'type' = type'
-          }
+        bucket
+        key
+        ( Proxy := if basic_quorum then Just True else Nothing
+        , Proxy := if head then Just True else Nothing
+        , Proxy := (Base16.encode <$> if_modified)
+        , Proxy := n_val
+        , Proxy := if no_notfound_ok then Just False else Nothing
+        , Proxy := pr
+        , Proxy := r
+        , Proxy := if sloppy_quorum then Just True else Nothing
+        , Proxy := timeout
+        , Proxy := type'
+        )
