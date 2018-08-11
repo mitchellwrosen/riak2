@@ -4,15 +4,20 @@
 module Riak
   ( Handle
   , withHandle
+    -- ** Basic server info
   , ping
   , getServerInfo
-  , getBucketTypeProps
-  , getBucketProps
-  , setBucketProps
-  , resetBucketProps
+    -- ** Key/value object storage
   , fetchObject
   , storeObject
   , deleteObject
+    -- ** Bucket metadata
+  , getBucketTypeProps
+  , setBucketTypeProps
+  , getBucketProps
+  , setBucketProps
+  , resetBucketProps
+    -- ** Aggregration and search
   , listBuckets
   , listKeys
   , mapReduce
@@ -65,6 +70,14 @@ getBucketTypeProps
   -> m (Either RpbErrorResp RpbGetBucketResp)
 getBucketTypeProps (Handle conn) req =
   liftIO (exchange1 conn req)
+
+setBucketTypeProps
+  :: MonadIO m
+  => Handle
+  -> RpbSetBucketTypeReq
+  -> m (Either RpbErrorResp ())
+setBucketTypeProps (Handle conn) req =
+  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange1 conn req))
 
 getBucketProps
   :: MonadIO m

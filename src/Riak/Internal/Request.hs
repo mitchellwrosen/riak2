@@ -32,6 +32,7 @@ instance Request RpbMapRedReq        where requestCode = 23
 instance Request RpbPutReq           where requestCode = 11
 instance Request RpbResetBucketReq   where requestCode = 29
 instance Request RpbSetBucketReq     where requestCode = 21
+instance Request RpbSetBucketTypeReq where requestCode = 31
 
 requestToMessage :: forall a. Request a => a -> Message
 requestToMessage req =
