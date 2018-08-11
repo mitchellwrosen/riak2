@@ -33,6 +33,7 @@ instance Response RpbGetResp           where responseCode = 10
 instance Response RpbGetServerInfoResp where responseCode =  8
 instance Response RpbListBucketsResp   where responseCode = 16
 instance Response RpbListKeysResp      where responseCode = 18
+instance Response RpbMapRedResp        where responseCode = 24
 instance Response RpbPutResp           where responseCode = 12
 
 data RpbDelResp

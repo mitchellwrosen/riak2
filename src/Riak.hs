@@ -14,6 +14,7 @@ module Riak
   , fetchObject
   , storeObject
   , deleteObject
+  , mapReduce
 
     -- ** Re-exports
   , def
@@ -133,6 +134,26 @@ deleteObject
   -> m (Either RpbErrorResp RpbDelResp)
 deleteObject (Handle conn) req =
   liftIO (exchange1 conn req)
+
+mapReduce
+  :: MonadIO m
+  => Handle
+  -> RpbMapRedReq
+  -> m (Either RpbErrorResp [RpbMapRedResp])
+mapReduce (Handle conn) req = liftIO $ do
+  send conn req
+
+  let
+    loop :: ExceptT RpbErrorResp IO [RpbMapRedResp]
+    loop = do
+      resp :: RpbMapRedResp <-
+        ExceptT (recv conn >>= parseResponse)
+
+      if resp ^. done
+        then pure [resp]
+        else (resp :) <$> loop
+
+  runExceptT loop
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
 emptyResponse =
