@@ -5,11 +5,13 @@ module Riak
   , withHandle
   , ping
   , getServerInfo
+  , listBuckets
   ) where
 
 import Control.Monad.IO.Unlift
 import Network.Socket          (HostName, PortNumber)
 
+import qualified Data.ProtoLens.Encoding as Proto (encodeMessage)
 
 import Proto.Riak
 import Riak.Internal.Connection
@@ -43,3 +45,11 @@ getServerInfo
   -> m (Either RpbErrorResp RpbGetServerInfoResp)
 getServerInfo (Handle conn) = liftIO $
   exchange1 conn (Message 7 mempty)
+
+listBuckets
+  :: MonadIO m
+  => Handle
+  -> RpbListBucketsReq
+  -> m (Either RpbErrorResp RpbListBucketsResp)
+listBuckets (Handle conn) req = liftIO $
+  exchange1 conn (Message 15 (Proto.encodeMessage req))
