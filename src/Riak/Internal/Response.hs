@@ -1,11 +1,11 @@
-{-# LANGUAGE DefaultSignatures, DerivingStrategies, GeneralizedNewtypeDeriving,
-             OverloadedStrings, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables, TypeApplications #-}
 
 module Riak.Internal.Response
   ( Response
   , parseResponse
 
   , RpbPingResp(..)
+  , RpbSetBucketResp(..)
   ) where
 
 import Data.ByteString (ByteString)
@@ -18,7 +18,7 @@ import Riak.Internal.Message
 import Riak.Internal.Panic
 
 class Response a where
-  responseCode :: Code a
+  responseCode :: MessageCode a
 
   responseDecode :: ByteString -> Either String a
   default responseDecode :: Proto.Message a => ByteString -> Either String a
@@ -30,16 +30,19 @@ instance Response RpbListBucketsResp   where responseCode = 16
 instance Response RpbListKeysResp      where responseCode = 18
 instance Response RpbGetBucketResp     where responseCode = 20
 
-newtype Code a
-  = Code { unCode :: Word8 }
-  deriving newtype Num
-
 data RpbPingResp
   = RpbPingResp
 
 instance Response RpbPingResp where
   responseCode = 2
   responseDecode _ = pure RpbPingResp
+
+data RpbSetBucketResp
+  = RpbSetBucketResp
+
+instance Response RpbSetBucketResp where
+  responseCode = 22
+  responseDecode _ = pure RpbSetBucketResp
 
 parseResponse :: forall a. Response a => Message -> IO (Either RpbErrorResp a)
 parseResponse (Message actual bytes)
@@ -57,7 +60,7 @@ parseResponse (Message actual bytes)
  where
   expected :: Word8
   expected =
-    unCode (responseCode @a)
+    unMessageCode (responseCode @a)
 
 decodeResponse :: Response a => Word8 -> ByteString -> IO a
 decodeResponse code bytes =

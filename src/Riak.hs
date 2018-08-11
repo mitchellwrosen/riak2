@@ -1,4 +1,5 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables,
+             TypeApplications #-}
 
 module Riak
   ( Handle
@@ -8,21 +9,24 @@ module Riak
   , listBuckets
   , listKeys
   , getBucketProps
+  , setBucketProps
+
+    -- ** Re-exports
+  , def
   ) where
 
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
+import Data.Default.Class         (def)
 import Lens.Family2
 import Network.Socket             (HostName, PortNumber)
-
-import qualified Data.ProtoLens.Encoding as Proto (encodeMessage)
 
 import Proto.Riak
 import Proto.Riak_Fields        (done, keys)
 import Riak.Internal.Connection
-import Riak.Internal.Message
-import Riak.Internal.Response   (RpbPingResp, parseResponse)
+import Riak.Internal.Request
+import Riak.Internal.Response
 
 -- | A non-thread-safe handle to Riak.
 data Handle
@@ -38,27 +42,23 @@ withHandle host port f =
   withConnection host port (f . Handle)
 
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
-ping (Handle conn) = liftIO $
-  f <$> exchange1 conn (Message 1 mempty)
- where
-  f :: Either RpbErrorResp RpbPingResp -> Either RpbErrorResp ()
-  f =
-    (() <$)
+ping (Handle conn) =
+  liftIO (emptyResponse @RpbPingResp (exchange1 conn RpbPingReq))
 
 getServerInfo
   :: MonadIO m
   => Handle
   -> m (Either RpbErrorResp RpbGetServerInfoResp)
-getServerInfo (Handle conn) = liftIO $
-  exchange1 conn (Message 7 mempty)
+getServerInfo (Handle conn) =
+  liftIO (exchange1 conn RpbGetServerInfoReq)
 
 listBuckets
   :: MonadIO m
   => Handle
   -> RpbListBucketsReq
   -> m (Either RpbErrorResp RpbListBucketsResp)
-listBuckets (Handle conn) req = liftIO $
-  exchange1 conn (Message 15 (Proto.encodeMessage req))
+listBuckets (Handle conn) req =
+  liftIO (exchange1 conn req)
 
 -- TODO streaming listKeys
 -- TODO key newtype
@@ -68,7 +68,7 @@ listKeys
   -> RpbListKeysReq
   -> m (Either RpbErrorResp [ByteString])
 listKeys (Handle conn) req = liftIO $ do
-  send conn (Message 17 (Proto.encodeMessage req))
+  send conn req
 
   let
     loop :: ExceptT RpbErrorResp IO [ByteString]
@@ -87,5 +87,17 @@ getBucketProps
   => Handle
   -> RpbGetBucketReq
   -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketProps (Handle conn) req = liftIO $
-  exchange1 conn (Message 19 (Proto.encodeMessage req))
+getBucketProps (Handle conn) req =
+  liftIO (exchange1 conn req )
+
+setBucketProps
+  :: MonadIO m
+  => Handle
+  -> RpbSetBucketReq
+  -> m (Either RpbErrorResp ())
+setBucketProps (Handle conn) req =
+  liftIO (emptyResponse @RpbSetBucketResp (exchange1 conn req))
+
+emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
+emptyResponse =
+  fmap (() <$)

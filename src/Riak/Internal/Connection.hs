@@ -1,4 +1,5 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables,
+             ViewPatterns #-}
 
 module Riak.Internal.Connection
   ( Connection
@@ -32,6 +33,7 @@ import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 import Proto.Riak
 import Riak.Internal.Message
 import Riak.Internal.Panic
+import Riak.Internal.Request  (Request, requestToMessage)
 import Riak.Internal.Response (Response, parseResponse)
 
 -- | A non-thread-safe connection to Riak.
@@ -91,8 +93,8 @@ disconnect (Connection socket _ _) =
   liftIO (Socket.close socket)
 
 -- | Send a 'Message' on a 'Connection'.
-send :: Connection -> Message -> IO ()
-send (Connection _ _ sink) (Message code bytes) =
+send :: Request a => Connection -> a -> IO ()
+send (Connection _ _ sink) (requestToMessage -> Message code bytes) =
   sink payload
  where
   payload :: Lazy.ByteString
@@ -128,7 +130,11 @@ recv (Connection _ sourceRef _) = do
 
       pure (Message code mempty)
 
-exchange1 :: Response a => Connection -> Message -> IO (Either RpbErrorResp a)
+exchange1
+  :: (Request a, Response b)
+  => Connection
+  -> a
+  -> IO (Either RpbErrorResp b)
 exchange1 conn req = do
   send conn req
   recv conn >>= parseResponse

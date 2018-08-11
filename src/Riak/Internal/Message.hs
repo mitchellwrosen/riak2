@@ -1,4 +1,4 @@
-{-# LANGUAGE PatternSynonyms #-}
+{-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving #-}
 
 module Riak.Internal.Message where
 
@@ -12,3 +12,7 @@ data Message
   = Message
       !Word8      -- Message code
       !ByteString -- Message payload
+
+newtype MessageCode a
+  = MessageCode { unMessageCode :: Word8 }
+  deriving newtype Num
