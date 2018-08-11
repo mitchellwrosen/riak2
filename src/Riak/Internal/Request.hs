@@ -22,11 +22,12 @@ class Request a where
   default requestEncode :: Proto.Message a => a -> ByteString
   requestEncode = Proto.encodeMessage
 
+instance Request RpbGetBucketReq   where requestCode = 19
+instance Request RpbGetReq         where requestCode =  9
 instance Request RpbListBucketsReq where requestCode = 15
 instance Request RpbListKeysReq    where requestCode = 17
-instance Request RpbGetBucketReq   where requestCode = 19
-instance Request RpbSetBucketReq   where requestCode = 21
 instance Request RpbResetBucketReq where requestCode = 29
+instance Request RpbSetBucketReq   where requestCode = 21
 
 requestToMessage :: forall a. Request a => a -> Message
 requestToMessage req =

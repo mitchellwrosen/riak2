@@ -26,10 +26,11 @@ class Response a where
   responseDecode = Proto.decodeMessage
 
 instance Response RpbErrorResp         where responseCode = 0
+instance Response RpbGetBucketResp     where responseCode = 20
+instance Response RpbGetResp           where responseCode = 10
 instance Response RpbGetServerInfoResp where responseCode = 8
 instance Response RpbListBucketsResp   where responseCode = 16
 instance Response RpbListKeysResp      where responseCode = 18
-instance Response RpbGetBucketResp     where responseCode = 20
 
 data RpbPingResp
   = RpbPingResp
