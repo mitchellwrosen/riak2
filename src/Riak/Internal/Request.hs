@@ -35,6 +35,7 @@ instance Request RpbPutReq               where requestCode = 11
 instance Request RpbResetBucketReq       where requestCode = 29
 instance Request RpbSetBucketReq         where requestCode = 21
 instance Request RpbSetBucketTypeReq     where requestCode = 31
+instance Request RpbYokozunaIndexGetReq  where requestCode = 54
 instance Request RpbYokozunaSchemaGetReq where requestCode = 58
 instance Request RpbYokozunaSchemaPutReq where requestCode = 60
 

@@ -39,6 +39,7 @@ instance Response RpbListBucketsResp       where responseCode = 16
 instance Response RpbListKeysResp          where responseCode = 18
 instance Response RpbMapRedResp            where responseCode = 24
 instance Response RpbPutResp               where responseCode = 12
+instance Response RpbYokozunaIndexGetResp  where responseCode = 55
 instance Response RpbYokozunaSchemaGetResp where responseCode = 59
 
 data RpbDelResp
