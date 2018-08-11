@@ -37,6 +37,7 @@ module Riak
   ) where
 
 import Control.Monad.IO.Unlift
+import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
 import Data.Default.Class         (def)
@@ -47,11 +48,11 @@ import Network.Socket             (HostName, PortNumber)
 
 import qualified Data.HashMap.Strict as HashMap
 
-import Proto.Riak
-import qualified Proto.Riak_Fields as L
-import Riak.Internal.Connection
-import Riak.Internal.Request
-import Riak.Internal.Response
+import           Proto.Riak
+import qualified Proto.Riak_Fields        as L
+import           Riak.Internal.Connection
+import           Riak.Internal.Request
+import           Riak.Internal.Response
 
 -- | A non-thread-safe handle to Riak.
 data Handle
@@ -81,6 +82,9 @@ fetchObject (Handle conn vclockCacheRef) req = liftIO $
     Left err ->
       pure (Left err)
 
+    -- TODO; this logic assumes if_modified is not set. If it is, and the object
+    -- is up to date, then we will have content = [], vclock = Nothing,
+    -- unchanged = Just True.
     Right resp -> do
       modifyIORef'
         vclockCacheRef
@@ -105,8 +109,45 @@ storeObject
   => Handle
   -> RpbPutReq
   -> m (Either RpbErrorResp RpbPutResp)
-storeObject (Handle conn _) req =
-  liftIO (exchange conn req)
+storeObject handle req =
+  liftIO (runExceptT (storeObject_ handle req))
+
+storeObject_
+  :: Handle
+  -> RpbPutReq
+  -> ExceptT RpbErrorResp IO RpbPutResp
+storeObject_ handle@(Handle conn vclockCacheRef) req = do
+  -- Get the cached vclock of this object to pass in the put request. If we
+  -- don't have it, first perform a head-fetch, which caches it. If it's still
+  -- not there, then this must be the very first store.
+  vclock :: Maybe ByteString <-
+    lift lookupVclock >>= \case
+      Nothing -> do
+        _ <- ExceptT (fetchObject handle getreq)
+        lift lookupVclock
+      Just vclock ->
+        pure (Just vclock)
+
+  ExceptT (exchange conn (req & L.maybe'vclock .~ vclock))
+
+ where
+  lookupVclock :: IO (Maybe ByteString)
+  lookupVclock =
+    HashMap.lookup (type', bucket, key) <$> readIORef vclockCacheRef
+
+  getreq :: RpbGetReq
+  getreq =
+    def
+      { _RpbGetReq'bucket        = bucket
+      , _RpbGetReq'deletedvclock = Just True
+      , _RpbGetReq'head          = Just True
+      , _RpbGetReq'key           = key
+      , _RpbGetReq'type'         = type'
+      }
+
+  type'  = req ^. L.maybe'type'
+  bucket = req ^. L.bucket
+  key    = req ^. L.key
 
 deleteObject
   :: MonadIO m
