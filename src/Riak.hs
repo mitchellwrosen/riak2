@@ -199,6 +199,40 @@ fetchObject
       , _RpbGetReq'type'          = coerce (Just type')
       }
 
+fetchVclock
+  :: Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Key
+  -> ExceptT RpbErrorResp IO (Maybe Vclock)
+fetchVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
+  lift lookupVclock >>= \case
+    Nothing -> do
+      _ <- ExceptT (fetchObject handle type' bucket key' params) -- cache it
+      lift lookupVclock
+
+    Just vclock ->
+      pure (Just vclock)
+ where
+  lookupVclock :: IO (Maybe Vclock)
+  lookupVclock =
+    HashMap.lookup (coerce type', bucket, key') <$>
+      readIORef vclockCacheRef
+
+  params
+    :: ( "basic_quorum"  := Bool
+       , "head"          := Bool
+       , "if_modified"   := ByteString
+       , "n_val"         := Quorum
+       , "notfound_ok"   := Bool
+       , "pr"            := Quorum
+       , "r"             := Quorum
+       , "sloppy_quorum" := Bool
+       , "timeout"       := Word32
+       )
+  params =
+    def & param (Proxy @"head") True
+
 -- TODO storeObject: nicer input type than RpbContent
 -- TODO storeObject: better return type
 storeObject
@@ -244,7 +278,7 @@ storeObject_
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
-    handle@(Handle conn vclockCacheRef) type' bucket content
+    handle@(Handle conn _) type' bucket content
     ( _ := asis
     , _ := dw
     , _ := if_none_match
@@ -263,25 +297,10 @@ storeObject_
   -- don't have it, first perform a head-fetch, which caches it. If it's still
   -- not there, then this must be the very first store.
   vclock :: Maybe Vclock <-
-    case key of
-      -- Riak will randomly generate a key for us. No vclock.
-      Nothing ->
-        pure Nothing
-
-      Just key' ->
-        let
-          lookupVclock :: IO (Maybe Vclock)
-          lookupVclock =
-            HashMap.lookup (coerce type', bucket, key') <$>
-              readIORef vclockCacheRef
-        in
-          lift lookupVclock >>= \case
-            Nothing -> do
-              _ <- ExceptT (fetchObject handle type' bucket key' params) -- cache it
-              lift lookupVclock
-
-            Just vclock ->
-              pure (Just vclock)
+    maybe
+      (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
+      (fetchVclock handle type' bucket)
+      key
 
   let
     request :: RpbPutReq
@@ -309,20 +328,8 @@ storeObject_
   ExceptT (exchange conn request)
 
  where
-  params
-    :: ( "basic_quorum"  := Bool
-       , "head"          := Bool
-       , "if_modified"   := ByteString
-       , "n_val"         := Quorum
-       , "notfound_ok"   := Bool
-       , "pr"            := Quorum
-       , "r"             := Quorum
-       , "sloppy_quorum" := Bool
-       , "timeout"       := Word32
-       )
-  params =
-    def & param (Proxy @"head") True
 
+-- TODO deleteObject figure out when vclock is required (always?)
 deleteObject
   :: MonadIO m
   => Handle
