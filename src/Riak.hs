@@ -51,6 +51,7 @@ module Riak
   , (&)
   ) where
 
+import Control.Monad
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -86,13 +87,18 @@ data Handle
       !Connection
       !(IORef (HashMap (SomeBucketType, Bucket, Key) Vclock))
 
+-- TODO configurable vclock caching
+-- TODO strict (type, bucket, key)
 
+
+-- | A Riak bucket type, tagged with the data type it contains.
 newtype BucketType (ty :: Maybe DataType)
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
 
+-- | A Riak bucket.
 newtype Bucket
   = Bucket { unBucket :: ByteString }
   deriving stock (Eq)
@@ -108,6 +114,7 @@ data DataType
   = DataTypeCounter
   | DataTypeMap
   | DataTypeSet
+  -- TODO hll, gset
 
 
 -- | A 'DataTypeError' is thrown when a data type operation is performed on an
@@ -124,6 +131,7 @@ data DataTypeError
   deriving anyclass (Exception)
 
 
+-- | A Riak key.
 newtype Key
   = Key { unKey :: ByteString }
   deriving stock (Eq)
@@ -274,13 +282,14 @@ fetchObjectVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
 -- | Given a fetched vclock, update the cache (if present) or delete it from the
 -- cache (if missing).
 cacheVclock
-  :: Handle
+  :: MonadIO m
+  => Handle
   -> BucketType ty
   -> Bucket
   -> Key
   -> Maybe Vclock
-  -> IO ()
-cacheVclock (Handle _ vclockCacheRef) type' bucket key vclock =
+  -> m ()
+cacheVclock (Handle _ vclockCacheRef) type' bucket key vclock = liftIO $
   modifyIORef'
     vclockCacheRef
     (maybe
@@ -453,7 +462,6 @@ fetchCounter
       }
 
 
-
 fetchSet
   :: MonadIO m
   => Handle
@@ -470,19 +478,29 @@ fetchSet
      , "timeout"         := Word32
      )
   -> m (Either RpbErrorResp [ByteString])
-fetchSet handle type' bucket key params = runExceptT $ do
+fetchSet
+    handle type' bucket key
+    params@(_, _ := include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
+
   response :: DtFetchResp <-
     ExceptT (fetchDataType handle type' bucket key params)
 
   case response ^. L.type' of
-    DtFetchResp'SET ->
+    DtFetchResp'SET -> do
+      -- Cache set context, if it was requested (it defaults to true)
+      when (include_context /= Just False) $
+        let
+          vclock :: Maybe Vclock
+          vclock = coerce (response ^. L.maybe'context)
+        in
+          cacheVclock handle type' bucket key vclock
+
       pure (response ^. L.value . L.setValue)
 
     dt ->
       throwIO
         (DataTypeError
-          (SomeBucketType (unBucketType type')) bucket key dt
-          DtFetchResp'SET)
+          (SomeBucketType (unBucketType type')) bucket key dt DtFetchResp'SET)
 
 
 fetchDataType
@@ -596,6 +614,7 @@ updateCounter
       , _DtOp'mapOp          = Nothing
       , _DtOp'setOp          = Nothing
       }
+
 
 updateDataType
   :: MonadIO m
