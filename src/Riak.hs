@@ -76,7 +76,7 @@ import           Riak.Internal.Response
 data Handle
   = Handle
       !Connection
-      !(IORef (HashMap (Maybe BucketType, Bucket, Key) Vclock))
+      !(IORef (HashMap (BucketType, Bucket, Key) Vclock))
 
 newtype BucketType
   = BucketType { unBucketType :: ByteString }
@@ -117,6 +117,7 @@ withHandle host port f = do
 fetchObject
   :: MonadIO m
   => Handle
+  -> BucketType
   -> Bucket
   -> Key
   -> ( "basic_quorum"  := Bool
@@ -128,11 +129,10 @@ fetchObject
      , "r"             := Word32
      , "sloppy_quorum" := Bool
      , "timeout"       := Word32
-     , "type"          := BucketType
      )
   -> m (Either RpbErrorResp (Maybe RpbGetResp))
 fetchObject
-    (Handle conn vclockCacheRef) bucket key
+    (Handle conn vclockCacheRef) type' bucket key
     ( _ := basic_quorum
     , _ := head
     , _ := if_modified
@@ -142,7 +142,6 @@ fetchObject
     , _ := r
     , _ := sloppy_quorum
     , _ := timeout
-    , _ := type'
     ) = liftIO $
   exchange conn request >>= \case
     Left err ->
@@ -182,7 +181,7 @@ fetchObject
       , _RpbGetReq'r              = r
       , _RpbGetReq'sloppyQuorum   = sloppy_quorum
       , _RpbGetReq'timeout        = timeout
-      , _RpbGetReq'type'          = coerce type'
+      , _RpbGetReq'type'          = coerce (Just type')
       }
 
 -- TODO storeObject: nicer input type than RpbContent
@@ -190,6 +189,7 @@ fetchObject
 storeObject
   :: MonadIO m
   => Handle
+  -> BucketType
   -> Bucket
   -> RpbContent
   -> ( "asis"            := Bool
@@ -203,15 +203,15 @@ storeObject
      , "return_head"     := Bool
      , "sloppy_quorum"   := Bool
      , "timeout"         := Word32
-     , "type'"           := BucketType
      , "w"               := Word32
      )
   -> m (Either RpbErrorResp RpbPutResp)
-storeObject handle bucket content params =
-  liftIO (runExceptT (storeObject_ handle bucket content params))
+storeObject handle type' bucket content params =
+  liftIO (runExceptT (storeObject_ handle type' bucket content params))
 
 storeObject_
   :: Handle
+  -> BucketType
   -> Bucket
   -> RpbContent
   -> ( "asis"            := Bool
@@ -225,12 +225,11 @@ storeObject_
      , "return_head"     := Bool
      , "sloppy_quorum"   := Bool
      , "timeout"         := Word32
-     , "type'"           := BucketType
      , "w"               := Word32
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
-    handle@(Handle conn vclockCacheRef) bucket content
+    handle@(Handle conn vclockCacheRef) type' bucket content
     ( _ := asis
     , _ := dw
     , _ := if_none_match
@@ -242,7 +241,6 @@ storeObject_
     , _ := return_head
     , _ := sloppy_quorum
     , _ := timeout
-    , _ := type'
     , _ := w
     ) = do
 
@@ -259,12 +257,12 @@ storeObject_
         let
           lookupVclock :: IO (Maybe Vclock)
           lookupVclock =
-            HashMap.lookup (coerce type', bucket, key') <$>
+            HashMap.lookup (type', bucket, key') <$>
               readIORef vclockCacheRef
         in
           lift lookupVclock >>= \case
             Nothing -> do
-              _ <- ExceptT (fetchObject handle bucket key' params) -- cache it
+              _ <- ExceptT (fetchObject handle type' bucket key' params) -- cache it
               lift lookupVclock
 
             Just vclock ->
@@ -288,7 +286,7 @@ storeObject_
         , _RpbPutReq'returnHead     = return_head
         , _RpbPutReq'sloppyQuorum   = sloppy_quorum
         , _RpbPutReq'timeout        = timeout
-        , _RpbPutReq'type'          = coerce type'
+        , _RpbPutReq'type'          = coerce (Just type')
         , _RpbPutReq'vclock         = coerce vclock
         , _RpbPutReq'w              = w
         }
@@ -306,16 +304,9 @@ storeObject_
        , "r"             := Word32
        , "sloppy_quorum" := Bool
        , "timeout"       := Word32
-       , "type"          := BucketType
        )
   params =
-    def
-      & param (Proxy @"head") True
-      & case type' of
-          Nothing ->
-            id
-          Just type'' ->
-            param (Proxy @"type") type''
+    def & param (Proxy @"head") True
 
 deleteObject
   :: MonadIO m

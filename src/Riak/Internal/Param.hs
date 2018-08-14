@@ -40,8 +40,8 @@ instance Has k0 v0 ( k0 := v0, k1 := v1 ) where
   param p v (_, x1) = (p := Just v, x1)
 
 
-instance Has k1 v1 ( k0 := v0, k1 := v1, k2 := v2, k3 := v3, k4 := v4, k5 := v5, k6 := v6, k7 := v7, k8 := v8, k9 := v9 ) where
-  param p v (x0, _, x2, x3, x4, x5, x6, x7, x8, x9) = (x0, p := Just v, x2, x3, x4, x5, x6, x7, x8, x9)
+instance Has k1 v1 ( k0 := v0, k1 := v1, k2 := v2, k3 := v3, k4 := v4, k5 := v5, k6 := v6, k7 := v7, k8 := v8 ) where
+  param p v (x0, _, x2, x3, x4, x5, x6, x7, x8) = (x0, p := Just v, x2, x3, x4, x5, x6, x7, x8)
 
-instance Has k9 v9 ( k0 := v0, k1 := v1, k2 := v2, k3 := v3, k4 := v4, k5 := v5, k6 := v6, k7 := v7, k8 := v8, k9 := v9 ) where
-  param p v (x0, x1, x2, x3, x4, x5, x6, x7, x8, _) = (x0, x1, x2, x3, x4, x5, x6, x7, x8, p := Just v)
+instance Has k8 v8 ( k0 := v0, k1 := v1, k2 := v2, k3 := v3, k4 := v4, k5 := v5, k6 := v6, k7 := v7, k8 := v8 ) where
+  param p v (x0, x1, x2, x3, x4, x5, x6, x7, _) = (x0, x1, x2, x3, x4, x5, x6, x7, p := Just v)
