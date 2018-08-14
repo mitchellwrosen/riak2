@@ -13,6 +13,7 @@ module Riak
   , deleteObject
     -- * Data type operations
   , fetchCounter
+  , fetchSet
   , fetchDataType
   , updateCounter
   , updateDataType
@@ -401,7 +402,6 @@ fetchCounter
   -> Bucket
   -> Key
   -> ( "basic_quorum"    := Bool
-     , "include_context" := Bool
      , "n_val"           := Quorum
      , "notfound_ok"     := Bool
      , "pr"              := Quorum
@@ -410,9 +410,19 @@ fetchCounter
      , "timeout"         := Word32
      )
   -> m (Either RpbErrorResp Int64)
-fetchCounter handle type' bucket key params = runExceptT $ do
+fetchCounter
+    (Handle conn _) type' bucket key
+    ( _ := basic_quorum
+    , _ := n_val
+    , _ := notfound_ok
+    , _ := pr
+    , _ := r
+    , _ := sloppy_quorum
+    , _ := timeout
+    ) = runExceptT $ do
+
   response :: DtFetchResp <-
-    ExceptT (fetchDataType handle type' bucket key params)
+    ExceptT (liftIO (exchange conn request))
 
   case response ^. L.type' of
     DtFetchResp'COUNTER ->
@@ -423,6 +433,56 @@ fetchCounter handle type' bucket key params = runExceptT $ do
         (DataTypeError
           (SomeBucketType (unBucketType type')) bucket key dt
           DtFetchResp'COUNTER)
+
+ where
+  request :: DtFetchReq
+  request =
+    DtFetchReq
+      { _DtFetchReq'_unknownFields = []
+      , _DtFetchReq'basicQuorum    = basic_quorum
+      , _DtFetchReq'bucket         = coerce bucket
+      , _DtFetchReq'includeContext = Nothing
+      , _DtFetchReq'key            = coerce key
+      , _DtFetchReq'nVal           = n_val
+      , _DtFetchReq'notfoundOk     = notfound_ok
+      , _DtFetchReq'pr             = pr
+      , _DtFetchReq'r              = r
+      , _DtFetchReq'sloppyQuorum   = sloppy_quorum
+      , _DtFetchReq'timeout        = timeout
+      , _DtFetchReq'type'          = coerce type'
+      }
+
+
+
+fetchSet
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'DataTypeSet)
+  -> Bucket
+  -> Key
+  -> ( "basic_quorum"    := Bool
+     , "include_context" := Bool
+     , "n_val"           := Quorum
+     , "notfound_ok"     := Bool
+     , "pr"              := Quorum
+     , "r"               := Quorum
+     , "sloppy_quorum"   := Bool
+     , "timeout"         := Word32
+     )
+  -> m (Either RpbErrorResp [ByteString])
+fetchSet handle type' bucket key params = runExceptT $ do
+  response :: DtFetchResp <-
+    ExceptT (fetchDataType handle type' bucket key params)
+
+  case response ^. L.type' of
+    DtFetchResp'SET ->
+      pure (response ^. L.value . L.setValue)
+
+    dt ->
+      throwIO
+        (DataTypeError
+          (SomeBucketType (unBucketType type')) bucket key dt
+          DtFetchResp'SET)
 
 
 fetchDataType
