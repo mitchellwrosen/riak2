@@ -1,6 +1,6 @@
 {-# LANGUAGE DataKinds, DerivingStrategies, GeneralizedNewtypeDeriving,
-             InstanceSigs, LambdaCase, ScopedTypeVariables, TypeApplications,
-             TypeOperators #-}
+             InstanceSigs, KindSignatures, LambdaCase, ScopedTypeVariables,
+             TypeApplications, TypeOperators #-}
 
 module Riak
   ( -- * Riak handle
@@ -39,6 +39,7 @@ module Riak
     -- * Types
   , Bucket(..)
   , BucketType(..)
+  , DataType(..)
   , Key(..)
     -- * Re-exports
   , Proxy(..)
@@ -76,11 +77,9 @@ import           Riak.Internal.Response
 data Handle
   = Handle
       !Connection
-      !(IORef (HashMap (BucketType, Bucket, Key) Vclock))
+      !(IORef (HashMap (SomeBucketType, Bucket, Key) Vclock))
 
--- TODO Tag BucketType with phantom type that indicates what data type it
--- contains
-newtype BucketType
+newtype BucketType (ty :: Maybe DataType)
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
@@ -95,6 +94,11 @@ instance Show Bucket where
   show =
     Text.unpack . decodeUtf8 . unBucket
 
+data DataType
+  = DataTypeCounter
+  | DataTypeMap
+  | DataTypeSet
+
 newtype Key
   = Key { unKey :: ByteString }
   deriving stock (Eq)
@@ -103,6 +107,11 @@ newtype Key
 -- TODO Better Quorum type
 type Quorum
   = Word32
+
+newtype SomeBucketType
+  = SomeBucketType { unSomeBucketType :: ByteString }
+  deriving stock (Eq)
+  deriving newtype (Hashable)
 
 newtype Vclock
   = Vclock { unVclock :: ByteString }
@@ -123,7 +132,7 @@ withHandle host port f = do
 fetchObject
   :: MonadIO m
   => Handle
-  -> BucketType
+  -> BucketType 'Nothing
   -> Bucket
   -> Key
   -> ( "basic_quorum"  := Bool
@@ -160,8 +169,8 @@ fetchObject
       modifyIORef'
         vclockCacheRef
         (maybe
-          (HashMap.delete (type', bucket, key))
-          (HashMap.insert (type', bucket, key))
+          (HashMap.delete (coerce type', bucket, key))
+          (HashMap.insert (coerce type', bucket, key))
           (coerce (resp ^. L.maybe'vclock)))
 
       case resp ^. L.content of
@@ -195,7 +204,7 @@ fetchObject
 storeObject
   :: MonadIO m
   => Handle
-  -> BucketType
+  -> BucketType 'Nothing
   -> Bucket
   -> RpbContent
   -> ( "asis"            := Bool
@@ -217,7 +226,7 @@ storeObject handle type' bucket content params =
 
 storeObject_
   :: Handle
-  -> BucketType
+  -> BucketType 'Nothing
   -> Bucket
   -> RpbContent
   -> ( "asis"            := Bool
@@ -263,7 +272,7 @@ storeObject_
         let
           lookupVclock :: IO (Maybe Vclock)
           lookupVclock =
-            HashMap.lookup (type', bucket, key') <$>
+            HashMap.lookup (coerce type', bucket, key') <$>
               readIORef vclockCacheRef
         in
           lift lookupVclock >>= \case
@@ -325,7 +334,7 @@ deleteObject (Handle conn _) req =
 fetchDataType
   :: MonadIO m
   => Handle
-  -> BucketType
+  -> BucketType ('Just ty)
   -> Bucket
   -> Key
   -> ( "basic_quorum"    := Bool
