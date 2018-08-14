@@ -3,6 +3,7 @@
 import Control.Monad
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum)
+import Data.Int
 import Data.Text           (Text)
 import Data.Text.Encoding  (encodeUtf8)
 import Data.Word
@@ -35,6 +36,7 @@ parser =
     [ hsubparser fetchCounterParser
     , hsubparser fetchObjectParser
     , hsubparser storeObjectParser
+    , hsubparser updateCounterParser
     ]
 
 fetchCounterParser :: Mod CommandFields (IO ())
@@ -43,9 +45,9 @@ fetchCounterParser =
     "fetch-counter"
     (info
       (doFetchCounter
-        <$> bucketTypeArg
-        <*> bucketArg
-        <*> keyArg)
+        <$> bucketTypeArgument
+        <*> bucketArgument
+        <*> keyArgument)
         -- TODO fetch-counter optional params
       (progDesc "Fetch a counter"))
 
@@ -55,9 +57,9 @@ fetchObjectParser =
     "fetch-object"
     (info
       (doFetchObject
-        <$> bucketTypeArg
-        <*> bucketArg
-        <*> keyArg
+        <$> bucketTypeArgument
+        <*> bucketArgument
+        <*> keyArgument
         <*> switch
               (mconcat
                 [ long "basic-quorum"
@@ -121,8 +123,8 @@ storeObjectParser =
     "store-object"
     (info
       (doStoreObject
-        <$> bucketTypeArg
-        <*> bucketArg
+        <$> bucketTypeArgument
+        <*> bucketArgument
         <*> strOption
               (mconcat
                 [ long "content"
@@ -130,6 +132,23 @@ storeObjectParser =
                 ]))
         -- TODO store-object optional params
       (progDesc "Store an object"))
+
+updateCounterParser :: Mod CommandFields (IO ())
+updateCounterParser =
+  command
+    "update-counter"
+    (info
+      (doUpdateCounter
+        <$> bucketTypeArgument
+        <*> bucketArgument
+        <*> argument auto
+              (mconcat
+                [ help "Value"
+                , metavar "VALUE"
+                ])
+        <*> optional keyOption)
+        -- TODO other update-counter optional params
+      (progDesc "Fetch a counter"))
 
 --------------------------------------------------------------------------------
 -- Implementations
@@ -198,30 +217,62 @@ doStoreObject type' bucket content =
         (def & L.value .~ encodeUtf8 content)
         def
 
+doUpdateCounter
+  :: BucketType ('Just 'DataTypeCounter)
+  -> Bucket
+  -> Int64
+  -> Maybe Key
+  -> IO ()
+doUpdateCounter type' bucket incr key =
+  withHandle "localhost" 8087 $ \h ->
+    print =<<
+      updateCounter h
+        type'
+        bucket
+        incr
+        ( Proxy := Nothing
+        , Proxy := key
+        , Proxy := Nothing
+        , Proxy := Nothing
+        , Proxy := Nothing
+        , Proxy := Nothing
+        , Proxy := Nothing
+        , Proxy := Nothing
+        )
+
 --------------------------------------------------------------------------------
 -- Misc. helpers
 --------------------------------------------------------------------------------
 
-bucketArg :: Parser Bucket
-bucketArg =
+bucketArgument :: Parser Bucket
+bucketArgument =
   (fmap Bucket . strArgument)
     (mconcat
       [ help "Bucket"
       , metavar "BUCKET"
       ])
 
-bucketTypeArg :: Parser (BucketType ty)
-bucketTypeArg =
+bucketTypeArgument :: Parser (BucketType ty)
+bucketTypeArgument =
   (fmap BucketType . strArgument)
     (mconcat
       [ help "Bucket type"
       , metavar "TYPE"
       ])
 
-keyArg :: Parser Key
-keyArg =
+keyArgument :: Parser Key
+keyArgument =
   (fmap Key . strArgument)
     (mconcat
       [ help "Key"
+      , metavar "KEY"
+      ])
+
+keyOption :: Parser Key
+keyOption =
+  (fmap Key . strOption)
+    (mconcat
+      [ long "key"
+      , help "Key"
       , metavar "KEY"
       ])

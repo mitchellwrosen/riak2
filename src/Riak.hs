@@ -14,6 +14,7 @@ module Riak
     -- * Data type operations
   , fetchCounter
   , fetchDataType
+  , updateCounter
   , updateDataType
     -- * Bucket operations
   , getBucketTypeProps
@@ -470,6 +471,71 @@ fetchDataType (Handle conn _) type' bucket key
       , _DtFetchReq'type'          = coerce type'
       }
 
+
+-- TODO better updateCounter return type
+-- Facts to encode:
+--   * If key provided, riak doesn't return key
+--   * If key not provided, riak returns random key
+--   * If return_body, riak returns counter val
+--   * If not return_body, riak doesn't return counter val
+updateCounter
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'DataTypeCounter)
+  -> Bucket
+  -> Int64
+  -> ( "dw"            := Quorum
+     , "key"           := Key
+     , "n_val"         := Quorum
+     , "pw"            := Quorum
+     , "return_body"   := Bool
+     , "sloppy_quorum" := Bool
+     , "timeout"       := Word32
+     , "w"             := Quorum
+     )
+  -> m (Either RpbErrorResp DtUpdateResp)
+updateCounter
+    (Handle conn _) type' bucket incr
+    ( _ := dw
+    , _ := key
+    , _ := n_val
+    , _ := pw
+    , _ := return_body
+    , _ := sloppy_quorum
+    , _ := timeout
+    , _ := w
+    ) = do
+  liftIO (exchange conn request)
+ where
+  request :: DtUpdateReq
+  request =
+    DtUpdateReq
+      { _DtUpdateReq'_unknownFields = []
+      , _DtUpdateReq'bucket         = coerce bucket
+      , _DtUpdateReq'context        = Nothing
+      , _DtUpdateReq'dw             = dw
+      , _DtUpdateReq'includeContext = Nothing
+      , _DtUpdateReq'key            = coerce key
+      , _DtUpdateReq'nVal           = n_val
+      , _DtUpdateReq'op             = op
+      , _DtUpdateReq'pw             = pw
+      , _DtUpdateReq'returnBody     = return_body
+      , _DtUpdateReq'sloppyQuorum   = sloppy_quorum
+      , _DtUpdateReq'timeout        = timeout
+      , _DtUpdateReq'type'          = coerce type'
+      , _DtUpdateReq'w              = w
+      }
+
+  op :: DtOp
+  op =
+    DtOp
+      { _DtOp'_unknownFields = []
+      , _DtOp'counterOp      = Just (CounterOp (Just incr) [])
+      , _DtOp'gsetOp         = Nothing
+      , _DtOp'hllOp          = Nothing
+      , _DtOp'mapOp          = Nothing
+      , _DtOp'setOp          = Nothing
+      }
 
 updateDataType
   :: MonadIO m
