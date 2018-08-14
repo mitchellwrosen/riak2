@@ -1,6 +1,7 @@
-{-# LANGUAGE DataKinds, DerivingStrategies, GeneralizedNewtypeDeriving,
-             InstanceSigs, KindSignatures, LambdaCase, ScopedTypeVariables,
-             TypeApplications, TypeOperators #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies,
+             GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
+             LambdaCase, ScopedTypeVariables, TypeApplications,
+             TypeOperators #-}
 
 module Riak
   ( -- * Riak handle
@@ -11,6 +12,7 @@ module Riak
   , storeObject
   , deleteObject
     -- * Data type operations
+  , fetchCounter
   , fetchDataType
   , updateDataType
     -- * Bucket operations
@@ -55,6 +57,7 @@ import Data.Coerce                (coerce)
 import Data.Default.Class         (def)
 import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
+import Data.Int
 import Data.IORef
 import Data.Proxy                 (Proxy(Proxy))
 import Data.Text.Encoding         (decodeUtf8)
@@ -62,6 +65,7 @@ import Data.Word
 import Lens.Family2
 import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head)
+import UnliftIO.Exception         (Exception, throwIO)
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text           as Text
@@ -73,16 +77,19 @@ import           Riak.Internal.Param
 import           Riak.Internal.Request
 import           Riak.Internal.Response
 
+
 -- | A non-thread-safe handle to Riak.
 data Handle
   = Handle
       !Connection
       !(IORef (HashMap (SomeBucketType, Bucket, Key) Vclock))
 
+
 newtype BucketType (ty :: Maybe DataType)
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
+
 
 newtype Bucket
   = Bucket { unBucket :: ByteString }
@@ -94,27 +101,57 @@ instance Show Bucket where
   show =
     Text.unpack . decodeUtf8 . unBucket
 
+
 data DataType
   = DataTypeCounter
   | DataTypeMap
   | DataTypeSet
+
+
+-- | A 'DataTypeError' is thrown when a data type operation is performed on an
+-- incompatible bucket type (for example, attempting to fetch a counter from a
+-- bucket type that contains sets).
+data DataTypeError
+  = DataTypeError
+      !SomeBucketType       -- Bucket type
+      !Bucket               -- Bucket
+      !Key                  -- Key
+      !DtFetchResp'DataType -- Actual data type
+      !DtFetchResp'DataType -- Expected data type
+  deriving stock (Show)
+  deriving anyclass (Exception)
+
 
 newtype Key
   = Key { unKey :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
+instance Show Key where
+  show :: Key -> String
+  show =
+    Text.unpack . decodeUtf8 . unKey
+
+
 -- TODO Better Quorum type
 type Quorum
   = Word32
+
 
 newtype SomeBucketType
   = SomeBucketType { unSomeBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
+instance Show SomeBucketType where
+  show :: SomeBucketType -> String
+  show =
+    Text.unpack . decodeUtf8 . unSomeBucketType
+
+
 newtype Vclock
   = Vclock { unVclock :: ByteString }
+
 
 withHandle
   :: MonadUnliftIO m
@@ -128,6 +165,7 @@ withHandle host port f = do
 
   withConnection host port (\conn -> f (Handle conn vclockCacheRef))
 
+
 -- TODO fetchObject: better return type
 fetchObject
   :: MonadIO m
@@ -137,7 +175,7 @@ fetchObject
   -> Key
   -> ( "basic_quorum"  := Bool
      , "head"          := Bool
-     , "if_modified"   := ByteString
+     , "if_modified"   := ByteString -- TODO use cached vclock for if_modified
      , "n_val"         := Quorum
      , "notfound_ok"   := Bool
      , "pr"            := Quorum
@@ -147,7 +185,7 @@ fetchObject
      )
   -> m (Either RpbErrorResp (Maybe RpbGetResp))
 fetchObject
-    (Handle conn vclockCacheRef) type' bucket key
+    handle@(Handle conn _) type' bucket key
     ( _ := basic_quorum
     , _ := head
     , _ := if_modified
@@ -166,12 +204,7 @@ fetchObject
     -- is up to date, then we will have content = [], vclock = Nothing,
     -- unchanged = Just True.
     Right resp -> do
-      modifyIORef'
-        vclockCacheRef
-        (maybe
-          (HashMap.delete (coerce type', bucket, key))
-          (HashMap.insert (coerce type', bucket, key))
-          (coerce (resp ^. L.maybe'vclock)))
+      cacheVclock handle type' bucket key (coerce (resp ^. L.maybe'vclock))
 
       case resp ^. L.content of
         [] ->
@@ -199,13 +232,14 @@ fetchObject
       , _RpbGetReq'type'          = coerce (Just type')
       }
 
-fetchVclock
+
+fetchObjectVclock
   :: Handle
   -> BucketType 'Nothing
   -> Bucket
   -> Key
   -> ExceptT RpbErrorResp IO (Maybe Vclock)
-fetchVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
+fetchObjectVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
   lift lookupVclock >>= \case
     Nothing -> do
       _ <- ExceptT (fetchObject handle type' bucket key' params) -- cache it
@@ -213,6 +247,7 @@ fetchVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
 
     Just vclock ->
       pure (Just vclock)
+
  where
   lookupVclock :: IO (Maybe Vclock)
   lookupVclock =
@@ -232,6 +267,25 @@ fetchVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
        )
   params =
     def & param (Proxy @"head") True
+
+
+-- | Given a fetched vclock, update the cache (if present) or delete it from the
+-- cache (if missing).
+cacheVclock
+  :: Handle
+  -> BucketType ty
+  -> Bucket
+  -> Key
+  -> Maybe Vclock
+  -> IO ()
+cacheVclock (Handle _ vclockCacheRef) type' bucket key vclock =
+  modifyIORef'
+    vclockCacheRef
+    (maybe
+      (HashMap.delete (coerce type', bucket, key))
+      (HashMap.insert (coerce type', bucket, key))
+      vclock)
+
 
 -- TODO storeObject: nicer input type than RpbContent
 -- TODO storeObject: better return type
@@ -257,6 +311,7 @@ storeObject
   -> m (Either RpbErrorResp RpbPutResp)
 storeObject handle type' bucket content params =
   liftIO (runExceptT (storeObject_ handle type' bucket content params))
+
 
 storeObject_
   :: Handle
@@ -299,7 +354,7 @@ storeObject_
   vclock :: Maybe Vclock <-
     maybe
       (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (fetchVclock handle type' bucket)
+      (fetchObjectVclock handle type' bucket)
       key
 
   let
@@ -327,7 +382,6 @@ storeObject_
 
   ExceptT (exchange conn request)
 
- where
 
 -- TODO deleteObject figure out when vclock is required (always?)
 deleteObject
@@ -337,6 +391,38 @@ deleteObject
   -> m (Either RpbErrorResp RpbDelResp)
 deleteObject (Handle conn _) req =
   liftIO (exchange conn req)
+
+
+fetchCounter
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'DataTypeCounter)
+  -> Bucket
+  -> Key
+  -> ( "basic_quorum"    := Bool
+     , "include_context" := Bool
+     , "n_val"           := Quorum
+     , "notfound_ok"     := Bool
+     , "pr"              := Quorum
+     , "r"               := Quorum
+     , "sloppy_quorum"   := Bool
+     , "timeout"         := Word32
+     )
+  -> m (Either RpbErrorResp Int64)
+fetchCounter handle type' bucket key params = runExceptT $ do
+  response :: DtFetchResp <-
+    ExceptT (fetchDataType handle type' bucket key params)
+
+  case response ^. L.type' of
+    DtFetchResp'COUNTER ->
+      pure (response ^. L.value . L.counterValue)
+
+    dt ->
+      throwIO
+        (DataTypeError
+          (SomeBucketType (unBucketType type')) bucket key dt
+          DtFetchResp'COUNTER)
+
 
 fetchDataType
   :: MonadIO m
@@ -364,6 +450,7 @@ fetchDataType (Handle conn _) type' bucket key
     , _ := sloppy_quorum
     , _ := timeout
     ) =
+
   liftIO (exchange conn request)
  where
   request :: DtFetchReq
@@ -383,6 +470,7 @@ fetchDataType (Handle conn _) type' bucket key
       , _DtFetchReq'type'          = coerce type'
       }
 
+
 updateDataType
   :: MonadIO m
   => Handle
@@ -390,6 +478,7 @@ updateDataType
   -> m (Either RpbErrorResp DtUpdateResp)
 updateDataType (Handle conn _) req =
   liftIO (exchange conn req)
+
 
 getBucketTypeProps
   :: MonadIO m
@@ -399,6 +488,7 @@ getBucketTypeProps
 getBucketTypeProps (Handle conn _) req =
   liftIO (exchange conn req)
 
+
 setBucketTypeProps
   :: MonadIO m
   => Handle
@@ -406,6 +496,7 @@ setBucketTypeProps
   -> m (Either RpbErrorResp ())
 setBucketTypeProps (Handle conn _) req =
   liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn req))
+
 
 getBucketProps
   :: MonadIO m
@@ -415,6 +506,7 @@ getBucketProps
 getBucketProps (Handle conn _) req =
   liftIO (exchange conn req)
 
+
 setBucketProps
   :: MonadIO m
   => Handle
@@ -422,6 +514,7 @@ setBucketProps
   -> m (Either RpbErrorResp ())
 setBucketProps (Handle conn _) req =
   liftIO (emptyResponse @RpbSetBucketResp (exchange conn req))
+
 
 resetBucketProps
   :: MonadIO m
@@ -439,6 +532,7 @@ listBuckets
   -> m (Either RpbErrorResp RpbListBucketsResp)
 listBuckets (Handle conn _) req =
   liftIO (exchange conn req)
+
 
 -- TODO streaming listKeys
 -- TODO key newtype
@@ -483,6 +577,7 @@ mapReduce (Handle conn _) req = liftIO $ do
 
   runExceptT loop
 
+
 getSchema
   :: MonadIO m
   => Handle
@@ -490,6 +585,7 @@ getSchema
   -> m (Either RpbErrorResp RpbYokozunaSchemaGetResp)
 getSchema (Handle conn _) req =
   liftIO (exchange conn req)
+
 
 putSchema
   :: MonadIO m
@@ -499,6 +595,7 @@ putSchema
 putSchema (Handle conn _) req =
   liftIO (exchange conn req)
 
+
 getIndex
   :: MonadIO m
   => Handle
@@ -506,6 +603,7 @@ getIndex
   -> m (Either RpbErrorResp RpbYokozunaIndexGetResp)
 getIndex (Handle conn _) req =
   liftIO (exchange conn req)
+
 
 putIndex
   :: MonadIO m
@@ -515,6 +613,7 @@ putIndex
 putIndex (Handle conn _) req =
   liftIO (exchange conn req)
 
+
 deleteIndex
   :: MonadIO m
   => Handle
@@ -523,9 +622,11 @@ deleteIndex
 deleteIndex (Handle conn _) req =
   liftIO (exchange conn req)
 
+
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
 ping (Handle conn _) =
   liftIO (emptyResponse @RpbPingResp (exchange conn RpbPingReq))
+
 
 getServerInfo
   :: MonadIO m
@@ -533,6 +634,7 @@ getServerInfo
   -> m (Either RpbErrorResp RpbGetServerInfoResp)
 getServerInfo (Handle conn _) =
   liftIO (exchange conn RpbGetServerInfoReq)
+
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
 emptyResponse =
