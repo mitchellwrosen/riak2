@@ -78,6 +78,8 @@ data Handle
       !Connection
       !(IORef (HashMap (BucketType, Bucket, Key) Vclock))
 
+-- TODO Tag BucketType with phantom type that indicates what data type it
+-- contains
 newtype BucketType
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
@@ -97,6 +99,10 @@ newtype Key
   = Key { unKey :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
+
+-- TODO Better Quorum type
+type Quorum
+  = Word32
 
 newtype Vclock
   = Vclock { unVclock :: ByteString }
@@ -123,10 +129,10 @@ fetchObject
   -> ( "basic_quorum"  := Bool
      , "head"          := Bool
      , "if_modified"   := ByteString
-     , "n_val"         := Word32
+     , "n_val"         := Quorum
      , "notfound_ok"   := Bool
-     , "pr"            := Word32
-     , "r"             := Word32
+     , "pr"            := Quorum
+     , "r"             := Quorum
      , "sloppy_quorum" := Bool
      , "timeout"       := Word32
      )
@@ -193,17 +199,17 @@ storeObject
   -> Bucket
   -> RpbContent
   -> ( "asis"            := Bool
-     , "dw"              := Word32
+     , "dw"              := Quorum
      , "if_none_match"   := Bool
      , "if_not_modified" := Bool
      , "key"             := Key
-     , "n_val"           := Word32
-     , "pw"              := Word32
+     , "n_val"           := Quorum
+     , "pw"              := Quorum
      , "return_body"     := Bool
      , "return_head"     := Bool
      , "sloppy_quorum"   := Bool
      , "timeout"         := Word32
-     , "w"               := Word32
+     , "w"               := Quorum
      )
   -> m (Either RpbErrorResp RpbPutResp)
 storeObject handle type' bucket content params =
@@ -215,17 +221,17 @@ storeObject_
   -> Bucket
   -> RpbContent
   -> ( "asis"            := Bool
-     , "dw"              := Word32
+     , "dw"              := Quorum
      , "if_none_match"   := Bool
      , "if_not_modified" := Bool
      , "key"             := Key
-     , "n_val"           := Word32
-     , "pw"              := Word32
+     , "n_val"           := Quorum
+     , "pw"              := Quorum
      , "return_body"     := Bool
      , "return_head"     := Bool
      , "sloppy_quorum"   := Bool
      , "timeout"         := Word32
-     , "w"               := Word32
+     , "w"               := Quorum
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
@@ -298,10 +304,10 @@ storeObject_
     :: ( "basic_quorum"  := Bool
        , "head"          := Bool
        , "if_modified"   := ByteString
-       , "n_val"         := Word32
+       , "n_val"         := Quorum
        , "notfound_ok"   := Bool
-       , "pr"            := Word32
-       , "r"             := Word32
+       , "pr"            := Quorum
+       , "r"             := Quorum
        , "sloppy_quorum" := Bool
        , "timeout"       := Word32
        )
@@ -319,10 +325,47 @@ deleteObject (Handle conn _) req =
 fetchDataType
   :: MonadIO m
   => Handle
-  -> DtFetchReq
+  -> BucketType
+  -> Bucket
+  -> Key
+  -> ( "basic_quorum"    := Bool
+     , "include_context" := Bool
+     , "n_val"           := Quorum
+     , "notfound_ok"     := Bool
+     , "pr"              := Quorum
+     , "r"               := Quorum
+     , "sloppy_quorum"   := Bool
+     , "timeout"         := Word32
+     )
   -> m (Either RpbErrorResp DtFetchResp)
-fetchDataType (Handle conn _) req =
-  liftIO (exchange conn req)
+fetchDataType (Handle conn _) type' bucket key
+    ( _ := basic_quorum
+    , _ := include_context
+    , _ := n_val
+    , _ := notfound_ok
+    , _ := pr
+    , _ := r
+    , _ := sloppy_quorum
+    , _ := timeout
+    ) =
+  liftIO (exchange conn request)
+ where
+  request :: DtFetchReq
+  request =
+    DtFetchReq
+      { _DtFetchReq'_unknownFields = []
+      , _DtFetchReq'basicQuorum    = basic_quorum
+      , _DtFetchReq'bucket         = coerce bucket
+      , _DtFetchReq'includeContext = include_context
+      , _DtFetchReq'key            = coerce key
+      , _DtFetchReq'nVal           = n_val
+      , _DtFetchReq'notfoundOk     = notfound_ok
+      , _DtFetchReq'pr             = pr
+      , _DtFetchReq'r              = r
+      , _DtFetchReq'sloppyQuorum   = sloppy_quorum
+      , _DtFetchReq'timeout        = timeout
+      , _DtFetchReq'type'          = coerce type'
+      }
 
 updateDataType
   :: MonadIO m
