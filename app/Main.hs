@@ -220,10 +220,11 @@ doFetchObject
           let tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
           let tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
-          tagbs "value" $
-            case content ^. L.contentType of
-              Just "text/plain" -> content ^. L.value
-              _ -> Base64.encode (content ^. L.value)
+          unless head $
+            tagbs "value" $
+              case content ^. L.contentType of
+                Just "text/plain" -> content ^. L.value
+                _ -> Base64.encode (content ^. L.value)
 
           for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
           for_ (content ^. L.charset)         (tagbs "charset")

@@ -294,7 +294,7 @@ fetchObject
   -> Key
   -> ( "basic_quorum"  := Bool
      , "head"          := Bool
-     , "if_modified"   := ByteString -- TODO use cached vclock for if_modified
+     , "if_modified"   := Bool
      , "n_val"         := Quorum
      , "notfound_ok"   := Bool
      , "pr"            := Quorum
@@ -304,7 +304,7 @@ fetchObject
      )
   -> m (Either RpbErrorResp (Maybe FetchObjectResp))
 fetchObject
-    handle@(Handle conn _) type' bucket key
+    handle@(Handle conn cache) type' bucket key
     ( _ := basic_quorum
     , _ := head
     , _ := if_modified
@@ -315,6 +315,31 @@ fetchObject
     , _ := sloppy_quorum
     , _ := timeout
     ) = liftIO . runExceptT $ do
+
+  vclock :: Maybe Vclock <-
+    if if_modified == Just True
+      then lift (vclockCacheLookup cache type' bucket key)
+      else pure Nothing
+
+  let
+    request :: RpbGetReq
+    request =
+      RpbGetReq
+        { _RpbGetReq'_unknownFields = []
+        , _RpbGetReq'basicQuorum    = basic_quorum
+        , _RpbGetReq'bucket         = coerce bucket
+        , _RpbGetReq'deletedvclock  = Just True
+        , _RpbGetReq'head           = head
+        , _RpbGetReq'ifModified     = coerce vclock
+        , _RpbGetReq'key            = coerce key
+        , _RpbGetReq'nVal           = n_val
+        , _RpbGetReq'notfoundOk     = notfound_ok
+        , _RpbGetReq'pr             = pr
+        , _RpbGetReq'r              = r
+        , _RpbGetReq'sloppyQuorum   = sloppy_quorum
+        , _RpbGetReq'timeout        = timeout
+        , _RpbGetReq'type'          = coerce (Just type')
+        }
 
   response :: RpbGetResp <-
     ExceptT (Internal.fetchObject conn request)
@@ -331,25 +356,6 @@ fetchObject
       pure (Just (mkResponse response))
 
  where
-  request :: RpbGetReq
-  request =
-    RpbGetReq
-      { _RpbGetReq'_unknownFields = []
-      , _RpbGetReq'basicQuorum    = basic_quorum
-      , _RpbGetReq'bucket         = coerce bucket
-      , _RpbGetReq'deletedvclock  = Just True
-      , _RpbGetReq'head           = head
-      , _RpbGetReq'ifModified     = if_modified
-      , _RpbGetReq'key            = coerce key
-      , _RpbGetReq'nVal           = n_val
-      , _RpbGetReq'notfoundOk     = notfound_ok
-      , _RpbGetReq'pr             = pr
-      , _RpbGetReq'r              = r
-      , _RpbGetReq'sloppyQuorum   = sloppy_quorum
-      , _RpbGetReq'timeout        = timeout
-      , _RpbGetReq'type'          = coerce (Just type')
-      }
-
   mkResponse :: RpbGetResp -> FetchObjectResp
   mkResponse (RpbGetResp content vclock unchanged _) =
     FetchObjectResp (map mkContent content) (coerce vclock) unchanged
