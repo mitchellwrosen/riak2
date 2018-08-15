@@ -9,13 +9,14 @@ import Data.Text.Encoding  (encodeUtf8)
 import Data.Word
 import Lens.Family2
 import Options.Applicative
+import Prelude             hiding (head)
 
 import qualified Data.ByteString.Base16 as Base16
 
 import Riak
 import Riak.Internal.Protobuf ()
 
-import qualified Riak.Internal.Protobuf as L (value)
+import qualified Riak.Internal.Protobuf as L
 
 -- TODO riak-cli take host/port as arguments
 
@@ -64,11 +65,6 @@ fetchObjectParser =
               (mconcat
                 [ long "basic-quorum"
                 , help "Basic quorum"
-                ])
-        <*> switch
-              (mconcat
-                [ long "deleted-vclock"
-                , help "Deleted vclock"
                 ])
         <*> switch
               (mconcat
@@ -125,11 +121,12 @@ storeObjectParser =
       (doStoreObject
         <$> bucketTypeArgument
         <*> bucketArgument
-        <*> strOption
+        <*> strArgument
               (mconcat
-                [ long "content"
-                , help "Content"
-                ]))
+                [ help "Content"
+                , metavar "CONTENT"
+                ])
+        <*> optional keyOption)
         -- TODO store-object optional params
       (progDesc "Store an object"))
 
@@ -174,7 +171,6 @@ doFetchObject
   -> Key
   -> Bool
   -> Bool
-  -> Bool
   -> Maybe ByteString -- vclock
   -> Bool
   -> Maybe Word32
@@ -184,8 +180,8 @@ doFetchObject
   -> Maybe Word32
   -> IO ()
 doFetchObject
-    type' bucket key basic_quorum deletedvclock head if_modified no_notfound_ok
-    n_val pr r sloppy_quorum timeout =
+    type' bucket key basic_quorum head if_modified no_notfound_ok n_val pr r
+    sloppy_quorum timeout =
   withHandle "localhost" 8087 $ \h ->
     print =<<
       fetchObject h
@@ -207,15 +203,16 @@ doStoreObject
   :: BucketType 'Nothing
   -> Bucket
   -> Text
+  -> Maybe Key
   -> IO ()
-doStoreObject type' bucket content =
+doStoreObject type' bucket content key =
   withHandle "localhost" 8087 $ \h ->
     print =<<
       storeObject h
         type'
         bucket
         (def & L.value .~ encodeUtf8 content)
-        def
+        (def & maybe id (param (Proxy @"key")) key)
 
 doUpdateCounter
   :: BucketType ('Just 'DataTypeCounter)

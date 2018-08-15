@@ -57,7 +57,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
-import Data.Default.Class         (def)
+-- import Data.Default.Class         (def)
 import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
