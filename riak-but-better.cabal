@@ -34,6 +34,7 @@ library
     Haskell2010
   exposed-modules:
     Riak
+    Riak.Internal
     Riak.Internal.Protobuf
     -- Temporarily exposed just to see them. These should be other-modules
     -- eventually
