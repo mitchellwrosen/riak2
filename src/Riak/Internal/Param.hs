@@ -24,6 +24,7 @@ class Default a where
   def :: a
 
 instance (Default a, Default b, Default c, Default d, Default e, Default f, Default g) => Default (a, b, c, d, e, f, g) where def = (def, def, def, def, def, def, def)
+instance (Default a, Default b, Default c, Default d, Default e, Default f, Default g, Default h) => Default (a, b, c, d, e, f, g, h) where def = (def, def, def, def, def, def, def, def)
 instance (Default a, Default b, Default c, Default d, Default e, Default f, Default g, Default h, Default i) => Default (a, b, c, d, e, f, g, h, i) where def = (def, def, def, def, def, def, def, def, def)
 instance (Default a, Default b, Default c, Default d, Default e, Default f, Default g, Default h, Default i, Default j, Default k, Default l) => Default (a, b, c, d, e, f, g, h, i, j, k, l) where def = (def, def, def, def, def, def, def, def, def, def, def, def)
 

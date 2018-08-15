@@ -298,7 +298,7 @@ fetchObject
      , "head"          := ()
      , "if_modified"   := ()
      , "n_val"         := Quorum
-     , "notfound_ok"   := ()
+     , "notfound_ok"   := Bool
      , "pr"            := Quorum
      , "r"             := Quorum
      , "sloppy_quorum" := ()
@@ -335,7 +335,7 @@ fetchObject
         , _RpbGetReq'ifModified     = coerce vclock
         , _RpbGetReq'key            = coerce key
         , _RpbGetReq'nVal           = n_val
-        , _RpbGetReq'notfoundOk     = True <$ notfound_ok
+        , _RpbGetReq'notfoundOk     = notfound_ok
         , _RpbGetReq'pr             = pr
         , _RpbGetReq'r              = r
         , _RpbGetReq'sloppyQuorum   = True <$ sloppy_quorum
@@ -387,9 +387,9 @@ storeObject
   => Handle
   -> BucketType 'Nothing
   -> Bucket
+  -> Maybe Key
   -> RpbContent
   -> ( "dw"              := Quorum
-     , "key"             := Key
      , "n_val"           := Quorum
      , "pw"              := Quorum
      , "return_body"     := ()
@@ -399,17 +399,17 @@ storeObject
      , "w"               := Quorum
      )
   -> m (Either RpbErrorResp RpbPutResp)
-storeObject handle type' bucket content params =
-  liftIO (runExceptT (storeObject_ handle type' bucket content params))
+storeObject handle type' bucket key content params =
+  liftIO (runExceptT (storeObject_ handle type' bucket key content params))
 
 
 storeObject_
   :: Handle
   -> BucketType 'Nothing
   -> Bucket
+  -> Maybe Key
   -> RpbContent
   -> ( "dw"              := Quorum
-     , "key"             := Key
      , "n_val"           := Quorum
      , "pw"              := Quorum
      , "return_body"     := ()
@@ -420,9 +420,8 @@ storeObject_
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
-    (Handle conn cache) type' bucket content
+    (Handle conn cache) type' bucket key content
     ( _ := dw
-    , _ := key
     , _ := n_val
     , _ := pw
     , _ := return_body
@@ -483,7 +482,7 @@ fetchCounter
   -> Key
   -> ( "basic_quorum"    := ()
      , "n_val"           := Quorum
-     , "notfound_ok"     := ()
+     , "notfound_ok"     := Bool
      , "pr"              := Quorum
      , "r"               := Quorum
      , "sloppy_quorum"   := ()
@@ -524,7 +523,7 @@ fetchCounter
       , _DtFetchReq'includeContext = Nothing
       , _DtFetchReq'key            = coerce key
       , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = True <$ notfound_ok
+      , _DtFetchReq'notfoundOk     = notfound_ok
       , _DtFetchReq'pr             = pr
       , _DtFetchReq'r              = r
       , _DtFetchReq'sloppyQuorum   = True <$ sloppy_quorum
@@ -542,7 +541,7 @@ fetchSet
   -> ( "basic_quorum"    := ()
      , "include_context" := Bool -- TODO rename to not_include_context?
      , "n_val"           := Quorum
-     , "notfound_ok"     := ()
+     , "notfound_ok"     := Bool -- TODO invert?
      , "pr"              := Quorum
      , "r"               := Quorum
      , "sloppy_quorum"   := ()
@@ -583,7 +582,7 @@ fetchDataType
   -> ( "basic_quorum"    := ()
      , "include_context" := Bool
      , "n_val"           := Quorum
-     , "notfound_ok"     := ()
+     , "notfound_ok"     := Bool
      , "pr"              := Quorum
      , "r"               := Quorum
      , "sloppy_quorum"   := ()
@@ -612,7 +611,7 @@ fetchDataType (Handle conn _) type' bucket key
       , _DtFetchReq'includeContext = include_context
       , _DtFetchReq'key            = coerce key
       , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = True <$ notfound_ok
+      , _DtFetchReq'notfoundOk     = notfound_ok
       , _DtFetchReq'pr             = pr
       , _DtFetchReq'r              = r
       , _DtFetchReq'sloppyQuorum   = True <$ sloppy_quorum
@@ -632,9 +631,9 @@ updateCounter
   => Handle
   -> BucketType ('Just 'DataTypeCounter)
   -> Bucket
+  -> Maybe Key
   -> Int64
   -> ( "dw"            := Quorum
-     , "key"           := Key
      , "n_val"         := Quorum
      , "pw"            := Quorum
      , "return_body"   := ()
@@ -644,9 +643,8 @@ updateCounter
      )
   -> m (Either RpbErrorResp DtUpdateResp)
 updateCounter
-    (Handle conn _) type' bucket incr
+    (Handle conn _) type' bucket key incr
     ( _ := dw
-    , _ := key
     , _ := n_val
     , _ := pw
     , _ := return_body

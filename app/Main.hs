@@ -2,7 +2,6 @@
              TypeApplications #-}
 
 import Control.Monad
-import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
 import Data.Int
 import Data.Proxy
@@ -36,11 +35,30 @@ main =
 
 parser :: Parser (IO ())
 parser =
-  asum
-    [ hsubparser fetchCounterParser
-    , hsubparser fetchObjectParser
-    , hsubparser storeObjectParser
-    , hsubparser updateCounterParser
+  (asum . map (hsubparser . mconcat))
+    [ [ commandGroup "Key/value object operations"
+      , fetchObjectParser
+      , storeObjectParser
+      ]
+    , [ commandGroup "Data type operations"
+      , fetchCounterParser
+      , updateCounterParser
+      ]
+    , [ commandGroup "Bucket operations"
+      , command "TODO" (info empty mempty)
+      ]
+    , [ commandGroup "MapReduce"
+      , command "TODO" (info empty mempty)
+      ]
+    , [ commandGroup "Secondary indexes (2i)"
+      , command "TODO" (info empty mempty)
+      ]
+    , [ commandGroup "Search 2.0"
+      , command "TODO" (info empty mempty)
+      ]
+    , [ commandGroup "Server info"
+      , command "TODO" (info empty mempty)
+      ]
     ]
 
 fetchCounterParser :: Mod CommandFields (IO ())
@@ -73,12 +91,6 @@ fetchObjectParser =
               (mconcat
                 [ long "head"
                 , help "Head"
-                ])
-        <*> (optional . strOption)
-              (mconcat
-                [ long "if-modified"
-                , help "If modified"
-                , metavar "VCLOCK"
                 ])
         <*> switch
               (mconcat
@@ -148,7 +160,7 @@ updateCounterParser =
                 ])
         <*> optional keyOption)
         -- TODO other update-counter optional params
-      (progDesc "Fetch a counter"))
+      (progDesc "Update a counter"))
 
 --------------------------------------------------------------------------------
 -- Implementations
@@ -175,7 +187,6 @@ doFetchObject
   -> Key
   -> Bool
   -> Bool
-  -> Maybe ByteString -- vclock
   -> Bool
   -> Maybe Word32
   -> Maybe Word32
@@ -184,8 +195,8 @@ doFetchObject
   -> Maybe Word32
   -> IO ()
 doFetchObject
-    type' bucket key basic_quorum head if_modified no_notfound_ok n_val pr r
-    sloppy_quorum timeout = do
+    type' bucket key basic_quorum head no_notfound_ok n_val pr r sloppy_quorum
+    timeout = do
   cache <- refVclockCache
   withHandle "localhost" 8087 cache $ \h -> do
     eresponse :: Either L.RpbErrorResp (Maybe FetchObjectResp) <-
@@ -193,14 +204,14 @@ doFetchObject
         type'
         bucket
         key
-        ( Proxy := if basic_quorum then Just True else Nothing
-        , Proxy := if head then Just True else Nothing
-        , Proxy := (Base64.decodeLenient <$> if_modified)
+        ( Proxy := guard basic_quorum
+        , Proxy := guard head
+        , Proxy := Nothing
         , Proxy := n_val
         , Proxy := if no_notfound_ok then Just False else Nothing
         , Proxy := pr
         , Proxy := r
-        , Proxy := if sloppy_quorum then Just True else Nothing
+        , Proxy := guard sloppy_quorum
         , Proxy := timeout
         )
 
@@ -224,7 +235,7 @@ doFetchObject
             tagbs "value" $
               case content ^. L.contentType of
                 Just "text/plain" -> content ^. L.value
-                _ -> Base64.encode (content ^. L.value)
+                _                 -> Base64.encode (content ^. L.value)
 
           for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
           for_ (content ^. L.charset)         (tagbs "charset")
@@ -250,9 +261,10 @@ doStoreObject type' bucket content key = do
       storeObject h
         type'
         bucket
+        key
         (def & L.value .~ encodeUtf8 content
              & L.contentType .~ "text/plain")
-        (def & maybe id (param (Proxy @"key")) key)
+        def
 
 doUpdateCounter
   :: BucketType ('Just 'DataTypeCounter)
@@ -267,16 +279,9 @@ doUpdateCounter type' bucket incr key = do
       updateCounter h
         type'
         bucket
+        key
         incr
-        ( Proxy := Nothing
-        , Proxy := key
-        , Proxy := Nothing
-        , Proxy := Nothing
-        , Proxy := Nothing
-        , Proxy := Nothing
-        , Proxy := Nothing
-        , Proxy := Nothing
-        )
+        def
 
 --------------------------------------------------------------------------------
 -- Misc. helpers
