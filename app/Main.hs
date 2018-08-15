@@ -228,7 +228,6 @@ doFetchObject
           for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
           for_ (content ^. L.charset)         (tagbs "charset")
           for_ (content ^. L.contentEncoding) (tagbs "content_encoding")
-          for_ (content ^. L.links)           print -- TODO better link printing
           for_ (content ^. L.lastMod)         (tag "last_mod")
           for_ (content ^. L.lastModUsecs)    (tag "last_mod_usecs")
           for_ (content ^. L.usermeta)        print -- TODO better usermeta printing

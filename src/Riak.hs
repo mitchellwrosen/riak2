@@ -175,7 +175,6 @@ data Content
       !(Maybe ByteString)               -- Charset
       !(Maybe ByteString)               -- Content encoding
       !(Maybe Vtag)
-      ![RpbLink]                        -- Links
       !(Maybe Word32)                   -- Last modified
       !(Maybe Word32)                   -- Last modified usecs
       ![(ByteString, Maybe ByteString)] -- User meta
@@ -186,18 +185,17 @@ data Content
 
 instance (HasLens' f Content x a, a ~ b) => HasLens f Content Content x a b where lensOf = lensOf'
 
-instance Functor f => HasLens' f Content "value"           ByteString                       where lensOf' _ = lens (\(Content x _ _ _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j k l) x -> Content x b c d e f g h i j k l)
-instance Functor f => HasLens' f Content "contentType"     (Maybe ContentType)              where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j k l) x -> Content a x c d e f g h i j k l)
-instance Functor f => HasLens' f Content "charset"         (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j k l) x -> Content a b x d e f g h i j k l)
-instance Functor f => HasLens' f Content "contentEncoding" (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j k l) x -> Content a b c x e f g h i j k l)
-instance Functor f => HasLens' f Content "vtag"            (Maybe Vtag)                     where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j k l) x -> Content a b c d x f g h i j k l)
-instance Functor f => HasLens' f Content "links"           [RpbLink]                        where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c d e _ g h i j k l) x -> Content a b c d e x g h i j k l)
-instance Functor f => HasLens' f Content "lastMod"         (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d e f _ h i j k l) x -> Content a b c d e f x h i j k l)
-instance Functor f => HasLens' f Content "lastModUsecs"    (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e f g _ i j k l) x -> Content a b c d e f g x i j k l)
-instance Functor f => HasLens' f Content "usermeta"        [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f g h _ j k l) x -> Content a b c d e f g h x j k l)
-instance Functor f => HasLens' f Content "indexes"         [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g h i _ k l) x -> Content a b c d e f g h i x k l)
-instance Functor f => HasLens' f Content "deleted"         (Maybe Bool)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h i j _ l) x -> Content a b c d e f g h i j x l)
-instance Functor f => HasLens' f Content "ttl"             (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i j k _) x -> Content a b c d e f g h i j k x)
+instance Functor f => HasLens' f Content "value"           ByteString                       where lensOf' _ = lens (\(Content x _ _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j k) x -> Content x b c d e f g h i j k)
+instance Functor f => HasLens' f Content "contentType"     (Maybe ContentType)              where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j k) x -> Content a x c d e f g h i j k)
+instance Functor f => HasLens' f Content "charset"         (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j k) x -> Content a b x d e f g h i j k)
+instance Functor f => HasLens' f Content "contentEncoding" (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j k) x -> Content a b c x e f g h i j k)
+instance Functor f => HasLens' f Content "vtag"            (Maybe Vtag)                     where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j k) x -> Content a b c d x f g h i j k)
+instance Functor f => HasLens' f Content "lastMod"         (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d e _ g h i j k) x -> Content a b c d e x g h i j k)
+instance Functor f => HasLens' f Content "lastModUsecs"    (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e f _ h i j k) x -> Content a b c d e f x h i j k)
+instance Functor f => HasLens' f Content "usermeta"        [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f g _ i j k) x -> Content a b c d e f g x i j k)
+instance Functor f => HasLens' f Content "indexes"         [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g h _ j k) x -> Content a b c d e f g h x j k)
+instance Functor f => HasLens' f Content "deleted"         (Maybe Bool)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h i _ k) x -> Content a b c d e f g h i x k)
+instance Functor f => HasLens' f Content "ttl"             (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i j _) x -> Content a b c d e f g h i j x)
 
 
 newtype ContentType
@@ -358,15 +356,14 @@ fetchObject
 
   mkContent :: RpbContent -> Content
   mkContent
-      (RpbContent value content_type charset content_encoding vtag links
-                  last_mod last_mod_usecs usermeta indexes deleted ttl _) =
+      (RpbContent value content_type charset content_encoding vtag _ last_mod
+                  last_mod_usecs usermeta indexes deleted ttl _) =
     Content
       value
       (coerce content_type)
       charset
       content_encoding
       (coerce vtag)
-      links
       last_mod
       last_mod_usecs
       (map unRpbPair usermeta)
