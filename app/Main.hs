@@ -220,7 +220,11 @@ doFetchObject
           let tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
           let tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
-          tagbs "value" (Base64.encode (content ^. L.value))
+          tagbs "value" $
+            case content ^. L.contentType of
+              Just "text/plain" -> content ^. L.value
+              _ -> Base64.encode (content ^. L.value)
+
           for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
           for_ (content ^. L.charset)         (tagbs "charset")
           for_ (content ^. L.contentEncoding) (tagbs "content_encoding")
@@ -246,7 +250,8 @@ doStoreObject type' bucket content key = do
       storeObject h
         type'
         bucket
-        (def & L.value .~ encodeUtf8 content)
+        (def & L.value .~ encodeUtf8 content
+             & L.contentType .~ "text/plain")
         (def & maybe id (param (Proxy @"key")) key)
 
 doUpdateCounter

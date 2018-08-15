@@ -70,6 +70,7 @@ import Data.Int
 import Data.IORef
 import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
+import GHC.Exts                   (IsString)
 import Lens.Family2.Unchecked     (lens)
 import Lens.Labels
 import Network.Socket             (HostName, PortNumber)
@@ -201,7 +202,8 @@ instance Functor f => HasLens' f Content "ttl"             (Maybe Word32)       
 
 newtype ContentType
   = ContentType { unContentType :: ByteString }
-  deriving (Show)
+  deriving stock (Eq, Show)
+  deriving newtype (IsString)
 
 
 data DataType
