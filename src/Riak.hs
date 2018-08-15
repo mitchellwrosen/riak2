@@ -68,6 +68,7 @@ import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
+import Data.Maybe                 (isJust)
 import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
 import GHC.Exts                   (IsString)
@@ -120,7 +121,8 @@ data VclockCache
           !(forall ty. BucketType ty -> Bucket -> Key -> IO ())
       }
 
--- | Make a 'VclockCache' backed by an 'IORef' + 'HashMap'.
+-- | Make a 'VclockCache' backed by an 'IORef' + 'HashMap' that never purges
+-- entries. TODO Smarter cache invalidation (controllable timeout).
 refVclockCache :: MonadIO m => m VclockCache
 refVclockCache = liftIO $ do
   -- TODO strict (type, bucket, key)
@@ -292,14 +294,14 @@ fetchObject
   -> BucketType 'Nothing
   -> Bucket
   -> Key
-  -> ( "basic_quorum"  := Bool
-     , "head"          := Bool
-     , "if_modified"   := Bool
+  -> ( "basic_quorum"  := ()
+     , "head"          := ()
+     , "if_modified"   := ()
      , "n_val"         := Quorum
-     , "notfound_ok"   := Bool
+     , "notfound_ok"   := ()
      , "pr"            := Quorum
      , "r"             := Quorum
-     , "sloppy_quorum" := Bool
+     , "sloppy_quorum" := ()
      , "timeout"       := Word32
      )
   -> m (Either RpbErrorResp (Maybe FetchObjectResp))
@@ -317,7 +319,7 @@ fetchObject
     ) = liftIO . runExceptT $ do
 
   vclock :: Maybe Vclock <-
-    if if_modified == Just True
+    if isJust if_modified
       then lift (vclockCacheLookup cache type' bucket key)
       else pure Nothing
 
@@ -326,17 +328,17 @@ fetchObject
     request =
       RpbGetReq
         { _RpbGetReq'_unknownFields = []
-        , _RpbGetReq'basicQuorum    = basic_quorum
+        , _RpbGetReq'basicQuorum    = True <$ basic_quorum
         , _RpbGetReq'bucket         = coerce bucket
         , _RpbGetReq'deletedvclock  = Just True
-        , _RpbGetReq'head           = head
+        , _RpbGetReq'head           = True <$ head
         , _RpbGetReq'ifModified     = coerce vclock
         , _RpbGetReq'key            = coerce key
         , _RpbGetReq'nVal           = n_val
-        , _RpbGetReq'notfoundOk     = notfound_ok
+        , _RpbGetReq'notfoundOk     = True <$ notfound_ok
         , _RpbGetReq'pr             = pr
         , _RpbGetReq'r              = r
-        , _RpbGetReq'sloppyQuorum   = sloppy_quorum
+        , _RpbGetReq'sloppyQuorum   = True <$ sloppy_quorum
         , _RpbGetReq'timeout        = timeout
         , _RpbGetReq'type'          = coerce (Just type')
         }
@@ -386,16 +388,13 @@ storeObject
   -> BucketType 'Nothing
   -> Bucket
   -> RpbContent
-  -> ( "asis"            := Bool
-     , "dw"              := Quorum
-     , "if_none_match"   := Bool
-     , "if_not_modified" := Bool
+  -> ( "dw"              := Quorum
      , "key"             := Key
      , "n_val"           := Quorum
      , "pw"              := Quorum
-     , "return_body"     := Bool
+     , "return_body"     := ()
      , "return_head"     := Bool
-     , "sloppy_quorum"   := Bool
+     , "sloppy_quorum"   := ()
      , "timeout"         := Word32
      , "w"               := Quorum
      )
@@ -409,26 +408,20 @@ storeObject_
   -> BucketType 'Nothing
   -> Bucket
   -> RpbContent
-  -> ( "asis"            := Bool
-     , "dw"              := Quorum
-     , "if_none_match"   := Bool
-     , "if_not_modified" := Bool
+  -> ( "dw"              := Quorum
      , "key"             := Key
      , "n_val"           := Quorum
      , "pw"              := Quorum
-     , "return_body"     := Bool
-     , "return_head"     := Bool
-     , "sloppy_quorum"   := Bool
+     , "return_body"     := ()
+     , "return_head"     := Bool -- TODO figure out what this defaults to
+     , "sloppy_quorum"   := ()
      , "timeout"         := Word32
      , "w"               := Quorum
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
     (Handle conn cache) type' bucket content
-    ( _ := asis
-    , _ := dw
-    , _ := if_none_match
-    , _ := if_not_modified
+    ( _ := dw
     , _ := key
     , _ := n_val
     , _ := pw
@@ -451,18 +444,18 @@ storeObject_
     request =
       RpbPutReq
         { _RpbPutReq'_unknownFields = []
-        , _RpbPutReq'asis           = asis
+        , _RpbPutReq'asis           = Nothing
         , _RpbPutReq'bucket         = coerce bucket
         , _RpbPutReq'content        = content
         , _RpbPutReq'dw             = dw
-        , _RpbPutReq'ifNoneMatch    = if_none_match
-        , _RpbPutReq'ifNotModified  = if_not_modified
+        , _RpbPutReq'ifNoneMatch    = Nothing
+        , _RpbPutReq'ifNotModified  = Nothing
         , _RpbPutReq'key            = coerce key
         , _RpbPutReq'nVal           = n_val
         , _RpbPutReq'pw             = pw
-        , _RpbPutReq'returnBody     = return_body
+        , _RpbPutReq'returnBody     = True <$ return_body
         , _RpbPutReq'returnHead     = return_head
-        , _RpbPutReq'sloppyQuorum   = sloppy_quorum
+        , _RpbPutReq'sloppyQuorum   = True <$ sloppy_quorum
         , _RpbPutReq'timeout        = timeout
         , _RpbPutReq'type'          = coerce (Just type')
         , _RpbPutReq'vclock         = coerce vclock
@@ -488,12 +481,12 @@ fetchCounter
   -> BucketType ('Just 'DataTypeCounter)
   -> Bucket
   -> Key
-  -> ( "basic_quorum"    := Bool
+  -> ( "basic_quorum"    := ()
      , "n_val"           := Quorum
-     , "notfound_ok"     := Bool
+     , "notfound_ok"     := ()
      , "pr"              := Quorum
      , "r"               := Quorum
-     , "sloppy_quorum"   := Bool
+     , "sloppy_quorum"   := ()
      , "timeout"         := Word32
      )
   -> m (Either RpbErrorResp Int64)
@@ -526,15 +519,15 @@ fetchCounter
   request =
     DtFetchReq
       { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = basic_quorum
+      , _DtFetchReq'basicQuorum    = True <$ basic_quorum
       , _DtFetchReq'bucket         = coerce bucket
       , _DtFetchReq'includeContext = Nothing
       , _DtFetchReq'key            = coerce key
       , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = notfound_ok
+      , _DtFetchReq'notfoundOk     = True <$ notfound_ok
       , _DtFetchReq'pr             = pr
       , _DtFetchReq'r              = r
-      , _DtFetchReq'sloppyQuorum   = sloppy_quorum
+      , _DtFetchReq'sloppyQuorum   = True <$ sloppy_quorum
       , _DtFetchReq'timeout        = timeout
       , _DtFetchReq'type'          = coerce type'
       }
@@ -546,13 +539,13 @@ fetchSet
   -> BucketType ('Just 'DataTypeSet)
   -> Bucket
   -> Key
-  -> ( "basic_quorum"    := Bool
-     , "include_context" := Bool
+  -> ( "basic_quorum"    := ()
+     , "include_context" := Bool -- TODO rename to not_include_context?
      , "n_val"           := Quorum
-     , "notfound_ok"     := Bool
+     , "notfound_ok"     := ()
      , "pr"              := Quorum
      , "r"               := Quorum
-     , "sloppy_quorum"   := Bool
+     , "sloppy_quorum"   := ()
      , "timeout"         := Word32
      )
   -> m (Either RpbErrorResp [ByteString])
@@ -587,13 +580,13 @@ fetchDataType
   -> BucketType ('Just ty)
   -> Bucket
   -> Key
-  -> ( "basic_quorum"    := Bool
+  -> ( "basic_quorum"    := ()
      , "include_context" := Bool
      , "n_val"           := Quorum
-     , "notfound_ok"     := Bool
+     , "notfound_ok"     := ()
      , "pr"              := Quorum
      , "r"               := Quorum
-     , "sloppy_quorum"   := Bool
+     , "sloppy_quorum"   := ()
      , "timeout"         := Word32
      )
   -> m (Either RpbErrorResp DtFetchResp)
@@ -614,15 +607,15 @@ fetchDataType (Handle conn _) type' bucket key
   request =
     DtFetchReq
       { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = basic_quorum
+      , _DtFetchReq'basicQuorum    = True <$ basic_quorum
       , _DtFetchReq'bucket         = coerce bucket
       , _DtFetchReq'includeContext = include_context
       , _DtFetchReq'key            = coerce key
       , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = notfound_ok
+      , _DtFetchReq'notfoundOk     = True <$ notfound_ok
       , _DtFetchReq'pr             = pr
       , _DtFetchReq'r              = r
-      , _DtFetchReq'sloppyQuorum   = sloppy_quorum
+      , _DtFetchReq'sloppyQuorum   = True <$ sloppy_quorum
       , _DtFetchReq'timeout        = timeout
       , _DtFetchReq'type'          = coerce type'
       }
@@ -644,8 +637,8 @@ updateCounter
      , "key"           := Key
      , "n_val"         := Quorum
      , "pw"            := Quorum
-     , "return_body"   := Bool
-     , "sloppy_quorum" := Bool
+     , "return_body"   := ()
+     , "sloppy_quorum" := ()
      , "timeout"       := Word32
      , "w"             := Quorum
      )
@@ -675,8 +668,8 @@ updateCounter
       , _DtUpdateReq'nVal           = n_val
       , _DtUpdateReq'op             = op
       , _DtUpdateReq'pw             = pw
-      , _DtUpdateReq'returnBody     = return_body
-      , _DtUpdateReq'sloppyQuorum   = sloppy_quorum
+      , _DtUpdateReq'returnBody     = True <$ return_body
+      , _DtUpdateReq'sloppyQuorum   = True <$ sloppy_quorum
       , _DtUpdateReq'timeout        = timeout
       , _DtUpdateReq'type'          = coerce type'
       , _DtUpdateReq'w              = w
