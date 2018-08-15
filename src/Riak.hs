@@ -1,12 +1,14 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies,
              GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
-             LambdaCase, ScopedTypeVariables, TypeApplications,
+             LambdaCase, RankNTypes, ScopedTypeVariables, TypeApplications,
              TypeOperators #-}
 
 module Riak
   ( -- * Riak handle
     Handle
   , withHandle
+  , VclockCache
+  , refVclockCache
     -- * Key/value object operations
   , fetchObject
   , storeObject
@@ -61,18 +63,17 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
--- import Data.Default.Class         (def)
-import Data.Hashable       (Hashable)
-import Data.HashMap.Strict (HashMap)
+import Data.Hashable              (Hashable)
+import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
-import Data.Proxy          (Proxy(Proxy))
-import Data.Text.Encoding  (decodeUtf8)
+import Data.Proxy                 (Proxy(Proxy))
+import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
 import Lens.Family2
-import Network.Socket      (HostName, PortNumber)
-import Prelude             hiding (head)
-import UnliftIO.Exception  (Exception, throwIO)
+import Network.Socket             (HostName, PortNumber)
+import Prelude                    hiding (head)
+import UnliftIO.Exception         (Exception, throwIO)
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Text           as Text
@@ -94,22 +95,52 @@ import           Riak.Internal.Response
 data Handle
   = Handle
       !Connection
-      !(IORef (HashMap (SomeBucketType, Bucket, Key) Vclock))
-
--- TODO configurable vclock caching
--- TODO strict (type, bucket, key)
+      !VclockCache
 
 withHandle
   :: MonadUnliftIO m
   => HostName
   -> PortNumber
+  -> VclockCache
   -> (Handle -> m a)
   -> m a
-withHandle host port f = do
-  vclockCacheRef <-
+withHandle host port cache f = do
+  withConnection host port (\conn -> f (Handle conn cache))
+
+
+data VclockCache
+  = VclockCache
+      { vclockCacheLookup ::
+          !(forall ty. BucketType ty -> Bucket -> Key -> IO (Maybe Vclock))
+      , vclockCacheInsert ::
+          !(forall ty. BucketType ty -> Bucket -> Key -> Vclock -> IO ())
+      , vclockCacheDelete ::
+          !(forall ty. BucketType ty -> Bucket -> Key -> IO ())
+      }
+
+-- | Make a 'VclockCache' backed by an 'IORef' + 'HashMap'.
+refVclockCache :: MonadIO m => m VclockCache
+refVclockCache = liftIO $ do
+  -- TODO strict (type, bucket, key)
+  cacheRef :: IORef (HashMap (SomeBucketType, Bucket, Key) Vclock) <-
     liftIO (newIORef mempty)
 
-  withConnection host port (\conn -> f (Handle conn vclockCacheRef))
+  pure VclockCache
+    { vclockCacheLookup =
+        \type' bucket key -> do
+          HashMap.lookup (coerce (unBucketType type'), bucket, key) <$>
+            readIORef cacheRef
+
+    , vclockCacheInsert =
+        \type' bucket key vclock ->
+          modifyIORef' cacheRef
+            (HashMap.insert (coerce (unBucketType type'), bucket, key) vclock)
+
+    , vclockCacheDelete =
+        \type' bucket key ->
+          modifyIORef cacheRef
+            (HashMap.delete (coerce (unBucketType type'), bucket, key))
+    }
 
 
 --------------------------------------------------------------------------------
@@ -806,10 +837,10 @@ fetchObjectVclock
   -> Bucket
   -> Key
   -> ExceptT RpbErrorResp IO (Maybe Vclock)
-fetchObjectVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
+fetchObjectVclock handle@(Handle _ cache) type' bucket key =
   lift lookupVclock >>= \case
     Nothing -> do
-      _ <- ExceptT (fetchObject handle type' bucket key' params) -- cache it
+      _ <- ExceptT (fetchObject handle type' bucket key params) -- cache it
       lift lookupVclock
 
     Just vclock ->
@@ -818,8 +849,7 @@ fetchObjectVclock handle@(Handle _ vclockCacheRef) type' bucket key' =
  where
   lookupVclock :: IO (Maybe Vclock)
   lookupVclock =
-    HashMap.lookup (coerce type', bucket, key') <$>
-      readIORef vclockCacheRef
+    vclockCacheLookup cache type' bucket key
 
   params
     :: ( "basic_quorum"  := Bool
@@ -846,13 +876,10 @@ cacheVclock
   -> Key
   -> Maybe Vclock
   -> m ()
-cacheVclock (Handle _ vclockCacheRef) type' bucket key vclock = liftIO $
-  modifyIORef'
-    vclockCacheRef
-    (maybe
-      (HashMap.delete (coerce type', bucket, key))
-      (HashMap.insert (coerce type', bucket, key))
-      vclock)
+cacheVclock (Handle _ cache) type' bucket key = liftIO .
+  maybe
+    (vclockCacheDelete cache type' bucket key)
+    (vclockCacheInsert cache type' bucket key)
 
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
