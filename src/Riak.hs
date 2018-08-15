@@ -180,11 +180,13 @@ data Content
       ![(ByteString, Maybe ByteString)] -- Indexes
       !(Maybe Bool)                     -- Deleted
       !(Maybe Word32)                   -- TTL
+  deriving (Show)
 -- TODO Content lenses
 
 
 newtype ContentType
   = ContentType { unContentType :: ByteString }
+  deriving (Show)
 
 
 data DataType
@@ -238,10 +240,12 @@ instance Show SomeBucketType where
 
 newtype Vclock
   = Vclock { unVclock :: ByteString }
+  deriving (Show)
 
 
 newtype Vtag
   = Vtag { unVtag :: ByteString }
+  deriving (Show)
 
 
 --------------------------------------------------------------------------------
@@ -253,6 +257,7 @@ data FetchObjectResp
       ![Content]      -- Content
       !(Maybe Vclock) -- Vclock
       !(Maybe Bool)   -- Unchanged
+  deriving (Show)
 -- TODO FetchObjectResp lenses
 
 -- TODO fetchObject: better return type

@@ -156,8 +156,9 @@ doFetchCounter
   -> Bucket
   -> Key
   -> IO ()
-doFetchCounter type' bucket key =
-  withHandle "localhost" 8087 $ \h ->
+doFetchCounter type' bucket key = do
+  cache <- refVclockCache
+  withHandle "localhost" 8087 cache $ \h ->
     print =<<
       fetchCounter h
         type'
@@ -181,8 +182,9 @@ doFetchObject
   -> IO ()
 doFetchObject
     type' bucket key basic_quorum head if_modified no_notfound_ok n_val pr r
-    sloppy_quorum timeout =
-  withHandle "localhost" 8087 $ \h ->
+    sloppy_quorum timeout = do
+  cache <- refVclockCache
+  withHandle "localhost" 8087 cache $ \h ->
     print =<<
       fetchObject h
         type'
@@ -205,8 +207,9 @@ doStoreObject
   -> Text
   -> Maybe Key
   -> IO ()
-doStoreObject type' bucket content key =
-  withHandle "localhost" 8087 $ \h ->
+doStoreObject type' bucket content key = do
+  cache <- refVclockCache
+  withHandle "localhost" 8087 cache $ \h ->
     print =<<
       storeObject h
         type'
@@ -220,8 +223,9 @@ doUpdateCounter
   -> Int64
   -> Maybe Key
   -> IO ()
-doUpdateCounter type' bucket incr key =
-  withHandle "localhost" 8087 $ \h ->
+doUpdateCounter type' bucket incr key = do
+  cache <- refVclockCache
+  withHandle "localhost" 8087 cache $ \h ->
     print =<<
       updateCounter h
         type'
