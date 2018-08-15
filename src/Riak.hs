@@ -68,7 +68,6 @@ import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
-import Data.Proxy                 (Proxy(Proxy))
 import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
 import Lens.Family2.Unchecked     (lens)
@@ -420,7 +419,7 @@ storeObject_
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
-    handle@(Handle conn _) type' bucket content
+    (Handle conn cache) type' bucket content
     ( _ := asis
     , _ := dw
     , _ := if_none_match
@@ -435,13 +434,11 @@ storeObject_
     , _ := w
     ) = do
 
-  -- Get the cached vclock of this object to pass in the put request. If we
-  -- don't have it, first perform a head-fetch, which caches it. If it's still
-  -- not there, then this must be the very first store.
+  -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe Vclock <-
     maybe
       (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (fetchObjectVclock handle type' bucket)
+      (lift . vclockCacheLookup cache type' bucket)
       key
 
   let
@@ -860,41 +857,6 @@ getServerInfo (Handle conn _) =
 --------------------------------------------------------------------------------
 -- Misc.
 --------------------------------------------------------------------------------
-
-fetchObjectVclock
-  :: Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
-  -> ExceptT RpbErrorResp IO (Maybe Vclock)
-fetchObjectVclock handle@(Handle _ cache) type' bucket key =
-  lift lookupVclock >>= \case
-    Nothing -> do
-      _ <- ExceptT (fetchObject handle type' bucket key params) -- cache it
-      lift lookupVclock
-
-    Just vclock ->
-      pure (Just vclock)
-
- where
-  lookupVclock :: IO (Maybe Vclock)
-  lookupVclock =
-    vclockCacheLookup cache type' bucket key
-
-  params
-    :: ( "basic_quorum"  := Bool
-       , "head"          := Bool
-       , "if_modified"   := ByteString
-       , "n_val"         := Quorum
-       , "notfound_ok"   := Bool
-       , "pr"            := Quorum
-       , "r"             := Quorum
-       , "sloppy_quorum" := Bool
-       , "timeout"       := Word32
-       )
-  params =
-    def & param (Proxy @"head") True
-
 
 -- | Given a fetched vclock, update the cache (if present) or delete it from the
 -- cache (if missing).
