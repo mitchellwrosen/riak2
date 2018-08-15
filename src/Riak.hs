@@ -1,7 +1,9 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies,
-             GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
-             LambdaCase, RankNTypes, ScopedTypeVariables, TypeApplications,
-             TypeOperators #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleContexts,
+             FlexibleInstances, GeneralizedNewtypeDeriving, InstanceSigs,
+             KindSignatures, LambdaCase, MagicHash, MultiParamTypeClasses,
+             OverloadedLabels, RankNTypes, ScopedTypeVariables,
+             TypeApplications, TypeFamilies, TypeOperators,
+             UndecidableInstances #-}
 
 module Riak
   ( -- * Riak handle
@@ -10,6 +12,7 @@ module Riak
   , VclockCache
   , refVclockCache
     -- * Key/value object operations
+  , FetchObjectResp(..)
   , fetchObject
   , storeObject
   , deleteObject
@@ -51,10 +54,8 @@ module Riak
   , Key(..)
   , Vclock(..)
   , Vtag(..)
-    -- * Re-exports
-  , Proxy(..)
+    -- * Temp
   , def
-  , (&)
   ) where
 
 import Control.Monad
@@ -70,16 +71,17 @@ import Data.IORef
 import Data.Proxy                 (Proxy(Proxy))
 import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
-import Lens.Family2
+import Lens.Family2.Unchecked     (lens)
+import Lens.Labels
 import Network.Socket             (HostName, PortNumber)
-import Prelude                    hiding (head)
+import Prelude                    hiding (head, (.))
 import UnliftIO.Exception         (Exception, throwIO)
 
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.Text           as Text
+import qualified Data.ByteString.Base64 as Base64
+import qualified Data.HashMap.Strict    as HashMap
+import qualified Data.Text              as Text
 
 import           Proto.Riak
-import qualified Proto.Riak_Fields        as L
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Connection
 import           Riak.Internal.Param
@@ -181,7 +183,21 @@ data Content
       !(Maybe Bool)                     -- Deleted
       !(Maybe Word32)                   -- TTL
   deriving (Show)
--- TODO Content lenses
+
+instance (HasLens' f Content x a, a ~ b) => HasLens f Content Content x a b where lensOf = lensOf'
+
+instance Functor f => HasLens' f Content "value"           ByteString                       where lensOf' _ = lens (\(Content x _ _ _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j k l) x -> Content x b c d e f g h i j k l)
+instance Functor f => HasLens' f Content "contentType"     (Maybe ContentType)              where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j k l) x -> Content a x c d e f g h i j k l)
+instance Functor f => HasLens' f Content "charset"         (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j k l) x -> Content a b x d e f g h i j k l)
+instance Functor f => HasLens' f Content "contentEncoding" (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j k l) x -> Content a b c x e f g h i j k l)
+instance Functor f => HasLens' f Content "vtag"            (Maybe Vtag)                     where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j k l) x -> Content a b c d x f g h i j k l)
+instance Functor f => HasLens' f Content "links"           [RpbLink]                        where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c d e _ g h i j k l) x -> Content a b c d e x g h i j k l)
+instance Functor f => HasLens' f Content "lastMod"         (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d e f _ h i j k l) x -> Content a b c d e f x h i j k l)
+instance Functor f => HasLens' f Content "lastModUsecs"    (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e f g _ i j k l) x -> Content a b c d e f g x i j k l)
+instance Functor f => HasLens' f Content "usermeta"        [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f g h _ j k l) x -> Content a b c d e f g h x j k l)
+instance Functor f => HasLens' f Content "indexes"         [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g h i _ k l) x -> Content a b c d e f g h i x k l)
+instance Functor f => HasLens' f Content "deleted"         (Maybe Bool)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h i j _ l) x -> Content a b c d e f g h i j x l)
+instance Functor f => HasLens' f Content "ttl"             (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i j k _) x -> Content a b c d e f g h i j k x)
 
 
 newtype ContentType
@@ -240,7 +256,11 @@ instance Show SomeBucketType where
 
 newtype Vclock
   = Vclock { unVclock :: ByteString }
-  deriving (Show)
+
+instance Show Vclock where
+  show :: Vclock -> String
+  show =
+    show . Base64.encode . unVclock
 
 
 newtype Vtag
@@ -258,7 +278,13 @@ data FetchObjectResp
       !(Maybe Vclock) -- Vclock
       !(Maybe Bool)   -- Unchanged
   deriving (Show)
--- TODO FetchObjectResp lenses
+
+instance (HasLens' f FetchObjectResp x a, a ~ b) => HasLens f FetchObjectResp FetchObjectResp x a b where lensOf = lensOf'
+
+instance Functor f => HasLens' f FetchObjectResp "content"   [Content]      where lensOf' _ = lens (\(FetchObjectResp a _ _) -> a) (\(FetchObjectResp _ b c) a -> FetchObjectResp a b c)
+instance Functor f => HasLens' f FetchObjectResp "vclock"    (Maybe Vclock) where lensOf' _ = lens (\(FetchObjectResp _ b _) -> b) (\(FetchObjectResp a _ c) b -> FetchObjectResp a b c)
+instance Functor f => HasLens' f FetchObjectResp "unchanged" (Maybe Bool)   where lensOf' _ = lens (\(FetchObjectResp _ _ c) -> c) (\(FetchObjectResp a b _) c -> FetchObjectResp a b c)
+
 
 -- TODO fetchObject: better return type
 fetchObject
@@ -289,22 +315,21 @@ fetchObject
     , _ := r
     , _ := sloppy_quorum
     , _ := timeout
-    ) = liftIO $
-  Internal.fetchObject conn request >>= \case
-    Left err ->
-      pure (Left err)
+    ) = liftIO . runExceptT $ do
 
-    -- TODO; this logic assumes if_modified is not set. If it is, and the object
-    -- is up to date, then we will have content = [], vclock = Nothing,
-    -- unchanged = Just True.
-    Right response -> do
-      cacheVclock handle type' bucket key (coerce (response ^. L.maybe'vclock))
+  response :: RpbGetResp <-
+    ExceptT (Internal.fetchObject conn request)
 
-      case response ^. L.content of
-        [] ->
-          pure (Right Nothing)
-        _ ->
-          pure (Right (Just (mkResponse response)))
+  -- TODO; this logic assumes if_modified is not set. If it is, and the object
+  -- is up to date, then we will have content = [], vclock = Nothing,
+  -- unchanged = Just True.
+  cacheVclock handle type' bucket key (coerce (response ^. #maybe'vclock))
+
+  case response ^. #content of
+    [] ->
+      pure Nothing
+    _ ->
+      pure (Just (mkResponse response))
 
  where
   request :: RpbGetReq
@@ -442,7 +467,7 @@ storeObject_
         , _RpbPutReq'w              = w
         }
 
-  ExceptT (exchange conn request)
+  ExceptT (Internal.storeObject conn request)
 
 
 -- TODO deleteObject figure out when vclock is required (always?)
@@ -484,9 +509,9 @@ fetchCounter
   response :: DtFetchResp <-
     ExceptT (liftIO (exchange conn request))
 
-  case response ^. L.type' of
+  case response ^. #type' of
     DtFetchResp'COUNTER ->
-      pure (response ^. L.value . L.counterValue)
+      pure (response ^. #value . #counterValue)
 
     dt ->
       throwIO
@@ -536,17 +561,17 @@ fetchSet
   response :: DtFetchResp <-
     ExceptT (fetchDataType handle type' bucket key params)
 
-  case response ^. L.type' of
+  case response ^. #type' of
     DtFetchResp'SET -> do
       -- Cache set context, if it was requested (it defaults to true)
       when (include_context /= Just False) $
         let
           vclock :: Maybe Vclock
-          vclock = coerce (response ^. L.maybe'context)
+          vclock = coerce (response ^. #maybe'context)
         in
           cacheVclock handle type' bucket key vclock
 
-      pure (response ^. L.value . L.setValue)
+      pure (response ^. #value . #setValue)
 
     dt ->
       throwIO
@@ -746,9 +771,9 @@ listKeys (Handle conn _) req = liftIO $ do
       resp :: RpbListKeysResp <-
         ExceptT (recv conn >>= parseResponse)
 
-      if resp ^. L.done
-        then pure (resp ^. L.keys)
-        else ((resp ^. L.keys) ++) <$> loop
+      if resp ^. #done
+        then pure (resp ^. #keys)
+        else ((resp ^. #keys) ++) <$> loop
 
   runExceptT loop
 
@@ -767,7 +792,7 @@ mapReduce (Handle conn _) req = liftIO $ do
       resp :: RpbMapRedResp <-
         ExceptT (recv conn >>= parseResponse)
 
-      if resp ^. L.done
+      if resp ^. #done
         then pure [resp]
         else (resp :) <$> loop
 
