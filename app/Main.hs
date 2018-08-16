@@ -1,5 +1,5 @@
-{-# LANGUAGE DataKinds, OverloadedStrings, ScopedTypeVariables,
-             TypeApplications #-}
+{-# LANGUAGE DataKinds, GADTs, OverloadedStrings, RankNTypes,
+             ScopedTypeVariables, TypeApplications #-}
 
 import Control.Monad
 import Data.Foldable       (asum, for_)
@@ -97,23 +97,26 @@ fetchObjectParser =
                 [ long "no-notfound-ok"
                 , help "No notfound ok"
                 ])
-        <*> (optional . option auto)
+        <*> option auto
               (mconcat
                 [ long "nval"
                 , help "N value"
                 , metavar "QUORUM"
+                , value QuorumDefault
                 ])
-        <*> (optional . option auto)
+        <*> option auto
               (mconcat
                 [ long "pr"
                 , help "PR value"
                 , metavar "QUORUM"
+                , value QuorumDefault
                 ])
-        <*> (optional . option auto)
+        <*> option auto
               (mconcat
                 [ long "r"
                 , help "R value"
                 , metavar "QUORUM"
+                , value QuorumDefault
                 ])
         <*> switch
               (mconcat
@@ -188,9 +191,9 @@ doFetchObject
   -> Bool
   -> Bool
   -> Bool
-  -> Maybe Word32
-  -> Maybe Word32
-  -> Maybe Word32
+  -> Quorum
+  -> Quorum
+  -> Quorum
   -> Bool
   -> Maybe Word32
   -> IO ()
@@ -198,54 +201,55 @@ doFetchObject
     type' bucket key basic_quorum head no_notfound_ok n_val pr r sloppy_quorum
     timeout = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h -> do
-    eresponse :: Either L.RpbErrorResp (Maybe FetchObjectResp) <-
-      fetchObject h
-        type'
-        bucket
-        key
-        ( Proxy := guard basic_quorum
-        , Proxy := guard head
-        , Proxy := Nothing
-        , Proxy := n_val
-        , Proxy := if no_notfound_ok then Just False else Nothing
-        , Proxy := pr
-        , Proxy := r
-        , Proxy := guard sloppy_quorum
-        , Proxy := timeout
-        )
+  withHandle "localhost" 8087 cache $ \h ->
+    withParamHead head $ \head' -> do
+      eresponse <- -- :: Either L.RpbErrorResp (Maybe FetchObjectResp) <-
+        fetchObject h
+          type'
+          bucket
+          key
+          ( ParamBasicQuorum basic_quorum
+          , head'
+          , ParamNoIfModified
+          , ParamNVal n_val
+          , ParamNotfoundOk (not no_notfound_ok)
+          , ParamPR pr
+          , ParamR r
+          , ParamSloppyQuorum sloppy_quorum
+          , ParamTimeout timeout
+          )
 
-    case eresponse of
-      Left err ->
-        print err
+      case eresponse of
+        Left err ->
+          print err
 
-      Right Nothing ->
-        putStrLn "Not found"
+        Right Nothing ->
+          putStrLn "Not found"
 
-      Right (Just response) -> do
-        for_ (response ^. L.vclock)
-          (Latin1.putStrLn . ("vclock = " <>) . Base64.encode . unVclock)
-        for_ (response ^. L.unchanged)
-          (putStrLn . ("unchanged = " ++) . show)
-        for_ (zip [(0::Int)..] (response ^. L.content)) $ \(i, content) -> do
-          let tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
-          let tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
+        Right (Just contents) -> do
+          for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
+            let tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
+            let tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
-          unless head $
-            tagbs "value" $
-              case content ^. L.contentType of
-                Just "text/plain" -> content ^. L.value
-                _                 -> Base64.encode (content ^. L.value)
+            () <-
+              case head' of
+                ParamHead ->
+                  pure ()
+                ParamNoHead ->
+                  tagbs "value" $
+                    case content ^. L.contentType of
+                      Just "text/plain" -> content ^. L.value
+                      _                 -> Base64.encode (content ^. L.value)
 
-          for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
-          for_ (content ^. L.charset)         (tagbs "charset")
-          for_ (content ^. L.contentEncoding) (tagbs "content_encoding")
-          for_ (content ^. L.lastMod)         (tag "last_mod")
-          for_ (content ^. L.lastModUsecs)    (tag "last_mod_usecs")
-          for_ (content ^. L.usermeta)        print -- TODO better usermeta printing
-          for_ (content ^. L.indexes)         print -- TODO better indexes printing
-          for_ (content ^. L.deleted)         (tag "deleted")
-          for_ (content ^. L.ttl)             (tag "ttl")
+            for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
+            for_ (content ^. L.charset)         (tagbs "charset")
+            for_ (content ^. L.contentEncoding) (tagbs "content_encoding")
+            for_ (content ^. L.lastMod)         (tag "last_mod")
+            for_ (content ^. L.lastModUsecs)    (tag "last_mod_usecs")
+            for_ (content ^. L.usermeta)        print -- TODO better usermeta printing
+            for_ (content ^. L.indexes)         print -- TODO better indexes printing
+            for_ (content ^. L.deleted)         (tag "deleted")
+            for_ (content ^. L.ttl)             (tag "ttl")
 
 
 doStoreObject
@@ -286,6 +290,12 @@ doUpdateCounter type' bucket incr key = do
 --------------------------------------------------------------------------------
 -- Misc. helpers
 --------------------------------------------------------------------------------
+
+withParamHead :: Bool -> (forall head. ParamHead head -> r) -> r
+withParamHead head k =
+  if head
+    then k ParamHead
+    else k ParamNoHead
 
 bucketArgument :: Parser Bucket
 bucketArgument =

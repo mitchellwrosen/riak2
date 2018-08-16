@@ -1,9 +1,9 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleContexts,
-             FlexibleInstances, GeneralizedNewtypeDeriving, InstanceSigs,
-             KindSignatures, LambdaCase, MagicHash, MultiParamTypeClasses,
-             OverloadedLabels, RankNTypes, ScopedTypeVariables,
-             TypeApplications, TypeFamilies, TypeOperators,
-             UndecidableInstances #-}
+             FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
+             InstanceSigs, KindSignatures, LambdaCase, MagicHash,
+             MultiParamTypeClasses, OverloadedLabels, PatternSynonyms,
+             RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies,
+             TypeOperators, UndecidableInstances #-}
 
 module Riak
   ( -- * Riak handle
@@ -12,7 +12,6 @@ module Riak
   , VclockCache
   , refVclockCache
     -- * Key/value object operations
-  , FetchObjectResp(..)
   , fetchObject
   , storeObject
   , deleteObject
@@ -51,9 +50,22 @@ module Riak
   , Content(..)
   , ContentType(..)
   , DataType(..)
+  , IfModified(..)
   , Key(..)
+  , Quorum
+  , pattern QuorumDefault
   , Vclock(..)
   , Vtag(..)
+    -- * Optional parameters
+  , ParamBasicQuorum(..)
+  , ParamHead(..)
+  , ParamIfModified(..)
+  , ParamNotfoundOk(..)
+  , ParamNVal(..)
+  , ParamPR(..)
+  , ParamR(..)
+  , ParamSloppyQuorum(..)
+  , ParamTimeout(..)
     -- * Temp
   , def
   ) where
@@ -68,7 +80,7 @@ import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
-import Data.Maybe                 (isJust)
+import Data.Kind                  (Type)
 import Data.Text.Encoding         (decodeUtf8)
 import Data.Word
 import GHC.Exts                   (IsString)
@@ -170,9 +182,9 @@ instance Show Bucket where
     Text.unpack . decodeUtf8 . unBucket
 
 
-data Content
+data Content a
   = Content
-      !ByteString                       -- Value
+      !a                                -- Value
       !(Maybe ContentType)
       !(Maybe ByteString)               -- Charset
       !(Maybe ByteString)               -- Content encoding
@@ -185,19 +197,17 @@ data Content
       !(Maybe Word32)                   -- TTL
   deriving (Show)
 
-instance (HasLens' f Content x a, a ~ b) => HasLens f Content Content x a b where lensOf = lensOf'
-
-instance Functor f => HasLens' f Content "value"           ByteString                       where lensOf' _ = lens (\(Content x _ _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j k) x -> Content x b c d e f g h i j k)
-instance Functor f => HasLens' f Content "contentType"     (Maybe ContentType)              where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j k) x -> Content a x c d e f g h i j k)
-instance Functor f => HasLens' f Content "charset"         (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j k) x -> Content a b x d e f g h i j k)
-instance Functor f => HasLens' f Content "contentEncoding" (Maybe ByteString)               where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j k) x -> Content a b c x e f g h i j k)
-instance Functor f => HasLens' f Content "vtag"            (Maybe Vtag)                     where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j k) x -> Content a b c d x f g h i j k)
-instance Functor f => HasLens' f Content "lastMod"         (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d e _ g h i j k) x -> Content a b c d e x g h i j k)
-instance Functor f => HasLens' f Content "lastModUsecs"    (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e f _ h i j k) x -> Content a b c d e f x h i j k)
-instance Functor f => HasLens' f Content "usermeta"        [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f g _ i j k) x -> Content a b c d e f g x i j k)
-instance Functor f => HasLens' f Content "indexes"         [(ByteString, Maybe ByteString)] where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g h _ j k) x -> Content a b c d e f g h x j k)
-instance Functor f => HasLens' f Content "deleted"         (Maybe Bool)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h i _ k) x -> Content a b c d e f g h i x k)
-instance Functor f => HasLens' f Content "ttl"             (Maybe Word32)                   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i j _) x -> Content a b c d e f g h i j x)
+instance Functor f => HasLens f (Content a) (Content b) "value"           a                                b                                where lensOf _ = lens (\(Content x _ _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j k) x -> Content x b c d e f g h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "contentType"     (Maybe ContentType)              (Maybe ContentType)              where lensOf _ = lens (\(Content _ x _ _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j k) x -> Content a x c d e f g h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "charset"         (Maybe ByteString)               (Maybe ByteString)               where lensOf _ = lens (\(Content _ _ x _ _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j k) x -> Content a b x d e f g h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "contentEncoding" (Maybe ByteString)               (Maybe ByteString)               where lensOf _ = lens (\(Content _ _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j k) x -> Content a b c x e f g h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "vtag"            (Maybe Vtag)                     (Maybe Vtag)                     where lensOf _ = lens (\(Content _ _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j k) x -> Content a b c d x f g h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "lastMod"         (Maybe Word32)                   (Maybe Word32)                   where lensOf _ = lens (\(Content _ _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d e _ g h i j k) x -> Content a b c d e x g h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "lastModUsecs"    (Maybe Word32)                   (Maybe Word32)                   where lensOf _ = lens (\(Content _ _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e f _ h i j k) x -> Content a b c d e f x h i j k)
+instance Functor f => HasLens f (Content a) (Content a) "usermeta"        [(ByteString, Maybe ByteString)] [(ByteString, Maybe ByteString)] where lensOf _ = lens (\(Content _ _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f g _ i j k) x -> Content a b c d e f g x i j k)
+instance Functor f => HasLens f (Content a) (Content a) "indexes"         [(ByteString, Maybe ByteString)] [(ByteString, Maybe ByteString)] where lensOf _ = lens (\(Content _ _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g h _ j k) x -> Content a b c d e f g h x j k)
+instance Functor f => HasLens f (Content a) (Content a) "deleted"         (Maybe Bool)                     (Maybe Bool)                     where lensOf _ = lens (\(Content _ _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h i _ k) x -> Content a b c d e f g h i x k)
+instance Functor f => HasLens f (Content a) (Content a) "ttl"             (Maybe Word32)                   (Maybe Word32)                   where lensOf _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i j _) x -> Content a b c d e f g h i j x)
 
 
 newtype ContentType
@@ -227,6 +237,11 @@ data DataTypeError
   deriving anyclass (Exception)
 
 
+data IfModified a
+  = Unmodified
+  | Modified a
+
+
 -- | A Riak key.
 newtype Key
   = Key { unKey :: ByteString }
@@ -242,6 +257,9 @@ instance Show Key where
 -- TODO Better Quorum type
 type Quorum
   = Word32
+
+pattern QuorumDefault :: Word32
+pattern QuorumDefault = 4294967291
 
 
 newtype SomeBucketType
@@ -270,75 +288,151 @@ newtype Vtag
 
 
 --------------------------------------------------------------------------------
+-- Params
+--------------------------------------------------------------------------------
+
+newtype ParamBasicQuorum
+  = ParamBasicQuorum Bool
+
+instance Default ParamBasicQuorum where
+  def = coerce False
+
+
+data ParamHead :: Bool -> Type where
+  ParamHead   :: ParamHead 'True
+  ParamNoHead :: ParamHead 'False
+
+instance (a ~ 'False) => Default (ParamHead a) where
+  def = ParamNoHead
+
+
+data ParamIfModified :: Bool -> Type where
+  ParamIfModified   :: ParamIfModified 'True
+  ParamNoIfModified :: ParamIfModified 'False
+
+instance (a ~ 'False) => Default (ParamIfModified a) where
+  def = ParamNoIfModified
+
+
+newtype ParamNotfoundOk
+  = ParamNotfoundOk Bool
+
+instance Default ParamNotfoundOk where
+  def = coerce True
+
+
+newtype ParamNVal
+  = ParamNVal Quorum
+
+instance Default ParamNVal where
+  def = coerce QuorumDefault
+
+
+newtype ParamPR
+  = ParamPR Quorum
+
+instance Default ParamPR where
+  def = coerce QuorumDefault
+
+
+newtype ParamR
+  = ParamR Quorum
+
+instance Default ParamR where
+  def = coerce QuorumDefault
+
+
+newtype ParamSloppyQuorum
+  = ParamSloppyQuorum Bool
+
+instance Default ParamSloppyQuorum where
+  def = coerce False
+
+
+newtype ParamTimeout
+  = ParamTimeout (Maybe Word32)
+
+instance Default ParamTimeout where
+  def = ParamTimeout Nothing
+
+
+--------------------------------------------------------------------------------
+-- Misc. helper type functions
+--------------------------------------------------------------------------------
+
+type family Ifte (a :: Bool) t f where
+  Ifte 'True  t _ = t
+  Ifte 'False _ f = f
+
+--------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
-data FetchObjectResp
-  = FetchObjectResp
-      ![Content]      -- Content
-      !(Maybe Vclock) -- Vclock
-      !(Maybe Bool)   -- Unchanged
-  deriving (Show)
+type FetchObjectResp (head :: Bool) (if_modified :: Bool) =
+  IfModifiedWrapper if_modified [Content (Ifte head () ByteString)]
 
-instance (HasLens' f FetchObjectResp x a, a ~ b) => HasLens f FetchObjectResp FetchObjectResp x a b where lensOf = lensOf'
+type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
+  IfModifiedWrapper 'True  a = IfModified a
+  IfModifiedWrapper 'False a = a
 
-instance Functor f => HasLens' f FetchObjectResp "content"   [Content]      where lensOf' _ = lens (\(FetchObjectResp a _ _) -> a) (\(FetchObjectResp _ b c) a -> FetchObjectResp a b c)
-instance Functor f => HasLens' f FetchObjectResp "vclock"    (Maybe Vclock) where lensOf' _ = lens (\(FetchObjectResp _ b _) -> b) (\(FetchObjectResp a _ c) b -> FetchObjectResp a b c)
-instance Functor f => HasLens' f FetchObjectResp "unchanged" (Maybe Bool)   where lensOf' _ = lens (\(FetchObjectResp _ _ c) -> c) (\(FetchObjectResp a b _) c -> FetchObjectResp a b c)
-
-
--- TODO fetchObject: better return type
 fetchObject
-  :: MonadIO m
+  :: forall head if_modified m.
+     MonadIO m
   => Handle
   -> BucketType 'Nothing
   -> Bucket
   -> Key
-  -> ( "basic_quorum"  := ()
-     , "head"          := ()
-     , "if_modified"   := ()
-     , "n_val"         := Quorum
-     , "notfound_ok"   := Bool
-     , "pr"            := Quorum
-     , "r"             := Quorum
-     , "sloppy_quorum" := ()
-     , "timeout"       := Word32
+  -> ( ParamBasicQuorum
+     , ParamHead head
+     , ParamIfModified if_modified
+     , ParamNVal
+     , ParamNotfoundOk
+     , ParamPR
+     , ParamR
+     , ParamSloppyQuorum
+     , ParamTimeout
      )
-  -> m (Either RpbErrorResp (Maybe FetchObjectResp))
+  -> m (Either RpbErrorResp (Maybe (FetchObjectResp head if_modified)))
 fetchObject
     handle@(Handle conn cache) type' bucket key
-    ( _ := basic_quorum
-    , _ := head
-    , _ := if_modified
-    , _ := n_val
-    , _ := notfound_ok
-    , _ := pr
-    , _ := r
-    , _ := sloppy_quorum
-    , _ := timeout
+    ( ParamBasicQuorum basic_quorum
+    , head
+    , if_modified
+    , ParamNVal n_val
+    , ParamNotfoundOk notfound_ok
+    , ParamPR pr
+    , ParamR r
+    , ParamSloppyQuorum sloppy_quorum
+    , ParamTimeout timeout
     ) = liftIO . runExceptT $ do
 
   vclock :: Maybe Vclock <-
-    if isJust if_modified
-      then lift (vclockCacheLookup cache type' bucket key)
-      else pure Nothing
+    case if_modified of
+      ParamIfModified   -> lift (vclockCacheLookup cache type' bucket key)
+      ParamNoIfModified -> pure Nothing
 
   let
     request :: RpbGetReq
     request =
       RpbGetReq
         { _RpbGetReq'_unknownFields = []
-        , _RpbGetReq'basicQuorum    = True <$ basic_quorum
+        , _RpbGetReq'basicQuorum    = Just basic_quorum
         , _RpbGetReq'bucket         = coerce bucket
         , _RpbGetReq'deletedvclock  = Just True
-        , _RpbGetReq'head           = True <$ head
-        , _RpbGetReq'ifModified     = coerce vclock
+        , _RpbGetReq'head           =
+            case head of
+              ParamHead   -> Just True
+              ParamNoHead -> Just False
+        , _RpbGetReq'ifModified     =
+            case if_modified of
+              ParamIfModified   -> coerce vclock
+              ParamNoIfModified -> Nothing
         , _RpbGetReq'key            = coerce key
-        , _RpbGetReq'nVal           = n_val
-        , _RpbGetReq'notfoundOk     = notfound_ok
-        , _RpbGetReq'pr             = pr
-        , _RpbGetReq'r              = r
-        , _RpbGetReq'sloppyQuorum   = True <$ sloppy_quorum
+        , _RpbGetReq'nVal           = Just n_val
+        , _RpbGetReq'notfoundOk     = Just notfound_ok
+        , _RpbGetReq'pr             = Just pr
+        , _RpbGetReq'r              = Just r
+        , _RpbGetReq'sloppyQuorum   = Just sloppy_quorum
         , _RpbGetReq'timeout        = timeout
         , _RpbGetReq'type'          = coerce (Just type')
         }
@@ -346,28 +440,47 @@ fetchObject
   response :: RpbGetResp <-
     ExceptT (Internal.fetchObject conn request)
 
-  -- TODO; this logic assumes if_modified is not set. If it is, and the object
-  -- is up to date, then we will have content = [], vclock = Nothing,
-  -- unchanged = Just True.
-  cacheVclock handle type' bucket key (coerce (response ^. #maybe'vclock))
+  -- Only cache the vclock if we didn't received an "unmodified" response (which
+  -- doesn't contain a vclock)
+  case (if_modified, response ^. #maybe'unchanged) of
+    (ParamIfModified, Just True) ->
+      pure ()
+    _ -> do
+      cacheVclock handle type' bucket key (coerce (response ^. #maybe'vclock))
 
-  case response ^. #content of
-    [] ->
-      pure Nothing
-    _ ->
-      pure (Just (mkResponse response))
+  pure (mkResponse response)
 
  where
-  mkResponse :: RpbGetResp -> FetchObjectResp
-  mkResponse (RpbGetResp content vclock unchanged _) =
-    FetchObjectResp (map mkContent content) (coerce vclock) unchanged
+  mkResponse
+    :: RpbGetResp
+    -> Maybe (FetchObjectResp head if_modified)
+  mkResponse (RpbGetResp content _ unchanged _) =
+    case if_modified of
+      ParamIfModified ->
+        case unchanged of
+          Just True ->
+            Just Unmodified
+          _ ->
+            Modified <$> contents
 
-  mkContent :: RpbContent -> Content
+      ParamNoIfModified ->
+        contents
+
+   where
+    contents :: Maybe [Content (Ifte head () ByteString)]
+    contents =
+      case content of
+        [] -> Nothing
+        _  -> Just (map mkContent content)
+
+  mkContent :: RpbContent -> Content (Ifte head () ByteString)
   mkContent
       (RpbContent value content_type charset content_encoding vtag _ last_mod
                   last_mod_usecs usermeta indexes deleted ttl _) =
     Content
-      value
+      (case head of
+        ParamHead   -> ()
+        ParamNoHead -> value)
       (coerce content_type)
       charset
       content_encoding
