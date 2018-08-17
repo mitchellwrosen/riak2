@@ -61,9 +61,13 @@ module Riak
   , ParamNotfoundOk(..)
   , ParamNVal(..)
   , ParamPR(..)
+  , ParamPW(..)
   , ParamR(..)
+  , ParamReturnBody(..)
+  , ParamReturnHead(..)
   , ParamSloppyQuorum(..)
   , ParamTimeout(..)
+  , ParamW(..)
     -- * Temp
   , def
   ) where
@@ -370,7 +374,9 @@ instance Default ParamR where
 
 newtype ParamReturnBody
   = ParamReturnBody Bool
--- TODO ParamReturnBody default
+
+instance Default ParamReturnBody where
+  def = coerce False
 
 
 newtype ParamReturnHead

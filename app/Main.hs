@@ -270,7 +270,15 @@ doStoreObject type' bucket content key = do
         key
         (def & L.value .~ encodeUtf8 content
              & L.contentType .~ "text/plain")
-        def
+        ( def @ParamDW
+        , def @ParamNVal
+        , def @ParamPW
+        , def @ParamReturnBody
+        , ParamReturnHead False
+        , def @ParamSloppyQuorum
+        , def @ParamTimeout
+        , def @ParamW
+        )
 
 doUpdateCounter
   :: BucketType ('Just 'DataTypeCounter)
