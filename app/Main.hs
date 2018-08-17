@@ -2,9 +2,9 @@
              ScopedTypeVariables, TypeApplications #-}
 
 import Control.Monad
+import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
 import Data.Int
-import Data.Proxy
 import Data.Text           (Text)
 import Data.Text.Encoding  (encodeUtf8)
 import Data.Word
@@ -228,8 +228,10 @@ doFetchObject
 
         Right (Just contents) -> do
           for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
-            let tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
-            let tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
+            let tagbs :: ByteString -> ByteString -> IO ()
+                tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
+            let tag :: Show a => String -> a -> IO ()
+                tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
             () <-
               case head' of

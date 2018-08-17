@@ -71,6 +71,8 @@ executable riak-cli
     , optparse-applicative
     , riak-but-better
     , text
+
+    , lens-labels ^>= 0.2.0
   buildable:
     True
   default-language:

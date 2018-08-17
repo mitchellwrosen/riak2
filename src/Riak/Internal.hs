@@ -1,5 +1,7 @@
 module Riak.Internal
-  ( fetchObject
+  ( Connection
+  , withConnection
+  , fetchObject
   , storeObject
   ) where
 
