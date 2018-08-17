@@ -41,9 +41,6 @@ module Riak
     -- * Server info
   , ping
   , getServerInfo
-    -- * Optional parameters
-  , (:=)((:=))
-  , param
     -- * Types
   , Bucket(..)
   , BucketType(..)
@@ -58,6 +55,7 @@ module Riak
   , Vtag(..)
     -- * Optional parameters
   , ParamBasicQuorum(..)
+  , ParamDW(..)
   , ParamHead(..)
   , ParamIfModified(..)
   , ParamNotfoundOk(..)
@@ -76,6 +74,7 @@ import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
+import Data.Default.Class
 import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
@@ -97,7 +96,6 @@ import qualified Data.Text              as Text
 import           Proto.Riak
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Connection
-import           Riak.Internal.Param
 import           Riak.Internal.Request
 import           Riak.Internal.Response
 
@@ -305,6 +303,13 @@ instance Default ParamBasicQuorum where
   def = coerce False
 
 
+newtype ParamDW
+  = ParamDW Quorum
+
+instance Default ParamDW where
+  def = coerce QuorumDefault
+
+
 data ParamHead :: Bool -> Type where
   ParamHead   :: ParamHead 'True
   ParamNoHead :: ParamHead 'False
@@ -319,6 +324,13 @@ data ParamIfModified :: Bool -> Type where
 
 instance (a ~ 'False) => Default (ParamIfModified a) where
   def = ParamNoIfModified
+
+
+newtype ParamIncludeContext
+  = ParamIncludeContext Bool
+
+instance Default ParamIncludeContext where
+  def = coerce True
 
 
 newtype ParamNotfoundOk
@@ -342,11 +354,28 @@ instance Default ParamPR where
   def = coerce QuorumDefault
 
 
+newtype ParamPW
+  = ParamPW Quorum
+
+instance Default ParamPW where
+  def = coerce QuorumDefault
+
+
 newtype ParamR
   = ParamR Quorum
 
 instance Default ParamR where
   def = coerce QuorumDefault
+
+
+newtype ParamReturnBody
+  = ParamReturnBody Bool
+-- TODO ParamReturnBody default
+
+
+newtype ParamReturnHead
+  = ParamReturnHead Bool
+-- TODO ParamReturnBody default
 
 
 newtype ParamSloppyQuorum
@@ -361,6 +390,13 @@ newtype ParamTimeout
 
 instance Default ParamTimeout where
   def = ParamTimeout Nothing
+
+
+newtype ParamW
+  = ParamW Quorum
+
+instance Default ParamW where
+  def = coerce QuorumDefault
 
 
 --------------------------------------------------------------------------------
@@ -509,14 +545,14 @@ storeObject
   -> Bucket
   -> Maybe Key
   -> RpbContent
-  -> ( "dw"              := Quorum
-     , "n_val"           := Quorum
-     , "pw"              := Quorum
-     , "return_body"     := ()
-     , "return_head"     := Bool
-     , "sloppy_quorum"   := ()
-     , "timeout"         := Word32
-     , "w"               := Quorum
+  -> ( ParamDW
+     , ParamNVal
+     , ParamPW
+     , ParamReturnBody
+     , ParamReturnHead
+     , ParamSloppyQuorum
+     , ParamTimeout
+     , ParamW
      )
   -> m (Either RpbErrorResp RpbPutResp)
 storeObject handle type' bucket key content params =
@@ -529,26 +565,26 @@ storeObject_
   -> Bucket
   -> Maybe Key
   -> RpbContent
-  -> ( "dw"              := Quorum
-     , "n_val"           := Quorum
-     , "pw"              := Quorum
-     , "return_body"     := ()
-     , "return_head"     := Bool -- TODO figure out what this defaults to
-     , "sloppy_quorum"   := ()
-     , "timeout"         := Word32
-     , "w"               := Quorum
+  -> ( ParamDW
+     , ParamNVal
+     , ParamPW
+     , ParamReturnBody
+     , ParamReturnHead -- TODO figure out what this defaults to
+     , ParamSloppyQuorum
+     , ParamTimeout
+     , ParamW
      )
   -> ExceptT RpbErrorResp IO RpbPutResp
 storeObject_
     (Handle conn cache) type' bucket key content
-    ( _ := dw
-    , _ := n_val
-    , _ := pw
-    , _ := return_body
-    , _ := return_head
-    , _ := sloppy_quorum
-    , _ := timeout
-    , _ := w
+    ( ParamDW dw
+    , ParamNVal n_val
+    , ParamPW pw
+    , ParamReturnBody return_body
+    , ParamReturnHead return_head
+    , ParamSloppyQuorum sloppy_quorum
+    , timeout
+    , ParamW w
     ) = do
 
   -- Get the cached vclock of this object to pass in the put request.
@@ -566,19 +602,19 @@ storeObject_
         , _RpbPutReq'asis           = Nothing
         , _RpbPutReq'bucket         = coerce bucket
         , _RpbPutReq'content        = content
-        , _RpbPutReq'dw             = dw
+        , _RpbPutReq'dw             = Just dw
         , _RpbPutReq'ifNoneMatch    = Nothing
         , _RpbPutReq'ifNotModified  = Nothing
         , _RpbPutReq'key            = coerce key
-        , _RpbPutReq'nVal           = n_val
-        , _RpbPutReq'pw             = pw
-        , _RpbPutReq'returnBody     = True <$ return_body
-        , _RpbPutReq'returnHead     = return_head
-        , _RpbPutReq'sloppyQuorum   = True <$ sloppy_quorum
-        , _RpbPutReq'timeout        = timeout
+        , _RpbPutReq'nVal           = Just n_val
+        , _RpbPutReq'pw             = Just pw
+        , _RpbPutReq'returnBody     = Just return_body
+        , _RpbPutReq'returnHead     = Just return_head
+        , _RpbPutReq'sloppyQuorum   = Just sloppy_quorum
+        , _RpbPutReq'timeout        = coerce timeout
         , _RpbPutReq'type'          = coerce (Just type')
         , _RpbPutReq'vclock         = coerce vclock
-        , _RpbPutReq'w              = w
+        , _RpbPutReq'w              = Just w
         }
 
   ExceptT (Internal.storeObject conn request)
@@ -600,24 +636,24 @@ fetchCounter
   -> BucketType ('Just 'DataTypeCounter)
   -> Bucket
   -> Key
-  -> ( "basic_quorum"    := ()
-     , "n_val"           := Quorum
-     , "notfound_ok"     := Bool
-     , "pr"              := Quorum
-     , "r"               := Quorum
-     , "sloppy_quorum"   := ()
-     , "timeout"         := Word32
+  -> ( ParamBasicQuorum
+     , ParamNotfoundOk
+     , ParamNVal
+     , ParamPR
+     , ParamR
+     , ParamSloppyQuorum
+     , ParamTimeout
      )
   -> m (Either RpbErrorResp Int64)
 fetchCounter
     (Handle conn _) type' bucket key
-    ( _ := basic_quorum
-    , _ := n_val
-    , _ := notfound_ok
-    , _ := pr
-    , _ := r
-    , _ := sloppy_quorum
-    , _ := timeout
+    ( ParamBasicQuorum basic_quorum
+    , ParamNotfoundOk notfound_ok
+    , ParamNVal n_val
+    , ParamPR pr
+    , ParamR r
+    , ParamSloppyQuorum sloppy_quorum
+    , timeout
     ) = runExceptT $ do
 
   response :: DtFetchResp <-
@@ -638,16 +674,16 @@ fetchCounter
   request =
     DtFetchReq
       { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = True <$ basic_quorum
+      , _DtFetchReq'basicQuorum    = Just basic_quorum
       , _DtFetchReq'bucket         = coerce bucket
       , _DtFetchReq'includeContext = Nothing
       , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = notfound_ok
-      , _DtFetchReq'pr             = pr
-      , _DtFetchReq'r              = r
-      , _DtFetchReq'sloppyQuorum   = True <$ sloppy_quorum
-      , _DtFetchReq'timeout        = timeout
+      , _DtFetchReq'nVal           = Just n_val
+      , _DtFetchReq'notfoundOk     = Just notfound_ok
+      , _DtFetchReq'pr             = Just pr
+      , _DtFetchReq'r              = Just r
+      , _DtFetchReq'sloppyQuorum   = Just sloppy_quorum
+      , _DtFetchReq'timeout        = coerce timeout
       , _DtFetchReq'type'          = coerce type'
       }
 
@@ -658,19 +694,19 @@ fetchSet
   -> BucketType ('Just 'DataTypeSet)
   -> Bucket
   -> Key
-  -> ( "basic_quorum"    := ()
-     , "include_context" := Bool -- TODO rename to not_include_context?
-     , "n_val"           := Quorum
-     , "notfound_ok"     := Bool -- TODO invert?
-     , "pr"              := Quorum
-     , "r"               := Quorum
-     , "sloppy_quorum"   := ()
-     , "timeout"         := Word32
+  -> ( ParamBasicQuorum
+     , ParamIncludeContext
+     , ParamNVal
+     , ParamNotfoundOk -- TODO invert?
+     , ParamPR
+     , ParamR
+     , ParamSloppyQuorum
+     , ParamTimeout
      )
   -> m (Either RpbErrorResp [ByteString])
 fetchSet
     handle type' bucket key
-    params@(_, _ := include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
+    params@(_, ParamIncludeContext include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
 
   response :: DtFetchResp <-
     ExceptT (fetchDataType handle type' bucket key params)
@@ -678,7 +714,7 @@ fetchSet
   case response ^. #type' of
     DtFetchResp'SET -> do
       -- Cache set context, if it was requested (it defaults to true)
-      when (include_context /= Just False) $
+      when include_context $
         let
           vclock :: Maybe Vclock
           vclock = coerce (response ^. #maybe'context)
@@ -699,25 +735,25 @@ fetchDataType
   -> BucketType ('Just ty)
   -> Bucket
   -> Key
-  -> ( "basic_quorum"    := ()
-     , "include_context" := Bool
-     , "n_val"           := Quorum
-     , "notfound_ok"     := Bool
-     , "pr"              := Quorum
-     , "r"               := Quorum
-     , "sloppy_quorum"   := ()
-     , "timeout"         := Word32
+  -> ( ParamBasicQuorum
+     , ParamIncludeContext
+     , ParamNVal
+     , ParamNotfoundOk
+     , ParamPR
+     , ParamR
+     , ParamSloppyQuorum
+     , ParamTimeout
      )
   -> m (Either RpbErrorResp DtFetchResp)
 fetchDataType (Handle conn _) type' bucket key
-    ( _ := basic_quorum
-    , _ := include_context
-    , _ := n_val
-    , _ := notfound_ok
-    , _ := pr
-    , _ := r
-    , _ := sloppy_quorum
-    , _ := timeout
+    ( ParamBasicQuorum basic_quorum
+    , ParamIncludeContext include_context
+    , ParamNVal n_val
+    , ParamNotfoundOk notfound_ok
+    , ParamPR pr
+    , ParamR r
+    , ParamSloppyQuorum sloppy_quorum
+    , timeout
     ) =
 
   liftIO (exchange conn request)
@@ -726,16 +762,16 @@ fetchDataType (Handle conn _) type' bucket key
   request =
     DtFetchReq
       { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = True <$ basic_quorum
+      , _DtFetchReq'basicQuorum    = Just basic_quorum
       , _DtFetchReq'bucket         = coerce bucket
-      , _DtFetchReq'includeContext = include_context
+      , _DtFetchReq'includeContext = Just include_context
       , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = notfound_ok
-      , _DtFetchReq'pr             = pr
-      , _DtFetchReq'r              = r
-      , _DtFetchReq'sloppyQuorum   = True <$ sloppy_quorum
-      , _DtFetchReq'timeout        = timeout
+      , _DtFetchReq'nVal           = Just n_val
+      , _DtFetchReq'notfoundOk     = Just notfound_ok
+      , _DtFetchReq'pr             = Just pr
+      , _DtFetchReq'r              = Just r
+      , _DtFetchReq'sloppyQuorum   = Just sloppy_quorum
+      , _DtFetchReq'timeout        = coerce timeout
       , _DtFetchReq'type'          = coerce type'
       }
 
@@ -753,24 +789,24 @@ updateCounter
   -> Bucket
   -> Maybe Key
   -> Int64
-  -> ( "dw"            := Quorum
-     , "n_val"         := Quorum
-     , "pw"            := Quorum
-     , "return_body"   := ()
-     , "sloppy_quorum" := ()
-     , "timeout"       := Word32
-     , "w"             := Quorum
+  -> ( ParamDW
+     , ParamNVal
+     , ParamPW
+     , ParamReturnBody
+     , ParamSloppyQuorum
+     , ParamTimeout
+     , ParamW
      )
   -> m (Either RpbErrorResp DtUpdateResp)
 updateCounter
     (Handle conn _) type' bucket key incr
-    ( _ := dw
-    , _ := n_val
-    , _ := pw
-    , _ := return_body
-    , _ := sloppy_quorum
-    , _ := timeout
-    , _ := w
+    ( ParamDW dw
+    , ParamNVal n_val
+    , ParamPW pw
+    , ParamReturnBody return_body
+    , ParamSloppyQuorum sloppy_quorum
+    , timeout
+    , ParamW w
     ) = do
   liftIO (exchange conn request)
  where
@@ -780,17 +816,17 @@ updateCounter
       { _DtUpdateReq'_unknownFields = []
       , _DtUpdateReq'bucket         = coerce bucket
       , _DtUpdateReq'context        = Nothing
-      , _DtUpdateReq'dw             = dw
+      , _DtUpdateReq'dw             = Just dw
       , _DtUpdateReq'includeContext = Nothing
       , _DtUpdateReq'key            = coerce key
-      , _DtUpdateReq'nVal           = n_val
+      , _DtUpdateReq'nVal           = Just n_val
       , _DtUpdateReq'op             = op
-      , _DtUpdateReq'pw             = pw
-      , _DtUpdateReq'returnBody     = True <$ return_body
-      , _DtUpdateReq'sloppyQuorum   = True <$ sloppy_quorum
-      , _DtUpdateReq'timeout        = timeout
+      , _DtUpdateReq'pw             = Just pw
+      , _DtUpdateReq'returnBody     = Just return_body
+      , _DtUpdateReq'sloppyQuorum   = Just sloppy_quorum
+      , _DtUpdateReq'timeout        = coerce timeout
       , _DtUpdateReq'type'          = coerce type'
-      , _DtUpdateReq'w              = w
+      , _DtUpdateReq'w              = Just w
       }
 
   op :: DtOp

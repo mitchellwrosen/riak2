@@ -58,7 +58,6 @@ library
     Riak.Internal.Connection
     Riak.Internal.Message
     Riak.Internal.Panic
-    Riak.Internal.Param
     Riak.Internal.Request
     Riak.Internal.Response
 
