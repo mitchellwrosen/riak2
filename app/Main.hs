@@ -1,16 +1,20 @@
-{-# LANGUAGE LambdaCase, DataKinds, GADTs, OverloadedStrings, RankNTypes,
+{-# LANGUAGE DataKinds, GADTs, LambdaCase, OverloadedStrings, RankNTypes,
              ScopedTypeVariables, TypeApplications #-}
 
 import Control.Monad
-import Data.ByteString     (ByteString)
-import Data.Foldable       (asum, for_)
+import Control.Monad.IO.Class
+import Control.Monad.Trans.Except
+import Data.ByteString            (ByteString)
+import Data.Coerce
+import Data.Foldable              (asum, for_)
 import Data.Int
-import Data.Text           (Text)
-import Data.Text.Encoding  (encodeUtf8)
+import Data.Text                  (Text)
+import Data.Text.Encoding         (encodeUtf8)
 import Lens.Family2
+import List.Transformer           (runListT)
 import Options.Applicative
-import Prelude             hiding (head)
-import Text.Read (readMaybe)
+import Prelude                    hiding (head)
+import Text.Read                  (readMaybe)
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
@@ -45,7 +49,7 @@ parser =
       , updateCounterParser
       ]
     , [ commandGroup "Bucket operations"
-      , command "TODO" (info empty mempty)
+      , listKeysParser
       ]
     , [ commandGroup "MapReduce"
       , command "TODO" (info empty mempty)
@@ -103,6 +107,16 @@ fetchObjectParser =
         <*> sloppyQuorumOption
         <*> timeoutOption)
       (progDesc "Fetch an object"))
+
+listKeysParser :: Mod CommandFields (IO ())
+listKeysParser =
+  command
+    "list-keys"
+    (info
+      (doListKeys
+        <$> bucketTypeArgument
+        <*> bucketArgument)
+      (progDesc "List all keys in a bucket"))
 
 storeObjectParser :: Mod CommandFields (IO ())
 storeObjectParser =
@@ -238,6 +252,17 @@ doFetchObject
             for_ (content ^. L.deleted)         (tag "deleted")
             for_ (content ^. L.ttl)             (tag "ttl")
 
+doListKeys
+  :: BucketType ty
+  -> Bucket
+  -> IO ()
+doListKeys type' bucket = do
+  cache <- refVclockCache
+  withHandle "localhost" 8087 cache $ \h -> do
+    result :: Either L.RpbErrorResp () <-
+      (runExceptT . runListT)
+        (listKeys h type' bucket >>= liftIO . Latin1.putStrLn . coerce)
+    either print (const (pure ())) result
 
 doStoreObject
   :: BucketType 'Nothing

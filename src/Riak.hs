@@ -77,6 +77,7 @@ module Riak
   , def
   ) where
 
+import Control.Applicative
 import Control.Monad
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
@@ -84,6 +85,7 @@ import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
 import Data.Default.Class
+import Data.Function              (fix)
 import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
@@ -94,6 +96,7 @@ import Data.Word
 import GHC.Exts                   (IsString)
 import Lens.Family2.Unchecked     (lens)
 import Lens.Labels
+import List.Transformer           (ListT)
 import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head, (.))
 import UnliftIO.Exception         (Exception, throwIO)
@@ -101,6 +104,7 @@ import UnliftIO.Exception         (Exception, throwIO)
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.HashMap.Strict    as HashMap
 import qualified Data.Text              as Text
+import qualified List.Transformer       as ListT
 
 import           Proto.Riak
 import qualified Riak.Internal            as Internal
@@ -922,6 +926,7 @@ resetBucketProps (Handle conn _) req =
   liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
 
 
+-- TODO streaming listBuckets
 listBuckets
   :: MonadIO m
   => Handle
@@ -931,28 +936,39 @@ listBuckets (Handle conn _) req =
   liftIO (exchange conn req)
 
 
--- TODO streaming listKeys
--- TODO key newtype
+-- TODO param timeout
 listKeys
-  :: MonadIO m
+  :: forall m ty.
+     MonadIO m
   => Handle
-  -> RpbListKeysReq
-  -> m (Either RpbErrorResp [ByteString])
-listKeys (Handle conn _) req = liftIO $ do
-  send conn req
+  -> BucketType ty
+  -> Bucket
+  -> ListT (ExceptT RpbErrorResp m) Key
+listKeys (Handle conn _) type' bucket = do
+  liftIO (send conn request)
 
-  let
-    loop :: ExceptT RpbErrorResp IO [ByteString]
-    loop = do
-      resp :: RpbListKeysResp <-
-        ExceptT (recv conn >>= parseResponse)
+  fix $ \loop -> do
+    resp :: RpbListKeysResp <-
+      lift (ExceptT (liftIO (recv conn >>= parseResponse)))
 
+    let
+      keys :: [Key]
+      keys =
+        coerce (resp ^. #keys)
+
+    ListT.select keys <|>
       if resp ^. #done
-        then pure (resp ^. #keys)
-        else ((resp ^. #keys) ++) <$> loop
-
-  runExceptT loop
-
+        then empty
+        else loop
+ where
+  request :: RpbListKeysReq
+  request =
+    RpbListKeysReq
+      { _RpbListKeysReq'_unknownFields = []
+      , _RpbListKeysReq'bucket         = coerce bucket
+      , _RpbListKeysReq'timeout        = Nothing
+      , _RpbListKeysReq'type'          = coerce (Just type')
+      }
 
 mapReduce
   :: MonadIO m
