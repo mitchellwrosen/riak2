@@ -1,9 +1,10 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleContexts,
              FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
              InstanceSigs, KindSignatures, LambdaCase, MagicHash,
-             MultiParamTypeClasses, OverloadedLabels, PatternSynonyms,
-             RankNTypes, ScopedTypeVariables, TypeApplications, TypeFamilies,
-             TypeOperators, UndecidableInstances #-}
+             MultiParamTypeClasses, OverloadedLabels, OverloadedStrings,
+             PatternSynonyms, RankNTypes, ScopedTypeVariables,
+             TypeApplications, TypeFamilies, TypeOperators,
+             UndecidableInstances #-}
 
 module Riak
   ( -- * Riak handle
@@ -44,6 +45,7 @@ module Riak
     -- * Types
   , Bucket(..)
   , BucketType(..)
+  , pattern BucketTypeDefault
   , Content(..)
   , ContentType(..)
   , DataType(..)
@@ -173,6 +175,10 @@ newtype BucketType (ty :: Maybe DataType)
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
+
+pattern BucketTypeDefault :: BucketType 'Nothing
+pattern BucketTypeDefault =
+  BucketType "default"
 
 
 -- | A Riak bucket.
