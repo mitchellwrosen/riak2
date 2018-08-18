@@ -49,6 +49,7 @@ parser =
       , updateCounterParser
       ]
     , [ commandGroup "Bucket operations"
+      , listBucketsParser
       , listKeysParser
       ]
     , [ commandGroup "MapReduce"
@@ -107,6 +108,14 @@ fetchObjectParser =
         <*> sloppyQuorumOption
         <*> timeoutOption)
       (progDesc "Fetch an object"))
+
+listBucketsParser :: Mod CommandFields (IO ())
+listBucketsParser =
+  command
+    "list-buckets"
+    (info
+      (doListBuckets <$> bucketTypeArgument)
+      (progDesc "List all buckets in a bucket type"))
 
 listKeysParser :: Mod CommandFields (IO ())
 listKeysParser =
@@ -251,6 +260,15 @@ doFetchObject
             for_ (content ^. L.indexes)         print -- TODO better indexes printing
             for_ (content ^. L.deleted)         (tag "deleted")
             for_ (content ^. L.ttl)             (tag "ttl")
+
+doListBuckets :: BucketType ty -> IO ()
+doListBuckets type' = do
+  cache <- refVclockCache
+  withHandle "localhost" 8087 cache $ \h -> do
+    result :: Either L.RpbErrorResp () <-
+      (runExceptT . runListT)
+        (listBuckets h type' >>= liftIO . Latin1.putStrLn . coerce)
+    either print (const (pure ())) result
 
 doListKeys
   :: BucketType ty

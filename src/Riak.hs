@@ -926,17 +926,39 @@ resetBucketProps (Handle conn _) req =
   liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
 
 
--- TODO streaming listBuckets
+-- TODO listBuckets param timeout
 listBuckets
   :: MonadIO m
   => Handle
-  -> RpbListBucketsReq
-  -> m (Either RpbErrorResp RpbListBucketsResp)
-listBuckets (Handle conn _) req =
-  liftIO (exchange conn req)
+  -> BucketType ty
+  -> ListT (ExceptT RpbErrorResp m) Bucket
+listBuckets (Handle conn _) type' = do
+  liftIO (send conn request)
 
+  fix $ \loop -> do
+    resp :: RpbListBucketsResp <-
+      lift (ExceptT (liftIO (recv conn >>= parseResponse)))
 
--- TODO param timeout
+    let
+      buckets :: [Bucket]
+      buckets =
+        coerce (resp ^. #buckets)
+
+    ListT.select buckets <|>
+      if resp ^. #done
+        then empty
+        else loop
+ where
+  request :: RpbListBucketsReq
+  request =
+    RpbListBucketsReq
+      { _RpbListBucketsReq'_unknownFields = []
+      , _RpbListBucketsReq'stream = Just True
+      , _RpbListBucketsReq'timeout = Nothing
+      , _RpbListBucketsReq'type' = coerce (Just type')
+      }
+
+-- TODO listKeys param timeout
 listKeys
   :: forall m ty.
      MonadIO m
