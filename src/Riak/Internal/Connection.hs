@@ -31,6 +31,7 @@ import qualified Network.Socket.ByteString      as Socket (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 
 import Proto.Riak
+import Riak.Internal.Debug
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Request  (Request, requestToMessage)
@@ -136,8 +137,11 @@ exchange
   -> a
   -> IO (Either RpbErrorResp b)
 exchange conn req = do
+  debug (">>> " ++ show req)
   send conn req
-  recv conn >>= parseResponse
+  resp <- parseResponse =<< recv conn
+  debug ("<<< " ++ show resp)
+  pure resp
 
 parsePanic
   :: Atto.Parser a

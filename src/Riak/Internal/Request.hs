@@ -15,7 +15,7 @@ import qualified Data.ProtoLens as Proto
 import Proto.Riak
 import Riak.Internal.Message
 
-class Request a where
+class Show a => Request a where
   requestCode :: MessageCode a
 
   requestEncode :: a -> ByteString
@@ -47,6 +47,7 @@ requestToMessage req =
 
 data RpbPingReq
   = RpbPingReq
+  deriving Show
 
 instance Request RpbPingReq where
   requestCode = 1
@@ -54,6 +55,7 @@ instance Request RpbPingReq where
 
 data RpbGetServerInfoReq
   = RpbGetServerInfoReq
+  deriving Show
 
 instance Request RpbGetServerInfoReq where
   requestCode = 7

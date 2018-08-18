@@ -56,6 +56,7 @@ library
     src
   other-modules:
     Riak.Internal.Connection
+    Riak.Internal.Debug
     Riak.Internal.Message
     Riak.Internal.Panic
     Riak.Internal.Request

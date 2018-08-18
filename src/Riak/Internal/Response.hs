@@ -22,7 +22,7 @@ import Proto.Riak
 import Riak.Internal.Message
 import Riak.Internal.Panic
 
-class Response a where
+class Show a => Response a where
   responseCode :: MessageCode a
 
   responseDecode :: ByteString -> Either String a
@@ -44,6 +44,7 @@ instance Response RpbYokozunaSchemaGetResp where responseCode = 59
 
 data RpbDelResp
   = RpbDelResp
+  deriving Show
 
 instance Response RpbDelResp where
   responseCode = 14
@@ -51,6 +52,7 @@ instance Response RpbDelResp where
 
 data RpbEmptyPutResp
   = RpbEmptyPutResp
+  deriving Show
 
 instance Response RpbEmptyPutResp where
   responseCode = 12
@@ -58,6 +60,7 @@ instance Response RpbEmptyPutResp where
 
 data RpbPingResp
   = RpbPingResp
+  deriving Show
 
 instance Response RpbPingResp where
   responseCode = 2
@@ -65,6 +68,7 @@ instance Response RpbPingResp where
 
 data RpbResetBucketResp
   = RpbResetBucketResp
+  deriving Show
 
 instance Response RpbResetBucketResp where
   responseCode = 30
@@ -72,6 +76,7 @@ instance Response RpbResetBucketResp where
 
 data RpbSetBucketResp
   = RpbSetBucketResp
+  deriving Show
 
 instance Response RpbSetBucketResp where
   responseCode = 22
@@ -79,6 +84,7 @@ instance Response RpbSetBucketResp where
 
 data RpbSetBucketTypeResp
   = RpbSetBucketTypeResp
+  deriving Show
 
 instance Response RpbSetBucketTypeResp where
   responseCode = 32

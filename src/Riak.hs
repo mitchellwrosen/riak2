@@ -49,8 +49,11 @@ module Riak
   , DataType(..)
   , IfModified(..)
   , Key(..)
-  , Quorum
+  , Quorum(..)
+  , pattern QuorumAll
   , pattern QuorumDefault
+  , pattern QuorumOne
+  , pattern QuorumQuorum
   , Vclock(..)
   , Vtag(..)
     -- * Optional parameters
@@ -263,12 +266,22 @@ instance Show Key where
     Text.unpack . decodeUtf8 . unKey
 
 
--- TODO Better Quorum type
-type Quorum
-  = Word32
+newtype Quorum
+  = Quorum Word32
+  deriving stock (Eq)
+  deriving newtype (Num)
 
-pattern QuorumDefault :: Word32
+pattern QuorumAll :: Quorum
+pattern QuorumAll = 4294967292
+
+pattern QuorumDefault :: Quorum
 pattern QuorumDefault = 4294967291
+
+pattern QuorumOne :: Quorum
+pattern QuorumOne = 4294967294
+
+pattern QuorumQuorum :: Quorum
+pattern QuorumQuorum = 4294967293
 
 
 newtype SomeBucketType
@@ -345,10 +358,10 @@ instance Default ParamNotfoundOk where
 
 
 newtype ParamNVal
-  = ParamNVal Quorum
+  = ParamNVal (Maybe Word32)
 
 instance Default ParamNVal where
-  def = coerce QuorumDefault
+  def = ParamNVal Nothing
 
 
 newtype ParamPR
@@ -381,7 +394,9 @@ instance Default ParamReturnBody where
 
 newtype ParamReturnHead
   = ParamReturnHead Bool
--- TODO ParamReturnBody default
+
+instance Default ParamReturnHead where
+  def = coerce False
 
 
 newtype ParamSloppyQuorum
@@ -477,10 +492,10 @@ fetchObject
               ParamIfModified   -> coerce vclock
               ParamNoIfModified -> Nothing
         , _RpbGetReq'key            = coerce key
-        , _RpbGetReq'nVal           = Just n_val
+        , _RpbGetReq'nVal           = n_val
         , _RpbGetReq'notfoundOk     = Just notfound_ok
-        , _RpbGetReq'pr             = Just pr
-        , _RpbGetReq'r              = Just r
+        , _RpbGetReq'pr             = coerce (Just pr)
+        , _RpbGetReq'r              = coerce (Just r)
         , _RpbGetReq'sloppyQuorum   = Just sloppy_quorum
         , _RpbGetReq'timeout        = timeout
         , _RpbGetReq'type'          = coerce (Just type')
@@ -608,19 +623,19 @@ storeObject_
         , _RpbPutReq'asis           = Nothing
         , _RpbPutReq'bucket         = coerce bucket
         , _RpbPutReq'content        = content
-        , _RpbPutReq'dw             = Just dw
+        , _RpbPutReq'dw             = Just (coerce dw)
         , _RpbPutReq'ifNoneMatch    = Nothing
         , _RpbPutReq'ifNotModified  = Nothing
         , _RpbPutReq'key            = coerce key
-        , _RpbPutReq'nVal           = Just n_val
-        , _RpbPutReq'pw             = Just pw
+        , _RpbPutReq'nVal           = n_val
+        , _RpbPutReq'pw             = Just (coerce pw)
         , _RpbPutReq'returnBody     = Just return_body
         , _RpbPutReq'returnHead     = Just return_head
         , _RpbPutReq'sloppyQuorum   = Just sloppy_quorum
         , _RpbPutReq'timeout        = coerce timeout
         , _RpbPutReq'type'          = coerce (Just type')
         , _RpbPutReq'vclock         = coerce vclock
-        , _RpbPutReq'w              = Just w
+        , _RpbPutReq'w              = coerce (Just w)
         }
 
   ExceptT (Internal.storeObject conn request)
@@ -684,10 +699,10 @@ fetchCounter
       , _DtFetchReq'bucket         = coerce bucket
       , _DtFetchReq'includeContext = Nothing
       , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = Just n_val
+      , _DtFetchReq'nVal           = n_val
       , _DtFetchReq'notfoundOk     = Just notfound_ok
-      , _DtFetchReq'pr             = Just pr
-      , _DtFetchReq'r              = Just r
+      , _DtFetchReq'pr             = coerce (Just pr)
+      , _DtFetchReq'r              = coerce (Just r)
       , _DtFetchReq'sloppyQuorum   = Just sloppy_quorum
       , _DtFetchReq'timeout        = coerce timeout
       , _DtFetchReq'type'          = coerce type'
@@ -772,10 +787,10 @@ fetchDataType (Handle conn _) type' bucket key
       , _DtFetchReq'bucket         = coerce bucket
       , _DtFetchReq'includeContext = Just include_context
       , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = Just n_val
+      , _DtFetchReq'nVal           = n_val
       , _DtFetchReq'notfoundOk     = Just notfound_ok
-      , _DtFetchReq'pr             = Just pr
-      , _DtFetchReq'r              = Just r
+      , _DtFetchReq'pr             = coerce (Just pr)
+      , _DtFetchReq'r              = coerce (Just r)
       , _DtFetchReq'sloppyQuorum   = Just sloppy_quorum
       , _DtFetchReq'timeout        = coerce timeout
       , _DtFetchReq'type'          = coerce type'
@@ -822,17 +837,17 @@ updateCounter
       { _DtUpdateReq'_unknownFields = []
       , _DtUpdateReq'bucket         = coerce bucket
       , _DtUpdateReq'context        = Nothing
-      , _DtUpdateReq'dw             = Just dw
+      , _DtUpdateReq'dw             = coerce (Just dw)
       , _DtUpdateReq'includeContext = Nothing
       , _DtUpdateReq'key            = coerce key
-      , _DtUpdateReq'nVal           = Just n_val
+      , _DtUpdateReq'nVal           = n_val
       , _DtUpdateReq'op             = op
-      , _DtUpdateReq'pw             = Just pw
+      , _DtUpdateReq'pw             = coerce (Just pw)
       , _DtUpdateReq'returnBody     = Just return_body
       , _DtUpdateReq'sloppyQuorum   = Just sloppy_quorum
       , _DtUpdateReq'timeout        = coerce timeout
       , _DtUpdateReq'type'          = coerce type'
-      , _DtUpdateReq'w              = Just w
+      , _DtUpdateReq'w              = coerce (Just w)
       }
 
   op :: DtOp

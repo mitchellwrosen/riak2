@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, GADTs, OverloadedStrings, RankNTypes,
+{-# LANGUAGE LambdaCase, DataKinds, GADTs, OverloadedStrings, RankNTypes,
              ScopedTypeVariables, TypeApplications #-}
 
 import Control.Monad
@@ -7,10 +7,10 @@ import Data.Foldable       (asum, for_)
 import Data.Int
 import Data.Text           (Text)
 import Data.Text.Encoding  (encodeUtf8)
-import Data.Word
 import Lens.Family2
 import Options.Applicative
 import Prelude             hiding (head)
+import Text.Read (readMaybe)
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
@@ -94,41 +94,14 @@ fetchObjectParser =
                 ])
         <*> switch
               (mconcat
-                [ long "no-notfound-ok"
-                , help "No notfound ok"
+                [ long "notfound-not-ok"
+                , help "notfound not ok"
                 ])
-        <*> option auto
-              (mconcat
-                [ long "nval"
-                , help "N value"
-                , metavar "QUORUM"
-                , value QuorumDefault
-                ])
-        <*> option auto
-              (mconcat
-                [ long "pr"
-                , help "PR value"
-                , metavar "QUORUM"
-                , value QuorumDefault
-                ])
-        <*> option auto
-              (mconcat
-                [ long "r"
-                , help "R value"
-                , metavar "QUORUM"
-                , value QuorumDefault
-                ])
-        <*> switch
-              (mconcat
-                [ long "sloppy-quorum"
-                , help "Sloppy quorum"
-                ])
-        <*> (optional . option auto)
-              (mconcat
-                [ long "timeout"
-                , help "Timeout"
-                , metavar "MILLISECONDS"
-                ]))
+        <*> nvalOption
+        <*> prOption
+        <*> rOption
+        <*> sloppyQuorumOption
+        <*> timeoutOption)
       (progDesc "Fetch an object"))
 
 storeObjectParser :: Mod CommandFields (IO ())
@@ -139,13 +112,25 @@ storeObjectParser =
       (doStoreObject
         <$> bucketTypeArgument
         <*> bucketArgument
+        <*> optional keyOption
         <*> strArgument
               (mconcat
                 [ help "Content"
                 , metavar "CONTENT"
                 ])
-        <*> optional keyOption)
-        -- TODO store-object optional params
+        <*> dwOption
+        <*> nvalOption
+        <*> pwOption
+        <*> returnBodyOption
+        <*> (ParamReturnHead <$>
+              switch
+                (mconcat
+                  [ long "return-head"
+                  , help "Return head"
+                  ]))
+        <*> sloppyQuorumOption
+        <*> timeoutOption
+        <*> wOption)
       (progDesc "Store an object"))
 
 updateCounterParser :: Mod CommandFields (IO ())
@@ -191,19 +176,19 @@ doFetchObject
   -> Bool
   -> Bool
   -> Bool
-  -> Quorum
-  -> Quorum
-  -> Quorum
-  -> Bool
-  -> Maybe Word32
+  -> ParamNVal
+  -> ParamPR
+  -> ParamR
+  -> ParamSloppyQuorum
+  -> ParamTimeout
   -> IO ()
 doFetchObject
-    type' bucket key basic_quorum head no_notfound_ok n_val pr r sloppy_quorum
+    type' bucket key basic_quorum head notfound_not_ok n_val pr r sloppy_quorum
     timeout = do
   cache <- refVclockCache
   withHandle "localhost" 8087 cache $ \h ->
     withParamHead head $ \head' -> do
-      eresponse <- -- :: Either L.RpbErrorResp (Maybe FetchObjectResp) <-
+      eresponse <-
         fetchObject h
           type'
           bucket
@@ -211,12 +196,12 @@ doFetchObject
           ( ParamBasicQuorum basic_quorum
           , head'
           , ParamNoIfModified
-          , ParamNVal n_val
-          , ParamNotfoundOk (not no_notfound_ok)
-          , ParamPR pr
-          , ParamR r
-          , ParamSloppyQuorum sloppy_quorum
-          , ParamTimeout timeout
+          , n_val
+          , ParamNotfoundOk (not notfound_not_ok)
+          , pr
+          , r
+          , sloppy_quorum
+          , timeout
           )
 
       case eresponse of
@@ -257,10 +242,20 @@ doFetchObject
 doStoreObject
   :: BucketType 'Nothing
   -> Bucket
-  -> Text
   -> Maybe Key
+  -> Text
+  -> ParamDW
+  -> ParamNVal
+  -> ParamPW
+  -> ParamReturnBody
+  -> ParamReturnHead
+  -> ParamSloppyQuorum
+  -> ParamTimeout
+  -> ParamW
   -> IO ()
-doStoreObject type' bucket content key = do
+doStoreObject
+    type' bucket key content dw n_val pw return_body return_head sloppy_quorum
+    timeout w = do
   cache <- refVclockCache
   withHandle "localhost" 8087 cache $ \h ->
     print =<<
@@ -270,14 +265,14 @@ doStoreObject type' bucket content key = do
         key
         (def & L.value .~ encodeUtf8 content
              & L.contentType .~ "text/plain")
-        ( def @ParamDW
-        , def @ParamNVal
-        , def @ParamPW
-        , def @ParamReturnBody
-        , ParamReturnHead False
-        , def @ParamSloppyQuorum
-        , def @ParamTimeout
-        , def @ParamW
+        ( dw
+        , n_val
+        , pw
+        , return_body
+        , return_head
+        , sloppy_quorum
+        , timeout
+        , w
         )
 
 doUpdateCounter
@@ -339,3 +334,77 @@ keyOption =
       , help "Key"
       , metavar "KEY"
       ])
+
+dwOption :: Parser ParamDW
+dwOption =
+  ParamDW <$> quorumOption "dw" "DW value"
+
+nvalOption :: Parser ParamNVal
+nvalOption =
+  (fmap ParamNVal . optional . option auto)
+    (mconcat
+      [ long "nval"
+      , help "N value"
+      , metavar "NODES"
+      ])
+
+prOption :: Parser ParamPR
+prOption =
+  ParamPR <$> quorumOption "pr" "PR value"
+
+pwOption :: Parser ParamPW
+pwOption =
+  ParamPW <$> quorumOption "pw" "PW value"
+
+quorumOption :: String -> String -> Parser Quorum
+quorumOption s1 s2 =
+  option (maybeReader readQuorum)
+    (mconcat
+      [ long s1
+      , help s2
+      , metavar "QUORUM"
+      , value QuorumDefault
+      ])
+ where
+  readQuorum :: String -> Maybe Quorum
+  readQuorum = \case
+    "all"     -> pure QuorumAll
+    "default" -> pure QuorumDefault
+    "one"     -> pure QuorumOne
+    "quorum"  -> pure QuorumQuorum
+    s         -> Quorum <$> readMaybe s
+
+rOption :: Parser ParamR
+rOption =
+  ParamR <$> quorumOption "r" "R value"
+
+returnBodyOption :: Parser ParamReturnBody
+returnBodyOption =
+  ParamReturnBody <$>
+    switch
+      (mconcat
+        [ long "return-body"
+        , help "Return body"
+        ])
+
+sloppyQuorumOption :: Parser ParamSloppyQuorum
+sloppyQuorumOption =
+  ParamSloppyQuorum <$>
+    switch
+      (mconcat
+        [ long "sloppy-quorum"
+        , help "Sloppy quorum"
+        ])
+
+timeoutOption :: Parser ParamTimeout
+timeoutOption =
+  (fmap ParamTimeout . optional . option auto)
+    (mconcat
+      [ long "timeout"
+      , help "Timeout"
+      , metavar "MILLISECONDS"
+      ])
+
+wOption :: Parser ParamW
+wOption =
+  ParamW <$> quorumOption "w" "W value"
