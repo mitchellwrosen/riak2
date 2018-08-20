@@ -3,7 +3,7 @@
              InstanceSigs, KindSignatures, LambdaCase, MagicHash,
              MultiParamTypeClasses, OverloadedLabels, OverloadedStrings,
              PatternSynonyms, RankNTypes, ScopedTypeVariables,
-             TypeApplications, TypeFamilies, TypeOperators,
+             StandaloneDeriving, TypeApplications, TypeFamilies, TypeOperators,
              UndecidableInstances #-}
 
 module Riak
@@ -13,8 +13,14 @@ module Riak
   , VclockCache
   , refVclockCache
     -- * Key/value object operations
+    -- ** Fetch object
   , fetchObject
+    -- ** Store object
+  , StoreObjectResp(..)
+  , ObjectReturn(..)
+  , ObjectReturnTy
   , storeObject
+    -- ** Delete object
   , deleteObject
     -- * Data type operations
   , fetchCounter
@@ -65,6 +71,7 @@ module Riak
   , ParamIfModified(..)
   , ParamNotfoundOk(..)
   , ParamNVal(..)
+  , ParamObjectReturn(..)
   , ParamPR(..)
   , ParamPW(..)
   , ParamR(..)
@@ -78,7 +85,7 @@ module Riak
   ) where
 
 import Control.Applicative
-import Control.Monad
+import Control.Monad              (guard, when)
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
@@ -91,14 +98,16 @@ import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
 import Data.Kind                  (Type)
+import Data.Text                  (Text)
 import Data.Text.Encoding         (decodeUtf8)
+import Data.Type.Bool             (If)
 import Data.Word
 import GHC.Exts                   (IsString)
 import Lens.Family2.Unchecked     (lens)
 import Lens.Labels
 import List.Transformer           (ListT)
 import Network.Socket             (HostName, PortNumber)
-import Prelude                    hiding (head, (.))
+import Prelude                    hiding (head, return, (.))
 import UnliftIO.Exception         (Exception, throwIO)
 
 import qualified Data.ByteString.Base64 as Base64
@@ -109,6 +118,7 @@ import qualified List.Transformer       as ListT
 import           Proto.Riak
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Connection
+import           Riak.Internal.Panic
 import           Riak.Internal.Request
 import           Riak.Internal.Response
 
@@ -197,6 +207,7 @@ instance Show Bucket where
     Text.unpack . decodeUtf8 . unBucket
 
 
+-- TODO IsContent typeclass
 data Content a
   = Content
       !a                                -- Value
@@ -276,6 +287,12 @@ instance Show Key where
     Text.unpack . decodeUtf8 . unKey
 
 
+data ObjectReturn
+  = ObjectReturnNone
+  | ObjectReturnHead
+  | ObjectReturnBody
+
+
 newtype Quorum
   = Quorum Word32
   deriving stock (Eq)
@@ -323,6 +340,7 @@ newtype Vtag
 -- Params
 --------------------------------------------------------------------------------
 
+-- | Whether or not to use the "basic quorum" policy for not-founds.
 newtype ParamBasicQuorum
   = ParamBasicQuorum Bool
 
@@ -360,6 +378,7 @@ instance Default ParamIncludeContext where
   def = coerce True
 
 
+-- | Whether to treat not-found responses as successful.
 newtype ParamNotfoundOk
   = ParamNotfoundOk Bool
 
@@ -372,6 +391,12 @@ newtype ParamNVal
 
 instance Default ParamNVal where
   def = ParamNVal Nothing
+
+
+data ParamObjectReturn :: ObjectReturn -> Type where
+  ParamObjectReturnNone :: ParamObjectReturn 'ObjectReturnNone
+  ParamObjectReturnHead :: ParamObjectReturn 'ObjectReturnHead
+  ParamObjectReturnBody :: ParamObjectReturn 'ObjectReturnBody
 
 
 newtype ParamPR
@@ -395,6 +420,7 @@ instance Default ParamR where
   def = coerce QuorumDefault
 
 
+-- TODO remove ParamReturnBody
 newtype ParamReturnBody
   = ParamReturnBody Bool
 
@@ -402,6 +428,7 @@ instance Default ParamReturnBody where
   def = coerce False
 
 
+-- TODO remove ParamReturnHead
 newtype ParamReturnHead
   = ParamReturnHead Bool
 
@@ -431,19 +458,19 @@ instance Default ParamW where
 
 
 --------------------------------------------------------------------------------
--- Misc. helper type functions
+-- Misc. fancy type helpers
 --------------------------------------------------------------------------------
 
-type family Ifte (a :: Bool) t f where
-  Ifte 'True  t _ = t
-  Ifte 'False _ f = f
+data SBool :: Bool -> Type where
+  STrue  :: SBool 'True
+  SFalse :: SBool 'False
 
 --------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
 type FetchObjectResp (head :: Bool) (if_modified :: Bool) =
-  IfModifiedWrapper if_modified [Content (Ifte head () ByteString)]
+  IfModifiedWrapper if_modified [Content (If head () ByteString)]
 
 type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
   IfModifiedWrapper 'True  a = IfModified a
@@ -541,36 +568,35 @@ fetchObject
         contents
 
    where
-    contents :: Maybe [Content (Ifte head () ByteString)]
-    contents =
-      case content of
-        [] -> Nothing
-        _  -> Just (map mkContent content)
+    contents :: Maybe [Content (If head () ByteString)]
+    contents = do
+      guard (not (null content))
+      pure (map (parseContent headAsBool) content)
+     where
+      headAsBool :: SBool head
+      headAsBool =
+        case head of
+          ParamHead   -> STrue
+          ParamNoHead -> SFalse
 
-  mkContent :: RpbContent -> Content (Ifte head () ByteString)
-  mkContent
-      (RpbContent value content_type charset content_encoding vtag _ last_mod
-                  last_mod_usecs usermeta indexes deleted ttl _) =
-    Content
-      (case head of
-        ParamHead   -> ()
-        ParamNoHead -> value)
-      (coerce content_type)
-      charset
-      content_encoding
-      (coerce vtag)
-      last_mod
-      last_mod_usecs
-      (map unRpbPair usermeta)
-      (map unRpbPair indexes)
-      deleted
-      ttl
+data StoreObjectResp (return :: ObjectReturn)
+  = StoreObjectResp
+      !Key
+      !(ObjectReturnTy return)
 
+deriving instance
+  ( Show (ObjectReturnTy return)
+  ) => Show (StoreObjectResp return)
+
+type family ObjectReturnTy (return :: ObjectReturn) where
+  ObjectReturnTy 'ObjectReturnNone = ()
+  ObjectReturnTy 'ObjectReturnHead = [Content ()]
+  ObjectReturnTy 'ObjectReturnBody = [Content ByteString]
 
 -- TODO storeObject: nicer input type than RpbContent
--- TODO storeObject: better return type
 storeObject
-  :: MonadIO m
+  :: forall m return.
+     MonadIO m
   => Handle
   -> BucketType 'Nothing
   -> Bucket
@@ -579,19 +605,18 @@ storeObject
   -> ( ParamDW
      , ParamNVal
      , ParamPW
-     , ParamReturnBody
-     , ParamReturnHead
+     , ParamObjectReturn return
      , ParamSloppyQuorum
      , ParamTimeout
      , ParamW
      )
-  -> m (Either RpbErrorResp RpbPutResp)
+  -> m (Either RpbErrorResp (StoreObjectResp return))
 storeObject handle type' bucket key content params =
   liftIO (runExceptT (storeObject_ handle type' bucket key content params))
 
-
 storeObject_
-  :: Handle
+  :: forall return.
+     Handle
   -> BucketType 'Nothing
   -> Bucket
   -> Maybe Key
@@ -599,20 +624,18 @@ storeObject_
   -> ( ParamDW
      , ParamNVal
      , ParamPW
-     , ParamReturnBody
-     , ParamReturnHead -- TODO figure out what this defaults to
+     , ParamObjectReturn return
      , ParamSloppyQuorum
      , ParamTimeout
      , ParamW
      )
-  -> ExceptT RpbErrorResp IO RpbPutResp
+  -> ExceptT RpbErrorResp IO (StoreObjectResp return)
 storeObject_
-    (Handle conn cache) type' bucket key content
+    handle@(Handle conn cache) type' bucket key content
     ( ParamDW dw
     , ParamNVal n_val
     , ParamPW pw
-    , ParamReturnBody return_body
-    , ParamReturnHead return_head
+    , return
     , ParamSloppyQuorum sloppy_quorum
     , timeout
     , ParamW w
@@ -639,8 +662,16 @@ storeObject_
         , _RpbPutReq'key            = coerce key
         , _RpbPutReq'nVal           = n_val
         , _RpbPutReq'pw             = Just (coerce pw)
-        , _RpbPutReq'returnBody     = Just return_body
-        , _RpbPutReq'returnHead     = Just return_head
+        , _RpbPutReq'returnBody     =
+            case return of
+              ParamObjectReturnNone -> Nothing
+              ParamObjectReturnHead -> Nothing
+              ParamObjectReturnBody -> Just True
+        , _RpbPutReq'returnHead     =
+            case return of
+              ParamObjectReturnNone -> Nothing
+              ParamObjectReturnHead -> Just True
+              ParamObjectReturnBody -> Nothing
         , _RpbPutReq'sloppyQuorum   = Just sloppy_quorum
         , _RpbPutReq'timeout        = coerce timeout
         , _RpbPutReq'type'          = coerce (Just type')
@@ -648,7 +679,52 @@ storeObject_
         , _RpbPutReq'w              = coerce (Just w)
         }
 
-  ExceptT (Internal.storeObject conn request)
+  response :: RpbPutResp <-
+    ExceptT (Internal.storeObject conn request)
+
+  let
+    nonsense :: Text -> ExceptT RpbErrorResp IO void
+    nonsense s =
+      panic s
+        ( ( "request",  request  )
+        , ( "response", response )
+        )
+
+  theKey :: Key <-
+    maybe
+      (maybe
+        (nonsense "missing key")
+        pure
+        (coerce (response ^. #maybe'key)))
+      pure
+      key
+
+  -- Cache the vclock if asked for it with return_head or return_body.
+  do
+    let
+      doCacheVclock :: ExceptT RpbErrorResp IO ()
+      doCacheVclock =
+        case response ^. #maybe'vclock of
+          Nothing ->
+            nonsense "missing vclock"
+
+          Just theVclock ->
+            cacheVclock handle type' bucket theKey (Just (coerce theVclock))
+
+    () <-
+      case return of
+        ParamObjectReturnNone -> pure ()
+        ParamObjectReturnHead -> doCacheVclock
+        ParamObjectReturnBody -> doCacheVclock
+
+    pure ()
+
+  pure $ StoreObjectResp
+    theKey
+    (case return of
+      ParamObjectReturnNone -> ()
+      ParamObjectReturnHead -> map (parseContent STrue) (response ^. #content)
+      ParamObjectReturnBody -> map (parseContent SFalse) (response ^. #content))
 
 
 -- TODO deleteObject figure out when vclock is required (always?)
@@ -1089,6 +1165,26 @@ cacheVclock (Handle _ cache) type' bucket key = liftIO .
   maybe
     (vclockCacheDelete cache type' bucket key)
     (vclockCacheInsert cache type' bucket key)
+
+
+parseContent :: SBool head -> RpbContent -> Content (If head () ByteString)
+parseContent head
+    (RpbContent value content_type charset content_encoding vtag _ last_mod
+                last_mod_usecs usermeta indexes deleted ttl _) =
+  Content
+    (case head of
+      STrue  -> ()
+      SFalse -> value)
+    (coerce content_type)
+    charset
+    content_encoding
+    (coerce vtag)
+    last_mod
+    last_mod_usecs
+    (map unRpbPair usermeta)
+    (map unRpbPair indexes)
+    deleted
+    ttl
 
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())

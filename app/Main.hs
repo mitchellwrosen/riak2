@@ -1,7 +1,7 @@
-{-# LANGUAGE DataKinds, GADTs, LambdaCase, OverloadedStrings, RankNTypes,
-             ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, GADTs, LambdaCase, OverloadedStrings,
+             RankNTypes, ScopedTypeVariables, TypeApplications #-}
 
-import Control.Monad
+import Control.Monad              (join)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
@@ -13,7 +13,7 @@ import Data.Text.Encoding         (encodeUtf8)
 import Lens.Family2
 import List.Transformer           (runListT)
 import Options.Applicative
-import Prelude                    hiding (head)
+import Prelude                    hiding (head, return)
 import Text.Read                  (readMaybe)
 
 import qualified Data.ByteString.Base64 as Base64
@@ -144,13 +144,21 @@ storeObjectParser =
         <*> dwOption
         <*> nvalOption
         <*> pwOption
-        <*> returnBodyOption
-        <*> (ParamReturnHead <$>
-              switch
-                (mconcat
-                  [ long "return-head"
-                  , help "Return head"
-                  ]))
+        <*> asum
+              [ flag'
+                  'a'
+                  (mconcat
+                    [ long "head"
+                    , help "Return head"
+                    ])
+              , flag'
+                  'b'
+                  (mconcat
+                    [ long "body"
+                    , help "Return body"
+                    ])
+              , pure 'c'
+              ]
         <*> sloppyQuorumOption
         <*> timeoutOption
         <*> wOption)
@@ -290,33 +298,32 @@ doStoreObject
   -> ParamDW
   -> ParamNVal
   -> ParamPW
-  -> ParamReturnBody
-  -> ParamReturnHead
+  -> Char
   -> ParamSloppyQuorum
   -> ParamTimeout
   -> ParamW
   -> IO ()
 doStoreObject
-    type' bucket key content dw n_val pw return_body return_head sloppy_quorum
-    timeout w = do
+    type' bucket key content dw n_val pw return sloppy_quorum timeout w = do
   cache <- refVclockCache
   withHandle "localhost" 8087 cache $ \h ->
-    print =<<
-      storeObject h
-        type'
-        bucket
-        key
-        (def & L.value .~ encodeUtf8 content
-             & L.contentType .~ "text/plain")
-        ( dw
-        , n_val
-        , pw
-        , return_body
-        , return_head
-        , sloppy_quorum
-        , timeout
-        , w
-        )
+    withParamObjectReturn return $ \return' -> do
+      eresponse <-
+        storeObject h
+          type'
+          bucket
+          key
+          (def & L.value .~ encodeUtf8 content
+               & L.contentType .~ "text/plain")
+          ( dw
+          , n_val
+          , pw
+          , return'
+          , sloppy_quorum
+          , timeout
+          , w
+          )
+      print eresponse
 
 doUpdateCounter
   :: BucketType ('Just 'DataTypeCounter)
@@ -344,6 +351,17 @@ withParamHead head k =
   if head
     then k ParamHead
     else k ParamNoHead
+
+withParamObjectReturn
+  :: Char
+  -> (forall return. Show (ObjectReturnTy return) => ParamObjectReturn return -> r)
+  -> r
+withParamObjectReturn ch k =
+  case ch of
+    'a' -> k ParamObjectReturnHead
+    'b' -> k ParamObjectReturnBody
+    'c' -> k ParamObjectReturnNone
+    _   -> undefined
 
 bucketArgument :: Parser Bucket
 bucketArgument =
@@ -420,15 +438,6 @@ quorumOption s1 s2 =
 rOption :: Parser ParamR
 rOption =
   ParamR <$> quorumOption "r" "R value"
-
-returnBodyOption :: Parser ParamReturnBody
-returnBodyOption =
-  ParamReturnBody <$>
-    switch
-      (mconcat
-        [ long "return-body"
-        , help "Return body"
-        ])
 
 sloppyQuorumOption :: Parser ParamSloppyQuorum
 sloppyQuorumOption =
