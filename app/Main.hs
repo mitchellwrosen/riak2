@@ -207,28 +207,28 @@ doFetchObject
   -> Bool
   -> Bool
   -> Bool
-  -> ParamNVal
-  -> ParamPR
-  -> ParamR
-  -> ParamSloppyQuorum
-  -> ParamTimeout
+  -> Nval
+  -> PR
+  -> R
+  -> SloppyQuorum
+  -> Timeout
   -> IO ()
 doFetchObject
     type' bucket key basic_quorum head notfound_not_ok n_val pr r sloppy_quorum
     timeout = do
   cache <- refVclockCache
   withHandle "localhost" 8087 cache $ \h ->
-    withParamHead head $ \(head' :: ParamHead Text head) -> do
+    withHead head $ \(head' :: Head Text head) -> do
       eresponse <-
         fetchObject h
           type'
           bucket
           key
-          ( ParamBasicQuorum basic_quorum
+          ( BasicQuorum basic_quorum
           , head'
-          , ParamNoIfModified
+          , NoIfModified
           , n_val
-          , ParamNotfoundOk (not notfound_not_ok)
+          , NotfoundOk (not notfound_not_ok)
           , pr
           , r
           , sloppy_quorum
@@ -255,9 +255,9 @@ doFetchObject
 
             () <-
               case head' of
-                ParamHead ->
+                Head ->
                   pure ()
-                ParamNoHead ->
+                NoHead ->
                   tagtxt "value" (content ^. L.value)
 
             for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
@@ -297,13 +297,13 @@ doStoreObject
   -> Bucket
   -> Maybe Key
   -> Text
-  -> ParamDW
-  -> ParamNVal
-  -> ParamPW
+  -> DW
+  -> Nval
+  -> PW
   -> Char
-  -> ParamSloppyQuorum
-  -> ParamTimeout
-  -> ParamW
+  -> SloppyQuorum
+  -> Timeout
+  -> W
   -> IO ()
 doStoreObject
     type' bucket key content dw n_val pw return sloppy_quorum timeout w = do
@@ -317,11 +317,14 @@ doStoreObject
           key
           content
           ( dw
+          , Indexes [] -- TODO riak-cli store-object indexes
+          , Metadata [] -- TODO riak-cli store-object metadata
           , n_val
           , pw
           , return'
           , sloppy_quorum
           , timeout
+          , def -- TODO riak-cli store-object ttl
           , w
           )
       print eresponse
@@ -347,11 +350,11 @@ doUpdateCounter type' bucket incr key = do
 -- Misc. helpers
 --------------------------------------------------------------------------------
 
-withParamHead :: Bool -> (forall head. ParamHead a head -> r) -> r
-withParamHead head k =
+withHead :: Bool -> (forall head. Head a head -> r) -> r
+withHead head k =
   if head
-    then k ParamHead
-    else k ParamNoHead
+    then k Head
+    else k NoHead
 
 withParamObjectReturn
   :: Char
@@ -397,26 +400,26 @@ keyOption =
       , metavar "KEY"
       ])
 
-dwOption :: Parser ParamDW
+dwOption :: Parser DW
 dwOption =
-  ParamDW <$> quorumOption "dw" "DW value"
+  DW <$> quorumOption "dw" "DW value"
 
-nvalOption :: Parser ParamNVal
+nvalOption :: Parser Nval
 nvalOption =
-  (fmap ParamNVal . optional . option auto)
+  (fmap Nval . optional . option auto)
     (mconcat
       [ long "nval"
       , help "N value"
       , metavar "NODES"
       ])
 
-prOption :: Parser ParamPR
+prOption :: Parser PR
 prOption =
-  ParamPR <$> quorumOption "pr" "PR value"
+  PR <$> quorumOption "pr" "PR value"
 
-pwOption :: Parser ParamPW
+pwOption :: Parser PW
 pwOption =
-  ParamPW <$> quorumOption "pw" "PW value"
+  PW <$> quorumOption "pw" "PW value"
 
 quorumOption :: String -> String -> Parser Quorum
 quorumOption s1 s2 =
@@ -436,28 +439,28 @@ quorumOption s1 s2 =
     "quorum"  -> pure QuorumQuorum
     s         -> Quorum <$> readMaybe s
 
-rOption :: Parser ParamR
+rOption :: Parser R
 rOption =
-  ParamR <$> quorumOption "r" "R value"
+  R <$> quorumOption "r" "R value"
 
-sloppyQuorumOption :: Parser ParamSloppyQuorum
+sloppyQuorumOption :: Parser SloppyQuorum
 sloppyQuorumOption =
-  ParamSloppyQuorum <$>
+  SloppyQuorum <$>
     switch
       (mconcat
         [ long "sloppy-quorum"
         , help "Sloppy quorum"
         ])
 
-timeoutOption :: Parser ParamTimeout
+timeoutOption :: Parser Timeout
 timeoutOption =
-  (fmap ParamTimeout . optional . option auto)
+  (fmap Timeout . optional . option auto)
     (mconcat
       [ long "timeout"
       , help "Timeout"
       , metavar "MILLISECONDS"
       ])
 
-wOption :: Parser ParamW
+wOption :: Parser W
 wOption =
-  ParamW <$> quorumOption "w" "W value"
+  W <$> quorumOption "w" "W value"

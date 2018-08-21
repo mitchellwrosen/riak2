@@ -60,8 +60,11 @@ module Riak
   , DW(..)
   , Head(..)
   , IfModified(..)
+  , Index(..)
+  , Indexes(..)
   , IsContent(..)
   , Key(..)
+  , Metadata(..)
   , Modified(..)
   , NotfoundOk(..)
   , Nval(..)
@@ -106,8 +109,9 @@ import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head, return, (.))
 import UnliftIO.Exception         (throwIO)
 
-import qualified Data.HashMap.Strict as HashMap
-import qualified List.Transformer    as ListT
+import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.HashMap.Strict   as HashMap
+import qualified List.Transformer      as ListT
 
 import           Proto.Riak
 import qualified Riak.Internal            as Internal
@@ -325,11 +329,14 @@ storeObject
   -> Maybe Key
   -> a
   -> ( DW
+     , Indexes
+     , Metadata
      , Nval
      , PW
      , ParamObjectReturn return
      , SloppyQuorum
      , Timeout
+     , TTL
      , W
      )
   -> m (Either RpbErrorResp (StoreObjectResp a return))
@@ -345,22 +352,28 @@ storeObject_
   -> Maybe Key
   -> a
   -> ( DW
+     , Indexes
+     , Metadata
      , Nval
      , PW
      , ParamObjectReturn return
      , SloppyQuorum
      , Timeout
+     , TTL
      , W
      )
   -> ExceptT RpbErrorResp IO (StoreObjectResp a return)
 storeObject_
     handle@(Handle conn cache) type' bucket key value
     ( DW dw
+    , Indexes indexes
+    , Metadata metadata
     , Nval n_val
     , PW pw
     , return
     , SloppyQuorum sloppy_quorum
     , timeout
+    , TTL ttl
     , W w
     ) = do
 
@@ -385,12 +398,12 @@ storeObject_
               , _RpbContent'contentEncoding = coerce (contentEncoding value)
               , _RpbContent'contentType = coerce (Just (contentType (proxy# @_ @a)))
               , _RpbContent'deleted = Nothing
-              , _RpbContent'indexes = [] -- TODO storeObject indexes
+              , _RpbContent'indexes = map indexToRpbPair indexes
               , _RpbContent'lastMod = Nothing
               , _RpbContent'lastModUsecs = Nothing
               , _RpbContent'links = []
-              , _RpbContent'ttl = Nothing -- TODO storeObject ttl
-              , _RpbContent'usermeta = [] -- TODO storeObject usermeta
+              , _RpbContent'ttl = ttl
+              , _RpbContent'usermeta = map rpbPair metadata
               , _RpbContent'value = contentEncode value
               , _RpbContent'vtag = Nothing
               }
@@ -956,6 +969,20 @@ parseContent _ head
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
 emptyResponse =
   fmap (() <$)
+
+
+indexToRpbPair :: Index -> RpbPair
+indexToRpbPair = \case
+  IndexInt k v ->
+    RpbPair k (Just (Latin1.pack (show v))) [] -- TODO more efficient show
+
+  IndexBin k v ->
+    RpbPair k (Just v) []
+
+
+rpbPair :: (ByteString, Maybe ByteString) -> RpbPair
+rpbPair (k, v) =
+  RpbPair k v []
 
 
 unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)

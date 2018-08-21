@@ -10,6 +10,7 @@ import Data.ByteString    (ByteString)
 import Data.Coerce        (coerce)
 import Data.Default.Class
 import Data.Hashable      (Hashable)
+import Data.Int
 import Data.Kind          (Type)
 import Data.Text.Encoding (decodeUtf8)
 import Data.Word
@@ -82,9 +83,13 @@ instance Default DW where
   def = coerce QuorumDefault
 
 
-data Modified a
-  = Unmodified
-  | Modified a
+data Index
+  = IndexInt !ByteString !Int64
+  | IndexBin !ByteString !ByteString
+
+
+newtype Indexes
+  = Indexes [Index]
 
 
 -- | A Riak key.
@@ -97,6 +102,15 @@ instance Show Key where
   show :: Key -> String
   show =
     Text.unpack . decodeUtf8 . unKey
+
+
+newtype Metadata
+  = Metadata [(ByteString, Maybe ByteString)]
+
+
+data Modified a
+  = Unmodified
+  | Modified a
 
 
 -- | Whether to treat not-found responses as successful.
@@ -208,6 +222,13 @@ newtype Timeout
 
 instance Default Timeout where
   def = Timeout Nothing
+
+
+newtype TTL
+  = TTL (Maybe Word32)
+
+instance Default TTL where
+  def = TTL Nothing
 
 
 newtype Vclock
