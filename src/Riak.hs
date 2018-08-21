@@ -1,9 +1,7 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleContexts,
-             FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
-             InstanceSigs, KindSignatures, LambdaCase, MagicHash,
-             MultiParamTypeClasses, OverloadedLabels, OverloadedStrings,
-             PatternSynonyms, RankNTypes, ScopedTypeVariables,
-             StandaloneDeriving, TypeApplications, TypeFamilies, TypeOperators,
+{-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, LambdaCase,
+             MagicHash, OverloadedLabels, OverloadedStrings, PatternSynonyms,
+             RankNTypes, ScopedTypeVariables, StandaloneDeriving,
+             TypeApplications, TypeFamilies, TypeOperators,
              UndecidableInstances #-}
 
 module Riak
@@ -18,6 +16,7 @@ module Riak
     -- ** Store object
   , StoreObjectResp(..)
   , ObjectReturn(..)
+  , SingObjectReturn
   , ObjectReturnTy
   , storeObject
     -- ** Delete object
@@ -89,38 +88,34 @@ import Control.Monad              (guard, when)
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
+import Control.Monad.Trans.Maybe
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
 import Data.Default.Class
 import Data.Function              (fix)
-import Data.Hashable              (Hashable)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
 import Data.Kind                  (Type)
 import Data.Text                  (Text)
-import Data.Text.Encoding         (decodeUtf8)
 import Data.Type.Bool             (If)
-import Data.Word
-import GHC.Exts                   (IsString)
-import Lens.Family2.Unchecked     (lens)
 import Lens.Labels
 import List.Transformer           (ListT)
 import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head, return, (.))
-import UnliftIO.Exception         (Exception, throwIO)
+import UnliftIO.Exception         (throwIO)
 
-import qualified Data.ByteString.Base64 as Base64
-import qualified Data.HashMap.Strict    as HashMap
-import qualified Data.Text              as Text
-import qualified List.Transformer       as ListT
+import qualified Data.HashMap.Strict as HashMap
+import qualified List.Transformer    as ListT
 
 import           Proto.Riak
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Connection
+import           Riak.Internal.Content
 import           Riak.Internal.Panic
 import           Riak.Internal.Request
 import           Riak.Internal.Response
+import           Riak.Internal.Types
 
 
 --------------------------------------------------------------------------------
@@ -181,310 +176,25 @@ refVclockCache = liftIO $ do
 
 
 --------------------------------------------------------------------------------
--- Types
---------------------------------------------------------------------------------
-
--- | A Riak bucket type, tagged with the data type it contains.
-newtype BucketType (ty :: Maybe DataType)
-  = BucketType { unBucketType :: ByteString }
-  deriving stock (Eq)
-  deriving newtype (Hashable)
-
-pattern BucketTypeDefault :: BucketType 'Nothing
-pattern BucketTypeDefault =
-  BucketType "default"
-
-
--- | A Riak bucket.
-newtype Bucket
-  = Bucket { unBucket :: ByteString }
-  deriving stock (Eq)
-  deriving newtype (Hashable)
-
-instance Show Bucket where
-  show :: Bucket -> String
-  show =
-    Text.unpack . decodeUtf8 . unBucket
-
-
--- TODO IsContent typeclass
-data Content a
-  = Content
-      !a                                -- Value
-      !(Maybe ContentType)
-      !(Maybe ByteString)               -- Charset
-      !(Maybe ByteString)               -- Content encoding
-      !(Maybe Vtag)
-      !(Maybe Word32)                   -- Last modified
-      !(Maybe Word32)                   -- Last modified usecs
-      ![(ByteString, Maybe ByteString)] -- User meta
-      ![(ByteString, Maybe ByteString)] -- Indexes
-      !(Maybe Bool)                     -- Deleted
-      !(Maybe Word32)                   -- TTL
-  deriving (Show)
-
-instance {-# OVERLAPPABLE #-}
-    ( HasLens' f (Content s) x a
-    , s ~ t
-    , a ~ b
-    ) => HasLens f (Content s) (Content t) x a b where
-  lensOf = lensOf'
-
-instance Functor f => HasLens  f (Content a) (Content b) "value"           a                                b where lensOf  _ = lens (\(Content x _ _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j k) x -> Content x b c d e f g h i j k)
-instance Functor f => HasLens' f (Content a)             "contentType"     (Maybe ContentType)                where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j k) x -> Content a x c d e f g h i j k)
-instance Functor f => HasLens' f (Content a)             "charset"         (Maybe ByteString)                 where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j k) x -> Content a b x d e f g h i j k)
-instance Functor f => HasLens' f (Content a)             "contentEncoding" (Maybe ByteString)                 where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j k) x -> Content a b c x e f g h i j k)
-instance Functor f => HasLens' f (Content a)             "vtag"            (Maybe Vtag)                       where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j k) x -> Content a b c d x f g h i j k)
-instance Functor f => HasLens' f (Content a)             "lastMod"         (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d e _ g h i j k) x -> Content a b c d e x g h i j k)
-instance Functor f => HasLens' f (Content a)             "lastModUsecs"    (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e f _ h i j k) x -> Content a b c d e f x h i j k)
-instance Functor f => HasLens' f (Content a)             "usermeta"        [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f g _ i j k) x -> Content a b c d e f g x i j k)
-instance Functor f => HasLens' f (Content a)             "indexes"         [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g h _ j k) x -> Content a b c d e f g h x j k)
-instance Functor f => HasLens' f (Content a)             "deleted"         (Maybe Bool)                       where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h i _ k) x -> Content a b c d e f g h i x k)
-instance Functor f => HasLens' f (Content a)             "ttl"             (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i j _) x -> Content a b c d e f g h i j x)
-
-
-newtype ContentType
-  = ContentType { unContentType :: ByteString }
-  deriving stock (Eq, Show)
-  deriving newtype (IsString)
-
-
-data DataType
-  = DataTypeCounter
-  | DataTypeMap
-  | DataTypeSet
-  -- TODO hll, gset
-
-
--- | A 'DataTypeError' is thrown when a data type operation is performed on an
--- incompatible bucket type (for example, attempting to fetch a counter from a
--- bucket type that contains sets).
-data DataTypeError
-  = DataTypeError
-      !SomeBucketType       -- Bucket type
-      !Bucket               -- Bucket
-      !Key                  -- Key
-      !DtFetchResp'DataType -- Actual data type
-      !DtFetchResp'DataType -- Expected data type
-  deriving stock (Show)
-  deriving anyclass (Exception)
-
-
-data IfModified a
-  = Unmodified
-  | Modified a
-
-
--- | A Riak key.
-newtype Key
-  = Key { unKey :: ByteString }
-  deriving stock (Eq)
-  deriving newtype (Hashable)
-
-instance Show Key where
-  show :: Key -> String
-  show =
-    Text.unpack . decodeUtf8 . unKey
-
-
-data ObjectReturn
-  = ObjectReturnNone
-  | ObjectReturnHead
-  | ObjectReturnBody
-
-
-newtype Quorum
-  = Quorum Word32
-  deriving stock (Eq)
-  deriving newtype (Num)
-
-pattern QuorumAll :: Quorum
-pattern QuorumAll = 4294967292
-
-pattern QuorumDefault :: Quorum
-pattern QuorumDefault = 4294967291
-
-pattern QuorumOne :: Quorum
-pattern QuorumOne = 4294967294
-
-pattern QuorumQuorum :: Quorum
-pattern QuorumQuorum = 4294967293
-
-
-newtype SomeBucketType
-  = SomeBucketType { unSomeBucketType :: ByteString }
-  deriving stock (Eq)
-  deriving newtype (Hashable)
-
-instance Show SomeBucketType where
-  show :: SomeBucketType -> String
-  show =
-    Text.unpack . decodeUtf8 . unSomeBucketType
-
-
-newtype Vclock
-  = Vclock { unVclock :: ByteString }
-
-instance Show Vclock where
-  show :: Vclock -> String
-  show =
-    show . Base64.encode . unVclock
-
-
-newtype Vtag
-  = Vtag { unVtag :: ByteString }
-  deriving (Show)
-
-
---------------------------------------------------------------------------------
--- Params
---------------------------------------------------------------------------------
-
--- | Whether or not to use the "basic quorum" policy for not-founds.
-newtype ParamBasicQuorum
-  = ParamBasicQuorum Bool
-
-instance Default ParamBasicQuorum where
-  def = coerce False
-
-
-newtype ParamDW
-  = ParamDW Quorum
-
-instance Default ParamDW where
-  def = coerce QuorumDefault
-
-
-data ParamHead :: Bool -> Type where
-  ParamHead   :: ParamHead 'True
-  ParamNoHead :: ParamHead 'False
-
-instance (a ~ 'False) => Default (ParamHead a) where
-  def = ParamNoHead
-
-
-data ParamIfModified :: Bool -> Type where
-  ParamIfModified   :: ParamIfModified 'True
-  ParamNoIfModified :: ParamIfModified 'False
-
-instance (a ~ 'False) => Default (ParamIfModified a) where
-  def = ParamNoIfModified
-
-
-newtype ParamIncludeContext
-  = ParamIncludeContext Bool
-
-instance Default ParamIncludeContext where
-  def = coerce True
-
-
--- | Whether to treat not-found responses as successful.
-newtype ParamNotfoundOk
-  = ParamNotfoundOk Bool
-
-instance Default ParamNotfoundOk where
-  def = coerce True
-
-
-newtype ParamNVal
-  = ParamNVal (Maybe Word32)
-
-instance Default ParamNVal where
-  def = ParamNVal Nothing
-
-
-data ParamObjectReturn :: ObjectReturn -> Type where
-  ParamObjectReturnNone :: ParamObjectReturn 'ObjectReturnNone
-  ParamObjectReturnHead :: ParamObjectReturn 'ObjectReturnHead
-  ParamObjectReturnBody :: ParamObjectReturn 'ObjectReturnBody
-
-
-newtype ParamPR
-  = ParamPR Quorum
-
-instance Default ParamPR where
-  def = coerce QuorumDefault
-
-
-newtype ParamPW
-  = ParamPW Quorum
-
-instance Default ParamPW where
-  def = coerce QuorumDefault
-
-
-newtype ParamR
-  = ParamR Quorum
-
-instance Default ParamR where
-  def = coerce QuorumDefault
-
-
--- TODO remove ParamReturnBody
-newtype ParamReturnBody
-  = ParamReturnBody Bool
-
-instance Default ParamReturnBody where
-  def = coerce False
-
-
--- TODO remove ParamReturnHead
-newtype ParamReturnHead
-  = ParamReturnHead Bool
-
-instance Default ParamReturnHead where
-  def = coerce False
-
-
-newtype ParamSloppyQuorum
-  = ParamSloppyQuorum Bool
-
-instance Default ParamSloppyQuorum where
-  def = coerce False
-
-
-newtype ParamTimeout
-  = ParamTimeout (Maybe Word32)
-
-instance Default ParamTimeout where
-  def = ParamTimeout Nothing
-
-
-newtype ParamW
-  = ParamW Quorum
-
-instance Default ParamW where
-  def = coerce QuorumDefault
-
-
---------------------------------------------------------------------------------
--- Misc. fancy type helpers
---------------------------------------------------------------------------------
-
-data SBool :: Bool -> Type where
-  STrue  :: SBool 'True
-  SFalse :: SBool 'False
-
---------------------------------------------------------------------------------
 -- API
 --------------------------------------------------------------------------------
 
-type FetchObjectResp (head :: Bool) (if_modified :: Bool) =
-  IfModifiedWrapper if_modified [Content (If head () ByteString)]
+type FetchObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
+  = IfModifiedWrapper if_modified [(Content (If head () a))]
 
 type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
   IfModifiedWrapper 'True  a = IfModified a
   IfModifiedWrapper 'False a = a
 
 fetchObject
-  :: forall head if_modified m.
-     MonadIO m
+  :: forall a head if_modified m.
+     (IsContent a, MonadIO m)
   => Handle
   -> BucketType 'Nothing
   -> Bucket
   -> Key
   -> ( ParamBasicQuorum
-     , ParamHead head
+     , ParamHead a head
      , ParamIfModified if_modified
      , ParamNVal
      , ParamNotfoundOk
@@ -493,7 +203,7 @@ fetchObject
      , ParamSloppyQuorum
      , ParamTimeout
      )
-  -> m (Either RpbErrorResp (Maybe (FetchObjectResp head if_modified)))
+  -> m (Either RpbErrorResp (Maybe (FetchObjectResp head if_modified a)))
 fetchObject
     handle@(Handle conn cache) type' bucket key
     ( ParamBasicQuorum basic_quorum
@@ -549,29 +259,30 @@ fetchObject
     _ -> do
       cacheVclock handle type' bucket key (coerce (response ^. #maybe'vclock))
 
-  pure (mkResponse response)
+  lift (mkResponse response)
 
  where
   mkResponse
     :: RpbGetResp
-    -> Maybe (FetchObjectResp head if_modified)
+    -> IO (Maybe (FetchObjectResp head if_modified a))
   mkResponse (RpbGetResp content _ unchanged _) =
     case if_modified of
       ParamIfModified ->
         case unchanged of
           Just True ->
-            Just Unmodified
+            pure (Just Unmodified)
+
           _ ->
-            Modified <$> contents
+            (fmap.fmap) Modified contents
 
       ParamNoIfModified ->
         contents
 
    where
-    contents :: Maybe [Content (If head () ByteString)]
-    contents = do
+    contents :: IO (Maybe [Content (If head () a)])
+    contents = runMaybeT $ do
       guard (not (null content))
-      pure (map (parseContent headAsBool) content)
+      traverse (lift . parseContent (proxy# @_ @a) headAsBool) content
      where
       headAsBool :: SBool head
       headAsBool =
@@ -579,29 +290,43 @@ fetchObject
           ParamHead   -> STrue
           ParamNoHead -> SFalse
 
-data StoreObjectResp (return :: ObjectReturn)
+
+data StoreObjectResp (a :: Type) (return :: ObjectReturn)
   = StoreObjectResp
       !Key
-      !(ObjectReturnTy return)
+      !(ObjectReturnTy a return)
 
-deriving instance
-  ( Show (ObjectReturnTy return)
-  ) => Show (StoreObjectResp return)
+instance
+  ( Show a
+  , SingObjectReturn return
+  ) => Show (StoreObjectResp a return) where
+  show (StoreObjectResp key val) =
+    case singObjectReturn @return of
+      SObjectReturnNone ->
+        "StoreObjectResp " ++ show key ++ " " ++ show val
+      SObjectReturnHead ->
+        "StoreObjectResp " ++ show key ++ " " ++ show val
+      SObjectReturnBody ->
+        "StoreObjectResp " ++ show key ++ " " ++ show val
 
-type family ObjectReturnTy (return :: ObjectReturn) where
-  ObjectReturnTy 'ObjectReturnNone = ()
-  ObjectReturnTy 'ObjectReturnHead = [Content ()]
-  ObjectReturnTy 'ObjectReturnBody = [Content ByteString]
+-- deriving instance Show a => Show (StoreObjectResp a 'ObjectReturnNone)
+-- deriving instance Show a => Show (StoreObjectResp a 'ObjectReturnHead)
+-- deriving instance Show a => Show (StoreObjectResp a 'ObjectReturnBody)
+
+type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
+  ObjectReturnTy _ 'ObjectReturnNone = ()
+  ObjectReturnTy _ 'ObjectReturnHead = [Content ()]
+  ObjectReturnTy a 'ObjectReturnBody = [Content a]
 
 -- TODO storeObject: nicer input type than RpbContent
 storeObject
-  :: forall m return.
-     MonadIO m
+  :: forall a m return.
+     (IsContent a, MonadIO m)
   => Handle
   -> BucketType 'Nothing
   -> Bucket
   -> Maybe Key
-  -> RpbContent
+  -> a
   -> ( ParamDW
      , ParamNVal
      , ParamPW
@@ -610,17 +335,18 @@ storeObject
      , ParamTimeout
      , ParamW
      )
-  -> m (Either RpbErrorResp (StoreObjectResp return))
+  -> m (Either RpbErrorResp (StoreObjectResp a return))
 storeObject handle type' bucket key content params =
   liftIO (runExceptT (storeObject_ handle type' bucket key content params))
 
 storeObject_
-  :: forall return.
-     Handle
+  :: forall a return.
+     IsContent a
+  => Handle
   -> BucketType 'Nothing
   -> Bucket
   -> Maybe Key
-  -> RpbContent
+  -> a
   -> ( ParamDW
      , ParamNVal
      , ParamPW
@@ -629,9 +355,9 @@ storeObject_
      , ParamTimeout
      , ParamW
      )
-  -> ExceptT RpbErrorResp IO (StoreObjectResp return)
+  -> ExceptT RpbErrorResp IO (StoreObjectResp a return)
 storeObject_
-    handle@(Handle conn cache) type' bucket key content
+    handle@(Handle conn cache) type' bucket key value
     ( ParamDW dw
     , ParamNVal n_val
     , ParamPW pw
@@ -655,7 +381,22 @@ storeObject_
         { _RpbPutReq'_unknownFields = []
         , _RpbPutReq'asis           = Nothing
         , _RpbPutReq'bucket         = coerce bucket
-        , _RpbPutReq'content        = content
+        , _RpbPutReq'content        =
+            RpbContent
+              { _RpbContent'_unknownFields = []
+              , _RpbContent'charset = Nothing
+              , _RpbContent'contentEncoding = coerce (contentEncoding value)
+              , _RpbContent'contentType = coerce (Just (contentType (proxy# @_ @a)))
+              , _RpbContent'deleted = Nothing
+              , _RpbContent'indexes = [] -- TODO storeObject indexes
+              , _RpbContent'lastMod = Nothing
+              , _RpbContent'lastModUsecs = Nothing
+              , _RpbContent'links = []
+              , _RpbContent'ttl = Nothing -- TODO storeObject ttl
+              , _RpbContent'usermeta = [] -- TODO storeObject usermeta
+              , _RpbContent'value = contentEncode value
+              , _RpbContent'vtag = Nothing
+              }
         , _RpbPutReq'dw             = Just (coerce dw)
         , _RpbPutReq'ifNoneMatch    = Nothing
         , _RpbPutReq'ifNotModified  = Nothing
@@ -719,12 +460,20 @@ storeObject_
 
     pure ()
 
-  pure $ StoreObjectResp
-    theKey
-    (case return of
-      ParamObjectReturnNone -> ()
-      ParamObjectReturnHead -> map (parseContent STrue) (response ^. #content)
-      ParamObjectReturnBody -> map (parseContent SFalse) (response ^. #content))
+  let
+    theValue :: IO (ObjectReturnTy a return)
+    theValue =
+      case return of
+        ParamObjectReturnNone ->
+          pure ()
+
+        ParamObjectReturnHead ->
+          traverse (parseContent (proxy# @_ @a) STrue) (response ^. #content)
+
+        ParamObjectReturnBody ->
+          traverse (parseContent (proxy# @_ @a) SFalse) (response ^. #content)
+
+  StoreObjectResp theKey <$> lift theValue
 
 
 -- TODO deleteObject figure out when vclock is required (always?)
@@ -1167,17 +916,37 @@ cacheVclock (Handle _ cache) type' bucket key = liftIO .
     (vclockCacheInsert cache type' bucket key)
 
 
-parseContent :: SBool head -> RpbContent -> Content (If head () ByteString)
-parseContent head
+parseContent
+  :: forall a head.
+     IsContent a
+  => Proxy# a
+  -> SBool head
+  -> RpbContent
+  -> IO (Content (If head () a))
+parseContent _ head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
-                last_mod_usecs usermeta indexes deleted ttl _) =
-  Content
-    (case head of
-      STrue  -> ()
-      SFalse -> value)
+                last_mod_usecs usermeta indexes deleted ttl _) = do
+
+  theValue :: If head () a <-
+    case head of
+      STrue ->
+        pure ()
+
+      SFalse ->
+        let
+          value' :: ByteString
+          value' =
+            case coerce content_encoding of
+              ContentEncodingNone -> value
+              _                   -> undefined
+              -- TODO handle unknown encoding
+        in
+          either throwIO pure (contentDecode value')
+
+  pure $ Content
+    theValue
     (coerce content_type)
     charset
-    content_encoding
     (coerce vtag)
     last_mod
     last_mod_usecs

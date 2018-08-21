@@ -9,15 +9,15 @@ import Data.Coerce
 import Data.Foldable              (asum, for_)
 import Data.Int
 import Data.Text                  (Text)
-import Data.Text.Encoding         (encodeUtf8)
 import Lens.Family2
 import List.Transformer           (runListT)
 import Options.Applicative
 import Prelude                    hiding (head, return)
 import Text.Read                  (readMaybe)
 
-import qualified Data.ByteString.Base64 as Base64
-import qualified Data.ByteString.Char8  as Latin1
+import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.Text             as Text
+import qualified Data.Text.IO          as Text
 
 import Riak
 import Riak.Internal.Protobuf ()
@@ -218,7 +218,7 @@ doFetchObject
     timeout = do
   cache <- refVclockCache
   withHandle "localhost" 8087 cache $ \h ->
-    withParamHead head $ \head' -> do
+    withParamHead head $ \(head' :: ParamHead Text head) -> do
       eresponse <-
         fetchObject h
           type'
@@ -246,6 +246,10 @@ doFetchObject
           for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
             let tagbs :: ByteString -> ByteString -> IO ()
                 tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
+
+            let tagtxt :: Text -> Text -> IO ()
+                tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
+
             let tag :: Show a => String -> a -> IO ()
                 tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
@@ -254,20 +258,18 @@ doFetchObject
                 ParamHead ->
                   pure ()
                 ParamNoHead ->
-                  tagbs "value" $
-                    case content ^. L.contentType of
-                      Just "text/plain" -> content ^. L.value
-                      _                 -> Base64.encode (content ^. L.value)
+                  tagtxt "value" (content ^. L.value)
 
             for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
             for_ (content ^. L.charset)         (tagbs "charset")
-            for_ (content ^. L.contentEncoding) (tagbs "content_encoding")
             for_ (content ^. L.lastMod)         (tag "last_mod")
             for_ (content ^. L.lastModUsecs)    (tag "last_mod_usecs")
             for_ (content ^. L.usermeta)        print -- TODO better usermeta printing
             for_ (content ^. L.indexes)         print -- TODO better indexes printing
             for_ (content ^. L.deleted)         (tag "deleted")
             for_ (content ^. L.ttl)             (tag "ttl")
+
+            pure ()
 
 doListBuckets :: BucketType ty -> IO ()
 doListBuckets type' = do
@@ -313,8 +315,7 @@ doStoreObject
           type'
           bucket
           key
-          (def & L.value .~ encodeUtf8 content
-               & L.contentType .~ "text/plain")
+          content
           ( dw
           , n_val
           , pw
@@ -346,7 +347,7 @@ doUpdateCounter type' bucket incr key = do
 -- Misc. helpers
 --------------------------------------------------------------------------------
 
-withParamHead :: Bool -> (forall head. ParamHead head -> r) -> r
+withParamHead :: Bool -> (forall head. ParamHead a head -> r) -> r
 withParamHead head k =
   if head
     then k ParamHead
@@ -354,7 +355,7 @@ withParamHead head k =
 
 withParamObjectReturn
   :: Char
-  -> (forall return. Show (ObjectReturnTy return) => ParamObjectReturn return -> r)
+  -> (forall return. SingObjectReturn return => ParamObjectReturn return -> r)
   -> r
 withParamObjectReturn ch k =
   case ch of

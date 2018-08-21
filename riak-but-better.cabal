@@ -57,16 +57,17 @@ library
     src
   other-modules:
     Riak.Internal.Connection
+    Riak.Internal.Content
     Riak.Internal.Debug
     Riak.Internal.Message
     Riak.Internal.Panic
     Riak.Internal.Request
     Riak.Internal.Response
+    Riak.Internal.Types
 
 executable riak-cli
   build-depends:
       base
-    , base64-bytestring
     , bytestring
     , lens-family
     , list-transformer
