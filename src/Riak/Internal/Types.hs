@@ -22,7 +22,14 @@ import qualified Data.Text              as Text
 
 import Proto.Riak
 
--- TODO Strip Param* prefix
+
+-- | Whether or not to use the "basic quorum" policy for not-founds.
+newtype BasicQuorum
+  = BasicQuorum Bool
+
+instance Default BasicQuorum where
+  def = coerce False
+
 
 -- | A Riak bucket type, tagged with the data type it contains.
 newtype BucketType (ty :: Maybe DataType)
@@ -68,7 +75,14 @@ data DataTypeError
   deriving anyclass (Exception)
 
 
-data IfModified a
+newtype DW
+  = DW Quorum
+
+instance Default DW where
+  def = coerce QuorumDefault
+
+
+data Modified a
   = Unmodified
   | Modified a
 
@@ -83,6 +97,21 @@ instance Show Key where
   show :: Key -> String
   show =
     Text.unpack . decodeUtf8 . unKey
+
+
+-- | Whether to treat not-found responses as successful.
+newtype NotfoundOk
+  = NotfoundOk Bool
+
+instance Default NotfoundOk where
+  def = coerce True
+
+
+newtype Nval
+  = Nval (Maybe Word32)
+
+instance Default Nval where
+  def = Nval Nothing
 
 
 data ObjectReturn
@@ -122,9 +151,45 @@ pattern QuorumQuorum :: Quorum
 pattern QuorumQuorum = 4294967293
 
 
+newtype PR
+  = PR Quorum
+
+instance Default PR where
+  def = coerce QuorumDefault
+
+
+newtype PW
+  = PW Quorum
+
+instance Default PW where
+  def = coerce QuorumDefault
+
+
+newtype R
+  = R Quorum
+
+instance Default R where
+  def = coerce QuorumDefault
+
+
+-- TODO remove ReturnBody
+newtype ReturnBody
+  = ReturnBody Bool
+
+instance Default ReturnBody where
+  def = coerce False
+
+
 data SBool :: Bool -> Type where
   STrue  :: SBool 'True
   SFalse :: SBool 'False
+
+
+newtype SloppyQuorum
+  = SloppyQuorum Bool
+
+instance Default SloppyQuorum where
+  def = coerce False
 
 
 newtype SomeBucketType
@@ -136,6 +201,13 @@ instance Show SomeBucketType where
   show :: SomeBucketType -> String
   show =
     Text.unpack . decodeUtf8 . unSomeBucketType
+
+
+newtype Timeout
+  = Timeout (Maybe Word32)
+
+instance Default Timeout where
+  def = Timeout Nothing
 
 
 newtype Vclock
@@ -152,36 +224,28 @@ newtype Vtag
   deriving (Show)
 
 
+newtype W
+  = W Quorum
+
+instance Default W where
+  def = coerce QuorumDefault
+
+
 --------------------------------------------------------------------------------
 -- Params
 --------------------------------------------------------------------------------
 
--- | Whether or not to use the "basic quorum" policy for not-founds.
-newtype ParamBasicQuorum
-  = ParamBasicQuorum Bool
-
-instance Default ParamBasicQuorum where
-  def = coerce False
+data Head a :: Bool -> Type where
+  Head   :: Head a 'True
+  NoHead :: Head a 'False
 
 
-newtype ParamDW
-  = ParamDW Quorum
+data IfModified :: Bool -> Type where
+  IfModified   :: IfModified 'True
+  NoIfModified :: IfModified 'False
 
-instance Default ParamDW where
-  def = coerce QuorumDefault
-
-
-data ParamHead a :: Bool -> Type where
-  ParamHead   :: ParamHead a 'True
-  ParamNoHead :: ParamHead a 'False
-
-
-data ParamIfModified :: Bool -> Type where
-  ParamIfModified   :: ParamIfModified 'True
-  ParamNoIfModified :: ParamIfModified 'False
-
-instance (a ~ 'False) => Default (ParamIfModified a) where
-  def = ParamNoIfModified
+instance (a ~ 'False) => Default (IfModified a) where
+  def = NoIfModified
 
 
 newtype ParamIncludeContext
@@ -191,80 +255,7 @@ instance Default ParamIncludeContext where
   def = coerce True
 
 
--- | Whether to treat not-found responses as successful.
-newtype ParamNotfoundOk
-  = ParamNotfoundOk Bool
-
-instance Default ParamNotfoundOk where
-  def = coerce True
-
-
-newtype ParamNVal
-  = ParamNVal (Maybe Word32)
-
-instance Default ParamNVal where
-  def = ParamNVal Nothing
-
-
 data ParamObjectReturn :: ObjectReturn -> Type where
   ParamObjectReturnNone :: ParamObjectReturn 'ObjectReturnNone
   ParamObjectReturnHead :: ParamObjectReturn 'ObjectReturnHead
   ParamObjectReturnBody :: ParamObjectReturn 'ObjectReturnBody
-
-
-newtype ParamPR
-  = ParamPR Quorum
-
-instance Default ParamPR where
-  def = coerce QuorumDefault
-
-
-newtype ParamPW
-  = ParamPW Quorum
-
-instance Default ParamPW where
-  def = coerce QuorumDefault
-
-
-newtype ParamR
-  = ParamR Quorum
-
-instance Default ParamR where
-  def = coerce QuorumDefault
-
-
--- TODO remove ParamReturnBody
-newtype ParamReturnBody
-  = ParamReturnBody Bool
-
-instance Default ParamReturnBody where
-  def = coerce False
-
-
--- TODO remove ParamReturnHead
-newtype ParamReturnHead
-  = ParamReturnHead Bool
-
-instance Default ParamReturnHead where
-  def = coerce False
-
-
-newtype ParamSloppyQuorum
-  = ParamSloppyQuorum Bool
-
-instance Default ParamSloppyQuorum where
-  def = coerce False
-
-
-newtype ParamTimeout
-  = ParamTimeout (Maybe Word32)
-
-instance Default ParamTimeout where
-  def = ParamTimeout Nothing
-
-
-newtype ParamW
-  = ParamW Quorum
-
-instance Default ParamW where
-  def = coerce QuorumDefault

@@ -88,6 +88,7 @@ newtype ContentEncoding
 pattern ContentEncodingNone :: ContentEncoding
 pattern ContentEncodingNone = ContentEncoding Nothing
 
+-- TODO more content encodings
 
 newtype ContentType
   = ContentType { unContentType :: ByteString }

@@ -48,37 +48,38 @@ module Riak
   , ping
   , getServerInfo
     -- * Types
+  , BasicQuorum(..)
   , Bucket(..)
   , BucketType(..)
   , pattern BucketTypeDefault
   , Content(..)
+  , ContentEncoding
+  , pattern ContentEncodingNone
   , ContentType(..)
   , DataType(..)
+  , DW(..)
+  , Head(..)
   , IfModified(..)
+  , IsContent(..)
   , Key(..)
+  , Modified(..)
+  , NotfoundOk(..)
+  , Nval(..)
+  , ParamObjectReturn(..) -- TODO rename ParamObjectReturn
+  , PR(..)
+  , PW(..)
   , Quorum(..)
   , pattern QuorumAll
   , pattern QuorumDefault
   , pattern QuorumOne
   , pattern QuorumQuorum
+  , R(..)
+  , ReturnBody(..)
+  , SloppyQuorum(..)
+  , Timeout(..)
   , Vclock(..)
   , Vtag(..)
-    -- * Optional parameters
-  , ParamBasicQuorum(..)
-  , ParamDW(..)
-  , ParamHead(..)
-  , ParamIfModified(..)
-  , ParamNotfoundOk(..)
-  , ParamNVal(..)
-  , ParamObjectReturn(..)
-  , ParamPR(..)
-  , ParamPW(..)
-  , ParamR(..)
-  , ParamReturnBody(..)
-  , ParamReturnHead(..)
-  , ParamSloppyQuorum(..)
-  , ParamTimeout(..)
-  , ParamW(..)
+  , W(..)
     -- * Temp
   , def
   ) where
@@ -183,7 +184,7 @@ type FetchObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
   = IfModifiedWrapper if_modified [(Content (If head () a))]
 
 type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
-  IfModifiedWrapper 'True  a = IfModified a
+  IfModifiedWrapper 'True  a = Modified a
   IfModifiedWrapper 'False a = a
 
 fetchObject
@@ -193,34 +194,34 @@ fetchObject
   -> BucketType 'Nothing
   -> Bucket
   -> Key
-  -> ( ParamBasicQuorum
-     , ParamHead a head
-     , ParamIfModified if_modified
-     , ParamNVal
-     , ParamNotfoundOk
-     , ParamPR
-     , ParamR
-     , ParamSloppyQuorum
-     , ParamTimeout
+  -> ( BasicQuorum
+     , Head a head
+     , IfModified if_modified
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
      )
   -> m (Either RpbErrorResp (Maybe (FetchObjectResp head if_modified a)))
 fetchObject
     handle@(Handle conn cache) type' bucket key
-    ( ParamBasicQuorum basic_quorum
+    ( BasicQuorum basic_quorum
     , head
     , if_modified
-    , ParamNVal n_val
-    , ParamNotfoundOk notfound_ok
-    , ParamPR pr
-    , ParamR r
-    , ParamSloppyQuorum sloppy_quorum
-    , ParamTimeout timeout
+    , Nval n_val
+    , NotfoundOk notfound_ok
+    , PR pr
+    , R r
+    , SloppyQuorum sloppy_quorum
+    , Timeout timeout
     ) = liftIO . runExceptT $ do
 
   vclock :: Maybe Vclock <-
     case if_modified of
-      ParamIfModified   -> lift (vclockCacheLookup cache type' bucket key)
-      ParamNoIfModified -> pure Nothing
+      IfModified   -> lift (vclockCacheLookup cache type' bucket key)
+      NoIfModified -> pure Nothing
 
   let
     request :: RpbGetReq
@@ -232,12 +233,12 @@ fetchObject
         , _RpbGetReq'deletedvclock  = Just True
         , _RpbGetReq'head           =
             case head of
-              ParamHead   -> Just True
-              ParamNoHead -> Just False
+              Head   -> Just True
+              NoHead -> Just False
         , _RpbGetReq'ifModified     =
             case if_modified of
-              ParamIfModified   -> coerce vclock
-              ParamNoIfModified -> Nothing
+              IfModified   -> coerce vclock
+              NoIfModified -> Nothing
         , _RpbGetReq'key            = coerce key
         , _RpbGetReq'nVal           = n_val
         , _RpbGetReq'notfoundOk     = Just notfound_ok
@@ -254,7 +255,7 @@ fetchObject
   -- Only cache the vclock if we didn't received an "unmodified" response (which
   -- doesn't contain a vclock)
   case (if_modified, response ^. #maybe'unchanged) of
-    (ParamIfModified, Just True) ->
+    (IfModified, Just True) ->
       pure ()
     _ -> do
       cacheVclock handle type' bucket key (coerce (response ^. #maybe'vclock))
@@ -267,7 +268,7 @@ fetchObject
     -> IO (Maybe (FetchObjectResp head if_modified a))
   mkResponse (RpbGetResp content _ unchanged _) =
     case if_modified of
-      ParamIfModified ->
+      IfModified ->
         case unchanged of
           Just True ->
             pure (Just Unmodified)
@@ -275,7 +276,7 @@ fetchObject
           _ ->
             (fmap.fmap) Modified contents
 
-      ParamNoIfModified ->
+      NoIfModified ->
         contents
 
    where
@@ -287,8 +288,8 @@ fetchObject
       headAsBool :: SBool head
       headAsBool =
         case head of
-          ParamHead   -> STrue
-          ParamNoHead -> SFalse
+          Head   -> STrue
+          NoHead -> SFalse
 
 
 data StoreObjectResp (a :: Type) (return :: ObjectReturn)
@@ -309,10 +310,6 @@ instance
       SObjectReturnBody ->
         "StoreObjectResp " ++ show key ++ " " ++ show val
 
--- deriving instance Show a => Show (StoreObjectResp a 'ObjectReturnNone)
--- deriving instance Show a => Show (StoreObjectResp a 'ObjectReturnHead)
--- deriving instance Show a => Show (StoreObjectResp a 'ObjectReturnBody)
-
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy _ 'ObjectReturnNone = ()
   ObjectReturnTy _ 'ObjectReturnHead = [Content ()]
@@ -327,13 +324,13 @@ storeObject
   -> Bucket
   -> Maybe Key
   -> a
-  -> ( ParamDW
-     , ParamNVal
-     , ParamPW
+  -> ( DW
+     , Nval
+     , PW
      , ParamObjectReturn return
-     , ParamSloppyQuorum
-     , ParamTimeout
-     , ParamW
+     , SloppyQuorum
+     , Timeout
+     , W
      )
   -> m (Either RpbErrorResp (StoreObjectResp a return))
 storeObject handle type' bucket key content params =
@@ -347,24 +344,24 @@ storeObject_
   -> Bucket
   -> Maybe Key
   -> a
-  -> ( ParamDW
-     , ParamNVal
-     , ParamPW
+  -> ( DW
+     , Nval
+     , PW
      , ParamObjectReturn return
-     , ParamSloppyQuorum
-     , ParamTimeout
-     , ParamW
+     , SloppyQuorum
+     , Timeout
+     , W
      )
   -> ExceptT RpbErrorResp IO (StoreObjectResp a return)
 storeObject_
     handle@(Handle conn cache) type' bucket key value
-    ( ParamDW dw
-    , ParamNVal n_val
-    , ParamPW pw
+    ( DW dw
+    , Nval n_val
+    , PW pw
     , return
-    , ParamSloppyQuorum sloppy_quorum
+    , SloppyQuorum sloppy_quorum
     , timeout
-    , ParamW w
+    , W w
     ) = do
 
   -- Get the cached vclock of this object to pass in the put request.
@@ -492,23 +489,23 @@ fetchCounter
   -> BucketType ('Just 'DataTypeCounter)
   -> Bucket
   -> Key
-  -> ( ParamBasicQuorum
-     , ParamNotfoundOk
-     , ParamNVal
-     , ParamPR
-     , ParamR
-     , ParamSloppyQuorum
-     , ParamTimeout
+  -> ( BasicQuorum
+     , NotfoundOk
+     , Nval
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
      )
   -> m (Either RpbErrorResp Int64)
 fetchCounter
     (Handle conn _) type' bucket key
-    ( ParamBasicQuorum basic_quorum
-    , ParamNotfoundOk notfound_ok
-    , ParamNVal n_val
-    , ParamPR pr
-    , ParamR r
-    , ParamSloppyQuorum sloppy_quorum
+    ( BasicQuorum basic_quorum
+    , NotfoundOk notfound_ok
+    , Nval n_val
+    , PR pr
+    , R r
+    , SloppyQuorum sloppy_quorum
     , timeout
     ) = runExceptT $ do
 
@@ -550,14 +547,14 @@ fetchSet
   -> BucketType ('Just 'DataTypeSet)
   -> Bucket
   -> Key
-  -> ( ParamBasicQuorum
+  -> ( BasicQuorum
      , ParamIncludeContext
-     , ParamNVal
-     , ParamNotfoundOk -- TODO invert?
-     , ParamPR
-     , ParamR
-     , ParamSloppyQuorum
-     , ParamTimeout
+     , Nval
+     , NotfoundOk -- TODO invert?
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
      )
   -> m (Either RpbErrorResp [ByteString])
 fetchSet
@@ -591,24 +588,24 @@ fetchDataType
   -> BucketType ('Just ty)
   -> Bucket
   -> Key
-  -> ( ParamBasicQuorum
+  -> ( BasicQuorum
      , ParamIncludeContext
-     , ParamNVal
-     , ParamNotfoundOk
-     , ParamPR
-     , ParamR
-     , ParamSloppyQuorum
-     , ParamTimeout
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
      )
   -> m (Either RpbErrorResp DtFetchResp)
 fetchDataType (Handle conn _) type' bucket key
-    ( ParamBasicQuorum basic_quorum
+    ( BasicQuorum basic_quorum
     , ParamIncludeContext include_context
-    , ParamNVal n_val
-    , ParamNotfoundOk notfound_ok
-    , ParamPR pr
-    , ParamR r
-    , ParamSloppyQuorum sloppy_quorum
+    , Nval n_val
+    , NotfoundOk notfound_ok
+    , PR pr
+    , R r
+    , SloppyQuorum sloppy_quorum
     , timeout
     ) =
 
@@ -645,24 +642,24 @@ updateCounter
   -> Bucket
   -> Maybe Key
   -> Int64
-  -> ( ParamDW
-     , ParamNVal
-     , ParamPW
-     , ParamReturnBody
-     , ParamSloppyQuorum
-     , ParamTimeout
-     , ParamW
+  -> ( DW
+     , Nval
+     , PW
+     , ReturnBody
+     , SloppyQuorum
+     , Timeout
+     , W
      )
   -> m (Either RpbErrorResp DtUpdateResp)
 updateCounter
     (Handle conn _) type' bucket key incr
-    ( ParamDW dw
-    , ParamNVal n_val
-    , ParamPW pw
-    , ParamReturnBody return_body
-    , ParamSloppyQuorum sloppy_quorum
+    ( DW dw
+    , Nval n_val
+    , PW pw
+    , ReturnBody return_body
+    , SloppyQuorum sloppy_quorum
     , timeout
-    , ParamW w
+    , W w
     ) = do
   liftIO (exchange conn request)
  where
