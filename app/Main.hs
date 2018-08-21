@@ -10,6 +10,7 @@ import Data.Int
 import Data.Text                  (Text)
 import Lens.Family2
 import List.Transformer           (runListT)
+import Network.Socket             (HostName, PortNumber)
 import Options.Applicative
 import Prelude                    hiding (head, return)
 import Text.Read                  (readMaybe)
@@ -38,34 +39,37 @@ main =
 
 parser :: Parser (IO ())
 parser =
-  (asum . map (hsubparser . mconcat))
-    [ [ commandGroup "Key/value object operations"
-      , fetchObjectParser
-      , storeObjectParser
+    nodeArgument
+    -- TODO --help output is ugly here (COMMAND | COMMAND | ...), fix it
+    <*>
+    (asum . map (hsubparser . mconcat))
+      [ [ commandGroup "Key/value object operations"
+        , fetchObjectParser
+        , storeObjectParser
+        ]
+      , [ commandGroup "Data type operations"
+        , fetchCounterParser
+        , updateCounterParser
+        ]
+      , [ commandGroup "Bucket operations"
+        , listBucketsParser
+        , listKeysParser
+        ]
+      , [ commandGroup "MapReduce"
+        , command "TODO" (info empty mempty)
+        ]
+      , [ commandGroup "Secondary indexes (2i)"
+        , command "TODO" (info empty mempty)
+        ]
+      , [ commandGroup "Search 2.0"
+        , command "TODO" (info empty mempty)
+        ]
+      , [ commandGroup "Server info"
+        , command "TODO" (info empty mempty)
+        ]
       ]
-    , [ commandGroup "Data type operations"
-      , fetchCounterParser
-      , updateCounterParser
-      ]
-    , [ commandGroup "Bucket operations"
-      , listBucketsParser
-      , listKeysParser
-      ]
-    , [ commandGroup "MapReduce"
-      , command "TODO" (info empty mempty)
-      ]
-    , [ commandGroup "Secondary indexes (2i)"
-      , command "TODO" (info empty mempty)
-      ]
-    , [ commandGroup "Search 2.0"
-      , command "TODO" (info empty mempty)
-      ]
-    , [ commandGroup "Server info"
-      , command "TODO" (info empty mempty)
-      ]
-    ]
 
-fetchCounterParser :: Mod CommandFields (IO ())
+fetchCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchCounterParser =
   command
     "fetch-counter"
@@ -77,7 +81,7 @@ fetchCounterParser =
         -- TODO fetch-counter optional params
       (progDesc "Fetch a counter"))
 
-fetchObjectParser :: Mod CommandFields (IO ())
+fetchObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchObjectParser =
   command
     "fetch-object"
@@ -108,7 +112,7 @@ fetchObjectParser =
         <*> timeoutOption)
       (progDesc "Fetch an object"))
 
-listBucketsParser :: Mod CommandFields (IO ())
+listBucketsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 listBucketsParser =
   command
     "list-buckets"
@@ -116,7 +120,7 @@ listBucketsParser =
       (doListBuckets <$> bucketTypeArgument)
       (progDesc "List all buckets in a bucket type"))
 
-listKeysParser :: Mod CommandFields (IO ())
+listKeysParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 listKeysParser =
   command
     "list-keys"
@@ -126,7 +130,7 @@ listKeysParser =
         <*> bucketArgument)
       (progDesc "List all keys in a bucket"))
 
-storeObjectParser :: Mod CommandFields (IO ())
+storeObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 storeObjectParser =
   command
     "store-object"
@@ -163,7 +167,7 @@ storeObjectParser =
         <*> wOption)
       (progDesc "Store an object"))
 
-updateCounterParser :: Mod CommandFields (IO ())
+updateCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 updateCounterParser =
   command
     "update-counter"
@@ -188,10 +192,12 @@ doFetchCounter
   :: BucketType ('Just 'DataTypeCounter)
   -> Bucket
   -> Key
+  -> HostName
+  -> PortNumber
   -> IO ()
-doFetchCounter type' bucket key = do
+doFetchCounter type' bucket key host port = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h ->
+  withHandle host port cache $ \h ->
     print =<<
       fetchCounter h
         type'
@@ -211,12 +217,14 @@ doFetchObject
   -> R
   -> SloppyQuorum
   -> Timeout
+  -> HostName
+  -> PortNumber
   -> IO ()
 doFetchObject
     type' bucket key basic_quorum head notfound_not_ok n_val pr r sloppy_quorum
-    timeout = do
+    timeout host port = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h ->
+  withHandle host port cache $ \h ->
     withHead head $ \(head' :: Head Text head) -> do
       eresponse <-
         fetchObject h
@@ -269,22 +277,19 @@ doFetchObject
             tag "deleted" (content ^. L.deleted)
             for_ (unTTL (content ^. L.ttl)) (tag "ttl")
 
-doListBuckets :: BucketType ty -> IO ()
-doListBuckets type' = do
+doListBuckets :: BucketType ty -> HostName -> PortNumber -> IO ()
+doListBuckets type' host port = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h -> do
+  withHandle host port cache $ \h -> do
     result :: Either L.RpbErrorResp () <-
       (runExceptT . runListT)
         (listBuckets h type' >>= liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
 
-doListKeys
-  :: BucketType ty
-  -> Bucket
-  -> IO ()
-doListKeys type' bucket = do
+doListKeys :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
+doListKeys type' bucket host port = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h -> do
+  withHandle host port cache $ \h -> do
     result :: Either L.RpbErrorResp () <-
       (runExceptT . runListT)
         (listKeys h type' bucket >>= liftIO . Latin1.putStrLn . coerce)
@@ -302,11 +307,14 @@ doStoreObject
   -> SloppyQuorum
   -> Timeout
   -> W
+  -> HostName
+  -> PortNumber
   -> IO ()
 doStoreObject
-    type' bucket key content dw n_val pw return sloppy_quorum timeout w = do
+    type' bucket key content dw n_val pw return sloppy_quorum timeout w
+    host port = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h ->
+  withHandle host port cache $ \h ->
     withParamObjectReturn return $ \return' -> do
       eresponse <-
         storeObject h
@@ -332,10 +340,12 @@ doUpdateCounter
   -> Bucket
   -> Int64
   -> Maybe Key
+  -> HostName
+  -> PortNumber
   -> IO ()
-doUpdateCounter type' bucket incr key = do
+doUpdateCounter type' bucket incr key host port = do
   cache <- refVclockCache
-  withHandle "localhost" 8087 cache $ \h ->
+  withHandle host port cache $ \h ->
     print =<<
       updateCounter h
         type'
@@ -401,6 +411,25 @@ keyOption =
 dwOption :: Parser DW
 dwOption =
   DW <$> quorumOption "dw" "DW value"
+
+nodeArgument :: Parser ((HostName -> PortNumber -> r) -> r)
+nodeArgument =
+  argument
+    (maybeReader readNode)
+    (mconcat
+      [ help "Riak node"
+      , metavar "NODE"
+      ])
+ where
+  readNode :: String -> Maybe ((HostName -> PortNumber -> r) -> r)
+  readNode s = do
+    case span (/= ':') s of
+      (host, ':':port) -> do
+        port' <- readMaybe port
+        pure (\k -> k host port')
+      (host, []) ->
+        pure (\k -> k host 8087)
+      _ -> undefined
 
 nvalOption :: Parser Nval
 nvalOption =

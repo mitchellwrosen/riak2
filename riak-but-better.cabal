@@ -73,10 +73,10 @@ executable riak-cli
     , lens-family
     , list-transformer
     , optparse-applicative
+    , network
     , riak-but-better
     , text
     , transformers
-    -- , lens-labels ^>= 0.2.0
   buildable:
     True
   default-language:
