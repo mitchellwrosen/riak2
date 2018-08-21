@@ -13,6 +13,9 @@ module Riak
     -- * Key/value object operations
     -- ** Fetch object
   , fetchObject
+  , fetchObjectHead
+  , fetchObjectIfModified
+  , fetchObjectIfModifiedHead
     -- ** Store object
   , StoreObjectResp(..)
   , ObjectReturn(..)
@@ -104,6 +107,7 @@ import Data.Int
 import Data.IORef
 import Data.Kind                  (Type)
 import Data.Maybe                 (fromMaybe)
+import Data.Proxy                 (Proxy(Proxy))
 import Data.Text                  (Text)
 import Data.Time
 import Data.Time.Clock.POSIX
@@ -192,13 +196,182 @@ refVclockCache = liftIO $ do
 --------------------------------------------------------------------------------
 
 type FetchObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
-  = IfModifiedWrapper if_modified [(Content (If head () a))]
+  = IfModifiedWrapper if_modified [(Content (If head (Proxy a) a))]
 
 type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
   IfModifiedWrapper 'True  a = Modified a
   IfModifiedWrapper 'False a = a
 
 fetchObject
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp (Maybe [Content a]))
+fetchObject
+    handle type' bucket key
+    ( basic_quorum
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    ) =
+  _fetchObject
+    handle
+    type'
+    bucket
+    key
+    ( basic_quorum
+    , NoHead
+    , NoIfModified
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    )
+
+fetchObjectHead
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp (Maybe [Content (Proxy a)]))
+fetchObjectHead
+    handle type' bucket key
+    ( basic_quorum
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    ) =
+  _fetchObject
+    handle
+    type'
+    bucket
+    key
+    ( basic_quorum
+    , Head
+    , NoIfModified
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    )
+
+fetchObjectIfModified
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp (Maybe (Modified [Content a])))
+fetchObjectIfModified
+    handle type' bucket key
+    ( basic_quorum
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    ) =
+  _fetchObject
+    handle
+    type'
+    bucket
+    key
+    ( basic_quorum
+    , NoHead
+    , IfModified
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    )
+
+fetchObjectIfModifiedHead
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp (Maybe (Modified [Content (Proxy a)])))
+fetchObjectIfModifiedHead
+    handle type' bucket key
+    ( basic_quorum
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    ) =
+  _fetchObject
+    handle
+    type'
+    bucket
+    key
+    ( basic_quorum
+    , Head
+    , IfModified
+    , n_val
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
+    , timeout
+    )
+
+-- TODO delete _fetchObject and inline its logic in the 4 variants?
+_fetchObject
   :: forall a head if_modified m.
      (IsContent a, MonadIO m)
   => Handle
@@ -216,7 +389,7 @@ fetchObject
      , Timeout
      )
   -> m (Either RpbErrorResp (Maybe (FetchObjectResp head if_modified a)))
-fetchObject
+_fetchObject
     handle@(Handle conn cache) type' bucket key
     ( BasicQuorum basic_quorum
     , head
@@ -291,7 +464,7 @@ fetchObject
         contents
 
    where
-    contents :: IO (Maybe [Content (If head () a)])
+    contents :: IO (Maybe [Content (If head (Proxy a) a)])
     contents = runMaybeT $ do
       guard (not (null content))
       traverse (lift . parseContent @a proxy# headAsBool) content
@@ -323,7 +496,7 @@ instance
 
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy _ 'ObjectReturnNone = ()
-  ObjectReturnTy _ 'ObjectReturnHead = [Content ()]
+  ObjectReturnTy a 'ObjectReturnHead = [Content (Proxy a)]
   ObjectReturnTy a 'ObjectReturnBody = [Content a]
 
 -- TODO storeObject: nicer input type than RpbContent
@@ -983,15 +1156,15 @@ parseContent
   => Proxy# a
   -> SBool head
   -> RpbContent
-  -> IO (Content (If head () a))
+  -> IO (Content (If head (Proxy a) a))
 parseContent _ head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
-  theValue :: If head () a <-
+  theValue :: If head (Proxy a) a <-
     case head of
       STrue ->
-        pure ()
+        pure Proxy
 
       SFalse ->
         either

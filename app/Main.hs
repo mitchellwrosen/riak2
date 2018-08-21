@@ -108,11 +108,11 @@ fetchObjectParser =
                 [ long "basic-quorum"
                 , help "Basic quorum"
                 ])
-        <*> switch
-              (mconcat
-                [ long "head"
-                , help "Head"
-                ])
+        -- <*> switch
+        --       (mconcat
+        --         [ long "head"
+        --         , help "Head"
+        --         ])
         <*> switch
               (mconcat
                 [ long "notfound-not-ok"
@@ -235,11 +235,11 @@ doFetchMap type' bucket key host port = do
         key
         (def, def, def, def, def, def, def, def)
 
+-- TODO doFetchObject add head param
 doFetchObject
   :: BucketType 'Nothing
   -> Bucket
   -> Key
-  -> Bool
   -> Bool
   -> Bool
   -> Nval
@@ -251,61 +251,53 @@ doFetchObject
   -> PortNumber
   -> IO ()
 doFetchObject
-    type' bucket key basic_quorum head notfound_not_ok n_val pr r sloppy_quorum
+    type' bucket key basic_quorum notfound_not_ok n_val pr r sloppy_quorum
     timeout host port = do
   cache <- refVclockCache
-  withHandle host port cache $ \h ->
-    withHead head $ \(head' :: Head Text head) -> do
-      eresponse <-
-        fetchObject h
-          type'
-          bucket
-          key
-          ( BasicQuorum basic_quorum
-          , head'
-          , NoIfModified
-          , n_val
-          , NotfoundOk (not notfound_not_ok)
-          , pr
-          , r
-          , sloppy_quorum
-          , timeout
-          )
+  withHandle host port cache $ \h -> do
+    eresponse <-
+      fetchObject h
+        type'
+        bucket
+        key
+        ( BasicQuorum basic_quorum
+        , n_val
+        , NotfoundOk (not notfound_not_ok)
+        , pr
+        , r
+        , sloppy_quorum
+        , timeout
+        )
 
-      case eresponse of
-        Left err ->
-          print err
+    case eresponse of
+      Left err ->
+        print err
 
-        Right Nothing ->
-          putStrLn "Not found"
+      Right Nothing ->
+        putStrLn "Not found"
 
-        Right (Just contents) -> do
-          for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
-            let tagtxt :: Text -> Text -> IO ()
-                tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
+      Right (Just contents) -> do
+        for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
+          let tagtxt :: Text -> Text -> IO ()
+              tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
 
-            let tag :: Show a => String -> a -> IO ()
-                tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
+          let tag :: Show a => String -> a -> IO ()
+              tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
-            () <-
-              case head' of
-                Head ->
-                  pure ()
-                NoHead ->
-                  tagtxt "value" (content ^. L.value)
+          tagtxt "value" (content ^. L.value)
 
-            for_ (content ^. L.lastMod) (tag "last_mod")
+          for_ (content ^. L.lastMod) (tag "last_mod")
 
-            case unMetadata (content ^. L.usermeta) of
-              [] -> pure ()
-              xs -> tag "metadata" xs
+          case unMetadata (content ^. L.usermeta) of
+            [] -> pure ()
+            xs -> tag "metadata" xs
 
-            case unIndexes (content ^. L.indexes) of
-              [] -> pure ()
-              xs -> tag "indexes" xs
+          case unIndexes (content ^. L.indexes) of
+            [] -> pure ()
+            xs -> tag "indexes" xs
 
-            tag "deleted" (content ^. L.deleted)
-            for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+          tag "deleted" (content ^. L.deleted)
+          for_ (unTTL (content ^. L.ttl)) (tag "ttl")
 
 doListBuckets :: BucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port = do
@@ -387,12 +379,6 @@ doUpdateCounter type' bucket incr key host port = do
 --------------------------------------------------------------------------------
 -- Misc. helpers
 --------------------------------------------------------------------------------
-
-withHead :: Bool -> (forall head. Head a head -> r) -> r
-withHead head k =
-  if head
-    then k Head
-    else k NoHead
 
 withParamObjectReturn
   :: Char
