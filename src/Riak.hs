@@ -101,6 +101,7 @@ import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.IORef
 import Data.Kind                  (Type)
+import Data.Maybe                 (fromMaybe)
 import Data.Text                  (Text)
 import Data.Type.Bool             (If)
 import Lens.Labels
@@ -962,7 +963,7 @@ parseContent _ head
     last_mod_usecs
     (map unRpbPair usermeta)
     (map unRpbPair indexes)
-    deleted
+    (fromMaybe False deleted)
     ttl
 
 

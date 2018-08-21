@@ -34,7 +34,7 @@ data Content a
       !(Maybe Word32)                   -- Last modified usecs
       ![(ByteString, Maybe ByteString)] -- User meta
       ![(ByteString, Maybe ByteString)] -- Indexes
-      !(Maybe Bool)                     -- Deleted
+      !Bool                             -- Deleted
       !(Maybe Word32)                   -- TTL
   deriving (Show)
 
@@ -52,7 +52,7 @@ instance Functor f => HasLens' f (Content a)             "lastMod"         (Mayb
 instance Functor f => HasLens' f (Content a)             "lastModUsecs"    (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d _ f g h i) x -> Content a b c d x f g h i)
 instance Functor f => HasLens' f (Content a)             "usermeta"        [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e _ g h i) x -> Content a b c d e x g h i)
 instance Functor f => HasLens' f (Content a)             "indexes"         [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f _ h i) x -> Content a b c d e f x h i)
-instance Functor f => HasLens' f (Content a)             "deleted"         (Maybe Bool)                       where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g _ i) x -> Content a b c d e f g x i)
+instance Functor f => HasLens' f (Content a)             "deleted"         Bool                               where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g _ i) x -> Content a b c d e f g x i)
 instance Functor f => HasLens' f (Content a)             "ttl"             (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h _) x -> Content a b c d e f g h x)
 
 
@@ -61,6 +61,23 @@ class IsContent a where
   contentEncoding :: a -> ContentEncoding
   contentEncode   :: a -> ByteString
   contentDecode   :: ByteString -> Either SomeException a
+
+instance IsContent ByteString where
+  contentType :: Proxy# ByteString -> ContentType
+  contentType _ =
+    "application/octet-stream"
+
+  contentEncoding :: ByteString -> ContentEncoding
+  contentEncoding _ =
+    ContentEncodingNone
+
+  contentEncode :: ByteString -> ByteString
+  contentEncode =
+    id
+
+  contentDecode :: ByteString -> Either SomeException ByteString
+  contentDecode =
+    Right
 
 instance IsContent Text where
   contentType :: Proxy# Text -> ContentType
