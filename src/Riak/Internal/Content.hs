@@ -12,12 +12,14 @@ module Riak.Internal.Content
   ) where
 
 import Control.Exception
+import Data.Bifunctor         (first)
 import Data.ByteString        (ByteString)
 import Data.Text              (Text)
 import Data.Word
 import GHC.Exts               (IsString)
 import Lens.Family2.Unchecked (lens)
 import Lens.Labels
+import Prelude                hiding ((.))
 
 import qualified Data.Text.Encoding as Text
 
@@ -76,7 +78,8 @@ instance IsContent Text where
     Text.encodeUtf8
 
   contentDecode :: ByteString -> Either SomeException Text
-  contentDecode = undefined
+  contentDecode =
+    first toException . Text.decodeUtf8'
 
 
 newtype ContentEncoding
