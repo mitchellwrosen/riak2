@@ -17,11 +17,9 @@ module Riak
   , fetchObjectIfModified
   , fetchObjectIfModifiedHead
     -- ** Store object
-  , StoreObjectResp(..)
-  , ObjectReturn(..)
-  , SingObjectReturn
-  , ObjectReturnTy
   , storeObject
+  , storeObjectHead
+  , storeObjectBody
     -- ** Delete object
   , deleteObject
     -- * Data type operations
@@ -98,6 +96,7 @@ import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
 import Data.ByteString            (ByteString)
+import Data.List.NonEmpty         (NonEmpty)
 import Data.Coerce                (coerce)
 import Data.Default.Class
 import Data.Function              (fix)
@@ -119,6 +118,7 @@ import Text.Read                  (readMaybe)
 import UnliftIO.Exception         (throwIO)
 
 import qualified Data.ByteString       as ByteString
+import qualified Data.List.NonEmpty as List1
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.HashMap.Strict   as HashMap
 import qualified List.Transformer      as ListT
@@ -474,31 +474,88 @@ _fetchObject
           NoHead -> SFalse
 
 
-data StoreObjectResp (a :: Type) (return :: ObjectReturn)
-  = StoreObjectResp
-      !Key
-      !(ObjectReturnTy a return)
-
-instance
-  ( Show a
-  , SingObjectReturn return
-  ) => Show (StoreObjectResp a return) where
-  show (StoreObjectResp key val) =
-    case singObjectReturn @return of
-      SObjectReturnNone ->
-        "StoreObjectResp " ++ show key ++ " " ++ show val
-      SObjectReturnHead ->
-        "StoreObjectResp " ++ show key ++ " " ++ show val
-      SObjectReturnBody ->
-        "StoreObjectResp " ++ show key ++ " " ++ show val
-
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy _ 'ObjectReturnNone = ()
-  ObjectReturnTy a 'ObjectReturnHead = [Content (Proxy a)]
-  ObjectReturnTy a 'ObjectReturnBody = [Content a]
+  ObjectReturnTy a 'ObjectReturnHead = NonEmpty (Content (Proxy a))
+  ObjectReturnTy a 'ObjectReturnBody = NonEmpty (Content a)
 
--- TODO storeObject: nicer input type than RpbContent
 storeObject
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Maybe Key
+  -> a
+  -> ( DW
+     , Indexes
+     , Metadata
+     , Nval
+     , PW
+     , SloppyQuorum
+     , Timeout
+     , TTL
+     , W
+     )
+  -> m (Either RpbErrorResp Key)
+storeObject handle type' bucket key content (a,b,c,d,e,f,g,h,i) = runExceptT $
+  ExceptT (_storeObject handle type' bucket key content params) >>= \case
+    (key', _) ->
+      pure key'
+
+ where
+  params = (a,b,c,d,e,ParamObjectReturnNone,f,g,h,i)
+
+storeObjectHead
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Maybe Key
+  -> a
+  -> ( DW
+     , Indexes
+     , Metadata
+     , Nval
+     , PW
+     , SloppyQuorum
+     , Timeout
+     , TTL
+     , W
+     )
+  -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
+storeObjectHead handle type' bucket key content (a,b,c,d,e,f,g,h,i) =
+  _storeObject handle type' bucket key content params
+ where
+  params = (a,b,c,d,e,ParamObjectReturnHead,f,g,h,i)
+
+storeObjectBody
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Maybe Key
+  -> a
+  -> ( DW
+     , Indexes
+     , Metadata
+     , Nval
+     , PW
+     , SloppyQuorum
+     , Timeout
+     , TTL
+     , W
+     )
+  -> m (Either RpbErrorResp (Key, NonEmpty (Content a)))
+storeObjectBody handle type' bucket key content (a,b,c,d,e,f,g,h,i) =
+  _storeObject handle type' bucket key content params
+ where
+  params = (a,b,c,d,e,ParamObjectReturnBody,f,g,h,i)
+
+-- TODO inline _storeObject in 3 variants?
+_storeObject
   :: forall a m return.
      (IsContent a, MonadIO m)
   => Handle
@@ -517,31 +574,8 @@ storeObject
      , TTL
      , W
      )
-  -> m (Either RpbErrorResp (StoreObjectResp a return))
-storeObject handle type' bucket key content params =
-  liftIO (runExceptT (storeObject_ handle type' bucket key content params))
-
-storeObject_
-  :: forall a return.
-     IsContent a
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Maybe Key
-  -> a
-  -> ( DW
-     , Indexes
-     , Metadata
-     , Nval
-     , PW
-     , ParamObjectReturn return
-     , SloppyQuorum
-     , Timeout
-     , TTL
-     , W
-     )
-  -> ExceptT RpbErrorResp IO (StoreObjectResp a return)
-storeObject_
+  -> m (Either RpbErrorResp (Key, ObjectReturnTy a return))
+_storeObject
     handle@(Handle conn cache) type' bucket key value
     ( DW dw
     , Indexes indexes
@@ -553,7 +587,7 @@ storeObject_
     , timeout
     , TTL ttl
     , W w
-    ) = do
+    ) = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe Vclock <-
@@ -659,12 +693,16 @@ storeObject_
           pure ()
 
         ParamObjectReturnHead ->
-          traverse (parseContent @a proxy# STrue) (response ^. #content)
+          traverse
+            (parseContent @a proxy# STrue)
+            (List1.fromList (response ^. #content))
 
         ParamObjectReturnBody ->
-          traverse (parseContent @a proxy# SFalse) (response ^. #content)
+          traverse
+            (parseContent @a proxy# SFalse)
+            (List1.fromList (response ^. #content))
 
-  StoreObjectResp theKey <$> lift theValue
+  (theKey ,) <$> lift theValue
 
 
 -- TODO deleteObject figure out when vclock is required (always?)

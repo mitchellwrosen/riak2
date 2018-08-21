@@ -333,29 +333,28 @@ doStoreObject
   -> PortNumber
   -> IO ()
 doStoreObject
-    type' bucket key content dw n_val pw return sloppy_quorum timeout w
+    -- TODO doStoreObject use return
+    type' bucket key content dw n_val pw _return sloppy_quorum timeout w
     host port = do
   cache <- refVclockCache
-  withHandle host port cache $ \h ->
-    withParamObjectReturn return $ \return' -> do
-      eresponse <-
-        storeObject h
-          type'
-          bucket
-          key
-          content
-          ( dw
-          , Indexes [] -- TODO riak-cli store-object indexes
-          , Metadata [] -- TODO riak-cli store-object metadata
-          , n_val
-          , pw
-          , return'
-          , sloppy_quorum
-          , timeout
-          , def -- TODO riak-cli store-object ttl
-          , w
-          )
-      print eresponse
+  withHandle host port cache $ \h -> do
+    eresponse <-
+      storeObject h
+        type'
+        bucket
+        key
+        content
+        ( dw
+        , Indexes [] -- TODO riak-cli store-object indexes
+        , Metadata [] -- TODO riak-cli store-object metadata
+        , n_val
+        , pw
+        , sloppy_quorum
+        , timeout
+        , def -- TODO riak-cli store-object ttl
+        , w
+        )
+    print eresponse
 
 doUpdateCounter
   :: BucketType ('Just 'DataTypeCounter)
@@ -379,17 +378,6 @@ doUpdateCounter type' bucket incr key host port = do
 --------------------------------------------------------------------------------
 -- Misc. helpers
 --------------------------------------------------------------------------------
-
-withParamObjectReturn
-  :: Char
-  -> (forall return. SingObjectReturn return => ParamObjectReturn return -> r)
-  -> r
-withParamObjectReturn ch k =
-  case ch of
-    'a' -> k ParamObjectReturnHead
-    'b' -> k ParamObjectReturnBody
-    'c' -> k ParamObjectReturnNone
-    _   -> undefined
 
 bucketArgument :: Parser Bucket
 bucketArgument =

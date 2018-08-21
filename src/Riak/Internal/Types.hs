@@ -145,19 +145,6 @@ data ObjectReturn
   | ObjectReturnHead
   | ObjectReturnBody
 
--- TODO singletons
-data SObjectReturn :: ObjectReturn -> Type where
-  SObjectReturnNone :: SObjectReturn 'ObjectReturnNone
-  SObjectReturnHead :: SObjectReturn 'ObjectReturnHead
-  SObjectReturnBody :: SObjectReturn 'ObjectReturnBody
-
-class SingObjectReturn (a :: ObjectReturn) where
-  singObjectReturn :: SObjectReturn a
-
-instance SingObjectReturn 'ObjectReturnNone where singObjectReturn = SObjectReturnNone
-instance SingObjectReturn 'ObjectReturnHead where singObjectReturn = SObjectReturnHead
-instance SingObjectReturn 'ObjectReturnBody where singObjectReturn = SObjectReturnBody
-
 
 newtype Quorum
   = Quorum Word32
