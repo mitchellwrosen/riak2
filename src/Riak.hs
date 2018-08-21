@@ -93,11 +93,10 @@ module Riak
   ) where
 
 import Control.Applicative
-import Control.Monad              (guard, when)
+import Control.Monad              (when)
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except
-import Control.Monad.Trans.Maybe
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
 import Data.Default.Class
@@ -217,7 +216,7 @@ fetchObject
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp (Maybe [Content a]))
+  -> m (Either RpbErrorResp [Content a])
 fetchObject
     handle type' bucket key
     ( basic_quorum
@@ -259,7 +258,7 @@ fetchObjectHead
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp (Maybe [Content (Proxy a)]))
+  -> m (Either RpbErrorResp [Content (Proxy a)])
 fetchObjectHead
     handle type' bucket key
     ( basic_quorum
@@ -301,7 +300,7 @@ fetchObjectIfModified
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp (Maybe (Modified [Content a])))
+  -> m (Either RpbErrorResp (Modified [Content a]))
 fetchObjectIfModified
     handle type' bucket key
     ( basic_quorum
@@ -343,7 +342,7 @@ fetchObjectIfModifiedHead
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp (Maybe (Modified [Content (Proxy a)])))
+  -> m (Either RpbErrorResp (Modified [Content (Proxy a)]))
 fetchObjectIfModifiedHead
     handle type' bucket key
     ( basic_quorum
@@ -388,7 +387,7 @@ _fetchObject
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp (Maybe (FetchObjectResp head if_modified a)))
+  -> m (Either RpbErrorResp (FetchObjectResp head if_modified a))
 _fetchObject
     handle@(Handle conn cache) type' bucket key
     ( BasicQuorum basic_quorum
@@ -449,25 +448,24 @@ _fetchObject
  where
   mkResponse
     :: RpbGetResp
-    -> IO (Maybe (FetchObjectResp head if_modified a))
+    -> IO (FetchObjectResp head if_modified a)
   mkResponse (RpbGetResp content _ unchanged _) =
     case if_modified of
       IfModified ->
         case unchanged of
           Just True ->
-            pure (Just Unmodified)
+            pure Unmodified
 
           _ ->
-            (fmap.fmap) Modified contents
+            Modified <$> contents
 
       NoIfModified ->
         contents
 
    where
-    contents :: IO (Maybe [Content (If head (Proxy a) a)])
-    contents = runMaybeT $ do
-      guard (not (null content))
-      traverse (lift . parseContent @a proxy# headAsBool) content
+    contents :: IO [Content (If head (Proxy a) a)]
+    contents =
+      traverse (parseContent @a proxy# headAsBool) content
      where
       headAsBool :: SBool head
       headAsBool =

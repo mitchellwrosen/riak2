@@ -273,10 +273,10 @@ doFetchObject
       Left err ->
         print err
 
-      Right Nothing ->
+      Right [] ->
         putStrLn "Not found"
 
-      Right (Just contents) -> do
+      Right contents -> do
         for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
           let tagtxt :: Text -> Text -> IO ()
               tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
