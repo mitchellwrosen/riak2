@@ -260,16 +260,12 @@ doFetchObject
                 NoHead ->
                   tagtxt "value" (content ^. L.value)
 
-            for_ (content ^. L.contentType)     (tagbs "content_type" . unContentType)
-            for_ (content ^. L.charset)         (tagbs "charset")
-            for_ (content ^. L.lastMod)         (tag "last_mod")
-            for_ (content ^. L.lastModUsecs)    (tag "last_mod_usecs")
-            for_ (content ^. L.usermeta)        print -- TODO better usermeta printing
-            for_ (content ^. L.indexes)         print -- TODO better indexes printing
-            for_ (content ^. L.deleted)         (tag "deleted")
-            for_ (content ^. L.ttl)             (tag "ttl")
-
-            pure ()
+            for_ (content ^. L.charset) (tagbs "charset")
+            for_ (content ^. L.lastMod) (tag "last_mod")
+            for_ (content ^. L.usermeta) print -- TODO better usermeta printing
+            for_ (content ^. L.indexes) print -- TODO better indexes printing
+            tag "deleted" (content ^. L.deleted)
+            for_ (content ^. L.ttl) (tag "ttl")
 
 doListBuckets :: BucketType ty -> IO ()
 doListBuckets type' = do

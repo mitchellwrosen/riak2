@@ -15,6 +15,7 @@ import Control.Exception
 import Data.Bifunctor         (first)
 import Data.ByteString        (ByteString)
 import Data.Text              (Text)
+import Data.Time
 import Data.Word
 import GHC.Exts               (IsString)
 import Lens.Family2.Unchecked (lens)
@@ -27,15 +28,14 @@ import Riak.Internal.Types
 
 data Content a
   = Content
-      !a                                -- Value
-      !(Maybe ByteString)               -- Charset
-      !(Maybe Vtag)
-      !(Maybe Word32)                   -- Last modified
-      !(Maybe Word32)                   -- Last modified usecs
-      ![(ByteString, Maybe ByteString)] -- User meta
-      ![(ByteString, Maybe ByteString)] -- Indexes
-      !Bool                             -- Deleted
-      !(Maybe Word32)                   -- TTL
+      a                                -- Value
+      (Maybe ByteString)               -- Charset
+      (Maybe Vtag)
+      (Maybe UTCTime)                  -- Last modified
+      [(ByteString, Maybe ByteString)] -- User meta
+      [(ByteString, Maybe ByteString)] -- Indexes
+      Bool                             -- Deleted
+      (Maybe Word32)                   -- TTL
   deriving (Show)
 
 instance {-# OVERLAPPABLE #-}
@@ -45,15 +45,14 @@ instance {-# OVERLAPPABLE #-}
     ) => HasLens f (Content s) (Content t) x a b where
   lensOf = lensOf'
 
-instance Functor f => HasLens  f (Content a) (Content b) "value"           a                                b where lensOf  _ = lens (\(Content x _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i) x -> Content x b c d e f g h i)
-instance Functor f => HasLens' f (Content a)             "charset"         (Maybe ByteString)                 where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i) x -> Content a x c d e f g h i)
-instance Functor f => HasLens' f (Content a)             "vtag"            (Maybe Vtag)                       where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i) x -> Content a b x d e f g h i)
-instance Functor f => HasLens' f (Content a)             "lastMod"         (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _ _) -> x) (\(Content a b c _ e f g h i) x -> Content a b c x e f g h i)
-instance Functor f => HasLens' f (Content a)             "lastModUsecs"    (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d _ f g h i) x -> Content a b c d x f g h i)
-instance Functor f => HasLens' f (Content a)             "usermeta"        [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e _ g h i) x -> Content a b c d e x g h i)
-instance Functor f => HasLens' f (Content a)             "indexes"         [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f _ h i) x -> Content a b c d e f x h i)
-instance Functor f => HasLens' f (Content a)             "deleted"         Bool                               where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g _ i) x -> Content a b c d e f g x i)
-instance Functor f => HasLens' f (Content a)             "ttl"             (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h _) x -> Content a b c d e f g h x)
+instance Functor f => HasLens  f (Content a) (Content b) "value"           a                                b where lensOf  _ = lens (\(Content x _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h) x -> Content x b c d e f g h)
+instance Functor f => HasLens' f (Content a)             "charset"         (Maybe ByteString)                 where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h) x -> Content a x c d e f g h)
+instance Functor f => HasLens' f (Content a)             "vtag"            (Maybe Vtag)                       where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _) -> x) (\(Content a b _ d e f g h) x -> Content a b x d e f g h)
+instance Functor f => HasLens' f (Content a)             "lastMod"         (Maybe UTCTime)                    where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _) -> x) (\(Content a b c _ e f g h) x -> Content a b c x e f g h)
+instance Functor f => HasLens' f (Content a)             "usermeta"        [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _) -> x) (\(Content a b c d _ f g h) x -> Content a b c d x f g h)
+instance Functor f => HasLens' f (Content a)             "indexes"         [(ByteString, Maybe ByteString)]   where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _) -> x) (\(Content a b c d e _ g h) x -> Content a b c d e x g h)
+instance Functor f => HasLens' f (Content a)             "deleted"         Bool                               where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f _ h) x -> Content a b c d e f x h)
+instance Functor f => HasLens' f (Content a)             "ttl"             (Maybe Word32)                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g _) x -> Content a b c d e f g x)
 
 
 class IsContent a where

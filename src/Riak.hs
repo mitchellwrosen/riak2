@@ -103,6 +103,8 @@ import Data.IORef
 import Data.Kind                  (Type)
 import Data.Maybe                 (fromMaybe)
 import Data.Text                  (Text)
+import Data.Time
+import Data.Time.Clock.POSIX
 import Data.Type.Bool             (If)
 import Lens.Labels
 import List.Transformer           (ListT)
@@ -955,12 +957,19 @@ parseContent _ head
           -- TODO make sure content_type from RpbContent matches?
           either throwIO pure (contentDecode value')
 
+  let
+    theLastMod :: Maybe NominalDiffTime
+    theLastMod = do
+      secs  <- last_mod
+      usecs <- last_mod_usecs <|> pure 0
+      let usecs_d = realToFrac usecs / 1000000 :: Double
+      pure (fromIntegral secs + realToFrac usecs_d)
+
   pure $ Content
     theValue
     charset
     (coerce vtag)
-    last_mod
-    last_mod_usecs
+    (posixSecondsToUTCTime <$> theLastMod)
     (map unRpbPair usermeta)
     (map unRpbPair indexes)
     (fromMaybe False deleted)
