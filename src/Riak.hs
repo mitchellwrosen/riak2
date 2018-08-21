@@ -2,7 +2,7 @@
              MagicHash, OverloadedLabels, OverloadedStrings, PatternSynonyms,
              RankNTypes, ScopedTypeVariables, StandaloneDeriving,
              TypeApplications, TypeFamilies, TypeOperators,
-             UndecidableInstances #-}
+             UndecidableInstances, ViewPatterns #-}
 
 module Riak
   ( -- * Riak handle
@@ -80,6 +80,7 @@ module Riak
   , ReturnBody(..)
   , SloppyQuorum(..)
   , Timeout(..)
+  , TTL(..)
   , Vclock(..)
   , Vtag(..)
   , W(..)
@@ -110,8 +111,10 @@ import Lens.Labels
 import List.Transformer           (ListT)
 import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head, return, (.))
+import Text.Read                  (readMaybe)
 import UnliftIO.Exception         (throwIO)
 
+import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.HashMap.Strict   as HashMap
 import qualified List.Transformer      as ListT
@@ -290,7 +293,7 @@ fetchObject
     contents :: IO (Maybe [Content (If head () a)])
     contents = runMaybeT $ do
       guard (not (null content))
-      traverse (lift . parseContent (proxy# @_ @a) headAsBool) content
+      traverse (lift . parseContent @a proxy# headAsBool) content
      where
       headAsBool :: SBool head
       headAsBool =
@@ -388,6 +391,9 @@ storeObject_
       key
 
   let
+    (content_type, charset, content_encoding, bytes) =
+      contentEncode value
+
     request :: RpbPutReq
     request =
       RpbPutReq
@@ -397,9 +403,9 @@ storeObject_
         , _RpbPutReq'content        =
             RpbContent
               { _RpbContent'_unknownFields = []
-              , _RpbContent'charset = Nothing
-              , _RpbContent'contentEncoding = coerce (contentEncoding value)
-              , _RpbContent'contentType = coerce (Just (contentType (proxy# @_ @a)))
+              , _RpbContent'charset = coerce charset
+              , _RpbContent'contentEncoding = coerce content_encoding
+              , _RpbContent'contentType = coerce (Just content_type)
               , _RpbContent'deleted = Nothing
               , _RpbContent'indexes = map indexToRpbPair indexes
               , _RpbContent'lastMod = Nothing
@@ -407,7 +413,7 @@ storeObject_
               , _RpbContent'links = []
               , _RpbContent'ttl = ttl
               , _RpbContent'usermeta = map rpbPair metadata
-              , _RpbContent'value = contentEncode value
+              , _RpbContent'value = bytes
               , _RpbContent'vtag = Nothing
               }
         , _RpbPutReq'dw             = Just (coerce dw)
@@ -481,10 +487,10 @@ storeObject_
           pure ()
 
         ParamObjectReturnHead ->
-          traverse (parseContent (proxy# @_ @a) STrue) (response ^. #content)
+          traverse (parseContent @a proxy# STrue) (response ^. #content)
 
         ParamObjectReturnBody ->
-          traverse (parseContent (proxy# @_ @a) SFalse) (response ^. #content)
+          traverse (parseContent @a proxy# SFalse) (response ^. #content)
 
   StoreObjectResp theKey <$> lift theValue
 
@@ -937,7 +943,7 @@ parseContent
   -> RpbContent
   -> IO (Content (If head () a))
 parseContent _ head
-    (RpbContent value _ charset content_encoding vtag _ last_mod
+    (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
   theValue :: If head () a <-
@@ -946,16 +952,14 @@ parseContent _ head
         pure ()
 
       SFalse ->
-        let
-          value' :: ByteString
-          value' =
-            case coerce content_encoding of
-              ContentEncodingNone -> value
-              _                   -> undefined
-              -- TODO handle unknown encoding
-        in
-          -- TODO make sure content_type from RpbContent matches?
-          either throwIO pure (contentDecode value')
+        either
+          throwIO
+          pure
+          (contentDecode
+            (coerce content_type)
+            (coerce charset)
+            (coerce content_encoding )
+            value)
 
   let
     theLastMod :: Maybe NominalDiffTime
@@ -967,13 +971,12 @@ parseContent _ head
 
   pure $ Content
     theValue
-    charset
     (coerce vtag)
     (posixSecondsToUTCTime <$> theLastMod)
-    (map unRpbPair usermeta)
-    (map unRpbPair indexes)
+    (coerce (map unRpbPair usermeta))
+    (coerce (map rpbPairToIndex indexes))
     (fromMaybe False deleted)
-    ttl
+    (coerce ttl)
 
 
 emptyResponse :: IO (Either RpbErrorResp a) -> IO (Either RpbErrorResp ())
@@ -988,6 +991,21 @@ indexToRpbPair = \case
 
   IndexBin k v ->
     RpbPair k (Just v) []
+
+
+rpbPairToIndex :: RpbPair -> Index
+rpbPairToIndex = \case
+  RpbPair (ByteString.stripSuffix "_bin" -> Just k) (Just v) _ ->
+    IndexBin k v
+
+  RpbPair
+      (ByteString.stripSuffix "_int" -> Just k)
+      (Just (readMaybe . Latin1.unpack -> Just v)) _ ->
+    IndexInt k v -- TODO better read
+
+  -- TODO what to do if index value is empty...?
+  _ ->
+    undefined
 
 
 rpbPair :: (ByteString, Maybe ByteString) -> RpbPair

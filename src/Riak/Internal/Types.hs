@@ -86,10 +86,12 @@ instance Default DW where
 data Index
   = IndexInt !ByteString !Int64
   | IndexBin !ByteString !ByteString
+  deriving (Show)
 
 
 newtype Indexes
-  = Indexes [Index]
+  = Indexes { unIndexes :: [Index] }
+  deriving (Show)
 
 
 -- | A Riak key.
@@ -105,7 +107,8 @@ instance Show Key where
 
 
 newtype Metadata
-  = Metadata [(ByteString, Maybe ByteString)]
+  = Metadata { unMetadata :: [(ByteString, Maybe ByteString)] }
+  deriving (Show)
 
 
 data Modified a
@@ -218,14 +221,15 @@ instance Show SomeBucketType where
 
 
 newtype Timeout
-  = Timeout (Maybe Word32)
+  = Timeout { unTimeout :: Maybe Word32 }
 
 instance Default Timeout where
   def = Timeout Nothing
 
 
 newtype TTL
-  = TTL (Maybe Word32)
+  = TTL { unTTL :: Maybe Word32 }
+  deriving Show
 
 instance Default TTL where
   def = TTL Nothing

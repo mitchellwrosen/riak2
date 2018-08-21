@@ -4,7 +4,6 @@
 import Control.Monad              (join)
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
-import Data.ByteString            (ByteString)
 import Data.Coerce
 import Data.Foldable              (asum, for_)
 import Data.Int
@@ -244,9 +243,6 @@ doFetchObject
 
         Right (Just contents) -> do
           for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
-            let tagbs :: ByteString -> ByteString -> IO ()
-                tagbs k v = Latin1.putStrLn (k <> "[" <> Latin1.pack (show i) <> "] = " <> v)
-
             let tagtxt :: Text -> Text -> IO ()
                 tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
 
@@ -260,12 +256,18 @@ doFetchObject
                 NoHead ->
                   tagtxt "value" (content ^. L.value)
 
-            for_ (content ^. L.charset) (tagbs "charset")
             for_ (content ^. L.lastMod) (tag "last_mod")
-            for_ (content ^. L.usermeta) print -- TODO better usermeta printing
-            for_ (content ^. L.indexes) print -- TODO better indexes printing
+
+            case unMetadata (content ^. L.usermeta) of
+              [] -> pure ()
+              xs -> tag "metadata" xs
+
+            case unIndexes (content ^. L.indexes) of
+              [] -> pure ()
+              xs -> tag "indexes" xs
+
             tag "deleted" (content ^. L.deleted)
-            for_ (content ^. L.ttl) (tag "ttl")
+            for_ (unTTL (content ^. L.ttl)) (tag "ttl")
 
 doListBuckets :: BucketType ty -> IO ()
 doListBuckets type' = do
