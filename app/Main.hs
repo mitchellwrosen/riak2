@@ -49,6 +49,7 @@ parser =
         ]
       , [ commandGroup "Data type operations"
         , fetchCounterParser
+        , fetchMapParser
         , updateCounterParser
         ]
       , [ commandGroup "Bucket operations"
@@ -80,6 +81,18 @@ fetchCounterParser =
         <*> keyArgument)
         -- TODO fetch-counter optional params
       (progDesc "Fetch a counter"))
+
+fetchMapParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+fetchMapParser =
+  command
+    "fetch-map"
+    (info
+      (doFetchMap
+        <$> bucketTypeArgument
+        <*> bucketArgument
+        <*> keyArgument)
+        -- TODO fetch-map optional params
+      (progDesc "Fetch a map"))
 
 fetchObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchObjectParser =
@@ -204,6 +217,23 @@ doFetchCounter type' bucket key host port = do
         bucket
         key
         def
+
+doFetchMap
+  :: BucketType ('Just 'DataTypeMap)
+  -> Bucket
+  -> Key
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doFetchMap type' bucket key host port = do
+  cache <- refVclockCache
+  withHandle host port cache $ \h ->
+    print =<<
+      fetchMap h
+        type'
+        bucket
+        key
+        (def, def, def, def, def, def, def, def)
 
 doFetchObject
   :: BucketType 'Nothing

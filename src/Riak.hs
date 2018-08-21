@@ -24,6 +24,7 @@ module Riak
     -- * Data type operations
   , fetchCounter
   , fetchSet
+  , fetchMap
   , fetchDataType
   , updateCounter
   , updateDataType
@@ -572,7 +573,7 @@ fetchSet
   -> ( BasicQuorum
      , ParamIncludeContext
      , Nval
-     , NotfoundOk -- TODO invert?
+     , NotfoundOk
      , PR
      , R
      , SloppyQuorum
@@ -588,13 +589,13 @@ fetchSet
 
   case response ^. #type' of
     DtFetchResp'SET -> do
-      -- Cache set context, if it was requested (it defaults to true)
       when include_context $
-        let
-          vclock :: Maybe Vclock
-          vclock = coerce (response ^. #maybe'context)
-        in
-          cacheVclock handle type' bucket key vclock
+        cacheVclock
+          handle
+          type'
+          bucket
+          key
+          (coerce (response ^. #maybe'context))
 
       pure (response ^. #value . #setValue)
 
@@ -602,6 +603,47 @@ fetchSet
       throwIO
         (DataTypeError
           (SomeBucketType (unBucketType type')) bucket key dt DtFetchResp'SET)
+
+fetchMap
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'DataTypeMap)
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , ParamIncludeContext
+     , Nval
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp [MapEntry])
+fetchMap
+    handle type' bucket key
+    params@(_, ParamIncludeContext include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
+
+  response :: DtFetchResp <-
+    ExceptT (fetchDataType handle type' bucket key params)
+
+  case response ^. #type' of
+    DtFetchResp'MAP -> do
+      -- Cache set context, if it was requested (it defaults to true)
+      when include_context $
+        cacheVclock
+          handle
+          type'
+          bucket
+          key
+          (coerce (response ^. #maybe'context))
+
+      pure (response ^. #value . #mapValue)
+
+    dt ->
+      throwIO
+        (DataTypeError
+          (SomeBucketType (unBucketType type')) bucket key dt DtFetchResp'MAP)
 
 
 fetchDataType
