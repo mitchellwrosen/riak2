@@ -934,7 +934,7 @@ parseContent
   -> RpbContent
   -> IO (Content (If head () a))
 parseContent _ head
-    (RpbContent value content_type charset content_encoding vtag _ last_mod
+    (RpbContent value _ charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
   theValue :: If head () a <-
@@ -951,11 +951,11 @@ parseContent _ head
               _                   -> undefined
               -- TODO handle unknown encoding
         in
+          -- TODO make sure content_type from RpbContent matches?
           either throwIO pure (contentDecode value')
 
   pure $ Content
     theValue
-    (coerce content_type)
     charset
     (coerce vtag)
     last_mod
