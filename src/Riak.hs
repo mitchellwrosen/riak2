@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, LambdaCase,
              MagicHash, OverloadedLabels, OverloadedStrings, PatternSynonyms,
              RankNTypes, ScopedTypeVariables, StandaloneDeriving,
-             TypeApplications, TypeFamilies, TypeOperators,
+             TupleSections, TypeApplications, TypeFamilies, TypeOperators,
              UndecidableInstances, ViewPatterns #-}
 
 module Riak
@@ -619,7 +619,7 @@ fetchMap
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp [MapEntry])
+  -> m (Either RpbErrorResp [(ByteString, MapValue)])
 fetchMap
     handle type' bucket key
     params@(_, ParamIncludeContext include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
@@ -638,7 +638,7 @@ fetchMap
           key
           (coerce (response ^. #maybe'context))
 
-      pure (response ^. #value . #mapValue)
+      pure (map mapEntryToPair (response ^. #value . #mapValue))
 
     dt ->
       throwIO
@@ -1033,6 +1033,30 @@ indexToRpbPair = \case
 
   IndexBin k v ->
     RpbPair k (Just v) []
+
+
+mapEntryToPair :: MapEntry -> (ByteString, MapValue)
+mapEntryToPair entry =
+  (k ,) $
+    case ty of
+      MapField'COUNTER ->
+        MapValueCounter (entry ^. #counterValue)
+
+      MapField'FLAG ->
+        MapValueFlag (entry ^. #flagValue)
+
+      MapField'MAP ->
+        MapValueMap (map mapEntryToPair (entry ^. #mapValue))
+
+      MapField'REGISTER ->
+        MapValueRegister (entry ^. #registerValue)
+
+      MapField'SET ->
+        MapValueSet (entry ^. #setValue)
+
+ where
+  MapField k ty _ =
+    entry ^. #field
 
 
 rpbPairToIndex :: RpbPair -> Index

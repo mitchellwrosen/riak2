@@ -106,6 +106,15 @@ instance Show Key where
     Text.unpack . decodeUtf8 . unKey
 
 
+data MapValue
+  = MapValueCounter Int64
+  | MapValueFlag Bool
+  | MapValueMap [(ByteString, MapValue)]
+  | MapValueRegister ByteString
+  | MapValueSet [ByteString]
+  deriving (Show)
+
+
 newtype Metadata
   = Metadata { unMetadata :: [(ByteString, Maybe ByteString)] }
   deriving (Show)
