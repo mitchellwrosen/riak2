@@ -350,7 +350,7 @@ _fetchObject
    where
     contents :: IO [Content (If head (Proxy a) a)]
     contents =
-      traverse (parseContent @a proxy# headAsBool) content
+      traverse (parseContent @a proxy# type' bucket key headAsBool) content
      where
       headAsBool :: SBool head
       headAsBool =
@@ -360,7 +360,7 @@ _fetchObject
 
 
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
-  ObjectReturnTy _ 'ObjectReturnNone = ()
+  ObjectReturnTy _ 'ObjectReturnNone = Key
   ObjectReturnTy a 'ObjectReturnHead = NonEmpty (Content (Proxy a))
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (Content a)
 
@@ -394,9 +394,8 @@ storeObjectHead
   -> m (Either RpbErrorResp (NonEmpty (Content (Proxy a))))
 storeObjectHead
     handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
-  (fmap.fmap) snd $
-    _storeObject handle type' bucket (Just key) content a b c d e
-      ParamObjectReturnHead f g h i
+  _storeObject handle type' bucket (Just key) content a b c d e
+    ParamObjectReturnHead f g h i
 
 -- | Store an object and return it.
 storeObjectBody
@@ -411,7 +410,6 @@ storeObjectBody
   -> m (Either RpbErrorResp (NonEmpty (Content a)))
 storeObjectBody
     handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
-  (fmap.fmap) snd $
   _storeObject handle type' bucket (Just key) content a b c d e
     ParamObjectReturnBody f g h i
 
@@ -427,11 +425,10 @@ storeNewObject
   -> m (Either RpbErrorResp Key)
 storeNewObject
     handle type' bucket content (StoreObjectParams a b c d e f g h i) =
-  (fmap.fmap) fst
-    (_storeObject handle type' bucket Nothing content a b c d e
-      ParamObjectReturnNone f g h i)
+  _storeObject handle type' bucket Nothing content a b c d e
+    ParamObjectReturnNone f g h i
 
--- | Store an new object and return its randomly-generated key and metadata.
+-- | Store an new object and return its metadata.
 storeNewObjectHead
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -440,10 +437,10 @@ storeNewObjectHead
   -> Bucket -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
-  -> m (Either RpbErrorResp (Key, Content (Proxy a)))
+  -> m (Either RpbErrorResp (Content (Proxy a)))
 storeNewObjectHead
     handle type' bucket content (StoreObjectParams a b c d e f g h i) =
-  (fmap.fmap.fmap) List1.head $
+  (fmap.fmap) List1.head $
     _storeObject handle type' bucket Nothing content a b c d e
       ParamObjectReturnHead f g h i
 
@@ -456,10 +453,10 @@ storeNewObjectBody
   -> Bucket -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
-  -> m (Either RpbErrorResp (Key, Content a))
+  -> m (Either RpbErrorResp (Content a))
 storeNewObjectBody
     handle type' bucket content (StoreObjectParams a b c d e f g h i) =
-  (fmap.fmap.fmap) List1.head $
+  (fmap.fmap) List1.head $
     _storeObject handle type' bucket Nothing content a b c d e
       ParamObjectReturnBody f g h i
 
@@ -481,7 +478,7 @@ _storeObject
   -> Timeout
   -> TTL
   -> W
-  -> m (Either RpbErrorResp (Key, ObjectReturnTy a return))
+  -> m (Either RpbErrorResp (ObjectReturnTy a return))
 _storeObject
     handle@(Handle conn cache) type' bucket key value dw indexes metadata n pw
     return sloppy_quorum timeout ttl w = liftIO . runExceptT $ do
@@ -587,19 +584,19 @@ _storeObject
     theValue =
       case return of
         ParamObjectReturnNone ->
-          pure ()
+          pure theKey
 
         ParamObjectReturnHead ->
           traverse
-            (parseContent @a proxy# STrue)
+            (parseContent @a proxy# type' bucket theKey STrue)
             (List1.fromList (response ^. #content))
 
         ParamObjectReturnBody ->
           traverse
-            (parseContent @a proxy# SFalse)
+            (parseContent @a proxy# type' bucket theKey SFalse)
             (List1.fromList (response ^. #content))
 
-  (theKey ,) <$> lift theValue
+  lift theValue
 
 
 -- TODO deleteObject figure out when vclock is required (always?)
@@ -1102,10 +1099,13 @@ parseContent
   :: forall a head.
      IsContent a
   => Proxy# a
+  -> BucketType 'Nothing
+  -> Bucket
+  -> Key
   -> SBool head
   -> RpbContent
   -> IO (Content (If head (Proxy a) a))
-parseContent _ head
+parseContent _ type' bucket key head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
@@ -1133,6 +1133,9 @@ parseContent _ head
       pure (fromIntegral secs + realToFrac usecs_d)
 
   pure $ Content
+    type'
+    bucket
+    key
     theValue
     (coerce vtag)
     (posixSecondsToUTCTime <$> theLastMod)

@@ -25,7 +25,7 @@ import qualified Data.Text              as Text
 -- /Note/: Must be UTF-8 encoded.
 newtype BucketType (ty :: Maybe DataTypeTy)
   = BucketType { unBucketType :: ByteString }
-  deriving stock (Eq)
+  deriving stock (Eq, Show)
   deriving newtype (Hashable)
 
 pattern BucketTypeDefault :: BucketType 'Nothing

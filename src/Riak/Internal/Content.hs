@@ -29,8 +29,13 @@ import qualified Data.Text.Encoding as Text
 
 import Riak.Internal.Types
 
+
+-- TODO add type, bucket, key to content
 data Content a
   = Content
+      !(BucketType 'Nothing)
+      !Bucket
+      !Key
       a                -- Value
       (Maybe Vtag)     -- Vtag
       (Maybe UTCTime)  -- Last modified
@@ -47,13 +52,16 @@ instance {-# OVERLAPPABLE #-}
     ) => HasLens f (Content s) (Content t) x a b where
   lensOf = lensOf'
 
-instance Functor f => HasLens  f (Content a) (Content b) "value"    a               b where lensOf  _ = lens (\(Content x _ _ _ _ _ _) -> x) (\(Content _ b c d e f g) x -> Content x b c d e f g)
-instance Functor f => HasLens' f (Content a)             "vtag"     (Maybe Vtag)      where lensOf' _ = lens (\(Content _ x _ _ _ _ _) -> x) (\(Content a _ c d e f g) x -> Content a x c d e f g)
-instance Functor f => HasLens' f (Content a)             "lastMod"  (Maybe UTCTime)   where lensOf' _ = lens (\(Content _ _ x _ _ _ _) -> x) (\(Content a b _ d e f g) x -> Content a b x d e f g)
-instance Functor f => HasLens' f (Content a)             "usermeta" Metadata          where lensOf' _ = lens (\(Content _ _ _ x _ _ _) -> x) (\(Content a b c _ e f g) x -> Content a b c x e f g)
-instance Functor f => HasLens' f (Content a)             "indexes"  [SecondaryIndex]  where lensOf' _ = lens (\(Content _ _ _ _ x _ _) -> x) (\(Content a b c d _ f g) x -> Content a b c d x f g)
-instance Functor f => HasLens' f (Content a)             "deleted"  Bool              where lensOf' _ = lens (\(Content _ _ _ _ _ x _) -> x) (\(Content a b c d e _ g) x -> Content a b c d e x g)
-instance Functor f => HasLens' f (Content a)             "ttl"      TTL               where lensOf' _ = lens (\(Content _ _ _ _ _ _ x) -> x) (\(Content a b c d e f _) x -> Content a b c d e f x)
+instance Functor f => HasLens' f (Content a)             "bucket_type" (BucketType 'Nothing)   where lensOf' _ = lens (\(Content x _ _ _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h i j) x -> Content x b c d e f g h i j)
+instance Functor f => HasLens' f (Content a)             "bucket"      Bucket                  where lensOf' _ = lens (\(Content _ x _ _ _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h i j) x -> Content a x c d e f g h i j)
+instance Functor f => HasLens' f (Content a)             "key"         Key                     where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _ _ _) -> x) (\(Content a b _ d e f g h i j) x -> Content a b x d e f g h i j)
+instance Functor f => HasLens  f (Content a) (Content b) "value"       a                     b where lensOf  _ = lens (\(Content _ _ _ x _ _ _ _ _ _) -> x) (\(Content a b c _ e f g h i j) x -> Content a b c x e f g h i j)
+instance Functor f => HasLens' f (Content a)             "vtag"        (Maybe Vtag)            where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _ _ _) -> x) (\(Content a b c d _ f g h i j) x -> Content a b c d x f g h i j)
+instance Functor f => HasLens' f (Content a)             "lastMod"     (Maybe UTCTime)         where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _ _ _) -> x) (\(Content a b c d e _ g h i j) x -> Content a b c d e x g h i j)
+instance Functor f => HasLens' f (Content a)             "usermeta"    Metadata                where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _ _ _) -> x) (\(Content a b c d e f _ h i j) x -> Content a b c d e f x h i j)
+instance Functor f => HasLens' f (Content a)             "indexes"     [SecondaryIndex]        where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x _ _) -> x) (\(Content a b c d e f g _ i j) x -> Content a b c d e f g x i j)
+instance Functor f => HasLens' f (Content a)             "deleted"     Bool                    where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f g h _ j) x -> Content a b c d e f g h x j)
+instance Functor f => HasLens' f (Content a)             "ttl"         TTL                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g h i _) x -> Content a b c d e f g h i x)
 
 
 class IsContent a where
