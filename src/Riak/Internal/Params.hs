@@ -27,6 +27,7 @@ newtype Timeout        = Timeout        { unTimeout        :: Maybe Word32 }
 newtype W              = W              { unW              :: Maybe Quorum }
 
 
+-- | Optional @fetch data type@ parameters.
 data FetchDataTypeParams
   = FetchDataTypeParams
       !BasicQuorum
@@ -51,6 +52,7 @@ instance IsLabel "sloppy_quorum"   (Bool   -> FetchDataTypeParams -> FetchDataTy
 instance IsLabel "timeout"         (Word32 -> FetchDataTypeParams -> FetchDataTypeParams) where fromLabel = \h (FetchDataTypeParams a b c d e f g _) -> FetchDataTypeParams a b c d e f g (coerce (Just h))
 
 
+-- | Optional @fetch object@ parameters.
 data FetchObjectParams
   = FetchObjectParams
       !BasicQuorum
@@ -73,6 +75,7 @@ instance IsLabel "sloppy_quorum" (Bool   -> FetchObjectParams -> FetchObjectPara
 instance IsLabel "timeout"       (Word32 -> FetchObjectParams -> FetchObjectParams) where fromLabel = \g (FetchObjectParams a b c d e f _) -> FetchObjectParams a b c d e f (coerce (Just g))
 
 
+-- | Optional @store object@ parameters.
 data StoreObjectParams
   = StoreObjectParams
       !DW
@@ -98,6 +101,7 @@ instance IsLabel "timeout"       (Word32                           -> StoreObjec
 instance IsLabel "ttl"           (Word32                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \h (StoreObjectParams a b c d e f g _ i) -> StoreObjectParams a b c d e f g (coerce (Just h)) i
 instance IsLabel "w"             (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \i (StoreObjectParams a b c d e f g h _) -> StoreObjectParams a b c d e f g h (coerce (Just i))
 
+-- | Optional @update data type@ parameters.
 data UpdateDataTypeParams
   = UpdateDataTypeParams
      !DW

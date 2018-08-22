@@ -12,24 +12,34 @@ module Riak
   , refVclockCache
     -- * Key/value object operations
     -- ** Fetch object
+  , FetchObjectParams
   , fetchObject
   , fetchObjectHead
   , fetchObjectIfModified
   , fetchObjectIfModifiedHead
     -- ** Store object
+  , StoreObjectParams
   , storeObject
   , storeObjectHead
   , storeObjectBody
     -- ** Delete object
   , deleteObject
     -- * Data type operations
+  , FetchDataTypeParams
+  , UpdateDataTypeParams
+    -- ** Counter
   , fetchCounter
-  , fetchGrowOnlySet
-  , fetchHyperLogLog
-  , fetchSet
-  , fetchMap
-  , fetchSomeDataType
   , updateCounter
+    -- ** Grow-only set
+  , fetchGrowOnlySet
+    -- ** HyperLogLog
+  , fetchHyperLogLog
+    -- ** Set
+  , fetchSet
+    -- ** Map
+  , fetchMap
+    -- ** Unknown
+  , fetchSomeDataType
     -- * Bucket operations
   , getBucketTypeProps
   , setBucketTypeProps
@@ -75,9 +85,10 @@ module Riak
   , TTL(..)
   , Vclock(..)
   , Vtag(..)
-    -- * Temp
+    -- * Re-exports
   , def
-    -- $ glossary
+    -- * Documentation
+    -- $documentation
   ) where
 
 import Control.Applicative
@@ -189,13 +200,10 @@ refVclockCache = liftIO $ do
 -- API
 --------------------------------------------------------------------------------
 
-type FetchObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
-  = IfModifiedWrapper if_modified [(Content (If head (Proxy a) a))]
-
-type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
-  IfModifiedWrapper 'True  a = Modified a
-  IfModifiedWrapper 'False a = a
-
+-- | Fetch an object.
+--
+-- If multiple siblings are returned, you should resolve them, then perform a
+-- 'storeObject'.
 fetchObject
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -207,6 +215,7 @@ fetchObject
   -> m (Either RpbErrorResp [Content a])
 fetchObject handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a NoHead NoIfModified b c d e f g
 
+-- | Fetch an object's metadata.
 fetchObjectHead
     :: forall a m.
        (IsContent a, MonadIO m)
@@ -218,6 +227,10 @@ fetchObjectHead
     -> m (Either RpbErrorResp [Content (Proxy a)])
 fetchObjectHead handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a Head NoIfModified b c d e f g
 
+-- | Fetch an object if it has been modified since the last fetch.
+--
+-- If multiple siblings are returned, you should resolve them, then perform a
+-- 'storeObject'.
 fetchObjectIfModified
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -229,6 +242,7 @@ fetchObjectIfModified
   -> m (Either RpbErrorResp (Modified [Content a]))
 fetchObjectIfModified handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a NoHead IfModified b c d e f g
 
+-- | Fetch an object's metadata if it has been modified since the last fetch.
 fetchObjectIfModifiedHead
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -239,6 +253,13 @@ fetchObjectIfModifiedHead
   -> FetchObjectParams -- ^
   -> m (Either RpbErrorResp (Modified [Content (Proxy a)]))
 fetchObjectIfModifiedHead handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a Head IfModified b c d e f g
+
+type FetchObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
+  = IfModifiedWrapper if_modified [(Content (If head (Proxy a) a))]
+
+type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
+  IfModifiedWrapper 'True  a = Modified a
+  IfModifiedWrapper 'False a = a
 
 -- TODO delete _fetchObject and inline its logic in the 4 variants?
 _fetchObject
@@ -340,6 +361,7 @@ type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy a 'ObjectReturnHead = NonEmpty (Content (Proxy a))
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (Content a)
 
+-- | Store an object.
 storeObject
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -352,6 +374,7 @@ storeObject
   -> m (Either RpbErrorResp Key)
 storeObject handle type' bucket key content (StoreObjectParams a b c d e f g h i) = (fmap.fmap) fst (_storeObject handle type' bucket key content a b c d e ParamObjectReturnNone f g h i)
 
+-- | Store an object and return its metadata.
 storeObjectHead
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -364,6 +387,7 @@ storeObjectHead
   -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
 storeObjectHead handle type' bucket key content (StoreObjectParams a b c d e f g h i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnHead f g h i
 
+-- | Store an object and return it.
 storeObjectBody
   :: forall a m.
      (IsContent a, MonadIO m)
@@ -1094,90 +1118,142 @@ unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)
 unRpbPair (RpbPair k v _) =
   (k, v)
 
--- $ glossary
+-- $documentation
 --
--- * __basic_quorum__
+-- = Bucket types
 --
---   * Whether to use the "basic quorum" policy for not-founds. Only relevant
---     when __notfound_ok__ is set to false.
+-- Bucket types ('BucketType') carry a type-level tag that indicates what kind
+-- of data is stored within:
 --
---   * /Default/: false.
+-- * Opaque objects
+-- * Counters
+-- * Grow-only sets
+-- * HyperLogLogs
+-- * Maps
+-- * Sets
 --
--- * __dw__
+-- Normally, you should know ahead of time what kind of data corresponds to each
+-- bucket type, and define these bucket types as top-level definitions.
 --
---   * The number of vnodes that must write a write request to storage before a
---     response is returned to the client. The request will still be replicated
---     to __n__ vnodes.
+-- For example,
 --
---   * /Default/: @quorum@.
+-- @
+-- countersBucketType :: 'BucketType' ''CounterTy'
+-- countersBucketType = 'BucketType' "counters"
+-- @
 --
---   * /Range/: 1 to __n__.
+-- However, you may always dynamically create 'BucketType's on the fly at any
+-- type you wish simply by using the 'BucketType' newtype constructor.
 --
--- * __n__
+-- = Content
 --
---   * The number of /primary vnodes/ responsible for each key, i.e. the
---     number of /replicas/ stores in the cluster.
+-- TODO write this
 --
---   * /Default/: 3.
+-- = Optional parameters
 --
---   * /Range/: 1 to the number of nodes in the cluster.
+-- Each request takes a bundle of optional parameters as a data type named
+-- @*Params@. It is always constructed using 'def' and overloaded labels syntax.
 --
--- * __notfound_ok__
+-- For example, 'FetchObjectParams' has an instance
 --
---   * Controls how Riak behaves during read requests when keys are not present.
+-- @
+-- IsLabel "sloppy_quorum" (Bool -> FetchObjectParams -> FetchObjectParams)
+-- @
 --
---     * If @true@, Riak will treat any @notfound@ as a positive assertion that
---       the key does not exist.
+-- To use this instance, write
 --
---     * If @false@, Riak will treat any @notfound@ as a failure condition. The
---       coordinating node will wait for enough vnodes to reply with @notfound@
---       to know that it cannot satisfy the requested __r__.
+-- @
+-- def & #sloppy_quorum False
+-- @
 --
---   * /Default/: true.
+-- = @vclock@ cache
 --
--- * __pr__
+-- Riak objects carry a causal context (either a vclock or a dotted version
+-- vector) that help Riak resolve some conflicts automatically.
 --
---   * The number of primary vnodes that must respond to a read request before a
---     response is returned to the client. The request will still be replicated
---     to __n__ vnodes.
+-- Proper handling of the causal context is fairly simple: to perform a write,
+-- first perform a read to fetch the causal context, then include it in the
+-- write request. This will minimize, but not eliminate, the creation of
+-- siblings.
 --
---   * /Default/: 0.
+-- This library caches every vclock fetched and includes them in write requests
+-- automatically. Siblings are _not_ automatically resolved: if you
+-- ever read siblings, it is your responsibility to resolve them in your
+-- application and perform a follow write to eliminate them.
 --
---   * /Range/: 1 to __n__.
+-- Data types, which cannot have siblings, also have causal contexts that are
+-- cached and included in write requests automatically.
 --
--- * __pw__
+-- = Glossary
 --
---   * The number of primary vnodes that must /respond/ to a write request
---     before a response is returned to the client. The request will still be
---     replicated to __n__ vnodes.
+-- [__basic_quorum__]
+-- Whether to use the "basic quorum" policy for not-founds. Only relevant when
+-- __notfound_ok__ is set to false.
 --
---   * /Default/: 0.
+--     * /Default/: false.
 --
---   * /Range/: 1 to __n__.
+-- [__dw__]
+-- The number of vnodes that must write a write request to storage before a
+-- response is returned to the client. The request will still be replicated to
+-- __n__ vnodes.
 --
--- * __r__
+--     * /Default/: @quorum@.
 --
---   * The number of vnodes that must respond to a read request before a
---     response is returned to the client. The request will still be replicated
---     to __n__ vnodes.
+--     * /Range/: 1 to __n__.
 --
---   * /Default/: @quorum@.
+-- [__n__]
+-- The number of /primary vnodes/ responsible for each key, i.e. the number of
+-- /replicas/ stores in the cluster.
 --
---   * /Range/: 1 to __n__.
+--     * /Default/: 3.
 --
--- * __sloppy_quorum__
+--     * /Range/: 1 to the number of nodes in the cluster.
 --
---   * Whether failover vnodes are consulted if one or more primary vnodes
---     fails.
+-- [__notfound_ok__]
+-- Controls how Riak behaves during read requests when keys are not present. If
+-- @true@, Riak will treat any @notfound@ as a positive assertion that the key
+-- does not exist. If @false@, Riak will treat any @notfound@ as a failure
+-- condition. The coordinating node will wait for enough vnodes to reply with
+-- @notfound@ to know that it cannot satisfy the requested __r__.
 --
---   * /Default/: true.
+--     * /Default/: true.
 --
--- * __w__
+-- [__pr__]
+-- The number of primary vnodes that must respond to a read request before a
+-- response is returned to the client. The request will still be replicated to
+-- __n__ vnodes.
 --
---   * The number of vnodes that must /respond/ to a write request before a
---     response is returned to the client. The request will still be replicated
---     to __n__ vnodes.
+--     * /Default/: 0.
 --
---   * /Default/: @quorum@.
+--     * /Range/: 1 to __n__.
 --
---   * /Range/: 1 to __nN__.
+-- [__pw__]
+-- The number of primary vnodes that must /respond/ to a write request before a
+-- response is returned to the client. The request will still be replicated to
+-- __n__ vnodes.
+--
+--     * /Default/: 0.
+--
+--     * /Range/: 1 to __n__.
+--
+-- [__r__]
+-- The number of vnodes that must respond to a read request before a response is
+-- returned to the client. The request will still be replicated to __n__ vnodes.
+--
+--     * /Default/: @quorum@.
+--
+--     * /Range/: 1 to __n__.
+--
+-- [__sloppy_quorum__]
+-- Whether failover vnodes are consulted if one or more primary vnodes fails.
+--
+-- * /Default/: true.
+--
+-- [__w__]
+-- The number of vnodes that must /respond/ to a write request before a response
+-- is returned to the client. The request will still be replicated to __n__
+-- vnodes.
+--
+--     * /Default/: @quorum@.
+--
+--     * /Range/: 1 to __nN__.

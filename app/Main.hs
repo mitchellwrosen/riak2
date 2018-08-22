@@ -2,7 +2,7 @@
              OverloadedStrings, RankNTypes, ScopedTypeVariables,
              TypeApplications #-}
 
-import Control.Monad              (join, (<=<))
+import Control.Monad              (join, when, (<=<))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import Data.Coerce
@@ -112,11 +112,11 @@ fetchObjectParser =
                 [ long "basic-quorum"
                 , help "Basic quorum"
                 ])
-        -- <*> switch
-        --       (mconcat
-        --         [ long "head"
-        --         , help "Head"
-        --         ])
+        <*> switch
+              (mconcat
+                [ long "head"
+                , help "Head"
+                ])
         <*> switch
               (mconcat
                 [ long "notfound-not-ok"
@@ -271,11 +271,11 @@ doFetchMap type' bucket key host port = do
         key
         def -- (def, def, def, def, def, def, def, def)
 
--- TODO doFetchObject add head param
 doFetchObject
   :: BucketType 'Nothing
   -> Bucket
   -> Key
+  -> Bool
   -> Bool
   -> Bool
   -> Maybe Word32
@@ -287,53 +287,99 @@ doFetchObject
   -> PortNumber
   -> IO ()
 doFetchObject
-    type' bucket key basic_quorum notfound_not_ok n pr r no_sloppy_quorum
+    type' bucket key basic_quorum head notfound_not_ok n pr r no_sloppy_quorum
     timeout host port = do
   cache <- refVclockCache
-  withHandle host port cache $ \h -> do
-    eresponse <-
-      fetchObject h
-        type'
-        bucket
-        key
-        (def
-          & (if basic_quorum then #basic_quorum True else id)
-          & (if notfound_not_ok then #notfound_ok False else id)
-          & maybe id #n n
-          & maybe id #pr pr
-          & maybe id #r r
-          & (if no_sloppy_quorum then #sloppy_quorum False else id)
-          & maybe id #timeout timeout)
+  withHandle host port cache $ \h ->
+    -- TODO de-dupe this code
+    if head
+      then do
+        eresponse <-
+          fetchObjectHead @Text h
+            type'
+            bucket
+            key
+            (def
+              & (if basic_quorum then #basic_quorum True else id)
+              & (if notfound_not_ok then #notfound_ok False else id)
+              & maybe id #n n
+              & maybe id #pr pr
+              & maybe id #r r
+              & (if no_sloppy_quorum then #sloppy_quorum False else id)
+              & maybe id #timeout timeout)
 
-    case eresponse of
-      Left err ->
-        print err
+        case eresponse of
+          Left err ->
+            print err
 
-      Right [] ->
-        putStrLn "Not found"
+          Right [] ->
+            putStrLn "Not found"
 
-      Right contents -> do
-        for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
-          let tagtxt :: Text -> Text -> IO ()
-              tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
+          Right contents -> do
+            for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
+              let tag :: Show a => String -> a -> IO ()
+                  tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
 
-          let tag :: Show a => String -> a -> IO ()
-              tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
+              for_ (content ^. L.lastMod) (tag "last_mod")
 
-          tagtxt "value" (content ^. L.value)
+              case unMetadata (content ^. L.usermeta) of
+                [] -> pure ()
+                xs -> tag "metadata" xs
 
-          for_ (content ^. L.lastMod) (tag "last_mod")
+              case content ^. L.indexes of
+                [] -> pure ()
+                xs -> tag "indexes" xs
 
-          case unMetadata (content ^. L.usermeta) of
-            [] -> pure ()
-            xs -> tag "metadata" xs
+              when (content ^. L.deleted)
+                (tag "deleted" (content ^. L.deleted))
 
-          case content ^. L.indexes of
-            [] -> pure ()
-            xs -> tag "indexes" xs
+              for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+      else do
+        eresponse <-
+          fetchObject h
+            type'
+            bucket
+            key
+            (def
+              & (if basic_quorum then #basic_quorum True else id)
+              & (if notfound_not_ok then #notfound_ok False else id)
+              & maybe id #n n
+              & maybe id #pr pr
+              & maybe id #r r
+              & (if no_sloppy_quorum then #sloppy_quorum False else id)
+              & maybe id #timeout timeout)
 
-          tag "deleted" (content ^. L.deleted)
-          for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+        case eresponse of
+          Left err ->
+            print err
+
+          Right [] ->
+            putStrLn "Not found"
+
+          Right contents -> do
+            for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
+              let tagtxt :: Text -> Text -> IO ()
+                  tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
+
+              let tag :: Show a => String -> a -> IO ()
+                  tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
+
+              tagtxt "value" (content ^. L.value)
+
+              for_ (content ^. L.lastMod) (tag "last_mod")
+
+              case unMetadata (content ^. L.usermeta) of
+                [] -> pure ()
+                xs -> tag "metadata" xs
+
+              case content ^. L.indexes of
+                [] -> pure ()
+                xs -> tag "indexes" xs
+
+              when (content ^. L.deleted)
+                (tag "deleted" (content ^. L.deleted))
+
+              for_ (unTTL (content ^. L.ttl)) (tag "ttl")
 
 doGetBucketProps :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
 doGetBucketProps type' bucket host port = do
