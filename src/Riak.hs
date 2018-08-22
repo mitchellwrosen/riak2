@@ -69,14 +69,12 @@ module Riak
   , Metadata(..)
   , Modified(..)
   , NotfoundOk(..)
-  , Nval(..)
+  , N(..)
   , ParamObjectReturn(..) -- TODO rename ParamObjectReturn
   , PR(..)
   , PW(..)
   , Quorum(..)
   , pattern QuorumAll
-  , pattern QuorumDefault
-  , pattern QuorumOne
   , pattern QuorumQuorum
   , R(..)
   , ReturnBody(..)
@@ -138,6 +136,8 @@ import           Riak.Internal.Types
 --------------------------------------------------------------------------------
 
 -- | A non-thread-safe handle to Riak.
+--
+-- TODO: Handle improvements: connection pool, cluster abstraction
 data Handle
   = Handle
       !Connection
@@ -201,173 +201,17 @@ type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
   IfModifiedWrapper 'True  a = Modified a
   IfModifiedWrapper 'False a = a
 
-fetchObject
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
-  -> ( BasicQuorum
-     , Nval
-     , NotfoundOk
-     , PR
-     , R
-     , SloppyQuorum
-     , Timeout
-     )
-  -> m (Either RpbErrorResp [Content a])
-fetchObject
-    handle type' bucket key
-    ( basic_quorum
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    ) =
-  _fetchObject
-    handle
-    type'
-    bucket
-    key
-    ( basic_quorum
-    , NoHead
-    , NoIfModified
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    )
+fetchObject :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Key -> (BasicQuorum, N, NotfoundOk, PR, R, SloppyQuorum, Timeout) -> m (Either RpbErrorResp [Content a])
+fetchObject handle type' bucket key (a,b,c,d,e,f,g) = _fetchObject handle type' bucket key a NoHead NoIfModified b c d e f g
 
-fetchObjectHead
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
-  -> ( BasicQuorum
-     , Nval
-     , NotfoundOk
-     , PR
-     , R
-     , SloppyQuorum
-     , Timeout
-     )
-  -> m (Either RpbErrorResp [Content (Proxy a)])
-fetchObjectHead
-    handle type' bucket key
-    ( basic_quorum
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    ) =
-  _fetchObject
-    handle
-    type'
-    bucket
-    key
-    ( basic_quorum
-    , Head
-    , NoIfModified
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    )
+fetchObjectHead :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Key -> (BasicQuorum, N, NotfoundOk, PR, R, SloppyQuorum, Timeout) -> m (Either RpbErrorResp [Content (Proxy a)])
+fetchObjectHead handle type' bucket key (a,b,c,d,e,f,g) = _fetchObject handle type' bucket key a Head NoIfModified b c d e f g
 
-fetchObjectIfModified
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
-  -> ( BasicQuorum
-     , Nval
-     , NotfoundOk
-     , PR
-     , R
-     , SloppyQuorum
-     , Timeout
-     )
-  -> m (Either RpbErrorResp (Modified [Content a]))
-fetchObjectIfModified
-    handle type' bucket key
-    ( basic_quorum
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    ) =
-  _fetchObject
-    handle
-    type'
-    bucket
-    key
-    ( basic_quorum
-    , NoHead
-    , IfModified
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    )
+fetchObjectIfModified :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Key -> (BasicQuorum, N, NotfoundOk, PR, R, SloppyQuorum, Timeout) -> m (Either RpbErrorResp (Modified [Content a]))
+fetchObjectIfModified handle type' bucket key (a,b,c,d,e,f,g) = _fetchObject handle type' bucket key a NoHead IfModified b c d e f g
 
-fetchObjectIfModifiedHead
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
-  -> ( BasicQuorum
-     , Nval
-     , NotfoundOk
-     , PR
-     , R
-     , SloppyQuorum
-     , Timeout
-     )
-  -> m (Either RpbErrorResp (Modified [Content (Proxy a)]))
-fetchObjectIfModifiedHead
-    handle type' bucket key
-    ( basic_quorum
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    ) =
-  _fetchObject
-    handle
-    type'
-    bucket
-    key
-    ( basic_quorum
-    , Head
-    , IfModified
-    , n_val
-    , notfound_ok
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    )
+fetchObjectIfModifiedHead :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Key -> (BasicQuorum, N, NotfoundOk, PR, R, SloppyQuorum, Timeout) -> m (Either RpbErrorResp (Modified [Content (Proxy a)]))
+fetchObjectIfModifiedHead handle type' bucket key (a,b,c,d,e,f,g) = _fetchObject handle type' bucket key a Head IfModified b c d e f g
 
 -- TODO delete _fetchObject and inline its logic in the 4 variants?
 _fetchObject
@@ -377,29 +221,19 @@ _fetchObject
   -> BucketType 'Nothing
   -> Bucket
   -> Key
-  -> ( BasicQuorum
-     , Head a head
-     , IfModified if_modified
-     , Nval
-     , NotfoundOk
-     , PR
-     , R
-     , SloppyQuorum
-     , Timeout
-     )
+  -> BasicQuorum
+  -> Head a head
+  -> IfModified if_modified
+  -> N
+  -> NotfoundOk
+  -> PR
+  -> R
+  -> SloppyQuorum
+  -> Timeout
   -> m (Either RpbErrorResp (FetchObjectResp head if_modified a))
 _fetchObject
-    handle@(Handle conn cache) type' bucket key
-    ( BasicQuorum basic_quorum
-    , head
-    , if_modified
-    , Nval n_val
-    , NotfoundOk notfound_ok
-    , PR pr
-    , R r
-    , SloppyQuorum sloppy_quorum
-    , Timeout timeout
-    ) = liftIO . runExceptT $ do
+    handle@(Handle conn cache) type' bucket key basic_quorum head if_modified n
+    notfound_ok pr r sloppy_quorum timeout = liftIO . runExceptT $ do
 
   vclock :: Maybe Vclock <-
     case if_modified of
@@ -411,7 +245,7 @@ _fetchObject
     request =
       RpbGetReq
         { _RpbGetReq'_unknownFields = []
-        , _RpbGetReq'basicQuorum    = Just basic_quorum
+        , _RpbGetReq'basicQuorum    = coerce (Just basic_quorum)
         , _RpbGetReq'bucket         = coerce bucket
         , _RpbGetReq'deletedvclock  = Just True
         , _RpbGetReq'head           =
@@ -423,12 +257,12 @@ _fetchObject
               IfModified   -> coerce vclock
               NoIfModified -> Nothing
         , _RpbGetReq'key            = coerce key
-        , _RpbGetReq'nVal           = n_val
-        , _RpbGetReq'notfoundOk     = Just notfound_ok
+        , _RpbGetReq'nVal           = coerce n
+        , _RpbGetReq'notfoundOk     = coerce (Just notfound_ok)
         , _RpbGetReq'pr             = coerce (Just pr)
         , _RpbGetReq'r              = coerce (Just r)
-        , _RpbGetReq'sloppyQuorum   = Just sloppy_quorum
-        , _RpbGetReq'timeout        = timeout
+        , _RpbGetReq'sloppyQuorum   = coerce (Just sloppy_quorum)
+        , _RpbGetReq'timeout        = coerce timeout
         , _RpbGetReq'type'          = coerce (Just type')
         }
 
@@ -479,80 +313,14 @@ type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy a 'ObjectReturnHead = NonEmpty (Content (Proxy a))
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (Content a)
 
-storeObject
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Maybe Key
-  -> a
-  -> ( DW
-     , Indexes
-     , Metadata
-     , Nval
-     , PW
-     , SloppyQuorum
-     , Timeout
-     , TTL
-     , W
-     )
-  -> m (Either RpbErrorResp Key)
-storeObject handle type' bucket key content (a,b,c,d,e,f,g,h,i) = runExceptT $
-  ExceptT (_storeObject handle type' bucket key content params) >>= \case
-    (key', _) ->
-      pure key'
+storeObject :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, Indexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp Key)
+storeObject handle type' bucket key content (a,b,c,d,e,f,g,h,i) = (fmap.fmap) fst (_storeObject handle type' bucket key content a b c d e ParamObjectReturnNone f g h i)
 
- where
-  params = (a,b,c,d,e,ParamObjectReturnNone,f,g,h,i)
+storeObjectHead :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, Indexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
+storeObjectHead handle type' bucket key content (a,b,c,d,e,f,g,h,i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnHead f g h i
 
-storeObjectHead
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Maybe Key
-  -> a
-  -> ( DW
-     , Indexes
-     , Metadata
-     , Nval
-     , PW
-     , SloppyQuorum
-     , Timeout
-     , TTL
-     , W
-     )
-  -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
-storeObjectHead handle type' bucket key content (a,b,c,d,e,f,g,h,i) =
-  _storeObject handle type' bucket key content params
- where
-  params = (a,b,c,d,e,ParamObjectReturnHead,f,g,h,i)
-
-storeObjectBody
-  :: forall a m.
-     (IsContent a, MonadIO m)
-  => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Maybe Key
-  -> a
-  -> ( DW
-     , Indexes
-     , Metadata
-     , Nval
-     , PW
-     , SloppyQuorum
-     , Timeout
-     , TTL
-     , W
-     )
-  -> m (Either RpbErrorResp (Key, NonEmpty (Content a)))
-storeObjectBody handle type' bucket key content (a,b,c,d,e,f,g,h,i) =
-  _storeObject handle type' bucket key content params
- where
-  params = (a,b,c,d,e,ParamObjectReturnBody,f,g,h,i)
+storeObjectBody :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, Indexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp (Key, NonEmpty (Content a)))
+storeObjectBody handle type' bucket key content (a,b,c,d,e,f,g,h,i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnBody f g h i
 
 -- TODO inline _storeObject in 3 variants?
 _storeObject
@@ -563,31 +331,20 @@ _storeObject
   -> Bucket
   -> Maybe Key
   -> a
-  -> ( DW
-     , Indexes
-     , Metadata
-     , Nval
-     , PW
-     , ParamObjectReturn return
-     , SloppyQuorum
-     , Timeout
-     , TTL
-     , W
-     )
+  -> DW
+  -> Indexes
+  -> Metadata
+  -> N
+  -> PW
+  -> ParamObjectReturn return
+  -> SloppyQuorum
+  -> Timeout
+  -> TTL
+  -> W
   -> m (Either RpbErrorResp (Key, ObjectReturnTy a return))
 _storeObject
-    handle@(Handle conn cache) type' bucket key value
-    ( DW dw
-    , Indexes indexes
-    , Metadata metadata
-    , Nval n_val
-    , PW pw
-    , return
-    , SloppyQuorum sloppy_quorum
-    , timeout
-    , TTL ttl
-    , W w
-    ) = liftIO . runExceptT $ do
+    handle@(Handle conn cache) type' bucket key value dw indexes metadata n pw
+    return sloppy_quorum timeout ttl w = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe Vclock <-
@@ -608,25 +365,25 @@ _storeObject
         , _RpbPutReq'bucket         = coerce bucket
         , _RpbPutReq'content        =
             RpbContent
-              { _RpbContent'_unknownFields = []
-              , _RpbContent'charset = coerce charset
+              { _RpbContent'_unknownFields  = []
+              , _RpbContent'charset         = coerce charset
               , _RpbContent'contentEncoding = coerce content_encoding
-              , _RpbContent'contentType = coerce (Just content_type)
-              , _RpbContent'deleted = Nothing
-              , _RpbContent'indexes = map indexToRpbPair indexes
-              , _RpbContent'lastMod = Nothing
-              , _RpbContent'lastModUsecs = Nothing
-              , _RpbContent'links = []
-              , _RpbContent'ttl = ttl
-              , _RpbContent'usermeta = map rpbPair metadata
-              , _RpbContent'value = bytes
-              , _RpbContent'vtag = Nothing
+              , _RpbContent'contentType     = coerce (Just content_type)
+              , _RpbContent'deleted         = Nothing
+              , _RpbContent'indexes         = map indexToRpbPair (coerce indexes)
+              , _RpbContent'lastMod         = Nothing
+              , _RpbContent'lastModUsecs    = Nothing
+              , _RpbContent'links           = []
+              , _RpbContent'ttl             = coerce ttl
+              , _RpbContent'usermeta        = map rpbPair (coerce metadata)
+              , _RpbContent'value           = bytes
+              , _RpbContent'vtag            = Nothing
               }
         , _RpbPutReq'dw             = Just (coerce dw)
         , _RpbPutReq'ifNoneMatch    = Nothing
         , _RpbPutReq'ifNotModified  = Nothing
         , _RpbPutReq'key            = coerce key
-        , _RpbPutReq'nVal           = n_val
+        , _RpbPutReq'nVal           = coerce n
         , _RpbPutReq'pw             = Just (coerce pw)
         , _RpbPutReq'returnBody     =
             case return of
@@ -638,7 +395,7 @@ _storeObject
               ParamObjectReturnNone -> Nothing
               ParamObjectReturnHead -> Just True
               ParamObjectReturnBody -> Nothing
-        , _RpbPutReq'sloppyQuorum   = Just sloppy_quorum
+        , _RpbPutReq'sloppyQuorum   = coerce (Just sloppy_quorum)
         , _RpbPutReq'timeout        = coerce timeout
         , _RpbPutReq'type'          = coerce (Just type')
         , _RpbPutReq'vclock         = coerce vclock
@@ -706,6 +463,7 @@ _storeObject
 
 
 -- TODO deleteObject figure out when vclock is required (always?)
+-- TODO don't use rw (deprecated)
 deleteObject
   :: MonadIO m
   => Handle
@@ -723,7 +481,7 @@ fetchCounter
   -> Key
   -> ( BasicQuorum
      , NotfoundOk
-     , Nval
+     , N
      , PR
      , R
      , SloppyQuorum
@@ -732,12 +490,12 @@ fetchCounter
   -> m (Either RpbErrorResp Int64)
 fetchCounter
     (Handle conn _) type' bucket key
-    ( BasicQuorum basic_quorum
-    , NotfoundOk notfound_ok
-    , Nval n_val
-    , PR pr
-    , R r
-    , SloppyQuorum sloppy_quorum
+    ( basic_quorum
+    , notfound_ok
+    , n
+    , pr
+    , r
+    , sloppy_quorum
     , timeout
     ) = runExceptT $ do
 
@@ -759,15 +517,15 @@ fetchCounter
   request =
     DtFetchReq
       { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = Just basic_quorum
+      , _DtFetchReq'basicQuorum    = coerce (Just basic_quorum)
       , _DtFetchReq'bucket         = coerce bucket
       , _DtFetchReq'includeContext = Nothing
       , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = Just notfound_ok
+      , _DtFetchReq'nVal           = coerce n
+      , _DtFetchReq'notfoundOk     = coerce (Just notfound_ok)
       , _DtFetchReq'pr             = coerce (Just pr)
       , _DtFetchReq'r              = coerce (Just r)
-      , _DtFetchReq'sloppyQuorum   = Just sloppy_quorum
+      , _DtFetchReq'sloppyQuorum   = coerce (Just sloppy_quorum)
       , _DtFetchReq'timeout        = coerce timeout
       , _DtFetchReq'type'          = coerce type'
       }
@@ -781,7 +539,7 @@ fetchSet
   -> Key
   -> ( BasicQuorum
      , ParamIncludeContext
-     , Nval
+     , N
      , NotfoundOk
      , PR
      , R
@@ -821,7 +579,7 @@ fetchMap
   -> Key
   -> ( BasicQuorum
      , ParamIncludeContext
-     , Nval
+     , N
      , NotfoundOk
      , PR
      , R
@@ -863,7 +621,7 @@ fetchDataType
   -> Key
   -> ( BasicQuorum
      , ParamIncludeContext
-     , Nval
+     , N
      , NotfoundOk
      , PR
      , R
@@ -872,13 +630,13 @@ fetchDataType
      )
   -> m (Either RpbErrorResp DtFetchResp)
 fetchDataType (Handle conn _) type' bucket key
-    ( BasicQuorum basic_quorum
-    , ParamIncludeContext include_context
-    , Nval n_val
-    , NotfoundOk notfound_ok
-    , PR pr
-    , R r
-    , SloppyQuorum sloppy_quorum
+    ( basic_quorum
+    , include_context
+    , n
+    , notfound_ok
+    , pr
+    , r
+    , sloppy_quorum
     , timeout
     ) =
 
@@ -888,15 +646,15 @@ fetchDataType (Handle conn _) type' bucket key
   request =
     DtFetchReq
       { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = Just basic_quorum
+      , _DtFetchReq'basicQuorum    = coerce (Just basic_quorum)
       , _DtFetchReq'bucket         = coerce bucket
-      , _DtFetchReq'includeContext = Just include_context
+      , _DtFetchReq'includeContext = coerce (Just include_context)
       , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = n_val
-      , _DtFetchReq'notfoundOk     = Just notfound_ok
+      , _DtFetchReq'nVal           = coerce n
+      , _DtFetchReq'notfoundOk     = coerce (Just notfound_ok)
       , _DtFetchReq'pr             = coerce (Just pr)
       , _DtFetchReq'r              = coerce (Just r)
-      , _DtFetchReq'sloppyQuorum   = Just sloppy_quorum
+      , _DtFetchReq'sloppyQuorum   = coerce (Just sloppy_quorum)
       , _DtFetchReq'timeout        = coerce timeout
       , _DtFetchReq'type'          = coerce type'
       }
@@ -916,7 +674,7 @@ updateCounter
   -> Maybe Key
   -> Int64
   -> ( DW
-     , Nval
+     , N
      , PW
      , ReturnBody
      , SloppyQuorum
@@ -926,13 +684,13 @@ updateCounter
   -> m (Either RpbErrorResp DtUpdateResp)
 updateCounter
     (Handle conn _) type' bucket key incr
-    ( DW dw
-    , Nval n_val
-    , PW pw
-    , ReturnBody return_body
-    , SloppyQuorum sloppy_quorum
+    ( dw
+    , n
+    , pw
+    , return_body
+    , sloppy_quorum
     , timeout
-    , W w
+    , w
     ) = do
   liftIO (exchange conn request)
  where
@@ -945,11 +703,11 @@ updateCounter
       , _DtUpdateReq'dw             = coerce (Just dw)
       , _DtUpdateReq'includeContext = Nothing
       , _DtUpdateReq'key            = coerce key
-      , _DtUpdateReq'nVal           = n_val
+      , _DtUpdateReq'nVal           = coerce n
       , _DtUpdateReq'op             = op
       , _DtUpdateReq'pw             = coerce (Just pw)
-      , _DtUpdateReq'returnBody     = Just return_body
-      , _DtUpdateReq'sloppyQuorum   = Just sloppy_quorum
+      , _DtUpdateReq'returnBody     = coerce (Just return_body)
+      , _DtUpdateReq'sloppyQuorum   = coerce (Just sloppy_quorum)
       , _DtUpdateReq'timeout        = coerce timeout
       , _DtUpdateReq'type'          = coerce type'
       , _DtUpdateReq'w              = coerce (Just w)
@@ -985,6 +743,7 @@ getBucketTypeProps (Handle conn _) req =
   liftIO (exchange conn req)
 
 
+-- TODO: Don't allow setting n
 setBucketTypeProps
   :: MonadIO m
   => Handle
@@ -1003,6 +762,7 @@ getBucketProps (Handle conn _) req =
   liftIO (exchange conn req)
 
 
+-- TODO: Don't allow setting n
 setBucketProps
   :: MonadIO m
   => Handle

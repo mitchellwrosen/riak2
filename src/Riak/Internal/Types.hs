@@ -24,7 +24,10 @@ import qualified Data.Text              as Text
 import Proto.Riak
 
 
--- | Whether or not to use the "basic quorum" policy for not-founds.
+-- | Whether to use the "basic quorum" policy for not-founds. Only relevant when
+-- @notfound_ok@ is set to false.
+--
+-- /Default/: false.
 newtype BasicQuorum
   = BasicQuorum Bool
 
@@ -33,6 +36,8 @@ instance Default BasicQuorum where
 
 
 -- | A Riak bucket type, tagged with the data type it contains.
+--
+-- /Note/: Must be UTF-8 encoded.
 newtype BucketType (ty :: Maybe DataType)
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
@@ -44,6 +49,8 @@ pattern BucketTypeDefault =
 
 
 -- | A Riak bucket.
+--
+-- /Note/: Must be UTF-8 encoded.
 newtype Bucket
   = Bucket { unBucket :: ByteString }
   deriving stock (Eq)
@@ -76,6 +83,12 @@ data DataTypeError
   deriving anyclass (Exception)
 
 
+-- | The number of vnodes that must write a write request to storage before a
+-- response is returned to the client. The request will still be replicated to
+-- @N@ vnodes.
+--
+-- /Default/: @quorum@.
+-- /Range/: 1 to @N@.
 newtype DW
   = DW Quorum
 
@@ -95,6 +108,8 @@ newtype Indexes
 
 
 -- | A Riak key.
+--
+-- /Note/: Must be UTF-8 encoded.
 newtype Key
   = Key { unKey :: ByteString }
   deriving stock (Eq)
@@ -125,7 +140,17 @@ data Modified a
   | Modified a
 
 
--- | Whether to treat not-found responses as successful.
+-- | @notfound_ok@ controls how Riak behaves during read requests when keys are
+-- not present.
+--
+-- * If @true@, Riak will treat any @notfound@ as a positive assertion that the
+-- key does not exist.
+--
+-- * If @false@, Riak will treat any @notfound@ as a failure condition. The
+-- coordinating node will wait for enough vnodes to reply with @notfound@ to
+-- know that it cannot satisfy the requested @R@.
+--
+-- /Default/: true.
 newtype NotfoundOk
   = NotfoundOk Bool
 
@@ -133,11 +158,16 @@ instance Default NotfoundOk where
   def = coerce True
 
 
-newtype Nval
-  = Nval (Maybe Word32)
+-- | The number of __primary vnodes__ responsible for each key, i.e. the number
+-- of __replicas__ stores in the cluster.
+--
+-- /Default/: 3.
+-- /Range/: 1 to the number of nodes in the cluster.
+newtype N
+  = N (Maybe Word32)
 
-instance Default Nval where
-  def = Nval Nothing
+instance Default N where
+  def = N Nothing
 
 
 data ObjectReturn
@@ -146,24 +176,32 @@ data ObjectReturn
   | ObjectReturnBody
 
 
+-- | How many vnodes must respond before an operation is considered successful.
+-- May be a number @<= N@, or a symbolic value.
 newtype Quorum
   = Quorum Word32
   deriving stock (Eq)
   deriving newtype (Num)
 
+-- | All vnodes must respond.
 pattern QuorumAll :: Quorum
 pattern QuorumAll = 4294967292
 
+-- | Use the bucket's @N@.
 pattern QuorumDefault :: Quorum
 pattern QuorumDefault = 4294967291
 
-pattern QuorumOne :: Quorum
-pattern QuorumOne = 4294967294
-
+-- | A majority of the vnodes must respond.
 pattern QuorumQuorum :: Quorum
 pattern QuorumQuorum = 4294967293
 
 
+-- | The number of primary vnodes that must respond to a read request before a
+-- response is returned to the client. The request will still be replicated to
+-- @N@ vnodes.
+--
+-- /Default/: 0.
+-- /Range/: 1 to @N@.
 newtype PR
   = PR Quorum
 
@@ -171,6 +209,12 @@ instance Default PR where
   def = coerce QuorumDefault
 
 
+-- | The number of primary vnodes that must /respond/ to a write request before
+-- a response is returned to the client. The request will still be replicated to
+-- @N@ vnodes.
+--
+-- /Default/: 0.
+-- /Range/: 1 to @N@.
 newtype PW
   = PW Quorum
 
@@ -178,6 +222,12 @@ instance Default PW where
   def = coerce QuorumDefault
 
 
+-- | The number of vnodes that must respond to a read request before a response
+-- is returned to the client. The request will still be replicated to @N@
+-- vnodes.
+--
+-- /Default/: @quorum@.
+-- /Range/: 1 to @N@.
 newtype R
   = R Quorum
 
@@ -198,6 +248,7 @@ data SBool :: Bool -> Type where
   SFalse :: SBool 'False
 
 
+-- | Whether failover vnodes are consulted if one or more primary vnodes fails.
 newtype SloppyQuorum
   = SloppyQuorum Bool
 
@@ -245,6 +296,12 @@ newtype Vtag
   deriving (Show)
 
 
+-- | The number of vnodes that must /respond/ to a write request before a
+-- response is returned to the client. The request will still be replicated to
+-- @N@ vnodes.
+--
+-- /Default/: @quorum@.
+-- /Range/: 1 to @N@.
 newtype W
   = W Quorum
 
