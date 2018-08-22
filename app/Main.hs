@@ -235,7 +235,7 @@ updateCounterParser =
 --------------------------------------------------------------------------------
 
 doFetchCounter
-  :: BucketType ('Just 'DataTypeCounter)
+  :: BucketType ('Just 'DataTypeCounterTy)
   -> Bucket
   -> Key
   -> HostName
@@ -252,7 +252,7 @@ doFetchCounter type' bucket key host port = do
         def
 
 doFetchMap
-  :: BucketType ('Just 'DataTypeMap)
+  :: BucketType ('Just 'DataTypeMapTy)
   -> Bucket
   -> Key
   -> HostName
@@ -413,7 +413,7 @@ doStoreObject
     print eresponse
 
 doUpdateCounter
-  :: BucketType ('Just 'DataTypeCounter)
+  :: BucketType ('Just 'DataTypeCounterTy)
   -> Bucket
   -> Int64
   -> Maybe Key

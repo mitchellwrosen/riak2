@@ -24,11 +24,12 @@ module Riak
   , deleteObject
     -- * Data type operations
   , fetchCounter
+  , fetchGrowOnlySet
+  , fetchHyperLogLog
   , fetchSet
   , fetchMap
-  , fetchDataType
+  , fetchSomeDataType
   , updateCounter
-  , updateDataType
     -- * Bucket operations
   , getBucketTypeProps
   , setBucketTypeProps
@@ -60,6 +61,7 @@ module Riak
   , pattern ContentEncodingNone
   , ContentType(..)
   , DataType(..)
+  , DataTypeTy(..)
   , DW(..)
   , Head(..)
   , IfModified(..)
@@ -94,22 +96,23 @@ import Control.Applicative
 import Control.Monad              (when)
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except
+import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Data.ByteString            (ByteString)
-import Data.List.NonEmpty         (NonEmpty)
 import Data.Coerce                (coerce)
-import Data.Default.Class
+import Data.Default.Class         (def)
 import Data.Function              (fix)
 import Data.HashMap.Strict        (HashMap)
-import Data.Int
+import Data.Int                   (Int64)
 import Data.IORef
 import Data.Kind                  (Type)
+import Data.List.NonEmpty         (NonEmpty)
 import Data.Maybe                 (fromMaybe)
 import Data.Proxy                 (Proxy(Proxy))
 import Data.Text                  (Text)
-import Data.Time
-import Data.Time.Clock.POSIX
+import Data.Time                  (NominalDiffTime)
+import Data.Time.Clock.POSIX      (posixSecondsToUTCTime)
 import Data.Type.Bool             (If)
+import Data.Word                  (Word64)
 import Lens.Labels
 import List.Transformer           (ListT)
 import Network.Socket             (HostName, PortNumber)
@@ -118,15 +121,16 @@ import Text.Read                  (readMaybe)
 import UnliftIO.Exception         (throwIO)
 
 import qualified Data.ByteString       as ByteString
-import qualified Data.List.NonEmpty as List1
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.HashMap.Strict   as HashMap
+import qualified Data.List.NonEmpty    as List1
 import qualified List.Transformer      as ListT
 
 import           Proto.Riak
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Connection
 import           Riak.Internal.Content
+import           Riak.Internal.DataTypes
 import           Riak.Internal.Panic
 import           Riak.Internal.Request
 import           Riak.Internal.Response
@@ -478,65 +482,28 @@ deleteObject (Handle conn _) req =
 fetchCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeCounter)
+  -> BucketType ('Just 'DataTypeCounterTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
-     , NotfoundOk
      , N
+     , NotfoundOk
      , PR
      , R
      , SloppyQuorum
      , Timeout
      )
   -> m (Either RpbErrorResp Int64)
-fetchCounter
-    (Handle conn _) type' bucket key
-    ( basic_quorum
-    , notfound_ok
-    , n
-    , pr
-    , r
-    , sloppy_quorum
-    , timeout
-    ) = runExceptT $ do
-
-  response :: DtFetchResp <-
-    ExceptT (liftIO (exchange conn request))
-
-  case response ^. #type' of
-    DtFetchResp'COUNTER ->
-      pure (response ^. #value . #counterValue)
-
-    dt ->
-      throwIO
-        (DataTypeError
-          (SomeBucketType (unBucketType type')) bucket key dt
-          DtFetchResp'COUNTER)
-
+fetchCounter handle type' bucket key (a,b,c,d,e,f,g) =
+  fetchDataType handle type' bucket key params
  where
-  request :: DtFetchReq
-  request =
-    DtFetchReq
-      { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = coerce (Just basic_quorum)
-      , _DtFetchReq'bucket         = coerce bucket
-      , _DtFetchReq'includeContext = Nothing
-      , _DtFetchReq'key            = coerce key
-      , _DtFetchReq'nVal           = coerce n
-      , _DtFetchReq'notfoundOk     = coerce (Just notfound_ok)
-      , _DtFetchReq'pr             = coerce (Just pr)
-      , _DtFetchReq'r              = coerce (Just r)
-      , _DtFetchReq'sloppyQuorum   = coerce (Just sloppy_quorum)
-      , _DtFetchReq'timeout        = coerce timeout
-      , _DtFetchReq'type'          = coerce type'
-      }
+  params = (a,ParamIncludeContext False,b,c,d,e,f,g)
 
 
-fetchSet
+fetchGrowOnlySet
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeSet)
+  -> BucketType ('Just 'DataTypeGrowOnlySetTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
@@ -549,34 +516,53 @@ fetchSet
      , Timeout
      )
   -> m (Either RpbErrorResp [ByteString])
+fetchGrowOnlySet handle type' bucket key params =
+  fetchDataType handle type' bucket key params
+
+
+fetchHyperLogLog
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'DataTypeHyperLogLogTy)
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , ParamIncludeContext
+     , N
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp Word64)
+fetchHyperLogLog handle type' bucket key params =
+  fetchDataType handle type' bucket key params
+
+
 fetchSet
-    handle type' bucket key
-    params@(_, ParamIncludeContext include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
-
-  response :: DtFetchResp <-
-    ExceptT (fetchDataType handle type' bucket key params)
-
-  case response ^. #type' of
-    DtFetchResp'SET -> do
-      when include_context $
-        cacheVclock
-          handle
-          type'
-          bucket
-          key
-          (coerce (response ^. #maybe'context))
-
-      pure (response ^. #value . #setValue)
-
-    dt ->
-      throwIO
-        (DataTypeError
-          (SomeBucketType (unBucketType type')) bucket key dt DtFetchResp'SET)
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'DataTypeSetTy)
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , ParamIncludeContext
+     , N
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp [ByteString])
+fetchSet handle type' bucket key params =
+  fetchDataType handle type' bucket key params
 
 fetchMap
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeMap)
+  -> BucketType ('Just 'DataTypeMapTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
@@ -589,33 +575,45 @@ fetchMap
      , Timeout
      )
   -> m (Either RpbErrorResp [(ByteString, MapValue)])
-fetchMap
-    handle type' bucket key
-    params@(_, ParamIncludeContext include_context, _, _, _, _, _, _) = liftIO . runExceptT $ do
-
-  response :: DtFetchResp <-
-    ExceptT (fetchDataType handle type' bucket key params)
-
-  case response ^. #type' of
-    DtFetchResp'MAP -> do
-      -- Cache set context, if it was requested (it defaults to true)
-      when include_context $
-        cacheVclock
-          handle
-          type'
-          bucket
-          key
-          (coerce (response ^. #maybe'context))
-
-      pure (map mapEntryToPair (response ^. #value . #mapValue))
-
-    dt ->
-      throwIO
-        (DataTypeError
-          (SomeBucketType (unBucketType type')) bucket key dt DtFetchResp'MAP)
+fetchMap handle type' bucket key params =
+  fetchDataType handle type' bucket key params
 
 
 fetchDataType
+  :: forall m ty.
+     (IsDataType ty, MonadIO m)
+  => Handle
+  -> BucketType ('Just ty)
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , ParamIncludeContext
+     , N
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp (DataTypeVal ty))
+fetchDataType handle type' bucket key params = liftIO . runExceptT $ do
+  value :: DataType <-
+    ExceptT (fetchSomeDataType handle type' bucket key params)
+
+  case fromDataType @ty proxy# value of
+    Left err ->
+      throwIO
+        (DataTypeError
+          (SomeBucketType (unBucketType type'))
+          bucket
+          key
+          err)
+
+    Right value' ->
+      pure value'
+
+
+fetchSomeDataType
   :: MonadIO m
   => Handle
   -> BucketType ('Just ty)
@@ -630,19 +628,51 @@ fetchDataType
      , SloppyQuorum
      , Timeout
      )
-  -> m (Either RpbErrorResp DtFetchResp)
-fetchDataType (Handle conn _) type' bucket key
+  -> m (Either RpbErrorResp DataType)
+fetchSomeDataType handle@(Handle conn _) type' bucket key
     ( basic_quorum
-    , include_context
+    , ParamIncludeContext include_context
     , n
     , notfound_ok
     , pr
     , r
     , sloppy_quorum
     , timeout
-    ) =
+    ) = liftIO . runExceptT $ do
 
-  liftIO (exchange conn request)
+  response :: DtFetchResp <-
+    ExceptT (Internal.fetchDataType conn request)
+
+  let
+    doCacheVclock =
+      when include_context $
+        cacheVclock
+          handle
+          type'
+          bucket
+          key
+          (coerce (response ^. #maybe'context))
+
+  case response ^. #type' of
+    DtFetchResp'COUNTER ->
+      pure (toDataType @'DataTypeCounterTy proxy# (response ^. #value))
+
+    DtFetchResp'GSET -> do
+      doCacheVclock
+      pure (toDataType @'DataTypeGrowOnlySetTy proxy# (response ^. #value))
+
+    DtFetchResp'HLL -> do
+      doCacheVclock
+      pure (toDataType @'DataTypeHyperLogLogTy proxy# (response ^. #value))
+
+    DtFetchResp'MAP -> do
+      doCacheVclock
+      pure (toDataType @'DataTypeMapTy proxy# (response ^. #value))
+
+    DtFetchResp'SET -> do
+      doCacheVclock
+      pure (toDataType @'DataTypeSetTy proxy# (response ^. #value))
+
  where
   request :: DtFetchReq
   request =
@@ -650,7 +680,7 @@ fetchDataType (Handle conn _) type' bucket key
       { _DtFetchReq'_unknownFields = []
       , _DtFetchReq'basicQuorum    = coerce (Just basic_quorum)
       , _DtFetchReq'bucket         = coerce bucket
-      , _DtFetchReq'includeContext = coerce (Just include_context)
+      , _DtFetchReq'includeContext = Just include_context
       , _DtFetchReq'key            = coerce key
       , _DtFetchReq'nVal           = coerce n
       , _DtFetchReq'notfoundOk     = coerce (Just notfound_ok)
@@ -662,16 +692,10 @@ fetchDataType (Handle conn _) type' bucket key
       }
 
 
--- TODO better updateCounter return type
--- Facts to encode:
---   * If key provided, riak doesn't return key
---   * If key not provided, riak returns random key
---   * If return_body, riak returns counter val
---   * If not return_body, riak doesn't return counter val
 updateCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeCounter)
+  -> BucketType ('Just 'DataTypeCounterTy)
   -> Bucket
   -> Maybe Key
   -> Int64
@@ -683,7 +707,7 @@ updateCounter
      , Timeout
      , W
      )
-  -> m (Either RpbErrorResp DtUpdateResp)
+  -> m (Either RpbErrorResp (Key, Int64))
 updateCounter
     (Handle conn _) type' bucket key incr
     ( dw
@@ -693,8 +717,25 @@ updateCounter
     , sloppy_quorum
     , timeout
     , w
-    ) = do
-  liftIO (exchange conn request)
+    ) = runExceptT $ do
+
+  response :: DtUpdateResp <-
+    ExceptT (liftIO (exchange conn request))
+
+  theKey :: Key <-
+    maybe
+      (maybe
+        (panic "missing key"
+          ( ( "request",  request )
+          , ( "response", response )
+          ))
+        pure
+        (coerce (response ^. #maybe'key)))
+      pure
+      key
+
+  pure (theKey, response ^. #counterValue)
+
  where
   request :: DtUpdateReq
   request =
@@ -725,15 +766,6 @@ updateCounter
       , _DtOp'mapOp          = Nothing
       , _DtOp'setOp          = Nothing
       }
-
-
-updateDataType
-  :: MonadIO m
-  => Handle
-  -> DtUpdateReq
-  -> m (Either RpbErrorResp DtUpdateResp)
-updateDataType (Handle conn _) req =
-  liftIO (exchange conn req)
 
 
 getBucketTypeProps
@@ -939,6 +971,7 @@ getIndex (Handle conn _) name = runExceptT $ do
       , _RpbYokozunaIndexGetReq'name           = coerce (Just name)
       }
 
+
 getIndexes
   :: MonadIO m
   => Handle
@@ -1064,30 +1097,6 @@ indexToRpbPair = \case
 
   SecondaryIndexBin k v ->
     RpbPair k (Just v) []
-
-
-mapEntryToPair :: MapEntry -> (ByteString, MapValue)
-mapEntryToPair entry =
-  (k ,) $
-    case ty of
-      MapField'COUNTER ->
-        MapValueCounter (entry ^. #counterValue)
-
-      MapField'FLAG ->
-        MapValueFlag (entry ^. #flagValue)
-
-      MapField'MAP ->
-        MapValueMap (map mapEntryToPair (entry ^. #mapValue))
-
-      MapField'REGISTER ->
-        MapValueRegister (entry ^. #registerValue)
-
-      MapField'SET ->
-        MapValueSet (entry ^. #setValue)
-
- where
-  MapField k ty _ =
-    entry ^. #field
 
 
 rpbPairToIndex :: RpbPair -> SecondaryIndex

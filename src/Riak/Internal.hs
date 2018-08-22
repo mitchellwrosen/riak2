@@ -2,11 +2,13 @@ module Riak.Internal
   ( Connection
   , withConnection
   , deleteObject
+  , fetchDataType
   , fetchObject
   , getBucketProps
   , getBucketTypeProps
   , getIndex
   , storeObject
+  , updateDataType
   ) where
 
 import Proto.Riak
@@ -19,6 +21,13 @@ deleteObject
   -> IO (Either RpbErrorResp RpbDelResp)
 deleteObject =
   exchange
+
+fetchDataType
+  :: Connection
+  -> DtFetchReq
+  -> IO (Either RpbErrorResp DtFetchResp)
+fetchDataType
+  = exchange
 
 fetchObject
   :: Connection
@@ -53,4 +62,11 @@ storeObject
   -> RpbPutReq
   -> IO (Either RpbErrorResp RpbPutResp)
 storeObject =
+  exchange
+
+updateDataType
+  :: Connection
+  -> DtUpdateReq
+  -> IO (Either RpbErrorResp DtUpdateResp)
+updateDataType =
   exchange

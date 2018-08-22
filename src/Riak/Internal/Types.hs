@@ -16,12 +16,9 @@ import Data.Text.Encoding (decodeUtf8)
 import Data.Word
 import Lens.Labels
 import Prelude            hiding (head, return, (.))
-import UnliftIO.Exception (Exception)
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text              as Text
-
-import Proto.Riak
 
 
 -- | Whether to use the "basic quorum" policy for not-founds. Only relevant when
@@ -38,7 +35,7 @@ instance Default BasicQuorum where
 -- | A Riak bucket type, tagged with the data type it contains.
 --
 -- /Note/: Must be UTF-8 encoded.
-newtype BucketType (ty :: Maybe DataType)
+newtype BucketType (ty :: Maybe DataTypeTy)
   = BucketType { unBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
@@ -62,25 +59,12 @@ instance Show Bucket where
     Text.unpack . decodeUtf8 . unBucket
 
 
-data DataType
-  = DataTypeCounter
-  | DataTypeMap
-  | DataTypeSet
-  -- TODO hll, gset
-
-
--- | A 'DataTypeError' is thrown when a data type operation is performed on an
--- incompatible bucket type (for example, attempting to fetch a counter from a
--- bucket type that contains sets).
-data DataTypeError
-  = DataTypeError
-      !SomeBucketType       -- Bucket type
-      !Bucket               -- Bucket
-      !Key                  -- Key
-      !DtFetchResp'DataType -- Actual data type
-      !DtFetchResp'DataType -- Expected data type
-  deriving stock (Show)
-  deriving anyclass (Exception)
+data DataTypeTy
+  = DataTypeCounterTy
+  | DataTypeGrowOnlySetTy
+  | DataTypeHyperLogLogTy
+  | DataTypeMapTy
+  | DataTypeSetTy
 
 
 -- | The number of vnodes that must write a write request to storage before a

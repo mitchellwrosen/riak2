@@ -59,6 +59,7 @@ library
   other-modules:
     Riak.Internal.Connection
     Riak.Internal.Content
+    Riak.Internal.DataTypes
     Riak.Internal.Debug
     Riak.Internal.Message
     Riak.Internal.Panic
