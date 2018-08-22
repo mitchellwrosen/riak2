@@ -23,11 +23,11 @@ import Riak.Internal.Types
 
 
 type family DataTypeVal (ty :: DataTypeTy) where
-  DataTypeVal 'DataTypeCounterTy     = Int64
-  DataTypeVal 'DataTypeGrowOnlySetTy = [ByteString]
-  DataTypeVal 'DataTypeHyperLogLogTy = Word64
-  DataTypeVal 'DataTypeMapTy         = [(ByteString, MapValue)]
-  DataTypeVal 'DataTypeSetTy         = [ByteString]
+  DataTypeVal 'CounterTy     = Int64
+  DataTypeVal 'GrowOnlySetTy = [ByteString]
+  DataTypeVal 'HyperLogLogTy = Word64
+  DataTypeVal 'MapTy         = [(ByteString, MapValue)]
+  DataTypeVal 'SetTy         = [ByteString]
 
 
 class IsDataType (ty :: DataTypeTy) where
@@ -37,7 +37,7 @@ class IsDataType (ty :: DataTypeTy) where
 
   toDataType   :: Proxy# ty -> DtValue -> DataType
 
-instance IsDataType 'DataTypeCounterTy where
+instance IsDataType 'CounterTy where
   fetchRespTy _ =
     DtFetchResp'COUNTER
 
@@ -48,7 +48,7 @@ instance IsDataType 'DataTypeCounterTy where
   toDataType _ =
     DataTypeCounter . view #counterValue
 
-instance IsDataType 'DataTypeGrowOnlySetTy where
+instance IsDataType 'GrowOnlySetTy where
   fetchRespTy _ =
     DtFetchResp'GSET
 
@@ -59,7 +59,7 @@ instance IsDataType 'DataTypeGrowOnlySetTy where
   toDataType _ =
     DataTypeGrowOnlySet . view #gsetValue
 
-instance IsDataType 'DataTypeHyperLogLogTy where
+instance IsDataType 'HyperLogLogTy where
   fetchRespTy _ =
     DtFetchResp'HLL
 
@@ -70,7 +70,7 @@ instance IsDataType 'DataTypeHyperLogLogTy where
   toDataType _ =
     DataTypeHyperLogLog . view #hllValue
 
-instance IsDataType 'DataTypeMapTy where
+instance IsDataType 'MapTy where
   fetchRespTy _ =
     DtFetchResp'MAP
 
@@ -104,7 +104,7 @@ instance IsDataType 'DataTypeMapTy where
             MapField'SET ->
               MapValueSet (entry ^. #setValue)
 
-instance IsDataType 'DataTypeSetTy where
+instance IsDataType 'SetTy where
   fetchRespTy _ =
     DtFetchResp'SET
 

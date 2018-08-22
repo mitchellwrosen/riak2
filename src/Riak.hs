@@ -68,10 +68,12 @@ module Riak
   , IndexName(..)
   , IsContent(..)
   , Key(..)
+  , MapValue(..)
   , Metadata(..)
   , Modified(..)
   , NotfoundOk(..)
   , N(..)
+  , ParamIncludeContext(..)
   , ParamObjectReturn(..) -- TODO rename ParamObjectReturn
   , PR(..)
   , PW(..)
@@ -482,7 +484,7 @@ deleteObject (Handle conn _) req =
 fetchCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeCounterTy)
+  -> BucketType ('Just 'CounterTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
@@ -503,7 +505,7 @@ fetchCounter handle type' bucket key (a,b,c,d,e,f,g) =
 fetchGrowOnlySet
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeGrowOnlySetTy)
+  -> BucketType ('Just 'GrowOnlySetTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
@@ -523,7 +525,7 @@ fetchGrowOnlySet handle type' bucket key params =
 fetchHyperLogLog
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeHyperLogLogTy)
+  -> BucketType ('Just 'HyperLogLogTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
@@ -539,30 +541,10 @@ fetchHyperLogLog
 fetchHyperLogLog handle type' bucket key params =
   fetchDataType handle type' bucket key params
 
-
-fetchSet
-  :: MonadIO m
-  => Handle
-  -> BucketType ('Just 'DataTypeSetTy)
-  -> Bucket
-  -> Key
-  -> ( BasicQuorum
-     , ParamIncludeContext
-     , N
-     , NotfoundOk
-     , PR
-     , R
-     , SloppyQuorum
-     , Timeout
-     )
-  -> m (Either RpbErrorResp [ByteString])
-fetchSet handle type' bucket key params =
-  fetchDataType handle type' bucket key params
-
 fetchMap
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeMapTy)
+  -> BucketType ('Just 'MapTy)
   -> Bucket
   -> Key
   -> ( BasicQuorum
@@ -578,6 +560,24 @@ fetchMap
 fetchMap handle type' bucket key params =
   fetchDataType handle type' bucket key params
 
+fetchSet
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'SetTy)
+  -> Bucket
+  -> Key
+  -> ( BasicQuorum
+     , ParamIncludeContext
+     , N
+     , NotfoundOk
+     , PR
+     , R
+     , SloppyQuorum
+     , Timeout
+     )
+  -> m (Either RpbErrorResp [ByteString])
+fetchSet handle type' bucket key params =
+  fetchDataType handle type' bucket key params
 
 fetchDataType
   :: forall m ty.
@@ -655,23 +655,23 @@ fetchSomeDataType handle@(Handle conn _) type' bucket key
 
   case response ^. #type' of
     DtFetchResp'COUNTER ->
-      pure (toDataType @'DataTypeCounterTy proxy# (response ^. #value))
+      pure (toDataType @'CounterTy proxy# (response ^. #value))
 
     DtFetchResp'GSET -> do
       doCacheVclock
-      pure (toDataType @'DataTypeGrowOnlySetTy proxy# (response ^. #value))
+      pure (toDataType @'GrowOnlySetTy proxy# (response ^. #value))
 
     DtFetchResp'HLL -> do
       doCacheVclock
-      pure (toDataType @'DataTypeHyperLogLogTy proxy# (response ^. #value))
+      pure (toDataType @'HyperLogLogTy proxy# (response ^. #value))
 
     DtFetchResp'MAP -> do
       doCacheVclock
-      pure (toDataType @'DataTypeMapTy proxy# (response ^. #value))
+      pure (toDataType @'MapTy proxy# (response ^. #value))
 
     DtFetchResp'SET -> do
       doCacheVclock
-      pure (toDataType @'DataTypeSetTy proxy# (response ^. #value))
+      pure (toDataType @'SetTy proxy# (response ^. #value))
 
  where
   request :: DtFetchReq
@@ -695,7 +695,7 @@ fetchSomeDataType handle@(Handle conn _) type' bucket key
 updateCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'DataTypeCounterTy)
+  -> BucketType ('Just 'CounterTy)
   -> Bucket
   -> Maybe Key
   -> Int64

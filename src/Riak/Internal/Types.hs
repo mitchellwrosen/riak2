@@ -60,11 +60,11 @@ instance Show Bucket where
 
 
 data DataTypeTy
-  = DataTypeCounterTy
-  | DataTypeGrowOnlySetTy
-  | DataTypeHyperLogLogTy
-  | DataTypeMapTy
-  | DataTypeSetTy
+  = CounterTy
+  | GrowOnlySetTy
+  | HyperLogLogTy
+  | MapTy
+  | SetTy
 
 
 -- | The number of vnodes that must write a write request to storage before a
