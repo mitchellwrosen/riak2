@@ -7,7 +7,6 @@
 module Riak.Internal.Types where
 
 import Data.ByteString    (ByteString)
-import Data.Coerce        (coerce)
 import Data.Default.Class
 import Data.Hashable      (Hashable)
 import Data.Int
@@ -19,17 +18,6 @@ import Prelude            hiding (head, return, (.))
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text              as Text
-
-
--- | Whether to use the "basic quorum" policy for not-founds. Only relevant when
--- @notfound_ok@ is set to false.
---
--- /Default/: false.
-newtype BasicQuorum
-  = BasicQuorum Bool
-
-instance Default BasicQuorum where
-  def = coerce False
 
 
 -- | A Riak bucket type, tagged with the data type it contains.
@@ -67,20 +55,9 @@ data DataTypeTy
   | SetTy
 
 
--- | The number of vnodes that must write a write request to storage before a
--- response is returned to the client. The request will still be replicated to
--- @N@ vnodes.
---
--- /Default/: @quorum@.
--- /Range/: 1 to @N@.
-newtype DW
-  = DW Quorum
-  deriving newtype (Default)
-
-
 -- | A Solr index name.
 newtype IndexName
-  = IndexName { unIndex :: ByteString }
+  = IndexName { unIndexName :: ByteString }
 
 
 -- | A Riak key.
@@ -116,36 +93,6 @@ data Modified a
   | Modified a
 
 
--- | @notfound_ok@ controls how Riak behaves during read requests when keys are
--- not present.
---
--- * If @true@, Riak will treat any @notfound@ as a positive assertion that the
--- key does not exist.
---
--- * If @false@, Riak will treat any @notfound@ as a failure condition. The
--- coordinating node will wait for enough vnodes to reply with @notfound@ to
--- know that it cannot satisfy the requested @R@.
---
--- /Default/: true.
-newtype NotfoundOk
-  = NotfoundOk Bool
-
-instance Default NotfoundOk where
-  def = coerce True
-
-
--- | The number of __primary vnodes__ responsible for each key, i.e. the number
--- of __replicas__ stores in the cluster.
---
--- /Default/: 3.
--- /Range/: 1 to the number of nodes in the cluster.
-newtype N
-  = N (Maybe Word32)
-
-instance Default N where
-  def = N Nothing
-
-
 data ObjectReturn
   = ObjectReturnNone
   | ObjectReturnHead
@@ -155,7 +102,7 @@ data ObjectReturn
 -- | How many vnodes must respond before an operation is considered successful.
 -- May be a number @<= N@, or a symbolic value.
 newtype Quorum
-  = Quorum Word32
+  = Quorum { unQuorum :: Word32 }
   deriving stock (Eq)
   deriving newtype (Num)
 
@@ -169,47 +116,6 @@ pattern QuorumAll = 4294967292
 -- | A majority of the vnodes must respond.
 pattern QuorumQuorum :: Quorum
 pattern QuorumQuorum = 4294967293
-
-
--- | The number of primary vnodes that must respond to a read request before a
--- response is returned to the client. The request will still be replicated to
--- @N@ vnodes.
---
--- /Default/: 0.
--- /Range/: 1 to @N@.
-newtype PR
-  = PR Quorum
-  deriving newtype (Default)
-
-
--- | The number of primary vnodes that must /respond/ to a write request before
--- a response is returned to the client. The request will still be replicated to
--- @N@ vnodes.
---
--- /Default/: 0.
--- /Range/: 1 to @N@.
-newtype PW
-  = PW Quorum
-  deriving newtype (Default)
-
-
--- | The number of vnodes that must respond to a read request before a response
--- is returned to the client. The request will still be replicated to @N@
--- vnodes.
---
--- /Default/: @quorum@.
--- /Range/: 1 to @N@.
-newtype R
-  = R Quorum
-  deriving newtype (Default)
-
-
--- TODO remove ReturnBody
-newtype ReturnBody
-  = ReturnBody Bool
-
-instance Default ReturnBody where
-  def = coerce False
 
 
 data SBool :: Bool -> Type where
@@ -228,16 +134,6 @@ newtype SecondaryIndexes
   deriving (Show)
 
 
--- | Whether failover vnodes are consulted if one or more primary vnodes fails.
---
--- /Default/: true.
-newtype SloppyQuorum
-  = SloppyQuorum Bool
-
-instance Default SloppyQuorum where
-  def = coerce True
-
-
 newtype SomeBucketType
   = SomeBucketType { unSomeBucketType :: ByteString }
   deriving stock (Eq)
@@ -249,19 +145,9 @@ instance Show SomeBucketType where
     Text.unpack . decodeUtf8 . unSomeBucketType
 
 
-newtype Timeout
-  = Timeout { unTimeout :: Maybe Word32 }
-
-instance Default Timeout where
-  def = Timeout Nothing
-
-
 newtype TTL
   = TTL { unTTL :: Maybe Word32 }
   deriving Show
-
-instance Default TTL where
-  def = TTL Nothing
 
 
 newtype Vclock
@@ -276,17 +162,6 @@ instance Show Vclock where
 newtype Vtag
   = Vtag { unVtag :: ByteString }
   deriving (Show)
-
-
--- | The number of vnodes that must /respond/ to a write request before a
--- response is returned to the client. The request will still be replicated to
--- @N@ vnodes.
---
--- /Default/: @quorum@.
--- /Range/: 1 to @N@.
-newtype W
-  = W Quorum
-  deriving newtype (Default)
 
 
 --------------------------------------------------------------------------------
@@ -304,13 +179,6 @@ data IfModified :: Bool -> Type where
 
 instance (a ~ 'False) => Default (IfModified a) where
   def = NoIfModified
-
-
-newtype ParamIncludeContext
-  = ParamIncludeContext Bool
-
-instance Default ParamIncludeContext where
-  def = coerce True
 
 
 data ParamObjectReturn :: ObjectReturn -> Type where

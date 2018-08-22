@@ -63,6 +63,7 @@ library
     Riak.Internal.Debug
     Riak.Internal.Message
     Riak.Internal.Panic
+    Riak.Internal.Params
     Riak.Internal.Request
     Riak.Internal.Response
     Riak.Internal.Types

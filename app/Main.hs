@@ -1,5 +1,6 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, GADTs, LambdaCase, OverloadedStrings,
-             RankNTypes, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, GADTs, LambdaCase, OverloadedLabels,
+             OverloadedStrings, RankNTypes, ScopedTypeVariables,
+             TypeApplications #-}
 
 import Control.Monad              (join, (<=<))
 import Control.Monad.IO.Class
@@ -8,6 +9,7 @@ import Data.Coerce
 import Data.Foldable              (asum, for_, traverse_)
 import Data.Int
 import Data.Text                  (Text)
+import Data.Word
 import Lens.Family2
 import List.Transformer           (runListT)
 import Network.Socket             (HostName, PortNumber)
@@ -120,7 +122,7 @@ fetchObjectParser =
                 [ long "notfound-not-ok"
                 , help "notfound not ok"
                 ])
-        <*> nvalOption
+        <*> nOption
         <*> prOption
         <*> rOption
         <*> sloppyQuorumOption
@@ -191,7 +193,7 @@ storeObjectParser =
                 , metavar "CONTENT"
                 ])
         <*> dwOption
-        <*> nvalOption
+        <*> nOption
         <*> pwOption
         <*> asum
               [ flag'
@@ -210,6 +212,7 @@ storeObjectParser =
               ]
         <*> sloppyQuorumOption
         <*> timeoutOption
+        <*> ttlOption
         <*> wOption)
       (progDesc "Store an object"))
 
@@ -266,7 +269,7 @@ doFetchMap type' bucket key host port = do
         type'
         bucket
         key
-        (def, def, def, def, def, def, def, def)
+        def -- (def, def, def, def, def, def, def, def)
 
 -- TODO doFetchObject add head param
 doFetchObject
@@ -275,16 +278,16 @@ doFetchObject
   -> Key
   -> Bool
   -> Bool
-  -> N
-  -> PR
-  -> R
-  -> SloppyQuorum
-  -> Timeout
+  -> Maybe Word32
+  -> Maybe Quorum
+  -> Maybe Quorum
+  -> Bool
+  -> Maybe Word32
   -> HostName
   -> PortNumber
   -> IO ()
 doFetchObject
-    type' bucket key basic_quorum notfound_not_ok n_val pr r sloppy_quorum
+    type' bucket key basic_quorum notfound_not_ok n pr r no_sloppy_quorum
     timeout host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h -> do
@@ -293,14 +296,14 @@ doFetchObject
         type'
         bucket
         key
-        ( BasicQuorum basic_quorum
-        , n_val
-        , NotfoundOk (not notfound_not_ok)
-        , pr
-        , r
-        , sloppy_quorum
-        , timeout
-        )
+        (def
+          & (if basic_quorum then #basic_quorum True else id)
+          & (if notfound_not_ok then #notfound_ok False else id)
+          & maybe id #n n
+          & maybe id #pr pr
+          & maybe id #r r
+          & (if no_sloppy_quorum then #sloppy_quorum False else id)
+          & maybe id #timeout timeout)
 
     case eresponse of
       Left err ->
@@ -325,7 +328,7 @@ doFetchObject
             [] -> pure ()
             xs -> tag "metadata" xs
 
-          case unSecondaryIndexes (content ^. L.indexes) of
+          case content ^. L.indexes of
             [] -> pure ()
             xs -> tag "indexes" xs
 
@@ -378,19 +381,20 @@ doStoreObject
   -> Bucket
   -> Maybe Key
   -> Text
-  -> DW
-  -> N
-  -> PW
+  -> Maybe Quorum
+  -> Maybe Word32
+  -> Maybe Quorum
   -> Char
-  -> SloppyQuorum
-  -> Timeout
-  -> W
+  -> Bool
+  -> Maybe Word32
+  -> Maybe Word32
+  -> Maybe Quorum
   -> HostName
   -> PortNumber
   -> IO ()
 doStoreObject
     -- TODO doStoreObject use return
-    type' bucket key content dw n_val pw _return sloppy_quorum timeout w
+    type' bucket key content dw n pw _return no_sloppy_quorum timeout ttl w
     host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h -> do
@@ -400,16 +404,14 @@ doStoreObject
         bucket
         key
         content
-        ( dw
-        , SecondaryIndexes [] -- TODO riak-cli store-object indexes
-        , Metadata [] -- TODO riak-cli store-object metadata
-        , n_val
-        , pw
-        , sloppy_quorum
-        , timeout
-        , def -- TODO riak-cli store-object ttl
-        , w
-        )
+        (def
+          & maybe id #dw dw
+          & maybe id #n n
+          & maybe id #pw pw
+          & (if no_sloppy_quorum then #sloppy_quorum False else id)
+          & maybe id #timeout timeout
+          & maybe id #ttl ttl
+          & maybe id #w w)
     print eresponse
 
 doUpdateCounter
@@ -468,9 +470,9 @@ keyOption =
       , metavar "KEY"
       ])
 
-dwOption :: Parser DW
+dwOption :: Parser (Maybe Quorum)
 dwOption =
-  DW <$> quorumOption "dw" "DW value"
+  quorumOption "dw" "DW value"
 
 nodeArgument :: Parser ((HostName -> PortNumber -> r) -> r)
 nodeArgument =
@@ -491,32 +493,31 @@ nodeArgument =
         pure (\k -> k host 8087)
       _ -> undefined
 
-nvalOption :: Parser N
-nvalOption =
-  (fmap N . optional . option auto)
+nOption :: Parser (Maybe Word32)
+nOption =
+  (optional . option auto)
     (mconcat
       [ long "n"
       , help "N value"
       , metavar "NODES"
       ])
 
-prOption :: Parser PR
+prOption :: Parser (Maybe Quorum)
 prOption =
-  PR <$> quorumOption "pr" "PR value"
+  quorumOption "pr" "PR value"
 
-pwOption :: Parser PW
+pwOption :: Parser (Maybe Quorum)
 pwOption =
-  PW <$> quorumOption "pw" "PW value"
+  quorumOption "pw" "PW value"
 
-quorumOption :: String -> String -> Parser Quorum
+quorumOption :: String -> String -> Parser (Maybe Quorum)
 quorumOption s1 s2 =
-  option (maybeReader readQuorum)
+  optional (option (maybeReader readQuorum)
     (mconcat
       [ long s1
       , help s2
       , metavar "QUORUM"
-      , value def
-      ])
+      ]))
  where
   readQuorum :: String -> Maybe Quorum
   readQuorum = \case
@@ -524,28 +525,36 @@ quorumOption s1 s2 =
     "quorum"  -> pure QuorumQuorum
     s         -> Quorum <$> readMaybe s
 
-rOption :: Parser R
+rOption :: Parser (Maybe Quorum)
 rOption =
-  R <$> quorumOption "r" "R value"
+  quorumOption "r" "R value"
 
-sloppyQuorumOption :: Parser SloppyQuorum
+sloppyQuorumOption :: Parser Bool
 sloppyQuorumOption =
-  SloppyQuorum <$>
-    switch
-      (mconcat
-        [ long "sloppy-quorum"
-        , help "Sloppy quorum"
-        ])
+  switch
+    (mconcat
+      [ long "no-sloppy-quorum"
+      , help "No sloppy quorum"
+      ])
 
-timeoutOption :: Parser Timeout
+timeoutOption :: Parser (Maybe Word32)
 timeoutOption =
-  (fmap Timeout . optional . option auto)
+  (optional . option auto)
     (mconcat
       [ long "timeout"
       , help "Timeout"
       , metavar "MILLISECONDS"
       ])
 
-wOption :: Parser W
+ttlOption :: Parser (Maybe Word32)
+ttlOption =
+  (optional . option auto)
+    (mconcat
+      [ long "ttl"
+      , help "TTL"
+      , metavar "MILLISECONDS"
+      ])
+
+wOption :: Parser (Maybe Quorum)
 wOption =
-  W <$> quorumOption "w" "W value"
+  quorumOption "w" "W value"
