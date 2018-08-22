@@ -213,7 +213,6 @@ storeObjectParser =
               ]
         <*> sloppyQuorumOption
         <*> timeoutOption
-        <*> ttlOption
         <*> wOption)
       (progDesc "Store an object"))
 
@@ -380,13 +379,12 @@ doStoreObject
   -> Char
   -> Bool
   -> Maybe Word32
-  -> Maybe Word32
   -> Maybe Quorum
   -> HostName
   -> PortNumber
   -> IO ()
 doStoreObject
-    type' bucket key content dw n pw return no_sloppy_quorum timeout ttl w host
+    type' bucket key content dw n pw return no_sloppy_quorum timeout w host
     port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
@@ -428,7 +426,6 @@ doStoreObject
           & maybe id #pw pw
           & (if no_sloppy_quorum then #sloppy_quorum False else id)
           & maybe id #timeout timeout
-          & maybe id #ttl ttl
           & maybe id #w w)
 
     either print f eresponse
@@ -589,15 +586,6 @@ timeoutOption =
     (mconcat
       [ long "timeout"
       , help "Timeout"
-      , metavar "MILLISECONDS"
-      ])
-
-ttlOption :: Parser (Maybe Word32)
-ttlOption =
-  (optional . option auto)
-    (mconcat
-      [ long "ttl"
-      , help "TTL"
       , metavar "MILLISECONDS"
       ])
 

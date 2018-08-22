@@ -85,21 +85,19 @@ data StoreObjectParams
       !PW
       !SloppyQuorum
       !Timeout
-      !TTL
       !W
 
 instance Default StoreObjectParams where
-  def = StoreObjectParams (DW Nothing) [] (Metadata []) (N Nothing) (PW Nothing) (SloppyQuorum Nothing) (Timeout Nothing) (TTL Nothing) (W Nothing)
+  def = StoreObjectParams (DW Nothing) [] (Metadata []) (N Nothing) (PW Nothing) (SloppyQuorum Nothing) (Timeout Nothing) (W Nothing)
 
-instance IsLabel "dw"            (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \a (StoreObjectParams _ b c d e f g h i) -> StoreObjectParams (coerce (Just a)) b c d e f g h i
-instance IsLabel "indexes"       ([SecondaryIndex]                 -> StoreObjectParams -> StoreObjectParams) where fromLabel = \b (StoreObjectParams a _ c d e f g h i) -> StoreObjectParams a b c d e f g h i
-instance IsLabel "metadata"      ([(ByteString, Maybe ByteString)] -> StoreObjectParams -> StoreObjectParams) where fromLabel = \c (StoreObjectParams a b _ d e f g h i) -> StoreObjectParams a b (Metadata c) d e f g h i
-instance IsLabel "n"             (Word32                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \d (StoreObjectParams a b c _ e f g h i) -> StoreObjectParams a b c (coerce (Just d)) e f g h i
-instance IsLabel "pw"            (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \e (StoreObjectParams a b c d _ f g h i) -> StoreObjectParams a b c d (coerce (Just e)) f g h i
-instance IsLabel "sloppy_quorum" (Bool                             -> StoreObjectParams -> StoreObjectParams) where fromLabel = \f (StoreObjectParams a b c d e _ g h i) -> StoreObjectParams a b c d e (coerce (Just f)) g h i
-instance IsLabel "timeout"       (Word32                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \g (StoreObjectParams a b c d e f _ h i) -> StoreObjectParams a b c d e f (coerce (Just g)) h i
-instance IsLabel "ttl"           (Word32                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \h (StoreObjectParams a b c d e f g _ i) -> StoreObjectParams a b c d e f g (coerce (Just h)) i
-instance IsLabel "w"             (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \i (StoreObjectParams a b c d e f g h _) -> StoreObjectParams a b c d e f g h (coerce (Just i))
+instance IsLabel "dw"            (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \a (StoreObjectParams _ b c d e f g h) -> StoreObjectParams (coerce (Just a)) b c d e f g h
+instance IsLabel "indexes"       ([SecondaryIndex]                 -> StoreObjectParams -> StoreObjectParams) where fromLabel = \b (StoreObjectParams a _ c d e f g h) -> StoreObjectParams a b c d e f g h
+instance IsLabel "metadata"      ([(ByteString, Maybe ByteString)] -> StoreObjectParams -> StoreObjectParams) where fromLabel = \c (StoreObjectParams a b _ d e f g h) -> StoreObjectParams a b (Metadata c) d e f g h
+instance IsLabel "n"             (Word32                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \d (StoreObjectParams a b c _ e f g h) -> StoreObjectParams a b c (coerce (Just d)) e f g h
+instance IsLabel "pw"            (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \e (StoreObjectParams a b c d _ f g h) -> StoreObjectParams a b c d (coerce (Just e)) f g h
+instance IsLabel "sloppy_quorum" (Bool                             -> StoreObjectParams -> StoreObjectParams) where fromLabel = \f (StoreObjectParams a b c d e _ g h) -> StoreObjectParams a b c d e (coerce (Just f)) g h
+instance IsLabel "timeout"       (Word32                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \g (StoreObjectParams a b c d e f _ h) -> StoreObjectParams a b c d e f (coerce (Just g)) h
+instance IsLabel "w"             (Quorum                           -> StoreObjectParams -> StoreObjectParams) where fromLabel = \h (StoreObjectParams a b c d e f g _) -> StoreObjectParams a b c d e f g (coerce (Just h))
 
 -- | Optional @update data type@ parameters.
 data UpdateDataTypeParams

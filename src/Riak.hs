@@ -376,10 +376,10 @@ storeObject
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp ())
 storeObject
-    handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
+    handle type' bucket key content (StoreObjectParams a b c d e f g h) =
   fmap (() <$)
     (_storeObject handle type' bucket (Just key) content a b c d e
-      ParamObjectReturnNone f g h i)
+      ParamObjectReturnNone f g h)
 
 -- | Store an object and return its metadata.
 storeObjectHead
@@ -393,9 +393,9 @@ storeObjectHead
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (NonEmpty (Content (Proxy a))))
 storeObjectHead
-    handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
+    handle type' bucket key content (StoreObjectParams a b c d e f g h) =
   _storeObject handle type' bucket (Just key) content a b c d e
-    ParamObjectReturnHead f g h i
+    ParamObjectReturnHead f g h
 
 -- | Store an object and return it.
 storeObjectBody
@@ -409,9 +409,9 @@ storeObjectBody
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (NonEmpty (Content a)))
 storeObjectBody
-    handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
+    handle type' bucket key content (StoreObjectParams a b c d e f g h) =
   _storeObject handle type' bucket (Just key) content a b c d e
-    ParamObjectReturnBody f g h i
+    ParamObjectReturnBody f g h
 
 -- | Store a new object and return its randomly-generated key.
 storeNewObject
@@ -424,9 +424,9 @@ storeNewObject
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp Key)
 storeNewObject
-    handle type' bucket content (StoreObjectParams a b c d e f g h i) =
+    handle type' bucket content (StoreObjectParams a b c d e f g h) =
   _storeObject handle type' bucket Nothing content a b c d e
-    ParamObjectReturnNone f g h i
+    ParamObjectReturnNone f g h
 
 -- | Store an new object and return its metadata.
 storeNewObjectHead
@@ -439,10 +439,10 @@ storeNewObjectHead
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (Content (Proxy a)))
 storeNewObjectHead
-    handle type' bucket content (StoreObjectParams a b c d e f g h i) =
+    handle type' bucket content (StoreObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
     _storeObject handle type' bucket Nothing content a b c d e
-      ParamObjectReturnHead f g h i
+      ParamObjectReturnHead f g h
 
 -- | Store an new object and return it.
 storeNewObjectBody
@@ -455,10 +455,10 @@ storeNewObjectBody
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (Content a))
 storeNewObjectBody
-    handle type' bucket content (StoreObjectParams a b c d e f g h i) =
+    handle type' bucket content (StoreObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
     _storeObject handle type' bucket Nothing content a b c d e
-      ParamObjectReturnBody f g h i
+      ParamObjectReturnBody f g h
 
 _storeObject
   :: forall a m return.
@@ -476,12 +476,11 @@ _storeObject
   -> ParamObjectReturn return
   -> SloppyQuorum
   -> Timeout
-  -> TTL
   -> W
   -> m (Either RpbErrorResp (ObjectReturnTy a return))
 _storeObject
     handle@(Handle conn cache) type' bucket key value dw indexes metadata n pw
-    return sloppy_quorum timeout ttl w = liftIO . runExceptT $ do
+    return sloppy_quorum timeout w = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe Vclock <-
@@ -511,7 +510,7 @@ _storeObject
               , _RpbContent'lastMod         = Nothing
               , _RpbContent'lastModUsecs    = Nothing
               , _RpbContent'links           = []
-              , _RpbContent'ttl             = coerce ttl
+              , _RpbContent'ttl             = Nothing
               , _RpbContent'usermeta        = map rpbPair (coerce metadata)
               , _RpbContent'value           = bytes
               , _RpbContent'vtag            = Nothing
