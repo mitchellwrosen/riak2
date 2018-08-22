@@ -1,6 +1,8 @@
 module Riak.Lenses
-  ( content
+  ( bucket
+  , content
   , contentType
+  , type'
   , unchanged
   , value
   , vclock

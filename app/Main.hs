@@ -6,7 +6,7 @@ import Control.Monad              (join, when, (<=<))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import Data.Coerce
-import Data.Foldable              (asum, for_, traverse_)
+import Data.Foldable              (asum, for_, toList, traverse_)
 import Data.Int
 import Data.Text                  (Text)
 import Data.Word
@@ -48,6 +48,7 @@ parser =
       [ [ commandGroup "Key/value object operations"
         , fetchObjectParser
         , storeObjectParser
+          -- TODO riak-cli store-new-object
         ]
       , [ commandGroup "Data type operations"
         , fetchCounterParser
@@ -186,7 +187,7 @@ storeObjectParser =
       (doStoreObject
         <$> bucketTypeArgument
         <*> bucketArgument
-        <*> optional keyOption
+        <*> keyArgument
         <*> strArgument
               (mconcat
                 [ help "Content"
@@ -291,95 +292,41 @@ doFetchObject
     timeout host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    -- TODO de-dupe this code
     if head
-      then do
-        eresponse <-
-          fetchObjectHead @Text h
-            type'
-            bucket
-            key
-            (def
-              & (if basic_quorum then #basic_quorum True else id)
-              & (if notfound_not_ok then #notfound_ok False else id)
-              & maybe id #n n
-              & maybe id #pr pr
-              & maybe id #r r
-              & (if no_sloppy_quorum then #sloppy_quorum False else id)
-              & maybe id #timeout timeout)
+      then go (fetchObjectHead @Text h) (\_ _ -> pure ())
+      else go (fetchObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
 
-        case eresponse of
-          Left err ->
-            print err
+ where
+  go
+    :: (BucketType 'Nothing -> Bucket -> Key -> FetchObjectParams -> IO (Either L.RpbErrorResp [Content a]))
+    -> (Int -> a -> IO ())
+    -> IO ()
+  go fetch f = do
+    eresponse <-
+      fetch
+        type'
+        bucket
+        key
+        (def
+          & (if basic_quorum then #basic_quorum True else id)
+          & (if notfound_not_ok then #notfound_ok False else id)
+          & maybe id #n n
+          & maybe id #pr pr
+          & maybe id #r r
+          & (if no_sloppy_quorum then #sloppy_quorum False else id)
+          & maybe id #timeout timeout)
 
-          Right [] ->
-            putStrLn "Not found"
+    case eresponse of
+      Left err ->
+        print err
 
-          Right contents -> do
-            for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
-              let tag :: Show a => String -> a -> IO ()
-                  tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
+      Right [] ->
+        putStrLn "Not found"
 
-              for_ (content ^. L.lastMod) (tag "last_mod")
-
-              case unMetadata (content ^. L.usermeta) of
-                [] -> pure ()
-                xs -> tag "metadata" xs
-
-              case content ^. L.indexes of
-                [] -> pure ()
-                xs -> tag "indexes" xs
-
-              when (content ^. L.deleted)
-                (tag "deleted" (content ^. L.deleted))
-
-              for_ (unTTL (content ^. L.ttl)) (tag "ttl")
-      else do
-        eresponse <-
-          fetchObject h
-            type'
-            bucket
-            key
-            (def
-              & (if basic_quorum then #basic_quorum True else id)
-              & (if notfound_not_ok then #notfound_ok False else id)
-              & maybe id #n n
-              & maybe id #pr pr
-              & maybe id #r r
-              & (if no_sloppy_quorum then #sloppy_quorum False else id)
-              & maybe id #timeout timeout)
-
-        case eresponse of
-          Left err ->
-            print err
-
-          Right [] ->
-            putStrLn "Not found"
-
-          Right contents -> do
-            for_ (zip [(0::Int)..] contents) $ \(i, content) -> do
-              let tagtxt :: Text -> Text -> IO ()
-                  tagtxt k v = Text.putStrLn (k <> "[" <> Text.pack (show i) <> "] = " <> v)
-
-              let tag :: Show a => String -> a -> IO ()
-                  tag k v = putStrLn (k ++ "[" ++ show i ++ "] = " ++ show v)
-
-              tagtxt "value" (content ^. L.value)
-
-              for_ (content ^. L.lastMod) (tag "last_mod")
-
-              case unMetadata (content ^. L.usermeta) of
-                [] -> pure ()
-                xs -> tag "metadata" xs
-
-              case content ^. L.indexes of
-                [] -> pure ()
-                xs -> tag "indexes" xs
-
-              when (content ^. L.deleted)
-                (tag "deleted" (content ^. L.deleted))
-
-              for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+      Right contents -> do
+        -- printContents f contents
+        for_ (zip [(0::Int)..] contents) $ \(i, content) ->
+          printContent (f i) (Just i) content
 
 doGetBucketProps :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
 doGetBucketProps type' bucket host port = do
@@ -425,7 +372,7 @@ doListKeys type' bucket host port = do
 doStoreObject
   :: BucketType 'Nothing
   -> Bucket
-  -> Maybe Key
+  -> Key
   -> Text
   -> Maybe Quorum
   -> Maybe Word32
@@ -439,13 +386,38 @@ doStoreObject
   -> PortNumber
   -> IO ()
 doStoreObject
-    -- TODO doStoreObject use return
-    type' bucket key content dw n pw _return no_sloppy_quorum timeout ttl w
-    host port = do
+    type' bucket key content dw n pw return no_sloppy_quorum timeout ttl w host
+    port = do
   cache <- refVclockCache
-  withHandle host port cache $ \h -> do
+  withHandle host port cache $ \h ->
+    case return of
+      'a' ->
+        go
+          (storeObjectHead h)
+          (\contents ->
+            (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
+              printContent (\_ -> pure ()) (Just i) content'))
+      'b' ->
+        go
+          (storeObjectBody h)
+          (\contents ->
+            (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
+              printContent
+                (\s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
+                (Just i)
+                content'))
+
+      'c' ->
+        go (storeObject h) pure
+      _   -> undefined
+ where
+  go
+    :: (BucketType 'Nothing -> Bucket -> Key -> Text -> StoreObjectParams -> IO (Either L.RpbErrorResp a))
+    -> (a -> IO ())
+    -> IO ()
+  go store f = do
     eresponse <-
-      storeObject h
+      store
         type'
         bucket
         key
@@ -458,7 +430,8 @@ doStoreObject
           & maybe id #timeout timeout
           & maybe id #ttl ttl
           & maybe id #w w)
-    print eresponse
+
+    either print f eresponse
 
 doUpdateCounter
   :: BucketType ('Just 'CounterTy)
@@ -482,6 +455,33 @@ doUpdateCounter type' bucket incr key host port = do
 --------------------------------------------------------------------------------
 -- Misc. helpers
 --------------------------------------------------------------------------------
+
+printContent :: (a -> IO ()) -> Maybe Int -> Content a -> IO ()
+printContent f mi content = do
+  tag "type" (content ^. L.type')
+  tag "bucket" (content ^. L.bucket)
+  tag "key" (content ^. L.key)
+
+  f (content ^. L.value)
+
+  for_ (content ^. L.lastMod) (tag "last_mod")
+
+  case unMetadata (content ^. L.usermeta) of
+    [] -> pure ()
+    xs -> tag "metadata" xs
+
+  case content ^. L.indexes of
+    [] -> pure ()
+    xs -> tag "indexes" xs
+
+  when (content ^. L.deleted)
+    (tag "deleted" (content ^. L.deleted))
+
+  for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+ where
+  tag :: Show a => String -> a -> IO ()
+  tag k v =
+    putStrLn (k ++ maybe "" (\i -> "[" ++ show i ++ "]") mi ++ " = " ++ show v)
 
 bucketArgument :: Parser Bucket
 bucketArgument =

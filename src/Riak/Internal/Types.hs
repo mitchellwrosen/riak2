@@ -25,8 +25,13 @@ import qualified Data.Text              as Text
 -- /Note/: Must be UTF-8 encoded.
 newtype BucketType (ty :: Maybe DataTypeTy)
   = BucketType { unBucketType :: ByteString }
-  deriving stock (Eq, Show)
+  deriving stock (Eq)
   deriving newtype (Hashable)
+
+instance Show (BucketType ty) where
+  show :: BucketType ty -> String
+  show =
+    Text.unpack . decodeUtf8 . unBucketType
 
 pattern BucketTypeDefault :: BucketType 'Nothing
 pattern BucketTypeDefault =
@@ -100,7 +105,7 @@ data ObjectReturn
 
 
 -- | How many vnodes must respond before an operation is considered successful.
--- May be a number @<= N@, or a symbolic value.
+-- May be a number @<= N@, 'QuorumQuorum', or 'QuorumAll'.
 newtype Quorum
   = Quorum { unQuorum :: Word32 }
   deriving stock (Eq)

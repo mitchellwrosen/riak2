@@ -68,6 +68,7 @@ module Riak
   , Bucket(..)
   , BucketType(..)
   , pattern BucketTypeDefault
+  , Charset(..)
   , Content(..)
   , ContentEncoding
   , pattern ContentEncodingNone
@@ -80,7 +81,6 @@ module Riak
   , MapValue(..)
   , Metadata(..)
   , Modified(..)
-  , ParamObjectReturn(..) -- TODO rename ParamObjectReturn
   , Quorum(..)
   , pattern QuorumAll
   , pattern QuorumQuorum
@@ -1187,15 +1187,22 @@ unRpbPair (RpbPair k v _) =
 --
 -- = Bucket types
 --
--- Bucket types ('BucketType') carry a type-level tag that indicates what kind
--- of data is stored within:
+-- 'BucketType's carry a type-level tag that indicates what kind of data is
+-- stored within:
 --
--- * Opaque objects
--- * Counters
--- * Grow-only sets
--- * HyperLogLogs
--- * Maps
--- * Sets
+-- +------------------------+-----------------+
+-- | @Nothing@              | Opaque objects. |
+-- +------------------------+-----------------+
+-- | @Just 'CounterTy'@     | Counters.       |
+-- +------------------------+-----------------+
+-- | @Just 'GrowOnlySetTy'@ | Grow-only sets. |
+-- +------------------------+-----------------+
+-- | @Just 'HyperLogLogTy'@ | HyperLogLogs.   |
+-- +------------------------+-----------------+
+-- | @Just 'MapTy'@         | Maps.           |
+-- +------------------------+-----------------+
+-- | @Just 'SetTy'@         | Sets.           |
+-- +------------------------+-----------------+
 --
 -- Normally, you should know ahead of time what kind of data corresponds to each
 -- bucket type, and define these bucket types as top-level definitions.
@@ -1207,8 +1214,8 @@ unRpbPair (RpbPair k v _) =
 -- countersBucketType = 'BucketType' "counters"
 -- @
 --
--- However, you may always dynamically create 'BucketType's on the fly at any
--- type you wish simply by using the 'BucketType' newtype constructor.
+-- However, you may always dynamically create bucket types on the fly at any
+-- type you wish by using the 'BucketType' newtype constructor.
 --
 -- = Content
 --
