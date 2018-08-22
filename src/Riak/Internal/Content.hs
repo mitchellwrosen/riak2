@@ -31,13 +31,13 @@ import Riak.Internal.Types
 
 data Content a
   = Content
-      a               -- Value
-      (Maybe Vtag)    -- Vtag
-      (Maybe UTCTime) -- Last modified
-      Metadata        -- User metadata
-      Indexes         -- Indexes
-      Bool            -- Deleted
-      TTL             -- TTL
+      a                -- Value
+      (Maybe Vtag)     -- Vtag
+      (Maybe UTCTime)  -- Last modified
+      Metadata         -- User metadata
+      SecondaryIndexes -- Secondary indexes
+      Bool             -- Deleted
+      TTL              -- TTL
   deriving (Show)
 
 instance {-# OVERLAPPABLE #-}
@@ -51,7 +51,7 @@ instance Functor f => HasLens  f (Content a) (Content b) "value"    a           
 instance Functor f => HasLens' f (Content a)             "vtag"     (Maybe Vtag)      where lensOf' _ = lens (\(Content _ x _ _ _ _ _) -> x) (\(Content a _ c d e f g) x -> Content a x c d e f g)
 instance Functor f => HasLens' f (Content a)             "lastMod"  (Maybe UTCTime)   where lensOf' _ = lens (\(Content _ _ x _ _ _ _) -> x) (\(Content a b _ d e f g) x -> Content a b x d e f g)
 instance Functor f => HasLens' f (Content a)             "usermeta" Metadata          where lensOf' _ = lens (\(Content _ _ _ x _ _ _) -> x) (\(Content a b c _ e f g) x -> Content a b c x e f g)
-instance Functor f => HasLens' f (Content a)             "indexes"  Indexes           where lensOf' _ = lens (\(Content _ _ _ _ x _ _) -> x) (\(Content a b c d _ f g) x -> Content a b c d x f g)
+instance Functor f => HasLens' f (Content a)             "indexes"  SecondaryIndexes  where lensOf' _ = lens (\(Content _ _ _ _ x _ _) -> x) (\(Content a b c d _ f g) x -> Content a b c d x f g)
 instance Functor f => HasLens' f (Content a)             "deleted"  Bool              where lensOf' _ = lens (\(Content _ _ _ _ _ x _) -> x) (\(Content a b c d e _ g) x -> Content a b c d e x g)
 instance Functor f => HasLens' f (Content a)             "ttl"      TTL               where lensOf' _ = lens (\(Content _ _ _ _ _ _ x) -> x) (\(Content a b c d e f _) x -> Content a b c d e f x)
 

@@ -1,11 +1,11 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, GADTs, LambdaCase, OverloadedStrings,
              RankNTypes, ScopedTypeVariables, TypeApplications #-}
 
-import Control.Monad              (join)
+import Control.Monad              (join, (<=<))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
 import Data.Coerce
-import Data.Foldable              (asum, for_)
+import Data.Foldable              (asum, for_, traverse_)
 import Data.Int
 import Data.Text                  (Text)
 import Lens.Family2
@@ -53,6 +53,8 @@ parser =
         , updateCounterParser
         ]
       , [ commandGroup "Bucket operations"
+        , getBucketTypePropsParser
+        , getBucketPropsParser
         , listBucketsParser
         , listKeysParser
         ]
@@ -63,7 +65,7 @@ parser =
         , command "TODO" (info empty mempty)
         ]
       , [ commandGroup "Search 2.0"
-        , command "TODO" (info empty mempty)
+        , getIndexParser
         ]
       , [ commandGroup "Server info"
         , command "TODO" (info empty mempty)
@@ -124,6 +126,37 @@ fetchObjectParser =
         <*> sloppyQuorumOption
         <*> timeoutOption)
       (progDesc "Fetch an object"))
+
+getBucketPropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getBucketPropsParser =
+  command
+    "get-bucket-props"
+    (info
+      (doGetBucketProps
+        <$> bucketTypeArgument
+        <*> bucketArgument)
+      (progDesc "Get a bucket's properties"))
+
+getBucketTypePropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getBucketTypePropsParser =
+  command
+    "get-bucket-type-props"
+    (info
+      (doGetBucketTypeProps <$> bucketTypeArgument)
+      (progDesc "Get a bucket type's properties"))
+
+getIndexParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getIndexParser =
+  command
+    "get-index"
+    (info
+      (doGetIndex
+        <$> (optional . fmap IndexName . strArgument)
+              (mconcat
+                [ help "Index name"
+                , metavar "INDEX"
+                ]))
+      (progDesc "Get a Solr index, or all Solr indexes"))
 
 listBucketsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 listBucketsParser =
@@ -242,7 +275,7 @@ doFetchObject
   -> Key
   -> Bool
   -> Bool
-  -> Nval
+  -> N
   -> PR
   -> R
   -> SloppyQuorum
@@ -292,12 +325,35 @@ doFetchObject
             [] -> pure ()
             xs -> tag "metadata" xs
 
-          case unIndexes (content ^. L.indexes) of
+          case unSecondaryIndexes (content ^. L.indexes) of
             [] -> pure ()
             xs -> tag "indexes" xs
 
           tag "deleted" (content ^. L.deleted)
           for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+
+doGetBucketProps :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
+doGetBucketProps type' bucket host port = do
+  cache <- refVclockCache
+  withHandle host port cache $ \h ->
+    print =<<
+      getBucketProps h type' bucket
+
+doGetBucketTypeProps :: BucketType ty -> HostName -> PortNumber -> IO ()
+doGetBucketTypeProps type' host port = do
+  cache <- refVclockCache
+  withHandle host port cache $ \h ->
+    print =<<
+      getBucketTypeProps h type'
+
+doGetIndex :: Maybe IndexName -> HostName -> PortNumber -> IO ()
+doGetIndex index host port = do
+  cache <- refVclockCache
+  withHandle host port cache $ \h ->
+    maybe
+      (traverse_ print =<< getIndexes h)
+      (print <=< getIndex h)
+      index
 
 doListBuckets :: BucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port = do
@@ -323,7 +379,7 @@ doStoreObject
   -> Maybe Key
   -> Text
   -> DW
-  -> Nval
+  -> N
   -> PW
   -> Char
   -> SloppyQuorum
@@ -345,7 +401,7 @@ doStoreObject
         key
         content
         ( dw
-        , Indexes [] -- TODO riak-cli store-object indexes
+        , SecondaryIndexes [] -- TODO riak-cli store-object indexes
         , Metadata [] -- TODO riak-cli store-object metadata
         , n_val
         , pw
@@ -435,11 +491,11 @@ nodeArgument =
         pure (\k -> k host 8087)
       _ -> undefined
 
-nvalOption :: Parser Nval
+nvalOption :: Parser N
 nvalOption =
-  (fmap Nval . optional . option auto)
+  (fmap N . optional . option auto)
     (mconcat
-      [ long "nval"
+      [ long "n"
       , help "N value"
       , metavar "NODES"
       ])
@@ -459,14 +515,12 @@ quorumOption s1 s2 =
       [ long s1
       , help s2
       , metavar "QUORUM"
-      , value QuorumDefault
+      , value def
       ])
  where
   readQuorum :: String -> Maybe Quorum
   readQuorum = \case
     "all"     -> pure QuorumAll
-    "default" -> pure QuorumDefault
-    "one"     -> pure QuorumOne
     "quorum"  -> pure QuorumQuorum
     s         -> Quorum <$> readMaybe s
 

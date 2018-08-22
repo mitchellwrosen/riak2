@@ -44,6 +44,7 @@ module Riak
   , getSchema
   , putSchema
   , getIndex
+  , getIndexes
   , putIndex
   , deleteIndex
     -- * Server info
@@ -62,8 +63,7 @@ module Riak
   , DW(..)
   , Head(..)
   , IfModified(..)
-  , Index(..)
-  , Indexes(..)
+  , IndexName(..)
   , IsContent(..)
   , Key(..)
   , Metadata(..)
@@ -78,6 +78,8 @@ module Riak
   , pattern QuorumQuorum
   , R(..)
   , ReturnBody(..)
+  , SecondaryIndex(..)
+  , SecondaryIndexes(..)
   , SloppyQuorum(..)
   , Timeout(..)
   , TTL(..)
@@ -313,13 +315,13 @@ type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy a 'ObjectReturnHead = NonEmpty (Content (Proxy a))
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (Content a)
 
-storeObject :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, Indexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp Key)
+storeObject :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, SecondaryIndexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp Key)
 storeObject handle type' bucket key content (a,b,c,d,e,f,g,h,i) = (fmap.fmap) fst (_storeObject handle type' bucket key content a b c d e ParamObjectReturnNone f g h i)
 
-storeObjectHead :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, Indexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
+storeObjectHead :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, SecondaryIndexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
 storeObjectHead handle type' bucket key content (a,b,c,d,e,f,g,h,i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnHead f g h i
 
-storeObjectBody :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, Indexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp (Key, NonEmpty (Content a)))
+storeObjectBody :: forall a m. (IsContent a, MonadIO m) => Handle -> BucketType 'Nothing -> Bucket -> Maybe Key -> a -> (DW, SecondaryIndexes, Metadata, N, PW, SloppyQuorum, Timeout, TTL, W) -> m (Either RpbErrorResp (Key, NonEmpty (Content a)))
 storeObjectBody handle type' bucket key content (a,b,c,d,e,f,g,h,i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnBody f g h i
 
 -- TODO inline _storeObject in 3 variants?
@@ -332,7 +334,7 @@ _storeObject
   -> Maybe Key
   -> a
   -> DW
-  -> Indexes
+  -> SecondaryIndexes
   -> Metadata
   -> N
   -> PW
@@ -470,7 +472,7 @@ deleteObject
   -> RpbDelReq
   -> m (Either RpbErrorResp RpbDelResp)
 deleteObject (Handle conn _) req =
-  liftIO (exchange conn req)
+  liftIO (Internal.deleteObject conn req)
 
 
 fetchCounter
@@ -737,29 +739,60 @@ updateDataType (Handle conn _) req =
 getBucketTypeProps
   :: MonadIO m
   => Handle
-  -> RpbGetBucketTypeReq
-  -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketTypeProps (Handle conn _) req =
-  liftIO (exchange conn req)
+  -> BucketType ty
+  -> m (Either RpbErrorResp RpbBucketProps)
+getBucketTypeProps (Handle conn _) type' = runExceptT $ do
+  response :: RpbGetBucketResp <-
+    ExceptT (liftIO (Internal.getBucketTypeProps conn request))
+  pure (response ^. #props)
+
+ where
+  request :: RpbGetBucketTypeReq
+  request =
+    RpbGetBucketTypeReq
+      { _RpbGetBucketTypeReq'_unknownFields = []
+      , _RpbGetBucketTypeReq'type'          = coerce type'
+      }
 
 
 -- TODO: Don't allow setting n
 setBucketTypeProps
   :: MonadIO m
   => Handle
-  -> RpbSetBucketTypeReq
+  -> BucketType ty
+  -> RpbBucketProps
   -> m (Either RpbErrorResp ())
-setBucketTypeProps (Handle conn _) req =
-  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn req))
+setBucketTypeProps (Handle conn _) type' props =
+  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn request))
+ where
+  request :: RpbSetBucketTypeReq
+  request =
+    RpbSetBucketTypeReq
+      { _RpbSetBucketTypeReq'_unknownFields = []
+      , _RpbSetBucketTypeReq'props          = props
+      , _RpbSetBucketTypeReq'type'          = coerce type'
+      }
 
 
 getBucketProps
   :: MonadIO m
   => Handle
-  -> RpbGetBucketReq
-  -> m (Either RpbErrorResp RpbGetBucketResp)
-getBucketProps (Handle conn _) req =
-  liftIO (exchange conn req)
+  -> BucketType ty
+  -> Bucket
+  -> m (Either RpbErrorResp RpbBucketProps)
+getBucketProps (Handle conn _) type' bucket = runExceptT $ do
+  response :: RpbGetBucketResp <-
+    ExceptT (liftIO (Internal.getBucketProps conn request))
+  pure (response ^. #props)
+
+ where
+  request :: RpbGetBucketReq
+  request =
+    RpbGetBucketReq
+      { _RpbGetBucketReq'_unknownFields = []
+      , _RpbGetBucketReq'bucket         = coerce bucket
+      , _RpbGetBucketReq'type'          = coerce (Just type')
+      }
 
 
 -- TODO: Don't allow setting n
@@ -889,10 +922,39 @@ putSchema (Handle conn _) req =
 getIndex
   :: MonadIO m
   => Handle
-  -> RpbYokozunaIndexGetReq
-  -> m (Either RpbErrorResp RpbYokozunaIndexGetResp)
-getIndex (Handle conn _) req =
-  liftIO (exchange conn req)
+  -> IndexName
+  -> m (Either RpbErrorResp (Maybe RpbYokozunaIndex))
+getIndex (Handle conn _) name = runExceptT $ do
+  ExceptT (liftIO (Internal.getIndex conn request)) >>= \case
+    RpbYokozunaIndexGetResp [] _ ->
+      pure Nothing
+    RpbYokozunaIndexGetResp (index:_) _ ->
+      pure (Just index)
+
+ where
+  request :: RpbYokozunaIndexGetReq
+  request =
+    RpbYokozunaIndexGetReq
+      { _RpbYokozunaIndexGetReq'_unknownFields = []
+      , _RpbYokozunaIndexGetReq'name           = coerce (Just name)
+      }
+
+getIndexes
+  :: MonadIO m
+  => Handle
+  -> m (Either RpbErrorResp [RpbYokozunaIndex])
+getIndexes (Handle conn _) = runExceptT $ do
+  RpbYokozunaIndexGetResp indexes _ <-
+    ExceptT (liftIO (Internal.getIndex conn request))
+  pure indexes
+
+ where
+  request :: RpbYokozunaIndexGetReq
+  request =
+    RpbYokozunaIndexGetReq
+      { _RpbYokozunaIndexGetReq'_unknownFields = []
+      , _RpbYokozunaIndexGetReq'name           = Nothing
+      }
 
 
 putIndex
@@ -995,12 +1057,12 @@ emptyResponse =
   fmap (() <$)
 
 
-indexToRpbPair :: Index -> RpbPair
+indexToRpbPair :: SecondaryIndex -> RpbPair
 indexToRpbPair = \case
-  IndexInt k v ->
+  SecondaryIndexInt k v ->
     RpbPair k (Just (Latin1.pack (show v))) [] -- TODO more efficient show
 
-  IndexBin k v ->
+  SecondaryIndexBin k v ->
     RpbPair k (Just v) []
 
 
@@ -1028,15 +1090,15 @@ mapEntryToPair entry =
     entry ^. #field
 
 
-rpbPairToIndex :: RpbPair -> Index
+rpbPairToIndex :: RpbPair -> SecondaryIndex
 rpbPairToIndex = \case
   RpbPair (ByteString.stripSuffix "_bin" -> Just k) (Just v) _ ->
-    IndexBin k v
+    SecondaryIndexBin k v
 
   RpbPair
       (ByteString.stripSuffix "_int" -> Just k)
       (Just (readMaybe . Latin1.unpack -> Just v)) _ ->
-    IndexInt k v -- TODO better read
+    SecondaryIndexInt k v -- TODO better read
 
   -- TODO what to do if index value is empty...?
   _ ->

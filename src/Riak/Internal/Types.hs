@@ -91,20 +91,12 @@ data DataTypeError
 -- /Range/: 1 to @N@.
 newtype DW
   = DW Quorum
-
-instance Default DW where
-  def = coerce QuorumDefault
+  deriving newtype (Default)
 
 
-data Index
-  = IndexInt !ByteString !Int64
-  | IndexBin !ByteString !ByteString
-  deriving (Show)
-
-
-newtype Indexes
-  = Indexes { unIndexes :: [Index] }
-  deriving (Show)
+-- | A Solr index name.
+newtype IndexName
+  = IndexName { unIndex :: ByteString }
 
 
 -- | A Riak key.
@@ -183,13 +175,12 @@ newtype Quorum
   deriving stock (Eq)
   deriving newtype (Num)
 
+instance Default Quorum where
+  def = 4294967291
+
 -- | All vnodes must respond.
 pattern QuorumAll :: Quorum
 pattern QuorumAll = 4294967292
-
--- | Use the bucket's @N@.
-pattern QuorumDefault :: Quorum
-pattern QuorumDefault = 4294967291
 
 -- | A majority of the vnodes must respond.
 pattern QuorumQuorum :: Quorum
@@ -204,9 +195,7 @@ pattern QuorumQuorum = 4294967293
 -- /Range/: 1 to @N@.
 newtype PR
   = PR Quorum
-
-instance Default PR where
-  def = coerce QuorumDefault
+  deriving newtype (Default)
 
 
 -- | The number of primary vnodes that must /respond/ to a write request before
@@ -217,9 +206,7 @@ instance Default PR where
 -- /Range/: 1 to @N@.
 newtype PW
   = PW Quorum
-
-instance Default PW where
-  def = coerce QuorumDefault
+  deriving newtype (Default)
 
 
 -- | The number of vnodes that must respond to a read request before a response
@@ -230,9 +217,7 @@ instance Default PW where
 -- /Range/: 1 to @N@.
 newtype R
   = R Quorum
-
-instance Default R where
-  def = coerce QuorumDefault
+  deriving newtype (Default)
 
 
 -- TODO remove ReturnBody
@@ -248,12 +233,25 @@ data SBool :: Bool -> Type where
   SFalse :: SBool 'False
 
 
+data SecondaryIndex
+  = SecondaryIndexInt !ByteString !Int64
+  | SecondaryIndexBin !ByteString !ByteString
+  deriving (Show)
+
+
+newtype SecondaryIndexes
+  = SecondaryIndexes { unSecondaryIndexes :: [SecondaryIndex] }
+  deriving (Show)
+
+
 -- | Whether failover vnodes are consulted if one or more primary vnodes fails.
+--
+-- /Default/: true.
 newtype SloppyQuorum
   = SloppyQuorum Bool
 
 instance Default SloppyQuorum where
-  def = coerce False
+  def = coerce True
 
 
 newtype SomeBucketType
@@ -304,9 +302,7 @@ newtype Vtag
 -- /Range/: 1 to @N@.
 newtype W
   = W Quorum
-
-instance Default W where
-  def = coerce QuorumDefault
+  deriving newtype (Default)
 
 
 --------------------------------------------------------------------------------
