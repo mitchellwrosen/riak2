@@ -22,6 +22,9 @@ module Riak
   , storeObject
   , storeObjectHead
   , storeObjectBody
+  , storeNewObject
+  , storeNewObjectHead
+  , storeNewObjectBody
     -- ** Delete object
   , deleteObject
     -- * Data type operations
@@ -368,11 +371,15 @@ storeObject
   => Handle -- ^
   -> BucketType 'Nothing -- ^
   -> Bucket -- ^
-  -> Maybe Key -- ^
+  -> Key -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
-  -> m (Either RpbErrorResp Key)
-storeObject handle type' bucket key content (StoreObjectParams a b c d e f g h i) = (fmap.fmap) fst (_storeObject handle type' bucket key content a b c d e ParamObjectReturnNone f g h i)
+  -> m (Either RpbErrorResp ())
+storeObject
+    handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
+  fmap (() <$)
+    (_storeObject handle type' bucket (Just key) content a b c d e
+      ParamObjectReturnNone f g h i)
 
 -- | Store an object and return its metadata.
 storeObjectHead
@@ -381,11 +388,15 @@ storeObjectHead
   => Handle -- ^
   -> BucketType 'Nothing -- ^
   -> Bucket -- ^
-  -> Maybe Key -- ^
+  -> Key -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
-  -> m (Either RpbErrorResp (Key, NonEmpty (Content (Proxy a))))
-storeObjectHead handle type' bucket key content (StoreObjectParams a b c d e f g h i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnHead f g h i
+  -> m (Either RpbErrorResp (NonEmpty (Content (Proxy a))))
+storeObjectHead
+    handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
+  (fmap.fmap) snd $
+    _storeObject handle type' bucket (Just key) content a b c d e
+      ParamObjectReturnHead f g h i
 
 -- | Store an object and return it.
 storeObjectBody
@@ -394,13 +405,64 @@ storeObjectBody
   => Handle -- ^
   -> BucketType 'Nothing -- ^
   -> Bucket -- ^
-  -> Maybe Key -- ^
+  -> Key -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
-  -> m (Either RpbErrorResp (Key, NonEmpty (Content a)))
-storeObjectBody handle type' bucket key content (StoreObjectParams a b c d e f g h i) = _storeObject handle type' bucket key content a b c d e ParamObjectReturnBody f g h i
+  -> m (Either RpbErrorResp (NonEmpty (Content a)))
+storeObjectBody
+    handle type' bucket key content (StoreObjectParams a b c d e f g h i) =
+  (fmap.fmap) snd $
+  _storeObject handle type' bucket (Just key) content a b c d e
+    ParamObjectReturnBody f g h i
 
--- TODO inline _storeObject in 3 variants?
+-- | Store a new object and return its randomly-generated key.
+storeNewObject
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle -- ^
+  -> BucketType 'Nothing -- ^
+  -> Bucket -- ^
+  -> a -- ^
+  -> StoreObjectParams -- ^
+  -> m (Either RpbErrorResp Key)
+storeNewObject
+    handle type' bucket content (StoreObjectParams a b c d e f g h i) =
+  (fmap.fmap) fst
+    (_storeObject handle type' bucket Nothing content a b c d e
+      ParamObjectReturnNone f g h i)
+
+-- | Store an new object and return its randomly-generated key and metadata.
+storeNewObjectHead
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle -- ^
+  -> BucketType 'Nothing -- ^
+  -> Bucket -- ^
+  -> a -- ^
+  -> StoreObjectParams -- ^
+  -> m (Either RpbErrorResp (Key, Content (Proxy a)))
+storeNewObjectHead
+    handle type' bucket content (StoreObjectParams a b c d e f g h i) =
+  (fmap.fmap.fmap) List1.head $
+    _storeObject handle type' bucket Nothing content a b c d e
+      ParamObjectReturnHead f g h i
+
+-- | Store an new object and return it.
+storeNewObjectBody
+  :: forall a m.
+     (IsContent a, MonadIO m)
+  => Handle -- ^
+  -> BucketType 'Nothing -- ^
+  -> Bucket -- ^
+  -> a -- ^
+  -> StoreObjectParams -- ^
+  -> m (Either RpbErrorResp (Key, Content a))
+storeNewObjectBody
+    handle type' bucket content (StoreObjectParams a b c d e f g h i) =
+  (fmap.fmap.fmap) List1.head $
+    _storeObject handle type' bucket Nothing content a b c d e
+      ParamObjectReturnBody f g h i
+
 _storeObject
   :: forall a m return.
      (IsContent a, MonadIO m)
