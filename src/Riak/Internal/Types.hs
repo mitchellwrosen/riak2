@@ -1,27 +1,23 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies,
              ExistentialQuantification, GADTs, GeneralizedNewtypeDeriving,
-             InstanceSigs, KindSignatures, OverloadedStrings,
-             PatternSynonyms #-}
+             InstanceSigs, KindSignatures, NoImplicitPrelude,
+             OverloadedStrings, PatternSynonyms #-}
 
 -- | Sin-bin of misc. types.
 
 module Riak.Internal.Types where
 
-import Data.ByteString    (ByteString)
 import Data.Default.Class
-import Data.Hashable      (Hashable, hashWithSalt)
-import Data.Int
-import Data.Kind          (Type)
+import Data.Hashable      (hashWithSalt)
 import Data.Text.Encoding (decodeUtf8, decodeUtf8')
-import Data.Word
 import Lens.Labels
-import Prelude            hiding (head, return, (.))
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
 import qualified Data.Text              as Text
 
 import Proto.Riak
+import Riak.Internal.Prelude
 
 
 -- TODO better BucketProps types

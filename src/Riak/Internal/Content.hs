@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
              GeneralizedNewtypeDeriving, InstanceSigs, LambdaCase, MagicHash,
-             MultiParamTypeClasses, OverloadedStrings, PatternSynonyms,
-             TypeFamilies, UndecidableInstances #-}
+             MultiParamTypeClasses, NoImplicitPrelude, OverloadedStrings,
+             PatternSynonyms, TypeFamilies, UndecidableInstances #-}
 
 module Riak.Internal.Content
   ( Charset(..)
@@ -14,19 +14,14 @@ module Riak.Internal.Content
   , IsContent(..)
   ) where
 
-import Control.Exception
-import Control.Monad
 import Data.Bifunctor         (first)
-import Data.ByteString        (ByteString)
-import Data.Text              (Text)
 import Data.Time
-import GHC.Exts               (IsString)
 import Lens.Family2.Unchecked (lens)
 import Lens.Labels
-import Prelude                hiding ((.))
 
 import qualified Data.Text.Encoding as Text
 
+import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 

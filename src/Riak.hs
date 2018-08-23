@@ -1,8 +1,9 @@
 {-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
-             LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
-             PatternSynonyms, RankNTypes, ScopedTypeVariables,
-             StandaloneDeriving, TupleSections, TypeApplications, TypeFamilies,
-             TypeOperators, UndecidableInstances, ViewPatterns #-}
+             LambdaCase, MagicHash, NoImplicitPrelude, OverloadedLabels,
+             OverloadedStrings, PatternSynonyms, RankNTypes,
+             ScopedTypeVariables, StandaloneDeriving, TupleSections,
+             TypeApplications, TypeFamilies, TypeOperators,
+             UndecidableInstances, ViewPatterns #-}
 
 module Riak
   ( -- * Handle
@@ -100,35 +101,12 @@ module Riak
     -- $documentation
   ) where
 
-import Control.Applicative
-import Control.Monad              (when)
-import Control.Monad.IO.Unlift
-import Control.Monad.Trans.Class
-import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
-import Data.ByteString            (ByteString)
-import Data.Coerce                (coerce)
-import Data.Default.Class         (def)
-import Data.Foldable              (toList)
-import Data.Function              (fix)
-import Data.HashMap.Strict        (HashMap)
-import Data.Int                   (Int64)
-import Data.Kind                  (Type)
-import Data.List.NonEmpty         (NonEmpty)
-import Data.Maybe                 (fromMaybe)
-import Data.Pool                  (Pool)
-import Data.Proxy                 (Proxy(Proxy))
-import Data.Set                   (Set)
-import Data.Text                  (Text)
-import Data.Time                  (NominalDiffTime)
-import Data.Time.Clock.POSIX      (posixSecondsToUTCTime)
-import Data.Type.Bool             (If)
-import Data.Word                  (Word64)
+import Data.Default.Class    (def)
+import Data.Pool             (Pool)
+import Data.Time             (NominalDiffTime)
+import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Lens.Labels
-import List.Transformer           (ListT)
-import Network.Socket             (HostName, PortNumber)
-import Prelude                    hiding (head, return, (.))
-import Text.Read                  (readMaybe)
-import UnliftIO.Exception         (finally, throwIO)
+import Network.Socket        (HostName, PortNumber)
 
 import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
@@ -145,6 +123,7 @@ import           Riak.Internal.Content
 import           Riak.Internal.DataTypes
 import           Riak.Internal.Panic
 import           Riak.Internal.Params
+import           Riak.Internal.Prelude
 import           Riak.Internal.Request
 import           Riak.Internal.Response
 import           Riak.Internal.Types
@@ -859,7 +838,7 @@ _updateSet
     ExceptT (updateDataType handle namespace key context op params)
 
   case parseDtUpdateResp @('SetTy a) proxy# value of
-    Left err -> undefined -- TODO _updateSet error handling
+    Left err     -> undefined -- TODO _updateSet error handling
     Right value' -> pure (key', value')
 
  where

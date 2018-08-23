@@ -1,13 +1,12 @@
-{-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses #-}
+{-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses,
+             NoImplicitPrelude #-}
 
 module Riak.Internal.Params where
 
-import Data.ByteString      (ByteString)
-import Data.Coerce          (coerce)
 import Data.Default.Class
-import Data.Word
 import GHC.OverloadedLabels
 
+import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 

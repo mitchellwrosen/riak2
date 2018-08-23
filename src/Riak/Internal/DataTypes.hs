@@ -1,7 +1,8 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleInstances,
              GADTs, GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
-             LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
-             ScopedTypeVariables, StandaloneDeriving, TypeFamilies #-}
+             LambdaCase, MagicHash, NoImplicitPrelude, OverloadedLabels,
+             OverloadedStrings, ScopedTypeVariables, StandaloneDeriving,
+             TypeFamilies #-}
 
 module Riak.Internal.DataTypes
   ( DataTypeError(..)
@@ -15,28 +16,17 @@ module Riak.Internal.DataTypes
   , setRemoveOp
   ) where
 
-import Control.Monad       (unless)
-import Data.Bifunctor      (first)
-import Data.ByteString     (ByteString)
-import Data.DList          (DList)
-import Data.Foldable       (for_)
-import Data.HashMap.Strict (HashMap)
-import Data.Int
-import Data.Set            (Set)
-import Data.Text           (Text)
-import Data.Text.Encoding  (decodeUtf8', encodeUtf8)
-import Data.Traversable    (for)
-import Data.Word
-import GHC.Exts            (Proxy#)
+import Data.Bifunctor     (first)
+import Data.DList         (DList)
+import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 import Lens.Labels
-import Prelude             hiding (head, return, (.))
-import UnliftIO.Exception  (Exception, displayException)
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set            as Set
 import qualified Data.Text           as Text
 
-import Proto.Riak          hiding (SetOp)
+import Proto.Riak            hiding (SetOp)
+import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 

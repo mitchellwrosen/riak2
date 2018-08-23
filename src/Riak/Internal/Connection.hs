@@ -1,5 +1,5 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings, ScopedTypeVariables,
-             ViewPatterns #-}
+{-# LANGUAGE LambdaCase, NoImplicitPrelude, OverloadedStrings,
+             ScopedTypeVariables, ViewPatterns #-}
 
 module Riak.Internal.Connection
   ( Connection
@@ -11,17 +11,9 @@ module Riak.Internal.Connection
   , exchange
   ) where
 
-import Control.Monad
-import Control.Monad.IO.Class  (MonadIO, liftIO)
-import Control.Monad.IO.Unlift
-import Data.Bits               (shiftL, (.|.))
-import Data.ByteString         (ByteString)
-import Data.Int
-import Data.IORef
-import Data.Void
-import Network.Socket          (AddrInfo(..), HostName, PortNumber, Socket,
-                                SocketType(Stream), defaultHints, getAddrInfo)
-import UnliftIO.Exception      (bracket)
+import Data.Bits      (shiftL, (.|.))
+import Network.Socket (AddrInfo(..), HostName, PortNumber, Socket,
+                       SocketType(Stream), defaultHints, getAddrInfo)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
@@ -36,6 +28,7 @@ import Proto.Riak
 import Riak.Internal.Debug
 import Riak.Internal.Message
 import Riak.Internal.Panic
+import Riak.Internal.Prelude
 import Riak.Internal.Request  (Request, requestToMessage)
 import Riak.Internal.Response (Response, parseResponse)
 

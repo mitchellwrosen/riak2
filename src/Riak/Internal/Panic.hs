@@ -1,16 +1,15 @@
 {-# LANGUAGE DeriveAnyClass, DerivingStrategies, ExistentialQuantification,
-             FlexibleInstances, InstanceSigs, TypeFamilies #-}
+             FlexibleInstances, InstanceSigs, NoImplicitPrelude,
+             TypeFamilies #-}
 
 module Riak.Internal.Panic
   ( Panic
   , panic
   ) where
 
-import Control.Monad.IO.Unlift
-import Data.Text               (Text)
-import UnliftIO.Exception      (Exception, throwIO)
-
 import qualified Data.Text as Text
+
+import Riak.Internal.Prelude
 
 data Panic
   = forall a. Panicked a => Panic !Text a

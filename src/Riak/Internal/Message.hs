@@ -1,12 +1,12 @@
-{-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving #-}
+{-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving,
+             NoImplicitPrelude #-}
 
 module Riak.Internal.Message
   ( Message(..)
   , MessageCode(..)
   ) where
 
-import Data.ByteString (ByteString)
-import Data.Word
+import Riak.Internal.Prelude
 
 -- | A 'Message' is a single message sent by both the server and client. On the
 -- wire, it consists of a 4-byte big-endian length, 1-byte message code, and

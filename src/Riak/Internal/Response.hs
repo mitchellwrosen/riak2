@@ -1,5 +1,5 @@
-{-# LANGUAGE DefaultSignatures, OverloadedStrings, ScopedTypeVariables,
-             TypeApplications #-}
+{-# LANGUAGE DefaultSignatures, NoImplicitPrelude, OverloadedStrings,
+             ScopedTypeVariables, TypeApplications #-}
 
 module Riak.Internal.Response
   ( Response
@@ -13,14 +13,12 @@ module Riak.Internal.Response
   , RpbEmptyPutResp(..)
   ) where
 
-import Data.ByteString (ByteString)
-import Data.Word
-
 import qualified Data.ProtoLens as Proto
 
 import Proto.Riak
 import Riak.Internal.Message
 import Riak.Internal.Panic
+import Riak.Internal.Prelude
 
 class Show a => Response a where
   responseCode :: MessageCode a

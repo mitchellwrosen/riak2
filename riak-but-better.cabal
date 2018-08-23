@@ -70,6 +70,7 @@ library
     Riak.Internal.Message
     Riak.Internal.Panic
     Riak.Internal.Params
+    Riak.Internal.Prelude
     Riak.Internal.Request
     Riak.Internal.Response
     Riak.Internal.Types

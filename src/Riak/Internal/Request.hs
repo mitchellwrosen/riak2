@@ -1,4 +1,5 @@
-{-# LANGUAGE DefaultSignatures, ScopedTypeVariables, TypeApplications #-}
+{-# LANGUAGE DefaultSignatures, NoImplicitPrelude, ScopedTypeVariables,
+             TypeApplications #-}
 
 module Riak.Internal.Request
   ( Request
@@ -8,12 +9,11 @@ module Riak.Internal.Request
   , RpbGetServerInfoReq(..)
   ) where
 
-import Data.ByteString (ByteString)
-
 import qualified Data.ProtoLens as Proto
 
 import Proto.Riak
 import Riak.Internal.Message
+import Riak.Internal.Prelude
 
 class Show a => Request a where
   requestCode :: MessageCode a

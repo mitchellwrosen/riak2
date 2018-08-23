@@ -1,4 +1,4 @@
-{-# LANGUAGE RankNTypes, ScopedTypeVariables #-}
+{-# LANGUAGE NoImplicitPrelude, RankNTypes, ScopedTypeVariables #-}
 
 module Riak.Internal.Cache
   ( Cache
@@ -13,6 +13,7 @@ import Control.Concurrent.STM
 import qualified StmContainers.Map as STM (Map)
 import qualified StmContainers.Map as STMMap
 
+import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 newtype Cache
