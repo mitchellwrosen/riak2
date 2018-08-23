@@ -21,6 +21,7 @@ library
     , bytestring ^>= 0.10.8
     , containers
     , data-default-class
+    , dlist
     , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
     , lens-labels ^>= 0.2.0

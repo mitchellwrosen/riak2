@@ -1,5 +1,6 @@
-{-# LANGUAGE StandaloneDeriving, GADTs, DataKinds, DeriveAnyClass, DerivingStrategies, KindSignatures,
-             LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
+{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, GADTs,
+             GeneralizedNewtypeDeriving, KindSignatures, LambdaCase, MagicHash,
+             OverloadedLabels, OverloadedStrings, StandaloneDeriving,
              TypeFamilies #-}
 
 module Riak.Internal.DataTypes
@@ -8,9 +9,13 @@ module Riak.Internal.DataTypes
   , DataTypeVal
   , IsDataType(..)
   , MapValue(..)
+  , SetOp(..)
+  , setAddOp
+  , setRemoveOp
   ) where
 
 import Data.ByteString     (ByteString)
+import Data.DList          (DList)
 import Data.HashMap.Strict (HashMap)
 import Data.Int
 import Data.Set            (Set)
@@ -24,7 +29,7 @@ import UnliftIO.Exception  (Exception)
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set            as Set
 
-import Proto.Riak
+import Proto.Riak hiding (SetOp)
 import Riak.Internal.Types
 
 
@@ -145,6 +150,19 @@ data MapValue
   | MapValueRegister ByteString
   | MapValueSet (Set ByteString)
   deriving (Show)
+
+
+newtype SetOp
+  = SetOp (DList ByteString, DList ByteString)
+  deriving newtype (Monoid, Semigroup)
+
+setAddOp :: ByteString -> SetOp
+setAddOp bytes =
+  SetOp (pure bytes, mempty)
+
+setRemoveOp :: ByteString -> SetOp
+setRemoveOp bytes =
+  SetOp (mempty, pure bytes)
 
 
 -- | A 'DataTypeError' is thrown when a data type operation is performed on an

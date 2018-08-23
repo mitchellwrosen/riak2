@@ -1,8 +1,8 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, FlexibleInstances, LambdaCase,
-             MagicHash, OverloadedLabels, OverloadedStrings, PatternSynonyms,
-             RankNTypes, ScopedTypeVariables, StandaloneDeriving,
-             TupleSections, TypeApplications, TypeFamilies, TypeOperators,
-             UndecidableInstances, ViewPatterns #-}
+{-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
+             LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
+             PatternSynonyms, RankNTypes, ScopedTypeVariables,
+             StandaloneDeriving, TupleSections, TypeApplications, TypeFamilies,
+             TypeOperators, UndecidableInstances, ViewPatterns #-}
 
 module Riak
   ( -- * Riak handle
@@ -36,6 +36,9 @@ module Riak
   , fetchHyperLogLog
     -- ** Set
   , fetchSet
+  , updateSet
+  , setAddOp
+  , setRemoveOp
     -- ** Map
   , fetchMap
     -- ** Unknown
@@ -86,6 +89,7 @@ module Riak
   , pattern QuorumAll
   , pattern QuorumQuorum
   , SecondaryIndex(..)
+  , SetOp
   , StoreObjectParams
   , UpdateDataTypeParams
   , TTL(..)
@@ -105,6 +109,7 @@ import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
 import Data.ByteString            (ByteString)
 import Data.Coerce                (coerce)
 import Data.Default.Class         (def)
+import Data.Foldable              (toList)
 import Data.Function              (fix)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int                   (Int64)
@@ -130,9 +135,11 @@ import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.HashMap.Strict   as HashMap
 import qualified Data.List.NonEmpty    as List1
+import qualified Data.Set              as Set
 import qualified List.Transformer      as ListT
 
-import           Proto.Riak
+import           Proto.Riak               hiding (SetOp)
+import qualified Proto.Riak               as Proto
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Connection
 import           Riak.Internal.Content
@@ -752,20 +759,9 @@ _updateCounter
   -> Int64
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp (Key, Int64))
-_updateCounter handle namespace key incr params = liftIO . runExceptT $ do
-  response :: DtUpdateResp <-
-    ExceptT (updateDataType handle namespace key op params)
-
-  theKey :: Key <-
-    maybe
-      (maybe
-        (panic "missing key" ("response", response))
-        pure
-        (coerce (response ^. #maybe'key)))
-      pure
-      key
-
-  pure (theKey, response ^. #counterValue)
+_updateCounter handle namespace key incr params =
+  (fmap.fmap.fmap) (view #counterValue)
+    (updateDataType handle namespace key Nothing op params)
 
  where
   op :: DtOp
@@ -779,19 +775,124 @@ _updateCounter handle namespace key incr params = liftIO . runExceptT $ do
       , _DtOp'setOp          = Nothing
       }
 
+
+updateSet
+  :: MonadIO m
+  => Handle
+  -> Location ('Just 'SetTy)
+  -> SetOp
+  -> UpdateDataTypeParams
+  -> m (Either RpbErrorResp (Set ByteString))
+updateSet handle (Location namespace key) op params =
+  (fmap.fmap) snd (_updateSet handle namespace (Just key) op params)
+
+_updateSet
+  :: MonadIO m
+  => Handle
+  -> Namespace ('Just 'SetTy)
+  -> Maybe Key
+  -> SetOp
+  -> UpdateDataTypeParams
+  -> m (Either RpbErrorResp (Key, Set ByteString))
+_updateSet
+    handle@(Handle _ cache) namespace key (unSetOp -> (adds, removes))
+    params = liftIO . runExceptT $ do
+
+  -- Be a good citizen and perhaps include the cached causal context with this
+  -- update request.
+  --
+  -- (1) If the set definitely doesn't already exist, no context is required.
+  --
+  -- (2) If the set might exist but we aren't attempting any removes, no
+  --     context is required.
+  --
+  -- (3) If the set might exist and we are attempting at least one remove, a
+  --     context is required (more like "recommended").
+  --
+  --     (a) If we have one cached, hooray.
+  --
+  --     (b) If we don't have one cached, perform a quick fetch first. Note that
+  --         we won't get a context if the set doesn't exist - this would mean
+  --         we are attempting to remove something from an empty set. That is
+  --         weird, so I'm okay with not passing in a context in this situation
+  --         (we don't have one to pass, anyway).
+
+  context :: Maybe Vclock <-
+    case key of
+      -- (1)
+      Nothing ->
+        pure Nothing
+
+      Just key' ->
+        let
+          loc :: Location ('Just 'SetTy)
+          loc =
+            Location namespace key'
+        in do
+          context :: Maybe Vclock <-
+            lift (vclockCacheLookup cache loc)
+
+          if null removes
+            then
+              -- (2)
+              pure context
+
+            else
+              case context of
+                -- (3b)
+                Nothing -> do
+                  _ <- ExceptT (fetchSet handle loc def)
+                  lift (vclockCacheLookup cache loc)
+
+                -- (3a)
+                Just context' ->
+                  pure (Just context')
+
+  (fmap.fmap) (Set.fromList . view #setValue)
+    (ExceptT (updateDataType handle namespace key context op params))
+
+ where
+  op :: DtOp
+  op =
+    DtOp
+      { _DtOp'_unknownFields = []
+      , _DtOp'counterOp      = Nothing
+      , _DtOp'gsetOp         = Nothing
+      , _DtOp'hllOp          = Nothing
+      , _DtOp'mapOp          = Nothing
+      , _DtOp'setOp          = Just (Proto.SetOp adds removes [])
+      }
+
 updateDataType
   :: MonadIO m
   => Handle
   -> Namespace ('Just ty)
   -> Maybe Key
+  -> Maybe Vclock
   -> DtOp
   -> UpdateDataTypeParams
-  -> m (Either RpbErrorResp DtUpdateResp)
+  -> m (Either RpbErrorResp (Key, DtUpdateResp))
 updateDataType
-    (Handle conn _) (Namespace type' bucket) key op
-    (UpdateDataTypeParams dw n pw return_body sloppy_quorum timeout w) = do
+    (Handle conn _) (Namespace type' bucket) key context op
+    (UpdateDataTypeParams dw n pw return_body sloppy_quorum timeout w) =
+    liftIO . runExceptT $ do
 
-  liftIO (Internal.updateDataType conn request)
+  response :: DtUpdateResp <-
+    ExceptT (Internal.updateDataType conn request)
+
+  theKey :: Key <-
+    maybe
+      (maybe
+        (panic "missing key"
+          ( ( "request" , request  )
+          , ( "response", response )
+          ))
+        pure
+        (coerce (response ^. #maybe'key)))
+      pure
+      key
+
+  pure (theKey, response)
 
  where
   request :: DtUpdateReq
@@ -799,7 +900,7 @@ updateDataType
     DtUpdateReq
       { _DtUpdateReq'_unknownFields = []
       , _DtUpdateReq'bucket         = unBucket bucket
-      , _DtUpdateReq'context        = Nothing
+      , _DtUpdateReq'context        = coerce context
       , _DtUpdateReq'dw             = coerce dw
       , _DtUpdateReq'includeContext = Nothing
       , _DtUpdateReq'key            = coerce key
@@ -1169,6 +1270,11 @@ rpbPair (k, v) =
 unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)
 unRpbPair (RpbPair k v _) =
   (k, v)
+
+unSetOp :: SetOp -> ([ByteString], [ByteString])
+unSetOp (SetOp (adds, removes)) =
+  (toList adds, toList removes)
+
 
 -- $documentation
 --
