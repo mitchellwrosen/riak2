@@ -2,13 +2,13 @@
              ScopedTypeVariables, ViewPatterns #-}
 
 module Riak.Internal.Connection
-  ( Connection
-  , withConnection
-  , connect
-  , disconnect
-  , send
-  , recv
-  , exchange
+  ( RiakConnection
+  , withRiakConnection
+  , riakConnect
+  , riakDisconnect
+  , riakSend
+  , riakRecv
+  , riakExchange
   ) where
 
 import Data.Bits      (shiftL, (.|.))
@@ -33,23 +33,23 @@ import Riak.Internal.Request  (Request, requestToMessage)
 import Riak.Internal.Response (Response, parseResponse)
 
 -- | A non-thread-safe connection to Riak.
-data Connection
-  = Connection
+data RiakConnection
+  = RiakConnection
       !Socket                         -- Server socket
       !(IORef (Q.ByteString IO Void)) -- Infinite input from server
       (Lazy.ByteString -> IO ())      -- Send bytes to server
 
-withConnection
+withRiakConnection
   :: MonadUnliftIO m
   => HostName
   -> PortNumber
-  -> (Connection -> m a)
+  -> (RiakConnection -> m a)
   -> m a
-withConnection host port =
-  bracket (connect host port) disconnect
+withRiakConnection host port =
+  bracket (riakConnect host port) riakDisconnect
 
-connect :: MonadIO m => HostName -> PortNumber -> m Connection
-connect host port = liftIO $ do
+riakConnect :: MonadIO m => HostName -> PortNumber -> m RiakConnection
+riakConnect host port = liftIO $ do
   info : _ <-
     let
       hints =
@@ -81,15 +81,15 @@ connect host port = liftIO $ do
     sink =
       Socket.sendAll socket
 
-  pure (Connection socket sourceRef sink)
+  pure (RiakConnection socket sourceRef sink)
 
-disconnect :: MonadIO m => Connection -> m ()
-disconnect (Connection socket _ _) =
+riakDisconnect :: MonadIO m => RiakConnection -> m ()
+riakDisconnect (RiakConnection socket _ _) =
   liftIO (Socket.close socket)
 
 -- | Send a 'Message' on a 'Connection'.
-send :: Request a => Connection -> a -> IO ()
-send (Connection _ _ sink) (requestToMessage -> Message code bytes) =
+riakSend :: Request a => RiakConnection -> a -> IO ()
+riakSend (RiakConnection _ _ sink) (requestToMessage -> Message code bytes) =
   sink payload
  where
   payload :: Lazy.ByteString
@@ -100,8 +100,8 @@ send (Connection _ _ sink) (requestToMessage -> Message code bytes) =
         <> Builder.byteString bytes)
 
 -- | Receive a 'Message' on a 'Connection'.
-recv :: Connection -> IO Message
-recv (Connection _ sourceRef _) = do
+riakRecv :: RiakConnection -> IO Message
+riakRecv (RiakConnection _ sourceRef _) = do
   source0 :: Q.ByteString IO Void <-
     readIORef sourceRef
 
@@ -125,15 +125,15 @@ recv (Connection _ sourceRef _) = do
 
       pure (Message code mempty)
 
-exchange
+riakExchange
   :: (Request a, Response b)
-  => Connection
+  => RiakConnection
   -> a
   -> IO (Either RpbErrorResp b)
-exchange conn req = do
+riakExchange conn req = do
   debug (">>> " ++ show req)
-  send conn req
-  resp <- parseResponse =<< recv conn
+  riakSend conn req
+  resp <- parseResponse =<< riakRecv conn
   debug ("<<< " ++ show resp)
   pure resp
 

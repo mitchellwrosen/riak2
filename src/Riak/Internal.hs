@@ -1,72 +1,72 @@
 module Riak.Internal
-  ( Connection
-  , withConnection
-  , deleteObject
-  , fetchDataType
-  , fetchObject
-  , getBucketProps
-  , getBucketTypeProps
-  , getIndex
-  , storeObject
-  , updateDataType
+  ( RiakConnection
+  , withRiakConnection
+  , deleteRiakObject
+  , fetchRiakDataType
+  , fetchRiakObject
+  , getRiakBucketProps
+  , getRiakBucketTypeProps
+  , getRiakIndex
+  , storeRiakObject
+  , updateRiakDataType
   ) where
 
 import Proto.Riak
 import Riak.Internal.Connection
 import Riak.Internal.Response
 
-deleteObject
-  :: Connection
+deleteRiakObject
+  :: RiakConnection
   -> RpbDelReq
   -> IO (Either RpbErrorResp RpbDelResp)
-deleteObject =
-  exchange
+deleteRiakObject =
+  riakExchange
 
-fetchDataType
-  :: Connection
+fetchRiakDataType
+  :: RiakConnection
   -> DtFetchReq
   -> IO (Either RpbErrorResp DtFetchResp)
-fetchDataType
-  = exchange
+fetchRiakDataType
+  = riakExchange
 
-fetchObject
-  :: Connection
+fetchRiakObject
+  :: RiakConnection
   -> RpbGetReq
   -> IO (Either RpbErrorResp RpbGetResp)
-fetchObject =
-  exchange
+fetchRiakObject =
+  riakExchange
 
-getBucketProps
-  :: Connection
+getRiakBucketProps
+  :: RiakConnection
   -> RpbGetBucketReq
   -> IO (Either RpbErrorResp RpbGetBucketResp)
-getBucketProps =
-  exchange
+getRiakBucketProps =
+  riakExchange
 
-getBucketTypeProps
-  :: Connection
+getRiakBucketTypeProps
+  :: RiakConnection
   -> RpbGetBucketTypeReq
   -> IO (Either RpbErrorResp RpbGetBucketResp)
-getBucketTypeProps =
-  exchange
+getRiakBucketTypeProps =
+  riakExchange
 
-getIndex
-  :: Connection
+getRiakIndex
+  :: RiakConnection
   -> RpbYokozunaIndexGetReq
   -> IO (Either RpbErrorResp RpbYokozunaIndexGetResp)
-getIndex =
-  exchange
+getRiakIndex =
+  riakExchange
 
-storeObject
-  :: Connection
+storeRiakObject
+  :: RiakConnection
   -> RpbPutReq
   -> IO (Either RpbErrorResp RpbPutResp)
-storeObject =
-  exchange
+storeRiakObject =
+  riakExchange
 
-updateDataType
-  :: Connection
+updateRiakDataType
+  :: RiakConnection
   -> DtUpdateReq
   -> IO (Either RpbErrorResp DtUpdateResp)
-updateDataType =
-  exchange
+updateRiakDataType =
+  riakExchange

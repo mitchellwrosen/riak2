@@ -5,13 +5,13 @@
 
 module Riak.Internal.Content
   ( Charset(..)
-  , Content(..)
+  , RiakContent(..)
   , ContentEncoding(..)
   , pattern ContentEncodingNone
   , ContentType(..)
   , pattern ContentTypeApplicationOctetStream
   , pattern ContentTypeTextPlain
-  , IsContent(..)
+  , IsRiakContent(..)
   ) where
 
 import Data.Bifunctor         (first)
@@ -26,38 +26,38 @@ import Riak.Internal.Types
 
 
 -- TODO add back content type, charset, content encoding
-data Content a
-  = Content
-      !(Location 'Nothing)
-      a                -- Value
-      (Maybe Vtag)     -- Vtag
-      (Maybe UTCTime)  -- Last modified
-      Metadata         -- User metadata
-      [SecondaryIndex] -- Secondary indexes
-      Bool             -- Deleted
-      TTL              -- TTL
+data RiakContent a
+  = RiakContent
+      !(RiakLocation 'Nothing)
+      a                    -- Value
+      (Maybe RiakVtag)     -- Vtag
+      (Maybe UTCTime)      -- Last modified
+      RiakMetadata         -- User metadata
+      [RiakSecondaryIndex] -- Secondary indexes
+      Bool                 -- Deleted
+      TTL                  -- TTL
   deriving (Show)
 
 instance {-# OVERLAPPABLE #-}
-    ( HasLens' f (Content s) x a
+    ( HasLens' f (RiakContent s) x a
     , s ~ t
     , a ~ b
-    ) => HasLens f (Content s) (Content t) x a b where
+    ) => HasLens f (RiakContent s) (RiakContent t) x a b where
   lensOf = lensOf'
 
 -- TODO content lenses for location, namespace, type, bucket, key
 
-instance Functor f => HasLens' f (Content a)             "location" (Location 'Nothing)     where lensOf' _ = lens (\(Content x _ _ _ _ _ _ _) -> x) (\(Content _ b c d e f g h) x -> Content x b c d e f g h)
-instance Functor f => HasLens  f (Content a) (Content b) "value"    a                     b where lensOf  _ = lens (\(Content _ x _ _ _ _ _ _) -> x) (\(Content a _ c d e f g h) x -> Content a x c d e f g h)
-instance Functor f => HasLens' f (Content a)             "vtag"     (Maybe Vtag)            where lensOf' _ = lens (\(Content _ _ x _ _ _ _ _) -> x) (\(Content a b _ d e f g h) x -> Content a b x d e f g h)
-instance Functor f => HasLens' f (Content a)             "lastMod"  (Maybe UTCTime)         where lensOf' _ = lens (\(Content _ _ _ x _ _ _ _) -> x) (\(Content a b c _ e f g h) x -> Content a b c x e f g h)
-instance Functor f => HasLens' f (Content a)             "usermeta" Metadata                where lensOf' _ = lens (\(Content _ _ _ _ x _ _ _) -> x) (\(Content a b c d _ f g h) x -> Content a b c d x f g h)
-instance Functor f => HasLens' f (Content a)             "indexes"  [SecondaryIndex]        where lensOf' _ = lens (\(Content _ _ _ _ _ x _ _) -> x) (\(Content a b c d e _ g h) x -> Content a b c d e x g h)
-instance Functor f => HasLens' f (Content a)             "deleted"  Bool                    where lensOf' _ = lens (\(Content _ _ _ _ _ _ x _) -> x) (\(Content a b c d e f _ h) x -> Content a b c d e f x h)
-instance Functor f => HasLens' f (Content a)             "ttl"      TTL                     where lensOf' _ = lens (\(Content _ _ _ _ _ _ _ x) -> x) (\(Content a b c d e f g _) x -> Content a b c d e f g x)
+instance Functor f => HasLens' f (RiakContent a)                 "location" (RiakLocation 'Nothing)   where lensOf' _ = lens (\(RiakContent x _ _ _ _ _ _ _) -> x) (\(RiakContent _ b c d e f g h) x -> RiakContent x b c d e f g h)
+instance Functor f => HasLens  f (RiakContent a) (RiakContent b) "value"    a                       b where lensOf  _ = lens (\(RiakContent _ x _ _ _ _ _ _) -> x) (\(RiakContent a _ c d e f g h) x -> RiakContent a x c d e f g h)
+instance Functor f => HasLens' f (RiakContent a)                 "vtag"     (Maybe RiakVtag)          where lensOf' _ = lens (\(RiakContent _ _ x _ _ _ _ _) -> x) (\(RiakContent a b _ d e f g h) x -> RiakContent a b x d e f g h)
+instance Functor f => HasLens' f (RiakContent a)                 "lastMod"  (Maybe UTCTime)           where lensOf' _ = lens (\(RiakContent _ _ _ x _ _ _ _) -> x) (\(RiakContent a b c _ e f g h) x -> RiakContent a b c x e f g h)
+instance Functor f => HasLens' f (RiakContent a)                 "usermeta" RiakMetadata              where lensOf' _ = lens (\(RiakContent _ _ _ _ x _ _ _) -> x) (\(RiakContent a b c d _ f g h) x -> RiakContent a b c d x f g h)
+instance Functor f => HasLens' f (RiakContent a)                 "indexes"  [RiakSecondaryIndex]      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ x _ _) -> x) (\(RiakContent a b c d e _ g h) x -> RiakContent a b c d e x g h)
+instance Functor f => HasLens' f (RiakContent a)                 "deleted"  Bool                      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ x _) -> x) (\(RiakContent a b c d e f _ h) x -> RiakContent a b c d e f x h)
+instance Functor f => HasLens' f (RiakContent a)                 "ttl"      TTL                       where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ x) -> x) (\(RiakContent a b c d e f g _) x -> RiakContent a b c d e f g x)
 
 
-class IsContent a where
+class IsRiakContent a where
   contentEncode :: a -> (ContentType, Charset, ContentEncoding, ByteString)
 
   contentDecode
@@ -67,7 +67,7 @@ class IsContent a where
     -> ByteString
     -> Either SomeException a
 
-instance IsContent ByteString where
+instance IsRiakContent ByteString where
   contentEncode
     :: ByteString
     -> (ContentType, Charset, ContentEncoding, ByteString)
@@ -87,7 +87,7 @@ instance IsContent ByteString where
   contentDecode _ _ _ =
     Right
 
-instance IsContent Text where
+instance IsRiakContent Text where
   contentEncode :: Text -> (ContentType, Charset, ContentEncoding, ByteString)
   contentEncode bytes =
     ( ContentTypeTextPlain

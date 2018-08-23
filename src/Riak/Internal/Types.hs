@@ -21,8 +21,8 @@ import Riak.Internal.Prelude
 
 
 -- TODO better BucketProps types
-data BucketProps
-  = BucketProps
+data RiakBucketProps
+  = RiakBucketProps
       !(Maybe Word32)                     -- n
       !(Maybe Bool)                       -- allow_mult
       !(Maybe Bool)                       -- last_write_wins
@@ -55,79 +55,79 @@ data BucketProps
 -- | A Riak bucket type, tagged with the data type it contains.
 --
 -- /Note/: Must be UTF-8 encoded.
-newtype BucketType (ty :: Maybe DataTypeTy)
-  = BucketType { unBucketType :: ByteString }
+newtype RiakBucketType (ty :: Maybe RiakDataTypeTy)
+  = RiakBucketType { unRiakBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
-instance Show (BucketType ty) where
-  show :: BucketType ty -> String
+instance Show (RiakBucketType ty) where
+  show :: RiakBucketType ty -> String
   show =
-    Text.unpack . decodeUtf8 . unBucketType
+    Text.unpack . decodeUtf8 . unRiakBucketType
 
-pattern BucketTypeDefault :: BucketType 'Nothing
-pattern BucketTypeDefault =
-  BucketType "default"
+pattern RiakBucketTypeDefault :: RiakBucketType 'Nothing
+pattern RiakBucketTypeDefault =
+  RiakBucketType "default"
 
 
 -- | A Riak bucket.
-newtype Bucket
-  = Bucket { unBucket :: ByteString }
+newtype RiakBucket
+  = RiakBucket { unRiakBucket :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
-instance Show Bucket where
-  show :: Bucket -> String
-  show (Bucket bucket) =
+instance Show RiakBucket where
+  show :: RiakBucket -> String
+  show (RiakBucket bucket) =
     either
       (const (Latin1.unpack (Base64.encode bucket)))
       Text.unpack
       (decodeUtf8' bucket)
 
 
-data DataTypeTy
-  = CounterTy
-  | GrowOnlySetTy -- TODO better GrowOnlySetTy
-  | HyperLogLogTy
-  | MapTy -- TODO better MapTy
-  | forall a. SetTy a
+data RiakDataTypeTy
+  = RiakCounterTy
+  | RiakGrowOnlySetTy -- TODO better GrowOnlySetTy
+  | RiakHyperLogLogTy
+  | RiakMapTy -- TODO better MapTy
+  | forall a. RiakSetTy a
 
 
 -- | A Solr index name.
-newtype IndexName
-  = IndexName { unIndexName :: ByteString }
+newtype RiakIndexName
+  = RiakIndexName { unRiakIndexName :: ByteString }
 
 
 -- | A Riak key.
-newtype Key
-  = Key { unKey :: ByteString }
+newtype RiakKey
+  = RiakKey { unRiakKey :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
-instance Show Key where
-  show :: Key -> String
-  show (Key key) =
+instance Show RiakKey where
+  show :: RiakKey -> String
+  show (RiakKey key) =
     either
       (const (Latin1.unpack (Base64.encode key)))
       Text.unpack
       (decodeUtf8' key)
 
 
-data Location (ty :: Maybe DataTypeTy)
-  = Location !(Namespace ty) Key
+data RiakLocation (ty :: Maybe RiakDataTypeTy)
+  = RiakLocation !(RiakNamespace ty) !RiakKey
   deriving stock (Eq, Show)
 
-instance Hashable (Location ty) where
-  hashWithSalt salt (Location namespace key) =
+instance Hashable (RiakLocation ty) where
+  hashWithSalt salt (RiakLocation namespace key) =
     salt `hashWithSalt` namespace `hashWithSalt` key
 
 
-newtype Metadata
-  = Metadata { unMetadata :: [(ByteString, Maybe ByteString)] }
+newtype RiakMetadata
+  = RiakMetadata { unRiakMetadata :: [(ByteString, Maybe ByteString)] }
   deriving (Show)
 
 
@@ -136,12 +136,12 @@ data Modified a
   | Modified a
 
 
-data Namespace (ty :: Maybe DataTypeTy)
-  = Namespace !(BucketType ty) !Bucket
+data RiakNamespace (ty :: Maybe RiakDataTypeTy)
+  = RiakNamespace !(RiakBucketType ty) !RiakBucket
   deriving stock (Eq, Show)
 
-instance Hashable (Namespace ty) where
-  hashWithSalt salt (Namespace type' bucket) =
+instance Hashable (RiakNamespace ty) where
+  hashWithSalt salt (RiakNamespace type' bucket) =
     salt `hashWithSalt` type' `hashWithSalt` bucket
 
 
@@ -152,22 +152,22 @@ data ObjectReturn
 
 
 -- | How many vnodes must respond before an operation is considered successful.
--- May be a number @<= N@, 'QuorumQuorum', or 'QuorumAll'.
-newtype Quorum
-  = Quorum { unQuorum :: Word32 }
+-- May be a number @<= N@, 'RiakQuorumQuorum', or 'RiakQuorumAll'.
+newtype RiakQuorum
+  = RiakQuorum { unRiakQuorum :: Word32 }
   deriving stock (Eq)
   deriving newtype (Num)
 
-instance Default Quorum where
+instance Default RiakQuorum where
   def = 4294967291
 
 -- | All vnodes must respond.
-pattern QuorumAll :: Quorum
-pattern QuorumAll = 4294967292
+pattern RiakQuorumAll :: RiakQuorum
+pattern RiakQuorumAll = 4294967292
 
 -- | A majority of the vnodes must respond.
-pattern QuorumQuorum :: Quorum
-pattern QuorumQuorum = 4294967293
+pattern RiakQuorumQuorum :: RiakQuorum
+pattern RiakQuorumQuorum = 4294967293
 
 
 data SBool :: Bool -> Type where
@@ -175,28 +175,24 @@ data SBool :: Bool -> Type where
   SFalse :: SBool 'False
 
 
-data SecondaryIndex
-  = SecondaryIndexInt !ByteString !Int64
-  | SecondaryIndexBin !ByteString !ByteString
+data RiakSecondaryIndex
+  = RiakSecondaryIndexInt !ByteString !Int64
+  | RiakSecondaryIndexBin !ByteString !ByteString
   deriving (Show)
 
 
-newtype SecondaryIndexes
-  = SecondaryIndexes { unSecondaryIndexes :: [SecondaryIndex] }
-  deriving (Show)
+data SomeRiakLocation where
+  SomeRiakLocation :: RiakLocation ty -> SomeRiakLocation
 
-
-data SomeLocation where
-  SomeLocation :: Location ty -> SomeLocation
-instance Eq SomeLocation where
-  SomeLocation loc1 == SomeLocation loc2 =
+instance Eq SomeRiakLocation where
+  SomeRiakLocation loc1 == SomeRiakLocation loc2 =
     type1 == type2 && bucket1 == bucket2 && key1 == key2
    where
-    Location (Namespace (BucketType type1) bucket1) key1 = loc1
-    Location (Namespace (BucketType type2) bucket2) key2 = loc2
+    RiakLocation (RiakNamespace (RiakBucketType type1) bucket1) key1 = loc1
+    RiakLocation (RiakNamespace (RiakBucketType type2) bucket2) key2 = loc2
 
-instance Hashable SomeLocation where
-  hashWithSalt salt (SomeLocation loc) =
+instance Hashable SomeRiakLocation where
+  hashWithSalt salt (SomeRiakLocation loc) =
     hashWithSalt salt loc
 
 
@@ -205,17 +201,17 @@ newtype TTL
   deriving Show
 
 
-newtype Vclock
-  = Vclock { unVclock :: ByteString }
+newtype RiakVclock
+  = RiakVclock { unRiakVclock :: ByteString }
 
-instance Show Vclock where
-  show :: Vclock -> String
+instance Show RiakVclock where
+  show :: RiakVclock -> String
   show =
-    show . Base64.encode . unVclock
+    show . Base64.encode . unRiakVclock
 
 
-newtype Vtag
-  = Vtag { unVtag :: ByteString }
+newtype RiakVtag
+  = RiakVtag { unRiakVtag :: ByteString }
   deriving (Show)
 
 

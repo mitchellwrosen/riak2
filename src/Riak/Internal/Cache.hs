@@ -17,21 +17,21 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 newtype Cache
-  = Cache (STM.Map SomeLocation Vclock)
+  = Cache (STM.Map SomeRiakLocation RiakVclock)
 
 
 newCache :: IO Cache
 newCache =
   Cache <$> STMMap.newIO
 
-cacheLookup :: Cache -> Location ty -> IO (Maybe Vclock)
+cacheLookup :: Cache -> RiakLocation ty -> IO (Maybe RiakVclock)
 cacheLookup (Cache cache) loc =
-  atomically (STMMap.lookup (SomeLocation loc) cache)
+  atomically (STMMap.lookup (SomeRiakLocation loc) cache)
 
-cacheInsert :: Cache -> Location ty -> Vclock -> IO ()
+cacheInsert :: Cache -> RiakLocation ty -> RiakVclock -> IO ()
 cacheInsert (Cache cache) loc vclock =
-  atomically (STMMap.insert vclock (SomeLocation loc) cache)
+  atomically (STMMap.insert vclock (SomeRiakLocation loc) cache)
 
-cacheDelete :: Cache -> Location ty -> IO ()
+cacheDelete :: Cache -> RiakLocation ty -> IO ()
 cacheDelete (Cache cache) loc =
-  atomically (STMMap.delete (SomeLocation loc) cache)
+  atomically (STMMap.delete (SomeRiakLocation loc) cache)
