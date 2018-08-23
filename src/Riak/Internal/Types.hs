@@ -6,15 +6,15 @@
 
 module Riak.Internal.Types where
 
-import Data.ByteString    (ByteString)
+import Data.ByteString     (ByteString)
 import Data.Default.Class
-import Data.Hashable      (Hashable)
+import Data.Hashable       (Hashable)
 import Data.Int
-import Data.Kind          (Type)
-import Data.Text.Encoding (decodeUtf8)
+import Data.Kind           (Type)
+import Data.Text.Encoding  (decodeUtf8)
 import Data.Word
 import Lens.Labels
-import Prelude            hiding (head, return, (.))
+import Prelude             hiding (head, return, (.))
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.Text              as Text
@@ -77,15 +77,6 @@ instance Show Key where
   show :: Key -> String
   show =
     Text.unpack . decodeUtf8 . unKey
-
-
-data MapValue
-  = MapValueCounter Int64
-  | MapValueFlag Bool
-  | MapValueMap [(ByteString, MapValue)]
-  | MapValueRegister ByteString
-  | MapValueSet [ByteString]
-  deriving (Show)
 
 
 newtype Metadata

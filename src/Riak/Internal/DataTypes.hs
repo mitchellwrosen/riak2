@@ -1,22 +1,28 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, KindSignatures,
              LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
-             TupleSections, TypeFamilies #-}
+             TypeFamilies #-}
 
 module Riak.Internal.DataTypes
   ( DataType(..)
   , DataTypeError(..)
   , DataTypeVal
   , IsDataType(..)
+  , MapValue(..)
   ) where
 
-import Data.ByteString    (ByteString)
+import Data.ByteString     (ByteString)
+import Data.HashMap.Strict (HashMap)
 import Data.Int
-import Data.Text          (Text)
+import Data.Set            (Set)
+import Data.Text           (Text)
 import Data.Word
-import GHC.Exts           (Proxy#)
+import GHC.Exts            (Proxy#)
 import Lens.Labels
-import Prelude            hiding (head, return, (.))
-import UnliftIO.Exception (Exception)
+import Prelude             hiding (head, return, (.))
+import UnliftIO.Exception  (Exception)
+
+import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Set            as Set
 
 import Proto.Riak
 import Riak.Internal.Types
@@ -24,10 +30,10 @@ import Riak.Internal.Types
 
 type family DataTypeVal (ty :: DataTypeTy) where
   DataTypeVal 'CounterTy     = Int64
-  DataTypeVal 'GrowOnlySetTy = [ByteString]
+  DataTypeVal 'GrowOnlySetTy = Set ByteString
   DataTypeVal 'HyperLogLogTy = Word64
-  DataTypeVal 'MapTy         = [(ByteString, MapValue)]
-  DataTypeVal 'SetTy         = [ByteString]
+  DataTypeVal 'MapTy         = HashMap ByteString MapValue
+  DataTypeVal 'SetTy         = Set ByteString
 
 
 class IsDataType (ty :: DataTypeTy) where
@@ -57,7 +63,7 @@ instance IsDataType 'GrowOnlySetTy where
     x -> Left ("expected gset but found " <> dataTypeToText x)
 
   toDataType _ =
-    DataTypeGrowOnlySet . view #gsetValue
+    DataTypeGrowOnlySet . Set.fromList . view #gsetValue
 
 instance IsDataType 'HyperLogLogTy where
   fetchRespTy _ =
@@ -79,15 +85,15 @@ instance IsDataType 'MapTy where
     x -> Left ("expected map but found " <> dataTypeToText x)
 
   toDataType _ =
-    DataTypeMap . map mapEntryToPair . view #mapValue
+    DataTypeMap . foldMap mapEntryToPair . view #mapValue
    where
-    mapEntryToPair :: MapEntry -> (ByteString, MapValue)
+    mapEntryToPair :: MapEntry -> HashMap ByteString MapValue
     mapEntryToPair entry =
       let
         MapField k ty _ =
           entry ^. #field
       in
-        (k ,) $
+        HashMap.singleton k $
           case ty of
             MapField'COUNTER ->
               MapValueCounter (entry ^. #counterValue)
@@ -96,13 +102,13 @@ instance IsDataType 'MapTy where
               MapValueFlag (entry ^. #flagValue)
 
             MapField'MAP ->
-              MapValueMap (map mapEntryToPair (entry ^. #mapValue))
+              MapValueMap (foldMap mapEntryToPair (entry ^. #mapValue))
 
             MapField'REGISTER ->
               MapValueRegister (entry ^. #registerValue)
 
             MapField'SET ->
-              MapValueSet (entry ^. #setValue)
+              MapValueSet (Set.fromList (entry ^. #setValue))
 
 instance IsDataType 'SetTy where
   fetchRespTy _ =
@@ -113,15 +119,15 @@ instance IsDataType 'SetTy where
     x -> Left ("expected set but found " <> dataTypeToText x)
 
   toDataType _ =
-    DataTypeSet . view #setValue
+    DataTypeSet . Set.fromList . view #setValue
 
 
 data DataType
   = DataTypeCounter Int64
-  | DataTypeGrowOnlySet [ByteString]
+  | DataTypeGrowOnlySet (Set ByteString)
   | DataTypeHyperLogLog Word64
-  | DataTypeMap [(ByteString, MapValue)]
-  | DataTypeSet [ByteString]
+  | DataTypeMap (HashMap ByteString MapValue)
+  | DataTypeSet (Set ByteString)
 
 dataTypeToText :: DataType -> Text
 dataTypeToText = \case
@@ -130,6 +136,15 @@ dataTypeToText = \case
   DataTypeHyperLogLog _ -> "hll"
   DataTypeMap         _ -> "map"
   DataTypeSet         _ -> "set"
+
+
+data MapValue
+  = MapValueCounter Int64
+  | MapValueFlag Bool
+  | MapValueMap (HashMap ByteString MapValue)
+  | MapValueRegister ByteString
+  | MapValueSet (Set ByteString)
+  deriving (Show)
 
 
 -- | A 'DataTypeError' is thrown when a data type operation is performed on an

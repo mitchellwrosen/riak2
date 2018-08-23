@@ -110,6 +110,7 @@ import Data.Kind                  (Type)
 import Data.List.NonEmpty         (NonEmpty)
 import Data.Maybe                 (fromMaybe)
 import Data.Proxy                 (Proxy(Proxy))
+import Data.Set                   (Set)
 import Data.Text                  (Text)
 import Data.Time                  (NominalDiffTime)
 import Data.Time.Clock.POSIX      (posixSecondsToUTCTime)
@@ -629,7 +630,7 @@ fetchGrowOnlySet
   -> Bucket -- ^
   -> Key -- ^
   -> FetchDataTypeParams -- ^
-  -> m (Either RpbErrorResp [ByteString])
+  -> m (Either RpbErrorResp (Set ByteString))
 fetchGrowOnlySet =
   fetchDataType
 
@@ -652,7 +653,7 @@ fetchMap
   -> Bucket -- ^
   -> Key -- ^
   -> FetchDataTypeParams -- ^
-  -> m (Either RpbErrorResp [(ByteString, MapValue)])
+  -> m (Either RpbErrorResp (HashMap ByteString MapValue))
 fetchMap =
   fetchDataType
 
@@ -663,7 +664,7 @@ fetchSet
   -> Bucket -- ^
   -> Key -- ^
   -> FetchDataTypeParams -- ^
-  -> m (Either RpbErrorResp [ByteString])
+  -> m (Either RpbErrorResp (Set ByteString))
 fetchSet =
   fetchDataType
 
