@@ -131,7 +131,6 @@ import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.List.NonEmpty    as List1
 import qualified Data.Pool             as Pool
-import qualified Data.Set              as Set
 import qualified List.Transformer      as ListT
 
 import           Proto.Riak               hiding (SetOp)
@@ -644,11 +643,11 @@ fetchMap =
 --
 -- Throws a 'DataTypeError' if the given 'Location' does not contain sets.
 fetchSet
-  :: MonadIO m
+  :: (IsSetContent a, MonadIO m)
   => Handle -- ^
-  -> Location ('Just 'SetTy) -- ^
+  -> Location ('Just ('SetTy a)) -- ^
   -> FetchDataTypeParams -- ^
-  -> m (Either RpbErrorResp (Set ByteString))
+  -> m (Either RpbErrorResp (Set a))
 fetchSet =
   fetchDataType
 
@@ -766,12 +765,12 @@ _updateCounter handle namespace key incr params =
 -- Throws a 'DataTypeError' if the given 'Location' does not contain
 -- counters.
 updateSet
-  :: MonadIO m
+  :: (IsSetContent a, MonadIO m)
   => Handle
-  -> Location ('Just 'SetTy)
-  -> SetOp
+  -> Location ('Just ('SetTy a))
+  -> SetOp a
   -> UpdateDataTypeParams
-  -> m (Either RpbErrorResp (Set ByteString))
+  -> m (Either RpbErrorResp (Set a))
 updateSet handle (Location namespace key) op params =
   (fmap.fmap) snd (_updateSet handle namespace (Just key) op params)
 
@@ -780,23 +779,25 @@ updateSet handle (Location namespace key) op params =
 -- Throws a 'DataTypeError' if the given 'Location' does not contain
 -- counters.
 updateNewSet
-  :: MonadIO m
+  :: (IsSetContent a, MonadIO m)
   => Handle
-  -> Namespace ('Just 'SetTy)
-  -> SetOp
+  -> Namespace ('Just ('SetTy a))
+  -> SetOp a
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp Key)
 updateNewSet handle namespace op params =
   (fmap.fmap) fst (_updateSet handle namespace Nothing op params)
 
+-- TODO _updateSet use same conn for get-put
 _updateSet
-  :: MonadIO m
+  :: forall a m.
+     (IsSetContent a, MonadIO m)
   => Handle
-  -> Namespace ('Just 'SetTy)
+  -> Namespace ('Just ('SetTy a))
   -> Maybe Key
-  -> SetOp
+  -> SetOp a
   -> UpdateDataTypeParams
-  -> m (Either RpbErrorResp (Key, Set ByteString))
+  -> m (Either RpbErrorResp (Key, Set a))
 _updateSet
     handle@(Handle _ cache) namespace key (unSetOp -> (adds, removes))
     params = liftIO . runExceptT $ do
@@ -828,7 +829,7 @@ _updateSet
 
       Just key' ->
         let
-          loc :: Location ('Just 'SetTy)
+          loc :: Location ('Just ('SetTy a))
           loc =
             Location namespace key'
         in do
@@ -851,8 +852,12 @@ _updateSet
                 Just context' ->
                   pure (Just context')
 
-  (fmap.fmap) (Set.fromList . view #setValue)
-    (ExceptT (updateDataType handle namespace key context op params))
+  (key', value) <-
+    ExceptT (updateDataType handle namespace key context op params)
+
+  case parseDtUpdateResp @('SetTy a) proxy# value of
+    Left err -> undefined -- TODO _updateSet error handling
+    Right value' -> pure (key', value')
 
  where
   op :: DtOp
@@ -1274,9 +1279,9 @@ unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)
 unRpbPair (RpbPair k v _) =
   (k, v)
 
-unSetOp :: SetOp -> ([ByteString], [ByteString])
+unSetOp :: IsSetContent a => SetOp a -> ([ByteString], [ByteString])
 unSetOp (SetOp (adds, removes)) =
-  (toList adds, toList removes)
+  (map encodeSetContent (toList adds), map encodeSetContent (toList removes))
 
 
 -- $documentation

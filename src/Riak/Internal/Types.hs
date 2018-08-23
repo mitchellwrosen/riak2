@@ -1,6 +1,7 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, GADTs,
-             GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
-             OverloadedStrings, PatternSynonyms #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies,
+             ExistentialQuantification, GADTs, GeneralizedNewtypeDeriving,
+             InstanceSigs, KindSignatures, OverloadedStrings,
+             PatternSynonyms #-}
 
 -- | Sin-bin of misc. types.
 
@@ -92,10 +93,10 @@ instance Show Bucket where
 
 data DataTypeTy
   = CounterTy
-  | GrowOnlySetTy
+  | GrowOnlySetTy -- TODO better GrowOnlySetTy
   | HyperLogLogTy
-  | MapTy
-  | SetTy
+  | MapTy -- TODO better MapTy
+  | forall a. SetTy a
 
 
 -- | A Solr index name.
@@ -191,7 +192,6 @@ newtype SecondaryIndexes
 
 data SomeLocation where
   SomeLocation :: Location ty -> SomeLocation
-
 instance Eq SomeLocation where
   SomeLocation loc1 == SomeLocation loc2 =
     type1 == type2 && bucket1 == bucket2 && key1 == key2
