@@ -12,13 +12,11 @@ module Riak
   , refVclockCache
     -- * Key/value object operations
     -- ** Fetch object
-  , FetchObjectParams
   , fetchObject
   , fetchObjectHead
   , fetchObjectIfModified
   , fetchObjectIfModifiedHead
     -- ** Store object
-  , StoreObjectParams
   , storeObject
   , storeObjectHead
   , storeObjectBody
@@ -28,11 +26,10 @@ module Riak
     -- ** Delete object
   , deleteObject
     -- * Data type operations
-  , FetchDataTypeParams
-  , UpdateDataTypeParams
     -- ** Counter
   , fetchCounter
   , updateCounter
+  , updateNewCounter
     -- ** Grow-only set
   , fetchGrowOnlySet
     -- ** HyperLogLog
@@ -75,6 +72,8 @@ module Riak
   , ContentType(..)
   , DataType(..)
   , DataTypeTy(..)
+  , FetchDataTypeParams
+  , FetchObjectParams
   , IndexName(..)
   , IsContent(..)
   , Key(..)
@@ -85,6 +84,8 @@ module Riak
   , pattern QuorumAll
   , pattern QuorumQuorum
   , SecondaryIndex(..)
+  , StoreObjectParams
+  , UpdateDataTypeParams
   , TTL(..)
   , Vclock(..)
   , Vtag(..)
@@ -140,6 +141,8 @@ import           Riak.Internal.Request
 import           Riak.Internal.Response
 import           Riak.Internal.Types
 
+
+-- TODO Namespace, Location like the Java client?
 
 --------------------------------------------------------------------------------
 -- Handle
@@ -758,8 +761,30 @@ fetchSomeDataType
       , _DtFetchReq'type'          = coerce type'
       }
 
-
 updateCounter
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'CounterTy)
+  -> Bucket
+  -> Key
+  -> Int64
+  -> UpdateDataTypeParams
+  -> m (Either RpbErrorResp Int64)
+updateCounter handle type' bucket key incr params =
+  (fmap.fmap) snd (_updateCounter handle type' bucket (Just key) incr params)
+
+updateNewCounter
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just 'CounterTy)
+  -> Bucket
+  -> Int64
+  -> UpdateDataTypeParams
+  -> m (Either RpbErrorResp (Key, Int64))
+updateNewCounter handle type' bucket =
+  _updateCounter handle type' bucket Nothing
+
+_updateCounter
   :: MonadIO m
   => Handle
   -> BucketType ('Just 'CounterTy)
@@ -768,19 +793,17 @@ updateCounter
   -> Int64
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp (Key, Int64))
-updateCounter
-    (Handle conn _) type' bucket key incr
-    (UpdateDataTypeParams dw n pw return_body sloppy_quorum timeout w)
-    = runExceptT $ do
-
+_updateCounter handle type' bucket key incr params = liftIO . runExceptT $ do
   response :: DtUpdateResp <-
-    ExceptT (liftIO (exchange conn request))
+    ExceptT (updateDataType handle type' bucket key op params)
 
   theKey :: Key <-
     maybe
       (maybe
         (panic "missing key"
-          ( ( "request",  request )
+          ( ( "type"    , type'    )
+          , ( "bucket"  , bucket   )
+          , ( "key"     , key      )
           , ( "response", response )
           ))
         pure
@@ -789,6 +812,33 @@ updateCounter
       key
 
   pure (theKey, response ^. #counterValue)
+
+ where
+  op :: DtOp
+  op =
+    DtOp
+      { _DtOp'_unknownFields = []
+      , _DtOp'counterOp      = Just (CounterOp (Just incr) [])
+      , _DtOp'gsetOp         = Nothing
+      , _DtOp'hllOp          = Nothing
+      , _DtOp'mapOp          = Nothing
+      , _DtOp'setOp          = Nothing
+      }
+
+updateDataType
+  :: MonadIO m
+  => Handle
+  -> BucketType ('Just ty)
+  -> Bucket
+  -> Maybe Key
+  -> DtOp
+  -> UpdateDataTypeParams
+  -> m (Either RpbErrorResp DtUpdateResp)
+updateDataType
+    (Handle conn _) type' bucket key op
+    (UpdateDataTypeParams dw n pw return_body sloppy_quorum timeout w) = do
+
+  liftIO (Internal.updateDataType conn request)
 
  where
   request :: DtUpdateReq
@@ -808,17 +858,6 @@ updateCounter
       , _DtUpdateReq'timeout        = unTimeout timeout
       , _DtUpdateReq'type'          = unBucketType type'
       , _DtUpdateReq'w              = coerce w
-      }
-
-  op :: DtOp
-  op =
-    DtOp
-      { _DtOp'_unknownFields = []
-      , _DtOp'counterOp      = Just (CounterOp (Just incr) [])
-      , _DtOp'gsetOp         = Nothing
-      , _DtOp'hllOp          = Nothing
-      , _DtOp'mapOp          = Nothing
-      , _DtOp'setOp          = Nothing
       }
 
 

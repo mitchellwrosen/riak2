@@ -22,9 +22,9 @@ import qualified Data.Text             as Text
 import qualified Data.Text.IO          as Text
 
 import Riak
-import Riak.Internal.Protobuf ()
+import Riak.Internal.Protobuf
 
-import qualified Riak.Internal.Protobuf as L
+import qualified Riak.Lenses as L
 
 -- TODO riak-cli take host/port as arguments
 
@@ -53,6 +53,7 @@ parser =
       , [ commandGroup "Data type operations"
         , fetchCounterParser
         , fetchMapParser
+        , fetchSetParser
         , updateCounterParser
         ]
       , [ commandGroup "Bucket operations"
@@ -129,6 +130,18 @@ fetchObjectParser =
         <*> sloppyQuorumOption
         <*> timeoutOption)
       (progDesc "Fetch an object"))
+
+fetchSetParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+fetchSetParser =
+  command
+    "fetch-set"
+    (info
+      (doFetchSet
+        <$> bucketTypeArgument
+        <*> bucketArgument
+        <*> keyArgument)
+        -- TODO fetch-set optional params
+      (progDesc "Fetch a set"))
 
 getBucketPropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getBucketPropsParser =
@@ -269,7 +282,7 @@ doFetchMap type' bucket key host port = do
         type'
         bucket
         key
-        def -- (def, def, def, def, def, def, def, def)
+        def
 
 doFetchObject
   :: BucketType 'Nothing
@@ -297,7 +310,7 @@ doFetchObject
 
  where
   go
-    :: (BucketType 'Nothing -> Bucket -> Key -> FetchObjectParams -> IO (Either L.RpbErrorResp [Content a]))
+    :: (BucketType 'Nothing -> Bucket -> Key -> FetchObjectParams -> IO (Either RpbErrorResp [Content a]))
     -> (Int -> a -> IO ())
     -> IO ()
   go fetch f = do
@@ -327,19 +340,31 @@ doFetchObject
         for_ (zip [(0::Int)..] contents) $ \(i, content) ->
           printContent (f i) (Just i) content
 
+doFetchSet
+  :: BucketType ('Just 'SetTy)
+  -> Bucket
+  -> Key
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doFetchSet type' bucket key host port = do
+  cache <- refVclockCache
+  withHandle host port cache $ \h ->
+    fetchSet h type' bucket key def >>= \case
+      Left err -> print err
+      Right vals -> for_ vals print -- TODO encoding?
+
 doGetBucketProps :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
 doGetBucketProps type' bucket host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    print =<<
-      getBucketProps h type' bucket
+    either print printBucketProps =<< getBucketProps h type' bucket
 
 doGetBucketTypeProps :: BucketType ty -> HostName -> PortNumber -> IO ()
 doGetBucketTypeProps type' host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    print =<<
-      getBucketTypeProps h type'
+    either print printBucketProps =<< getBucketTypeProps h type'
 
 doGetIndex :: Maybe IndexName -> HostName -> PortNumber -> IO ()
 doGetIndex index host port = do
@@ -354,7 +379,7 @@ doListBuckets :: BucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h -> do
-    result :: Either L.RpbErrorResp () <-
+    result :: Either RpbErrorResp () <-
       (runExceptT . runListT)
         (listBuckets h type' >>= liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
@@ -363,7 +388,7 @@ doListKeys :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
 doListKeys type' bucket host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h -> do
-    result :: Either L.RpbErrorResp () <-
+    result :: Either RpbErrorResp () <-
       (runExceptT . runListT)
         (listKeys h type' bucket >>= liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
@@ -410,7 +435,7 @@ doStoreObject
       _   -> undefined
  where
   go
-    :: (BucketType 'Nothing -> Bucket -> Key -> Text -> StoreObjectParams -> IO (Either L.RpbErrorResp a))
+    :: (BucketType 'Nothing -> Bucket -> Key -> Text -> StoreObjectParams -> IO (Either RpbErrorResp a))
     -> (a -> IO ())
     -> IO ()
   go store f = do
@@ -441,17 +466,47 @@ doUpdateCounter
 doUpdateCounter type' bucket incr key host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    print =<<
-      updateCounter h
-        type'
-        bucket
-        key
-        incr
-        def
+    either print print =<< updateCounter h type' bucket key incr def
 
 --------------------------------------------------------------------------------
 -- Misc. helpers
 --------------------------------------------------------------------------------
+
+printBucketProps :: RpbBucketProps -> IO ()
+printBucketProps props = do
+  p "allow_mult"      (fmap showBool . view L.maybe'allowMult)
+  p "backend"         (fmap show . view L.maybe'backend)
+  p "basic_quorum"    (fmap showBool . view L.maybe'basicQuorum)
+  p "big_vclock"      (fmap show . view L.maybe'bigVclock)
+  p "chash_keyfun"    (fmap showModFun . view L.maybe'chashKeyfun)
+  p "consistent"      (fmap showBool . view L.maybe'consistent)
+  p "datatype"        (fmap show . view L.maybe'datatype)
+  p "dw"              (fmap show . view L.maybe'dw)
+  p "has_precommit"   (fmap showBool . view L.maybe'hasPrecommit)
+  p "hll_precision"   (fmap show . view L.maybe'hllPrecision)
+  p "last_write_wins" (fmap showBool . view L.maybe'lastWriteWins)
+  p "linkfun"         (fmap showModFun . view L.maybe'linkfun)
+  p "n"               (fmap show . view L.maybe'nVal)
+  p "notfound_ok"     (fmap showBool . view L.maybe'notfoundOk)
+  p "old_vclock"      (fmap show . view L.maybe'oldVclock)
+  p "postcommit"      (fmap show . view L.maybe'hasPostcommit)
+  p "pr"              (fmap showQuorum . view L.maybe'pr)
+  p "precommit"       (\case { [] -> Nothing; xs -> Just (show xs) } . view L.precommit)
+  p "pw"              (fmap showQuorum . view L.maybe'pw)
+  p "r"               (fmap showQuorum . view L.maybe'r)
+  p "repl"            (fmap show . view L.maybe'repl)
+  p "rw"              (fmap showQuorum . view L.maybe'rw)
+  p "search"          (fmap showBool . view L.maybe'search)
+  p "search_index"    (fmap show . view L.maybe'searchIndex)
+  p "small_vclock"    (fmap show . view L.maybe'smallVclock)
+  p "ttl"             (fmap show . view L.maybe'ttl)
+  p "w"               (fmap showQuorum . view L.maybe'w)
+  p "write_once"      (fmap showBool . view L.maybe'writeOnce)
+  p "young_vclock"    (fmap show . view L.maybe'youngVclock)
+ where
+  p :: String -> (RpbBucketProps -> Maybe String) -> IO ()
+  p s f =
+    for_ (f props) (\x -> putStrLn (s ++ " = " ++ x))
 
 printContent :: (a -> IO ()) -> Maybe Int -> Content a -> IO ()
 printContent f mi content = do
@@ -479,6 +534,23 @@ printContent f mi content = do
   tag :: Show a => String -> a -> IO ()
   tag k v =
     putStrLn (k ++ maybe "" (\i -> "[" ++ show i ++ "]") mi ++ " = " ++ show v)
+
+showBool :: Bool -> String
+showBool = \case
+  False -> "false"
+  True  -> "true"
+
+showModFun :: RpbModFun -> String
+showModFun fun =
+  Latin1.unpack (fun ^. L.module') ++ ":" ++ Latin1.unpack (fun ^. L.function)
+
+showQuorum :: Word32 -> String
+showQuorum = \case
+  4294967291 -> "default"
+  4294967292 -> "all"
+  4294967293 -> "quorum"
+  4294967294 -> "one"
+  n          -> show n
 
 bucketArgument :: Parser Bucket
 bucketArgument =
