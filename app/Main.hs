@@ -5,8 +5,10 @@
 import Control.Monad              (join, when, (<=<))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
+import Data.ByteString            (ByteString)
 import Data.Coerce
 import Data.Foldable              (asum, for_, toList, traverse_)
+import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.Text                  (Text)
 import Data.Word
@@ -45,19 +47,29 @@ parser =
     -- TODO --help output is ugly here (COMMAND | COMMAND | ...), fix it
     <*>
     (asum . map (hsubparser . mconcat))
-      [ [ commandGroup "RiakKey/value object operations"
+      [ [ commandGroup "Object operations"
         , fetchObjectParser
         , storeObjectParser
           -- TODO riak-cli store-new-object
         ]
-      , [ commandGroup "Data type operations"
+      , [ commandGroup "Counter operations"
         , fetchCounterParser
-        , fetchMapParser
-        , fetchSetParser
         , updateCounterParser
           -- TODO riak-cli update-new-counter
         ]
-      , [ commandGroup "RiakBucket operations"
+      , [ commandGroup "Grow-only set opeations"
+        , command "TODO" (info empty mempty)
+        ]
+      , [ commandGroup "HyperLogLog opeations"
+        , command "TODO" (info empty mempty)
+        ]
+      , [ commandGroup "Map operators"
+        , fetchMapParser
+        ]
+      , [ commandGroup "Set operations"
+        , fetchSetParser
+        ]
+      , [ commandGroup "Bucket operations"
         , getBucketTypePropsParser
         , getBucketPropsParser
         , listBucketsParser
@@ -80,7 +92,7 @@ parser =
 fetchCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchCounterParser =
   command
-    "fetch-counter"
+    "get-counter"
     (info
       (doFetchCounter
         <$> bucketTypeArgument
@@ -92,7 +104,7 @@ fetchCounterParser =
 fetchMapParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchMapParser =
   command
-    "fetch-map"
+    "get-map"
     (info
       (doFetchMap
         <$> bucketTypeArgument
@@ -104,7 +116,7 @@ fetchMapParser =
 fetchObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchObjectParser =
   command
-    "fetch-object"
+    "get"
     (info
       (doFetchObject
         <$> bucketTypeArgument
@@ -135,7 +147,7 @@ fetchObjectParser =
 fetchSetParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 fetchSetParser =
   command
-    "fetch-set"
+    "get-set"
     (info
       (doFetchSet
         <$> bucketTypeArgument
@@ -147,7 +159,7 @@ fetchSetParser =
 getBucketPropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getBucketPropsParser =
   command
-    "get-bucket-props"
+    "get-bucket"
     (info
       (doGetBucketProps
         <$> bucketTypeArgument
@@ -157,7 +169,7 @@ getBucketPropsParser =
 getBucketTypePropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getBucketTypePropsParser =
   command
-    "get-bucket-type-props"
+    "get-bucket-type"
     (info
       (doGetBucketTypeProps <$> bucketTypeArgument)
       (progDesc "Get a bucket type's properties"))
@@ -196,7 +208,7 @@ listKeysParser =
 storeObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 storeObjectParser =
   command
-    "store-object"
+    "put"
     (info
       (doStoreObject
         <$> bucketTypeArgument
@@ -233,7 +245,7 @@ storeObjectParser =
 updateCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 updateCounterParser =
   command
-    "update-counter"
+    "incr-counter"
     (info
       (doUpdateCounter
         <$> bucketTypeArgument
@@ -264,7 +276,7 @@ doFetchCounter type' bucket key host port =
       fetchRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
 
 doFetchMap
-  :: RiakBucketType ('Just 'RiakMapTy)
+  :: RiakBucketType ('Just ('RiakMapTy (HashMap ByteString RiakMapValue)))
   -> RiakBucket
   -> RiakKey
   -> HostName

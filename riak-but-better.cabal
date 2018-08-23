@@ -16,12 +16,12 @@ library
     Proto.Riak_Fields
   build-depends:
       attoparsec ^>= 0.13.2
-    , base
+    , base ^>= 4.11.1
     , base64-bytestring ^>= 1.0.0
     , bytestring ^>= 0.10.8
-    , containers
-    , data-default-class
-    , dlist
+    , containers ^>= 0.5.11 || ^>= 0.6.0
+    , data-default-class ^>= 0.1.2
+    , dlist ^>= 0.8.0
     , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
     , lens-labels ^>= 0.2.0
@@ -30,7 +30,7 @@ library
     , proto-lens ^>= 0.3.1
     , proto-lens-protoc == 0.3.1.0
     , resource-pool ^>= 0.2.3
-    , stm
+    , stm ^>= 2.4.5
     , stm-containers ^>= 1.0.1
     , streaming-bytestring ^>= 0.1.6
     , text ^>= 1.2.3
@@ -86,6 +86,7 @@ executable riak-cli
     , riak-but-better
     , text
     , transformers
+    , unordered-containers
   buildable:
     True
   default-language:

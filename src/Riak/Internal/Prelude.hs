@@ -8,6 +8,7 @@ import Control.Monad              as X hiding (return)
 import Control.Monad.IO.Unlift    as X
 import Control.Monad.Trans.Class  as X
 import Control.Monad.Trans.Except as X (ExceptT(..), runExceptT)
+import Data.Bifunctor             as X (bimap)
 import Data.ByteString            as X (ByteString)
 import Data.Coerce                as X (coerce)
 import Data.Foldable              as X (for_, toList)

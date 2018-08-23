@@ -37,6 +37,7 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 
+-- TODO not either text
 class IsRiakDataType (ty :: RiakDataTypeTy) where
   type DataTypeVal    ty :: *
 
@@ -72,11 +73,13 @@ dataTypeToText = \case
 instance IsRiakDataType 'RiakCounterTy where
   type DataTypeVal 'RiakCounterTy = Int64
 
+  parseDtFetchResp :: Proxy# 'RiakCounterTy -> DtFetchResp -> Either Text Int64
   parseDtFetchResp _ resp =
     case resp ^. #type' of
       DtFetchResp'COUNTER -> Right (resp ^. #value . #counterValue)
       x -> Left ("expected counter but found " <> dataTypeToText x)
 
+  parseDtUpdateResp :: Proxy# 'RiakCounterTy -> DtUpdateResp -> Either Text Int64
   parseDtUpdateResp _ resp =
     Right (resp ^. #counterValue)
 
@@ -88,11 +91,19 @@ instance IsRiakDataType 'RiakCounterTy where
 instance IsRiakDataType 'RiakGrowOnlySetTy where
   type DataTypeVal 'RiakGrowOnlySetTy = Set ByteString
 
+  parseDtFetchResp
+    :: Proxy# 'RiakGrowOnlySetTy
+    -> DtFetchResp
+    -> Either Text (Set ByteString)
   parseDtFetchResp _ resp =
     case resp ^. #type' of
       DtFetchResp'GSET -> Right (Set.fromList (resp ^. #value . #gsetValue))
       x -> Left ("expected gset but found " <>dataTypeToText x)
 
+  parseDtUpdateResp
+    :: Proxy# 'RiakGrowOnlySetTy
+    -> DtUpdateResp
+    -> Either Text (Set ByteString)
   parseDtUpdateResp _ resp =
     Right (Set.fromList (resp ^. #gsetValue))
 
@@ -104,11 +115,19 @@ instance IsRiakDataType 'RiakGrowOnlySetTy where
 instance IsRiakDataType 'RiakHyperLogLogTy where
   type DataTypeVal 'RiakHyperLogLogTy = Word64
 
+  parseDtFetchResp
+    :: Proxy# 'RiakHyperLogLogTy
+    -> DtFetchResp
+    -> Either Text Word64
   parseDtFetchResp _ resp =
     case resp ^. #type' of
       DtFetchResp'HLL -> Right (resp ^. #value . #hllValue)
       x               -> Left ("expected hll but found " <> dataTypeToText x)
 
+  parseDtUpdateResp
+    :: Proxy# 'RiakHyperLogLogTy
+    -> DtUpdateResp
+    -> Either Text Word64
   parseDtUpdateResp _ resp =
     Right (resp ^. #hllValue)
 
@@ -116,18 +135,25 @@ instance IsRiakDataType 'RiakHyperLogLogTy where
 -- Map
 --------------------------------------------------------------------------------
 
-instance IsRiakDataType 'RiakMapTy where
-  type DataTypeVal 'RiakMapTy = HashMap ByteString RiakMapValue
+instance IsRiakMap a => IsRiakDataType ('RiakMapTy a) where
+  type DataTypeVal ('RiakMapTy a) = a
 
+  parseDtFetchResp
+    :: Proxy# ('RiakMapTy a)
+    -> DtFetchResp
+    -> Either Text a
   parseDtFetchResp _ resp =
     case resp ^. #type' of
       DtFetchResp'MAP ->
-        Right (parseMapEntries (resp ^. #value . #mapValue))
+        undefined
+        -- runParser decodeRiakMap (parseMapEntries (resp ^. #value . #mapValue))
       x ->
         Left ("expected map but found " <> dataTypeToText x)
 
+  parseDtUpdateResp :: Proxy# ('RiakMapTy a) -> DtUpdateResp -> Either Text a
   parseDtUpdateResp _ resp =
-    Right (parseMapEntries (resp ^. #mapValue))
+    undefined
+    -- Right (parseMapEntries (resp ^. #mapValue))
 
 parseMapEntries :: [MapEntry] -> HashMap ByteString RiakMapValue
 parseMapEntries =
@@ -247,7 +273,9 @@ riakSetField key =
         pure mempty
 
       Just (RiakMapValueSet values) ->
-        undefined
+        -- TODO make it so I don't have to pay for to/from/to set
+        bimap ParseFailure (Set.fromList)
+          (traverse decodeRiakRegister (toList values))
 
       Just _ ->
         Left TypeMismatch
@@ -314,6 +342,7 @@ instance (IsRiakRegister a, Ord a) => IsRiakSet a
 instance IsRiakSet a => IsRiakDataType ('RiakSetTy a) where
   type DataTypeVal ('RiakSetTy a) = Set a
 
+  parseDtFetchResp :: Proxy# ty -> DtFetchResp -> Either Text (Set a)
   parseDtFetchResp _ resp =
     case resp ^. #type' of
       DtFetchResp'SET ->
@@ -322,6 +351,7 @@ instance IsRiakSet a => IsRiakDataType ('RiakSetTy a) where
       x ->
         Left ("expected set but found " <> dataTypeToText x)
 
+  parseDtUpdateResp :: Proxy# ty -> DtUpdateResp -> Either Text (Set a)
   parseDtUpdateResp _ resp =
     Set.fromList <$> for (resp ^. #setValue) decodeRiakRegister
 

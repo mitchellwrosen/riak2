@@ -20,6 +20,34 @@ import Proto.Riak
 import Riak.Internal.Prelude
 
 
+data Modified a
+  = Unmodified
+  | Modified a
+
+
+data ObjectReturn
+  = ObjectReturnNone
+  | ObjectReturnHead
+  | ObjectReturnBody
+
+
+-- | A Riak bucket.
+newtype RiakBucket
+  = RiakBucket { unRiakBucket :: ByteString }
+  deriving stock (Eq)
+  deriving newtype (Hashable)
+
+-- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
+-- base64-encoding.
+instance Show RiakBucket where
+  show :: RiakBucket -> String
+  show (RiakBucket bucket) =
+    either
+      (const ("base64:" ++ Latin1.unpack (Base64.encode bucket)))
+      Text.unpack
+      (decodeUtf8' bucket)
+
+
 -- TODO better BucketProps types
 data RiakBucketProps
   = RiakBucketProps
@@ -70,28 +98,11 @@ pattern RiakBucketTypeDefault =
   RiakBucketType "default"
 
 
--- | A Riak bucket.
-newtype RiakBucket
-  = RiakBucket { unRiakBucket :: ByteString }
-  deriving stock (Eq)
-  deriving newtype (Hashable)
-
--- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
--- base64-encoding.
-instance Show RiakBucket where
-  show :: RiakBucket -> String
-  show (RiakBucket bucket) =
-    either
-      (const (Latin1.unpack (Base64.encode bucket)))
-      Text.unpack
-      (decodeUtf8' bucket)
-
-
 data RiakDataTypeTy
   = RiakCounterTy
   | RiakGrowOnlySetTy -- TODO better GrowOnlySetTy
   | RiakHyperLogLogTy
-  | RiakMapTy -- TODO better MapTy
+  | forall a. RiakMapTy a
   | forall a. RiakSetTy a
 
 
@@ -112,7 +123,7 @@ instance Show RiakKey where
   show :: RiakKey -> String
   show (RiakKey key) =
     either
-      (const (Latin1.unpack (Base64.encode key)))
+      (const ("base64:" ++ Latin1.unpack (Base64.encode key)))
       Text.unpack
       (decodeUtf8' key)
 
@@ -131,11 +142,6 @@ newtype RiakMetadata
   deriving (Show)
 
 
-data Modified a
-  = Unmodified
-  | Modified a
-
-
 data RiakNamespace (ty :: Maybe RiakDataTypeTy)
   = RiakNamespace !(RiakBucketType ty) !RiakBucket
   deriving stock (Eq, Show)
@@ -143,12 +149,6 @@ data RiakNamespace (ty :: Maybe RiakDataTypeTy)
 instance Hashable (RiakNamespace ty) where
   hashWithSalt salt (RiakNamespace type' bucket) =
     salt `hashWithSalt` type' `hashWithSalt` bucket
-
-
-data ObjectReturn
-  = ObjectReturnNone
-  | ObjectReturnHead
-  | ObjectReturnBody
 
 
 -- | How many vnodes must respond before an operation is considered successful.

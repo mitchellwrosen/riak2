@@ -618,11 +618,11 @@ fetchRiakHyperLogLog =
 --
 -- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain maps.
 fetchRiakMap
-  :: MonadIO m
+  :: (IsRiakMap a, MonadIO m)
   => RiakHandle -- ^
-  -> RiakLocation ('Just 'RiakMapTy) -- ^
+  -> RiakLocation ('Just ('RiakMapTy a)) -- ^
   -> FetchRiakDataTypeParams -- ^
-  -> m (Either RpbErrorResp (HashMap ByteString RiakMapValue))
+  -> m (Either RpbErrorResp a)
 fetchRiakMap =
   fetchDataType
 
