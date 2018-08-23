@@ -1,33 +1,40 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, GADTs,
-             GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
+{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleInstances,
+             GADTs, GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
              LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
-             StandaloneDeriving, TypeFamilies #-}
+             ScopedTypeVariables, StandaloneDeriving, TypeFamilies #-}
 
 module Riak.Internal.DataTypes
   ( DataTypeError(..)
   , IsDataType(..)
+  , IsMap(..)
+  , IsRegister(..)
+  , IsSet
   , MapValue(..)
-  , IsSetContent(..)
   , SetOp(..)
   , setAddOp
   , setRemoveOp
   ) where
 
+import Control.Monad       (unless)
+import Data.Bifunctor      (first)
 import Data.ByteString     (ByteString)
 import Data.DList          (DList)
+import Data.Foldable       (for_)
 import Data.HashMap.Strict (HashMap)
 import Data.Int
 import Data.Set            (Set)
 import Data.Text           (Text)
+import Data.Text.Encoding  (decodeUtf8', encodeUtf8)
 import Data.Traversable    (for)
 import Data.Word
 import GHC.Exts            (Proxy#)
 import Lens.Labels
 import Prelude             hiding (head, return, (.))
-import UnliftIO.Exception  (Exception)
+import UnliftIO.Exception  (Exception, displayException)
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set            as Set
+import qualified Data.Text           as Text
 
 import Proto.Riak          hiding (SetOp)
 import Riak.Internal.Types
@@ -121,7 +128,6 @@ instance IsDataType 'MapTy where
         Right (parseMapEntries (resp ^. #value . #mapValue))
       x ->
         Left ("expected map but found " <> dataTypeToText x)
-   where
 
   parseDtUpdateResp _ resp =
     Right (parseMapEntries (resp ^. #mapValue))
@@ -159,33 +165,163 @@ data MapValue
   deriving (Show)
 
 
+-- WIP parsing primitives
+
+data MapParseError
+  = TypeMismatch
+  | UnexpectedKeys
+  | ParseFailure Text
+
+data MapParser a
+  = MapParser
+      (HashMap ByteString MapValue -> Either MapParseError a)
+      (Maybe (HashMap ByteString ()))
+
+instance Functor MapParser where
+
+runParser :: MapParser a -> HashMap ByteString MapValue -> Either MapParseError a
+runParser (MapParser f expected) m = do
+  for_ expected $ \expected' ->
+    unless (null (HashMap.differenceWith (\_ _ -> Nothing) m expected'))
+      (Left UnexpectedKeys)
+  f m
+
+counterField :: ByteString -> MapParser Int64
+counterField key =
+  MapParser f (Just (HashMap.singleton key ()))
+ where
+  f :: HashMap ByteString MapValue -> Either MapParseError Int64
+  f m =
+    case HashMap.lookup key m of
+      Nothing ->
+        Right 0
+
+      Just (MapValueCounter n) ->
+        Right n
+
+      Just _ ->
+        Left TypeMismatch
+
+flagField :: ByteString -> MapParser Bool
+flagField key =
+  MapParser f (Just (HashMap.singleton key ()))
+ where
+  f :: HashMap ByteString MapValue -> Either MapParseError Bool
+  f m =
+    case HashMap.lookup key m of
+      Nothing ->
+        Right False
+
+      Just (MapValueFlag b) ->
+        Right b
+
+      Just _ ->
+        Left TypeMismatch
+
+registerField :: forall a. IsRegister a => ByteString -> MapParser a
+registerField key =
+  MapParser f (Just (HashMap.singleton key ()))
+ where
+  f :: HashMap ByteString MapValue -> Either MapParseError a
+  f m =
+    case HashMap.lookup key m of
+      Nothing ->
+        first ParseFailure (decodeRegister mempty)
+
+      Just (MapValueRegister bytes) ->
+        first ParseFailure (decodeRegister bytes)
+
+      Just _ ->
+        Left TypeMismatch
+
+setField :: forall a. IsSet a => ByteString -> MapParser (Set a)
+setField key =
+  MapParser f (Just (HashMap.singleton key ()))
+ where
+  f :: HashMap ByteString MapValue -> Either MapParseError (Set a)
+  f m =
+    case HashMap.lookup key m of
+      Nothing ->
+        pure mempty
+
+      Just (MapValueSet values) ->
+        undefined
+
+      Just _ ->
+        Left TypeMismatch
+
+mapField :: forall a. IsMap a => ByteString -> MapParser a
+mapField key =
+  MapParser f (Just (HashMap.singleton key ()))
+ where
+  f :: HashMap ByteString MapValue -> Either MapParseError a
+  f outer =
+    case HashMap.lookup key outer of
+      Nothing ->
+        runParser mapParser mempty
+
+      Just (MapValueMap inner) ->
+        runParser mapParser inner
+
+      Just _ ->
+        Left TypeMismatch
+
+class IsMap a where
+  mapParser :: MapParser a
+
+instance IsMap (HashMap ByteString MapValue) where
+  mapParser :: MapParser (HashMap ByteString MapValue)
+  mapParser =
+    MapParser Right Nothing
+
+--------------------------------------------------------------------------------
+-- Register
+--------------------------------------------------------------------------------
+
+-- TODO better name for IsRegister
+class IsRegister a where
+  decodeRegister :: ByteString -> Either Text a
+
+  encodeRegister :: a -> ByteString
+
+instance IsRegister ByteString where
+  decodeRegister :: ByteString -> Either Text ByteString
+  decodeRegister =
+    Right
+
+  encodeRegister :: ByteString -> ByteString
+  encodeRegister =
+    id
+
+instance IsRegister Text where
+  decodeRegister :: ByteString -> Either Text Text
+  decodeRegister =
+    first (Text.pack . displayException) . decodeUtf8'
+
+  encodeRegister :: Text -> ByteString
+  encodeRegister =
+    encodeUtf8
+
+
 --------------------------------------------------------------------------------
 -- Set
 --------------------------------------------------------------------------------
 
-instance IsSetContent a => IsDataType ('SetTy a) where
+class (IsRegister a, Ord a) => IsSet a
+
+instance IsSet a => IsDataType ('SetTy a) where
   type DataTypeVal ('SetTy a) = Set a
 
   parseDtFetchResp _ resp =
     case resp ^. #type' of
       DtFetchResp'SET ->
-        Set.fromList <$> for (resp ^. #value . #setValue) decodeSetContent
+        Set.fromList <$> for (resp ^. #value . #setValue) decodeRegister
 
       x ->
         Left ("expected set but found " <> dataTypeToText x)
 
   parseDtUpdateResp _ resp =
-    Set.fromList <$> for (resp ^. #setValue) decodeSetContent
-
--- TODO better name for IsSetContent
-class Ord a => IsSetContent a where
-  decodeSetContent :: ByteString -> Either Text a
-
-  encodeSetContent :: a -> ByteString
-
-instance IsSetContent ByteString where
-  decodeSetContent = Right
-  encodeSetContent = id
+    Set.fromList <$> for (resp ^. #setValue) decodeRegister
 
 
 newtype SetOp a

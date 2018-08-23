@@ -329,7 +329,7 @@ doFetchObject
           printContent (f i) (Just i) content
 
 doFetchSet
-  :: BucketType ('Just 'SetTy)
+  :: BucketType ('Just ('SetTy Text))
   -> Bucket
   -> Key
   -> HostName

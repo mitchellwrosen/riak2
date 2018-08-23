@@ -75,6 +75,9 @@ module Riak
   , Handle
   , IndexName(..)
   , IsContent(..)
+  , IsMap(..)
+  , IsRegister(..)
+  , IsSet
   , Key(..)
   , Location(..)
   , MapValue(..)
@@ -643,7 +646,7 @@ fetchMap =
 --
 -- Throws a 'DataTypeError' if the given 'Location' does not contain sets.
 fetchSet
-  :: (IsSetContent a, MonadIO m)
+  :: (IsSet a, MonadIO m)
   => Handle -- ^
   -> Location ('Just ('SetTy a)) -- ^
   -> FetchDataTypeParams -- ^
@@ -765,7 +768,7 @@ _updateCounter handle namespace key incr params =
 -- Throws a 'DataTypeError' if the given 'Location' does not contain
 -- counters.
 updateSet
-  :: (IsSetContent a, MonadIO m)
+  :: (IsSet a, MonadIO m)
   => Handle
   -> Location ('Just ('SetTy a))
   -> SetOp a
@@ -779,7 +782,7 @@ updateSet handle (Location namespace key) op params =
 -- Throws a 'DataTypeError' if the given 'Location' does not contain
 -- counters.
 updateNewSet
-  :: (IsSetContent a, MonadIO m)
+  :: (IsSet a, MonadIO m)
   => Handle
   -> Namespace ('Just ('SetTy a))
   -> SetOp a
@@ -791,7 +794,7 @@ updateNewSet handle namespace op params =
 -- TODO _updateSet use same conn for get-put
 _updateSet
   :: forall a m.
-     (IsSetContent a, MonadIO m)
+     (IsSet a, MonadIO m)
   => Handle
   -> Namespace ('Just ('SetTy a))
   -> Maybe Key
@@ -1279,9 +1282,9 @@ unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)
 unRpbPair (RpbPair k v _) =
   (k, v)
 
-unSetOp :: IsSetContent a => SetOp a -> ([ByteString], [ByteString])
+unSetOp :: IsSet a => SetOp a -> ([ByteString], [ByteString])
 unSetOp (SetOp (adds, removes)) =
-  (map encodeSetContent (toList adds), map encodeSetContent (toList removes))
+  (map encodeRegister (toList adds), map encodeRegister (toList removes))
 
 
 -- $documentation
