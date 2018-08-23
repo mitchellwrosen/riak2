@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, KindSignatures,
+{-# LANGUAGE StandaloneDeriving, GADTs, DataKinds, DeriveAnyClass, DerivingStrategies, KindSignatures,
              LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
              TypeFamilies #-}
 
@@ -150,11 +150,9 @@ data MapValue
 -- | A 'DataTypeError' is thrown when a data type operation is performed on an
 -- incompatible bucket type (for example, attempting to fetch a counter from a
 -- bucket type that contains sets).
-data DataTypeError
-  = DataTypeError
-      !SomeBucketType       -- Bucket type
-      !Bucket               -- Bucket
-      !Key                  -- Key
-      !Text                 -- Error message
-  deriving stock (Show)
-  deriving anyclass (Exception)
+data DataTypeError where
+  DataTypeError :: Location ty -> Text -> DataTypeError
+
+deriving instance Show DataTypeError
+
+instance Exception DataTypeError

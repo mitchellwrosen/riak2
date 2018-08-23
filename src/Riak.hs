@@ -77,9 +77,11 @@ module Riak
   , IndexName(..)
   , IsContent(..)
   , Key(..)
+  , Location(..)
   , MapValue(..)
   , Metadata(..)
   , Modified(..)
+  , Namespace(..)
   , Quorum(..)
   , pattern QuorumAll
   , pattern QuorumQuorum
@@ -170,11 +172,11 @@ withHandle host port cache f = do
 data VclockCache
   = VclockCache
       { vclockCacheLookup ::
-          !(forall ty. BucketType ty -> Bucket -> Key -> IO (Maybe Vclock))
+          !(forall ty. Location ty -> IO (Maybe Vclock))
       , vclockCacheInsert ::
-          !(forall ty. BucketType ty -> Bucket -> Key -> Vclock -> IO ())
+          !(forall ty. Location ty -> Vclock -> IO ())
       , vclockCacheDelete ::
-          !(forall ty. BucketType ty -> Bucket -> Key -> IO ())
+          !(forall ty. Location ty -> IO ())
       }
 
 -- | Make a 'VclockCache' backed by an 'IORef' + 'HashMap' that never purges
@@ -182,24 +184,20 @@ data VclockCache
 refVclockCache :: MonadIO m => m VclockCache
 refVclockCache = liftIO $ do
   -- TODO strict (type, bucket, key)
-  cacheRef :: IORef (HashMap (SomeBucketType, Bucket, Key) Vclock) <-
+  cacheRef :: IORef (HashMap SomeLocation Vclock) <-
     liftIO (newIORef mempty)
 
   pure VclockCache
     { vclockCacheLookup =
-        \type' bucket key -> do
-          HashMap.lookup (SomeBucketType (unBucketType type'), bucket, key) <$>
-            readIORef cacheRef
+        \loc -> do
+          HashMap.lookup (SomeLocation loc) <$> readIORef cacheRef
 
     , vclockCacheInsert =
-        \type' bucket key vclock ->
-          modifyIORef' cacheRef
-            (HashMap.insert (SomeBucketType (unBucketType type'), bucket, key) vclock)
+        \loc vclock ->
+          modifyIORef' cacheRef (HashMap.insert (SomeLocation loc) vclock)
 
     , vclockCacheDelete =
-        \type' bucket key ->
-          modifyIORef cacheRef
-            (HashMap.delete (SomeBucketType (unBucketType type'), bucket, key))
+        \loc -> modifyIORef cacheRef (HashMap.delete (SomeLocation loc))
     }
 
 
@@ -215,24 +213,20 @@ fetchObject
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location 'Nothing -- ^
   -> FetchObjectParams -- ^
   -> m (Either RpbErrorResp [Content a])
-fetchObject handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a NoHead NoIfModified b c d e f g
+fetchObject handle loc (FetchObjectParams a b c d e f g) = _fetchObject handle loc a NoHead NoIfModified b c d e f g
 
 -- | Fetch an object's metadata.
 fetchObjectHead
     :: forall a m.
        (IsContent a, MonadIO m)
     => Handle -- ^
-    -> BucketType 'Nothing -- ^
-    -> Bucket -- ^
-    -> Key -- ^
+    -> Location 'Nothing -- ^
     -> FetchObjectParams
     -> m (Either RpbErrorResp [Content (Proxy a)])
-fetchObjectHead handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a Head NoIfModified b c d e f g
+fetchObjectHead handle loc (FetchObjectParams a b c d e f g) = _fetchObject handle loc a Head NoIfModified b c d e f g
 
 -- | Fetch an object if it has been modified since the last fetch.
 --
@@ -242,24 +236,20 @@ fetchObjectIfModified
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location 'Nothing -- ^
   -> FetchObjectParams -- ^
   -> m (Either RpbErrorResp (Modified [Content a]))
-fetchObjectIfModified handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a NoHead IfModified b c d e f g
+fetchObjectIfModified handle loc (FetchObjectParams a b c d e f g) = _fetchObject handle loc a NoHead IfModified b c d e f g
 
 -- | Fetch an object's metadata if it has been modified since the last fetch.
 fetchObjectIfModifiedHead
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location 'Nothing -- ^
   -> FetchObjectParams -- ^
   -> m (Either RpbErrorResp (Modified [Content (Proxy a)]))
-fetchObjectIfModifiedHead handle type' bucket key (FetchObjectParams a b c d e f g) = _fetchObject handle type' bucket key a Head IfModified b c d e f g
+fetchObjectIfModifiedHead handle loc (FetchObjectParams a b c d e f g) = _fetchObject handle loc a Head IfModified b c d e f g
 
 type FetchObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
   = IfModifiedWrapper if_modified [(Content (If head (Proxy a) a))]
@@ -273,9 +263,7 @@ _fetchObject
   :: forall a head if_modified m.
      (IsContent a, MonadIO m)
   => Handle
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
+  -> Location 'Nothing
   -> BasicQuorum
   -> Head a head
   -> IfModified if_modified
@@ -287,12 +275,13 @@ _fetchObject
   -> Timeout
   -> m (Either RpbErrorResp (FetchObjectResp head if_modified a))
 _fetchObject
-    handle@(Handle conn cache) type' bucket key basic_quorum head if_modified n
-    notfound_ok pr r sloppy_quorum timeout = liftIO . runExceptT $ do
+    handle@(Handle conn cache) loc@(Location (Namespace type' bucket) key)
+    basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
+    liftIO . runExceptT $ do
 
   vclock :: Maybe Vclock <-
     case if_modified of
-      IfModified   -> lift (vclockCacheLookup cache type' bucket key)
+      IfModified   -> lift (vclockCacheLookup cache loc)
       NoIfModified -> pure Nothing
 
   let
@@ -330,7 +319,7 @@ _fetchObject
     (IfModified, Just True) ->
       pure ()
     _ -> do
-      cacheVclock handle type' bucket key (coerce (response ^. #maybe'vclock))
+      cacheVclock handle loc (coerce (response ^. #maybe'vclock))
 
   lift (mkResponse response)
 
@@ -354,7 +343,7 @@ _fetchObject
    where
     contents :: IO [Content (If head (Proxy a) a)]
     contents =
-      traverse (parseContent @a proxy# type' bucket key headAsBool) content
+      traverse (parseContent @a proxy# loc headAsBool) content
      where
       headAsBool :: SBool head
       headAsBool =
@@ -373,16 +362,14 @@ storeObject
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location 'Nothing -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp ())
 storeObject
-    handle type' bucket key content (StoreObjectParams a b c d e f g h) =
+    handle (Location namespace key) content (StoreObjectParams a b c d e f g h) =
   fmap (() <$)
-    (_storeObject handle type' bucket (Just key) content a b c d e
+    (_storeObject handle namespace (Just key) content a b c d e
       ParamObjectReturnNone f g h)
 
 -- | Store an object and return its metadata.
@@ -390,15 +377,13 @@ storeObjectHead
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location 'Nothing -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (NonEmpty (Content (Proxy a))))
 storeObjectHead
-    handle type' bucket key content (StoreObjectParams a b c d e f g h) =
-  _storeObject handle type' bucket (Just key) content a b c d e
+    handle (Location namespace key) content (StoreObjectParams a b c d e f g h) =
+  _storeObject handle namespace (Just key) content a b c d e
     ParamObjectReturnHead f g h
 
 -- | Store an object and return it.
@@ -406,15 +391,13 @@ storeObjectBody
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location 'Nothing -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (NonEmpty (Content a)))
 storeObjectBody
-    handle type' bucket key content (StoreObjectParams a b c d e f g h) =
-  _storeObject handle type' bucket (Just key) content a b c d e
+    handle (Location namespace key) content (StoreObjectParams a b c d e f g h) =
+  _storeObject handle namespace (Just key) content a b c d e
     ParamObjectReturnBody f g h
 
 -- | Store a new object and return its randomly-generated key.
@@ -422,14 +405,13 @@ storeNewObject
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
+  -> Namespace 'Nothing -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp Key)
 storeNewObject
-    handle type' bucket content (StoreObjectParams a b c d e f g h) =
-  _storeObject handle type' bucket Nothing content a b c d e
+    handle namespace content (StoreObjectParams a b c d e f g h) =
+  _storeObject handle namespace Nothing content a b c d e
     ParamObjectReturnNone f g h
 
 -- | Store an new object and return its metadata.
@@ -437,15 +419,14 @@ storeNewObjectHead
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
+  -> Namespace 'Nothing -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (Content (Proxy a)))
 storeNewObjectHead
-    handle type' bucket content (StoreObjectParams a b c d e f g h) =
+    handle namespace content (StoreObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
-    _storeObject handle type' bucket Nothing content a b c d e
+    _storeObject handle namespace Nothing content a b c d e
       ParamObjectReturnHead f g h
 
 -- | Store an new object and return it.
@@ -453,23 +434,21 @@ storeNewObjectBody
   :: forall a m.
      (IsContent a, MonadIO m)
   => Handle -- ^
-  -> BucketType 'Nothing -- ^
-  -> Bucket -- ^
+  -> Namespace 'Nothing -- ^
   -> a -- ^
   -> StoreObjectParams -- ^
   -> m (Either RpbErrorResp (Content a))
 storeNewObjectBody
-    handle type' bucket content (StoreObjectParams a b c d e f g h) =
+    handle namespace content (StoreObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
-    _storeObject handle type' bucket Nothing content a b c d e
+    _storeObject handle namespace Nothing content a b c d e
       ParamObjectReturnBody f g h
 
 _storeObject
   :: forall a m return.
      (IsContent a, MonadIO m)
   => Handle
-  -> BucketType 'Nothing
-  -> Bucket
+  -> Namespace 'Nothing
   -> Maybe Key
   -> a
   -> DW
@@ -483,14 +462,14 @@ _storeObject
   -> W
   -> m (Either RpbErrorResp (ObjectReturnTy a return))
 _storeObject
-    handle@(Handle conn cache) type' bucket key value dw indexes metadata n pw
+    handle@(Handle conn cache) namespace@(Namespace type' bucket) key value dw indexes metadata n pw
     return sloppy_quorum timeout w = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe Vclock <-
     maybe
       (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (lift . vclockCacheLookup cache type' bucket)
+      (lift . vclockCacheLookup cache . Location namespace)
       key
 
   let
@@ -562,6 +541,11 @@ _storeObject
       pure
       key
 
+  let
+    loc :: Location 'Nothing
+    loc =
+      Location (Namespace type' bucket) theKey
+
   -- Cache the vclock if asked for it with return_head or return_body.
   do
     let
@@ -572,7 +556,7 @@ _storeObject
             nonsense "missing vclock"
 
           Just theVclock ->
-            cacheVclock handle type' bucket theKey (Just (coerce theVclock))
+            cacheVclock handle loc (Just (coerce theVclock))
 
     () <-
       case return of
@@ -591,12 +575,12 @@ _storeObject
 
         ParamObjectReturnHead ->
           traverse
-            (parseContent @a proxy# type' bucket theKey STrue)
+            (parseContent @a proxy# loc STrue)
             (List1.fromList (response ^. #content))
 
         ParamObjectReturnBody ->
           traverse
-            (parseContent @a proxy# type' bucket theKey SFalse)
+            (parseContent @a proxy# loc SFalse)
             (List1.fromList (response ^. #content))
 
   lift theValue
@@ -616,22 +600,18 @@ deleteObject (Handle conn _) req =
 fetchCounter
   :: MonadIO m
   => Handle -- ^
-  -> BucketType ('Just 'CounterTy) -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location ('Just 'CounterTy) -- ^
   -> FetchObjectParams -- ^
   -> m (Either RpbErrorResp Int64)
-fetchCounter handle type' bucket key (FetchObjectParams a b c d e f g) =
-  fetchDataType handle type' bucket key
+fetchCounter handle loc (FetchObjectParams a b c d e f g) =
+  fetchDataType handle loc
     (FetchDataTypeParams a (IncludeContext Nothing) b c d e f g)
 
 
 fetchGrowOnlySet
   :: MonadIO m
   => Handle -- ^
-  -> BucketType ('Just 'GrowOnlySetTy) -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location ('Just 'GrowOnlySetTy) -- ^
   -> FetchDataTypeParams -- ^
   -> m (Either RpbErrorResp (Set ByteString))
 fetchGrowOnlySet =
@@ -641,9 +621,7 @@ fetchGrowOnlySet =
 fetchHyperLogLog
   :: MonadIO m
   => Handle -- ^
-  -> BucketType ('Just 'HyperLogLogTy) -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location ('Just 'HyperLogLogTy) -- ^
   -> FetchDataTypeParams -- ^
   -> m (Either RpbErrorResp Word64)
 fetchHyperLogLog =
@@ -652,9 +630,7 @@ fetchHyperLogLog =
 fetchMap
   :: MonadIO m
   => Handle -- ^
-  -> BucketType ('Just 'MapTy) -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location ('Just 'MapTy) -- ^
   -> FetchDataTypeParams -- ^
   -> m (Either RpbErrorResp (HashMap ByteString MapValue))
 fetchMap =
@@ -663,9 +639,7 @@ fetchMap =
 fetchSet
   :: MonadIO m
   => Handle -- ^
-  -> BucketType ('Just 'SetTy) -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location ('Just 'SetTy) -- ^
   -> FetchDataTypeParams -- ^
   -> m (Either RpbErrorResp (Set ByteString))
 fetchSet =
@@ -675,23 +649,16 @@ fetchDataType
   :: forall m ty.
      (IsDataType ty, MonadIO m)
   => Handle
-  -> BucketType ('Just ty)
-  -> Bucket
-  -> Key
+  -> Location ('Just ty)
   -> FetchDataTypeParams
   -> m (Either RpbErrorResp (DataTypeVal ty))
-fetchDataType handle type' bucket key params = liftIO . runExceptT $ do
+fetchDataType handle loc params = liftIO . runExceptT $ do
   value :: DataType <-
-    ExceptT (fetchSomeDataType handle type' bucket key params)
+    ExceptT (fetchSomeDataType handle loc params)
 
   case fromDataType @ty proxy# value of
     Left err ->
-      throwIO
-        (DataTypeError
-          (SomeBucketType (unBucketType type'))
-          bucket
-          key
-          err)
+      throwIO (DataTypeError loc err)
 
     Right value' ->
       pure value'
@@ -700,13 +667,11 @@ fetchDataType handle type' bucket key params = liftIO . runExceptT $ do
 fetchSomeDataType
   :: MonadIO m
   => Handle -- ^
-  -> BucketType ('Just ty) -- ^
-  -> Bucket -- ^
-  -> Key -- ^
+  -> Location ('Just ty) -- ^
   -> FetchDataTypeParams
   -> m (Either RpbErrorResp DataType)
 fetchSomeDataType
-    handle@(Handle conn _) type' bucket key
+    handle@(Handle conn _) loc@(Location (Namespace type' bucket) key)
     (FetchDataTypeParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
@@ -718,9 +683,7 @@ fetchSomeDataType
       unless (include_context == Just False) $
         cacheVclock
           handle
-          type'
-          bucket
-          key
+          loc
           (coerce (response ^. #maybe'context))
 
   case response ^. #type' of
@@ -764,48 +727,39 @@ fetchSomeDataType
 updateCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'CounterTy)
-  -> Bucket
-  -> Key
+  -> Location ('Just 'CounterTy)
   -> Int64
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp Int64)
-updateCounter handle type' bucket key incr params =
-  (fmap.fmap) snd (_updateCounter handle type' bucket (Just key) incr params)
+updateCounter handle (Location namespace key) incr params =
+  (fmap.fmap) snd (_updateCounter handle namespace (Just key) incr params)
 
 updateNewCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'CounterTy)
-  -> Bucket
+  -> Namespace ('Just 'CounterTy)
   -> Int64
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp (Key, Int64))
-updateNewCounter handle type' bucket =
-  _updateCounter handle type' bucket Nothing
+updateNewCounter handle namespace =
+  _updateCounter handle namespace Nothing
 
 _updateCounter
   :: MonadIO m
   => Handle
-  -> BucketType ('Just 'CounterTy)
-  -> Bucket
+  -> Namespace ('Just 'CounterTy)
   -> Maybe Key
   -> Int64
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp (Key, Int64))
-_updateCounter handle type' bucket key incr params = liftIO . runExceptT $ do
+_updateCounter handle namespace key incr params = liftIO . runExceptT $ do
   response :: DtUpdateResp <-
-    ExceptT (updateDataType handle type' bucket key op params)
+    ExceptT (updateDataType handle namespace key op params)
 
   theKey :: Key <-
     maybe
       (maybe
-        (panic "missing key"
-          ( ( "type"    , type'    )
-          , ( "bucket"  , bucket   )
-          , ( "key"     , key      )
-          , ( "response", response )
-          ))
+        (panic "missing key" ("response", response))
         pure
         (coerce (response ^. #maybe'key)))
       pure
@@ -828,14 +782,13 @@ _updateCounter handle type' bucket key incr params = liftIO . runExceptT $ do
 updateDataType
   :: MonadIO m
   => Handle
-  -> BucketType ('Just ty)
-  -> Bucket
+  -> Namespace ('Just ty)
   -> Maybe Key
   -> DtOp
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp DtUpdateResp)
 updateDataType
-    (Handle conn _) type' bucket key op
+    (Handle conn _) (Namespace type' bucket) key op
     (UpdateDataTypeParams dw n pw return_body sloppy_quorum timeout w) = do
 
   liftIO (Internal.updateDataType conn request)
@@ -861,6 +814,7 @@ updateDataType
       }
 
 
+-- TODO getBucketTypeProps return BucketProps
 getBucketTypeProps
   :: MonadIO m
   => Handle
@@ -899,13 +853,13 @@ setBucketTypeProps (Handle conn _) type' props =
       }
 
 
+-- TODO getBucketProps return BucketProps
 getBucketProps
   :: MonadIO m
   => Handle
-  -> BucketType ty
-  -> Bucket
+  -> Namespace ty
   -> m (Either RpbErrorResp RpbBucketProps)
-getBucketProps (Handle conn _) type' bucket = runExceptT $ do
+getBucketProps (Handle conn _) (Namespace type' bucket) = runExceptT $ do
   response :: RpbGetBucketResp <-
     ExceptT (liftIO (Internal.getBucketProps conn request))
   pure (response ^. #props)
@@ -920,7 +874,7 @@ getBucketProps (Handle conn _) type' bucket = runExceptT $ do
       }
 
 
--- TODO: Don't allow setting n
+-- TODO: setBucketProps Don't allow setting n
 setBucketProps
   :: MonadIO m
   => Handle
@@ -976,10 +930,9 @@ listKeys
   :: forall m ty.
      MonadIO m
   => Handle
-  -> BucketType ty
-  -> Bucket
+  -> Namespace ty
   -> ListT (ExceptT RpbErrorResp m) Key
-listKeys (Handle conn _) type' bucket = do
+listKeys (Handle conn _) (Namespace type' bucket) = do
   liftIO (send conn request)
 
   fix $ \loop -> do
@@ -1123,28 +1076,25 @@ getServerInfo (Handle conn _) =
 cacheVclock
   :: MonadIO m
   => Handle
-  -> BucketType ty
-  -> Bucket
-  -> Key
+  -> Location ty
   -> Maybe Vclock
   -> m ()
-cacheVclock (Handle _ cache) type' bucket key = liftIO .
-  maybe
-    (vclockCacheDelete cache type' bucket key)
-    (vclockCacheInsert cache type' bucket key)
+cacheVclock (Handle _ cache) loc =
+  liftIO .
+    maybe
+      (vclockCacheDelete cache loc)
+      (vclockCacheInsert cache loc)
 
 
 parseContent
   :: forall a head.
      IsContent a
   => Proxy# a
-  -> BucketType 'Nothing
-  -> Bucket
-  -> Key
+  -> Location 'Nothing
   -> SBool head
   -> RpbContent
   -> IO (Content (If head (Proxy a) a))
-parseContent _ type' bucket key head
+parseContent _ loc head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
@@ -1172,9 +1122,7 @@ parseContent _ type' bucket key head
       pure (fromIntegral secs + realToFrac usecs_d)
 
   pure $ Content
-    type'
-    bucket
-    key
+    loc
     theValue
     (coerce vtag)
     (posixSecondsToUTCTime <$> theLastMod)
@@ -1297,7 +1245,12 @@ unRpbPair (RpbPair k v _) =
 --
 -- = Glossary
 --
--- [__basic_quorum__]
+-- [__allow mult__]
+-- Whether siblings can be created. The legacy default bucket type defaults to
+-- false, but other bucket types default to false, and false is the recommended
+-- setting for most use cases.
+--
+-- [__basic quorum__]
 -- Whether to use the "basic quorum" policy for not-founds. Only relevant when
 -- __notfound_ok__ is set to false.
 --
@@ -1312,6 +1265,10 @@ unRpbPair (RpbPair k v _) =
 --
 --     * /Range/: 1 to __n__.
 --
+-- [__last write wins__]
+-- Resolve conflicts with timestamps. Only relevant if __allow mult__ is false,
+-- which is not recommended.
+--
 -- [__n__]
 -- The number of /primary vnodes/ responsible for each key, i.e. the number of
 -- /replicas/ stores in the cluster.
@@ -1320,7 +1277,7 @@ unRpbPair (RpbPair k v _) =
 --
 --     * /Range/: 1 to the number of nodes in the cluster.
 --
--- [__notfound_ok__]
+-- [__notfound ok__]
 -- Controls how Riak behaves during read requests when keys are not present. If
 -- @true@, Riak will treat any @notfound@ as a positive assertion that the key
 -- does not exist. If @false@, Riak will treat any @notfound@ as a failure
@@ -1355,7 +1312,7 @@ unRpbPair (RpbPair k v _) =
 --
 --     * /Range/: 1 to __n__.
 --
--- [__sloppy_quorum__]
+-- [__sloppy quorum__]
 -- Whether failover vnodes are consulted if one or more primary vnodes fails.
 --
 -- * /Default/: true.

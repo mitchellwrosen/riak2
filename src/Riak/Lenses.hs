@@ -1,4 +1,5 @@
-{-# LANGUAGE NoImplicitPrelude #-}
+{-# LANGUAGE DataKinds, FlexibleContexts, MagicHash, NoImplicitPrelude,
+             TypeApplications #-}
 
 module Riak.Lenses
   ( adds
@@ -73,6 +74,7 @@ module Riak.Lenses
   , lastWriteWins
   , linkfun
   , links
+  , location
   , lowerBound
   , lowerBoundInclusive
   , mapOp
@@ -191,6 +193,7 @@ module Riak.Lenses
   , module'
   , nVal
   , name
+  , namespace
   , node
   , notfoundOk
   , numFound
@@ -269,4 +272,21 @@ module Riak.Lenses
   , youngVclock
   ) where
 
+import GHC.Exts (proxy#)
+
+import qualified Lens.Family2
+import qualified Lens.Labels
+
 import Proto.Riak_Fields
+
+location
+  :: Lens.Labels.HasLens f s t "location" a b
+  => Lens.Family2.LensLike f s t a b
+location =
+  Lens.Labels.lensOf (proxy# @_ @"location")
+
+namespace
+  :: Lens.Labels.HasLens f s t "namespace" a b
+  => Lens.Family2.LensLike f s t a b
+namespace =
+  Lens.Labels.lensOf (proxy# @_ @"namespace")

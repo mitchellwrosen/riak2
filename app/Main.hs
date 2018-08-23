@@ -55,6 +55,7 @@ parser =
         , fetchMapParser
         , fetchSetParser
         , updateCounterParser
+          -- TODO riak-cli update-new-counter
         ]
       , [ commandGroup "Bucket operations"
         , getBucketTypePropsParser
@@ -237,12 +238,12 @@ updateCounterParser =
       (doUpdateCounter
         <$> bucketTypeArgument
         <*> bucketArgument
+        <*> keyArgument
         <*> argument auto
               (mconcat
                 [ help "Value"
                 , metavar "VALUE"
-                ])
-        <*> optional keyOption)
+                ]))
         -- TODO other update-counter optional params
       (progDesc "Update a counter"))
 
@@ -260,12 +261,8 @@ doFetchCounter
 doFetchCounter type' bucket key host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    print =<<
-      fetchCounter h
-        type'
-        bucket
-        key
-        def
+    either print print =<<
+      fetchCounter h (Location (Namespace type' bucket) key) def
 
 doFetchMap
   :: BucketType ('Just 'MapTy)
@@ -277,12 +274,8 @@ doFetchMap
 doFetchMap type' bucket key host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    print =<<
-      fetchMap h
-        type'
-        bucket
-        key
-        def
+    either print print =<<
+      fetchMap h (Location (Namespace type' bucket) key) def
 
 doFetchObject
   :: BucketType 'Nothing
@@ -310,15 +303,13 @@ doFetchObject
 
  where
   go
-    :: (BucketType 'Nothing -> Bucket -> Key -> FetchObjectParams -> IO (Either RpbErrorResp [Content a]))
+    :: (Location 'Nothing -> FetchObjectParams -> IO (Either RpbErrorResp [Content a]))
     -> (Int -> a -> IO ())
     -> IO ()
   go fetch f = do
     eresponse <-
       fetch
-        type'
-        bucket
-        key
+        (Location (Namespace type' bucket) key)
         (def
           & (if basic_quorum then #basic_quorum True else id)
           & (if notfound_not_ok then #notfound_ok False else id)
@@ -350,7 +341,7 @@ doFetchSet
 doFetchSet type' bucket key host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    fetchSet h type' bucket key def >>= \case
+    fetchSet h (Location (Namespace type' bucket) key) def >>= \case
       Left err -> print err
       Right vals -> for_ vals print -- TODO encoding?
 
@@ -358,13 +349,14 @@ doGetBucketProps :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
 doGetBucketProps type' bucket host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    either print printBucketProps =<< getBucketProps h type' bucket
+    either print printBucketProps =<< getBucketProps h (Namespace type' bucket)
 
 doGetBucketTypeProps :: BucketType ty -> HostName -> PortNumber -> IO ()
 doGetBucketTypeProps type' host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    either print printBucketProps =<< getBucketTypeProps h type'
+    either print printBucketProps
+      =<< getBucketTypeProps h type'
 
 doGetIndex :: Maybe IndexName -> HostName -> PortNumber -> IO ()
 doGetIndex index host port = do
@@ -390,7 +382,8 @@ doListKeys type' bucket host port = do
   withHandle host port cache $ \h -> do
     result :: Either RpbErrorResp () <-
       (runExceptT . runListT)
-        (listKeys h type' bucket >>= liftIO . Latin1.putStrLn . coerce)
+        (listKeys h (Namespace type' bucket) >>=
+          liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
 
 doStoreObject
@@ -435,15 +428,13 @@ doStoreObject
       _   -> undefined
  where
   go
-    :: (BucketType 'Nothing -> Bucket -> Key -> Text -> StoreObjectParams -> IO (Either RpbErrorResp a))
+    :: (Location 'Nothing -> Text -> StoreObjectParams -> IO (Either RpbErrorResp a))
     -> (a -> IO ())
     -> IO ()
   go store f = do
     eresponse <-
       store
-        type'
-        bucket
-        key
+        (Location (Namespace type' bucket) key)
         content
         (def
           & maybe id #dw dw
@@ -458,15 +449,16 @@ doStoreObject
 doUpdateCounter
   :: BucketType ('Just 'CounterTy)
   -> Bucket
+  -> Key
   -> Int64
-  -> Maybe Key
   -> HostName
   -> PortNumber
   -> IO ()
-doUpdateCounter type' bucket incr key host port = do
+doUpdateCounter type' bucket key incr host port = do
   cache <- refVclockCache
   withHandle host port cache $ \h ->
-    either print print =<< updateCounter h type' bucket key incr def
+    either print print =<<
+      updateCounter h (Location (Namespace type' bucket) key) incr def
 
 --------------------------------------------------------------------------------
 -- Misc. helpers
@@ -510,9 +502,7 @@ printBucketProps props = do
 
 printContent :: (a -> IO ()) -> Maybe Int -> Content a -> IO ()
 printContent f mi content = do
-  tag "type" (content ^. L.type')
-  tag "bucket" (content ^. L.bucket)
-  tag "key" (content ^. L.key)
+  tag "location" (showLocation (content ^. L.location))
 
   f (content ^. L.value)
 
@@ -552,6 +542,10 @@ showQuorum = \case
   4294967294 -> "one"
   n          -> show n
 
+showLocation :: Location ty -> String
+showLocation (Location (Namespace type' bucket) key) =
+  show type' ++ "/" ++ show bucket ++ "/" ++ show key
+
 bucketArgument :: Parser Bucket
 bucketArgument =
   (fmap Bucket . strArgument)
@@ -573,15 +567,6 @@ keyArgument =
   (fmap Key . strArgument)
     (mconcat
       [ help "Key"
-      , metavar "KEY"
-      ])
-
-keyOption :: Parser Key
-keyOption =
-  (fmap Key . strOption)
-    (mconcat
-      [ long "key"
-      , help "Key"
       , metavar "KEY"
       ])
 
