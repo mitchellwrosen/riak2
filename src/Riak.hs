@@ -1,15 +1,12 @@
 {-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
              LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
-             PatternSynonyms, RankNTypes, ScopedTypeVariables,
-             StandaloneDeriving, TupleSections, TypeApplications, TypeFamilies,
-             TypeOperators, UndecidableInstances, ViewPatterns #-}
+             PatternSynonyms, ScopedTypeVariables, StandaloneDeriving,
+             TupleSections, TypeApplications, TypeFamilies, TypeOperators,
+             UndecidableInstances, ViewPatterns #-}
 
 module Riak
-  ( -- * Riak handle
-    Handle
-  , withHandle
-  , VclockCache(..)
-  , refVclockCache
+  ( -- * Handle
+    withHandle
     -- * Key/value object operations
     -- ** Fetch object
   , fetchObject
@@ -37,6 +34,7 @@ module Riak
     -- ** Set
   , fetchSet
   , updateSet
+  , updateNewSet
   , setAddOp
   , setRemoveOp
     -- ** Map
@@ -77,6 +75,7 @@ module Riak
   , DataTypeTy(..)
   , FetchDataTypeParams
   , FetchObjectParams
+  , Handle
   , IndexName(..)
   , IsContent(..)
   , Key(..)
@@ -113,7 +112,6 @@ import Data.Foldable              (toList)
 import Data.Function              (fix)
 import Data.HashMap.Strict        (HashMap)
 import Data.Int                   (Int64)
-import Data.IORef
 import Data.Kind                  (Type)
 import Data.List.NonEmpty         (NonEmpty)
 import Data.Maybe                 (fromMaybe)
@@ -133,7 +131,6 @@ import UnliftIO.Exception         (throwIO)
 
 import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
-import qualified Data.HashMap.Strict   as HashMap
 import qualified Data.List.NonEmpty    as List1
 import qualified Data.Set              as Set
 import qualified List.Transformer      as ListT
@@ -141,6 +138,7 @@ import qualified List.Transformer      as ListT
 import           Proto.Riak               hiding (SetOp)
 import qualified Proto.Riak               as Proto
 import qualified Riak.Internal            as Internal
+import           Riak.Internal.Cache
 import           Riak.Internal.Connection
 import           Riak.Internal.Content
 import           Riak.Internal.DataTypes
@@ -163,49 +161,17 @@ import           Riak.Internal.Types
 data Handle
   = Handle
       !Connection
-      !VclockCache
+      !Cache
 
 withHandle
   :: MonadUnliftIO m
   => HostName -- ^
   -> PortNumber -- ^
-  -> VclockCache -- ^
   -> (Handle -> m a) -- ^
   -> m a -- ^
-withHandle host port cache f = do
+withHandle host port f = do
+  cache <- liftIO newCache
   withConnection host port (\conn -> f (Handle conn cache))
-
-
-data VclockCache
-  = VclockCache
-      { vclockCacheLookup ::
-          !(forall ty. Location ty -> IO (Maybe Vclock))
-      , vclockCacheInsert ::
-          !(forall ty. Location ty -> Vclock -> IO ())
-      , vclockCacheDelete ::
-          !(forall ty. Location ty -> IO ())
-      }
-
--- | Make a 'VclockCache' backed by an 'IORef' + 'HashMap' that never purges
--- entries. TODO Smarter cache invalidation (controllable timeout).
-refVclockCache :: MonadIO m => m VclockCache
-refVclockCache = liftIO $ do
-  -- TODO strict (type, bucket, key)
-  cacheRef :: IORef (HashMap SomeLocation Vclock) <-
-    liftIO (newIORef mempty)
-
-  pure VclockCache
-    { vclockCacheLookup =
-        \loc -> do
-          HashMap.lookup (SomeLocation loc) <$> readIORef cacheRef
-
-    , vclockCacheInsert =
-        \loc vclock ->
-          modifyIORef' cacheRef (HashMap.insert (SomeLocation loc) vclock)
-
-    , vclockCacheDelete =
-        \loc -> modifyIORef cacheRef (HashMap.delete (SomeLocation loc))
-    }
 
 
 --------------------------------------------------------------------------------
@@ -288,7 +254,7 @@ _fetchObject
 
   vclock :: Maybe Vclock <-
     case if_modified of
-      IfModified   -> lift (vclockCacheLookup cache loc)
+      IfModified   -> lift (cacheLookup cache loc)
       NoIfModified -> pure Nothing
 
   let
@@ -476,7 +442,7 @@ _storeObject
   vclock :: Maybe Vclock <-
     maybe
       (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (lift . vclockCacheLookup cache . Location namespace)
+      (lift . cacheLookup cache . Location namespace)
       key
 
   let
@@ -604,6 +570,10 @@ deleteObject (Handle conn _) req =
   liftIO (Internal.deleteObject conn req)
 
 
+-- | Fetch a counter.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- counters.
 fetchCounter
   :: MonadIO m
   => Handle -- ^
@@ -615,6 +585,10 @@ fetchCounter handle loc (FetchObjectParams a b c d e f g) =
     (FetchDataTypeParams a (IncludeContext Nothing) b c d e f g)
 
 
+-- | Fetch a grow-only set.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- grow-only sets.
 fetchGrowOnlySet
   :: MonadIO m
   => Handle -- ^
@@ -625,6 +599,10 @@ fetchGrowOnlySet =
   fetchDataType
 
 
+-- | Fetch a HyperLogLog.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- HyperLogLogs.
 fetchHyperLogLog
   :: MonadIO m
   => Handle -- ^
@@ -634,6 +612,10 @@ fetchHyperLogLog
 fetchHyperLogLog =
   fetchDataType
 
+
+-- | Fetch a HyperLogLog.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain maps.
 fetchMap
   :: MonadIO m
   => Handle -- ^
@@ -643,6 +625,10 @@ fetchMap
 fetchMap =
   fetchDataType
 
+
+-- | Fetch a HyperLogLog.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain sets.
 fetchSet
   :: MonadIO m
   => Handle -- ^
@@ -651,6 +637,7 @@ fetchSet
   -> m (Either RpbErrorResp (Set ByteString))
 fetchSet =
   fetchDataType
+
 
 fetchDataType
   :: forall m ty.
@@ -671,6 +658,7 @@ fetchDataType handle loc params = liftIO . runExceptT $ do
       pure value'
 
 
+-- | Fetch some data type.
 fetchSomeDataType
   :: MonadIO m
   => Handle -- ^
@@ -731,6 +719,11 @@ fetchSomeDataType
       , _DtFetchReq'type'          = coerce type'
       }
 
+
+-- | Update a counter and its updated value if @return_body@ is set, else 0.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- counters.
 updateCounter
   :: MonadIO m
   => Handle
@@ -741,15 +734,20 @@ updateCounter
 updateCounter handle (Location namespace key) incr params =
   (fmap.fmap) snd (_updateCounter handle namespace (Just key) incr params)
 
+
+-- | Update a new counter and return its randomly-generated key.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- counters.
 updateNewCounter
   :: MonadIO m
   => Handle
   -> Namespace ('Just 'CounterTy)
   -> Int64
   -> UpdateDataTypeParams
-  -> m (Either RpbErrorResp (Key, Int64))
-updateNewCounter handle namespace =
-  _updateCounter handle namespace Nothing
+  -> m (Either RpbErrorResp Key)
+updateNewCounter handle namespace incr params =
+  (fmap.fmap) fst (_updateCounter handle namespace Nothing incr params)
 
 _updateCounter
   :: MonadIO m
@@ -762,7 +760,6 @@ _updateCounter
 _updateCounter handle namespace key incr params =
   (fmap.fmap.fmap) (view #counterValue)
     (updateDataType handle namespace key Nothing op params)
-
  where
   op :: DtOp
   op =
@@ -776,6 +773,11 @@ _updateCounter handle namespace key incr params =
       }
 
 
+-- | Update a set and return its updated value if @return_body@ is set, else
+-- the empty set.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- counters.
 updateSet
   :: MonadIO m
   => Handle
@@ -785,6 +787,20 @@ updateSet
   -> m (Either RpbErrorResp (Set ByteString))
 updateSet handle (Location namespace key) op params =
   (fmap.fmap) snd (_updateSet handle namespace (Just key) op params)
+
+-- | Update a new set and return its randomly-generated key.
+--
+-- Throws a 'DataTypeError' if the given 'Location' does not contain
+-- counters.
+updateNewSet
+  :: MonadIO m
+  => Handle
+  -> Namespace ('Just 'SetTy)
+  -> SetOp
+  -> UpdateDataTypeParams
+  -> m (Either RpbErrorResp Key)
+updateNewSet handle namespace op params =
+  (fmap.fmap) fst (_updateSet handle namespace Nothing op params)
 
 _updateSet
   :: MonadIO m
@@ -830,7 +846,7 @@ _updateSet
             Location namespace key'
         in do
           context :: Maybe Vclock <-
-            lift (vclockCacheLookup cache loc)
+            lift (cacheLookup cache loc)
 
           if null removes
             then
@@ -842,7 +858,7 @@ _updateSet
                 -- (3b)
                 Nothing -> do
                   _ <- ExceptT (fetchSet handle loc def)
-                  lift (vclockCacheLookup cache loc)
+                  lift (cacheLookup cache loc)
 
                 -- (3a)
                 Just context' ->
@@ -1181,10 +1197,7 @@ cacheVclock
   -> Maybe Vclock
   -> m ()
 cacheVclock (Handle _ cache) loc =
-  liftIO .
-    maybe
-      (vclockCacheDelete cache loc)
-      (vclockCacheInsert cache loc)
+  liftIO . maybe (cacheDelete cache loc) (cacheInsert cache loc)
 
 
 parseContent

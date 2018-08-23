@@ -29,6 +29,8 @@ library
     , network ^>= 2.7.0
     , proto-lens ^>= 0.3.1
     , proto-lens-protoc == 0.3.1.0
+    , stm
+    , stm-containers ^>= 1.0.1
     , streaming-bytestring ^>= 0.1.6
     , text ^>= 1.2.3
     , time
@@ -59,6 +61,7 @@ library
   hs-source-dirs:
     src
   other-modules:
+    Riak.Internal.Cache
     Riak.Internal.Connection
     Riak.Internal.Content
     Riak.Internal.DataTypes
