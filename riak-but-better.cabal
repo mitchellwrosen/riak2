@@ -29,6 +29,7 @@ library
     , network ^>= 2.7.0
     , proto-lens ^>= 0.3.1
     , proto-lens-protoc == 0.3.1.0
+    , resource-pool ^>= 0.2.3
     , stm
     , stm-containers ^>= 1.0.1
     , streaming-bytestring ^>= 0.1.6

@@ -1,8 +1,8 @@
 {-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
              LambdaCase, MagicHash, OverloadedLabels, OverloadedStrings,
-             PatternSynonyms, ScopedTypeVariables, StandaloneDeriving,
-             TupleSections, TypeApplications, TypeFamilies, TypeOperators,
-             UndecidableInstances, ViewPatterns #-}
+             PatternSynonyms, RankNTypes, ScopedTypeVariables,
+             StandaloneDeriving, TupleSections, TypeApplications, TypeFamilies,
+             TypeOperators, UndecidableInstances, ViewPatterns #-}
 
 module Riak
   ( -- * Handle
@@ -115,6 +115,7 @@ import Data.Int                   (Int64)
 import Data.Kind                  (Type)
 import Data.List.NonEmpty         (NonEmpty)
 import Data.Maybe                 (fromMaybe)
+import Data.Pool                  (Pool)
 import Data.Proxy                 (Proxy(Proxy))
 import Data.Set                   (Set)
 import Data.Text                  (Text)
@@ -127,11 +128,12 @@ import List.Transformer           (ListT)
 import Network.Socket             (HostName, PortNumber)
 import Prelude                    hiding (head, return, (.))
 import Text.Read                  (readMaybe)
-import UnliftIO.Exception         (throwIO)
+import UnliftIO.Exception         (finally, throwIO)
 
 import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.List.NonEmpty    as List1
+import qualified Data.Pool             as Pool
 import qualified Data.Set              as Set
 import qualified List.Transformer      as ListT
 
@@ -149,18 +151,16 @@ import           Riak.Internal.Response
 import           Riak.Internal.Types
 
 
--- TODO Namespace, Location like the Java client?
-
 --------------------------------------------------------------------------------
 -- Handle
 --------------------------------------------------------------------------------
 
 -- | A non-thread-safe handle to Riak.
 --
--- TODO: Handle improvements: connection pool, cluster abstraction
+-- TODO: Handle improvement: cluster abstraction, backpressure, enqueueing
 data Handle
   = Handle
-      !Connection
+      !(forall r. (Connection -> IO r) -> IO r)
       !Cache
 
 withHandle
@@ -170,8 +170,25 @@ withHandle
   -> (Handle -> m a) -- ^
   -> m a -- ^
 withHandle host port f = do
-  cache <- liftIO newCache
-  withConnection host port (\conn -> f (Handle conn cache))
+  cache :: Cache <-
+    liftIO newCache
+
+  pool :: Pool Connection <- liftIO $
+    Pool.createPool
+      (connect host port)
+      disconnect
+      5
+      5
+      10
+
+  let
+    handle :: Handle
+    handle =
+      Handle
+        (Pool.withResource pool)
+        cache
+
+  f handle `finally` liftIO (Pool.destroyAllResources pool)
 
 
 --------------------------------------------------------------------------------
@@ -248,7 +265,7 @@ _fetchObject
   -> Timeout
   -> m (Either RpbErrorResp (FetchObjectResp head if_modified a))
 _fetchObject
-    handle@(Handle conn cache) loc@(Location (Namespace type' bucket) key)
+    handle@(Handle withConn cache) loc@(Location (Namespace type' bucket) key)
     basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
     liftIO . runExceptT $ do
 
@@ -284,7 +301,7 @@ _fetchObject
         }
 
   response :: RpbGetResp <-
-    ExceptT (Internal.fetchObject conn request)
+    ExceptT (withConn (\conn -> Internal.fetchObject conn request))
 
   -- Only cache the vclock if we didn't received an "unmodified" response (which
   -- doesn't contain a vclock)
@@ -435,8 +452,8 @@ _storeObject
   -> W
   -> m (Either RpbErrorResp (ObjectReturnTy a return))
 _storeObject
-    handle@(Handle conn cache) namespace@(Namespace type' bucket) key value dw indexes metadata n pw
-    return sloppy_quorum timeout w = liftIO . runExceptT $ do
+    handle@(Handle withConn cache) namespace@(Namespace type' bucket) key value
+    dw indexes metadata n pw return sloppy_quorum timeout w = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe Vclock <-
@@ -495,7 +512,7 @@ _storeObject
         }
 
   response :: RpbPutResp <-
-    ExceptT (Internal.storeObject conn request)
+    ExceptT (withConn (\conn -> Internal.storeObject conn request))
 
   let
     nonsense :: Text -> ExceptT RpbErrorResp IO void
@@ -566,8 +583,8 @@ deleteObject
   => Handle
   -> RpbDelReq
   -> m (Either RpbErrorResp RpbDelResp)
-deleteObject (Handle conn _) req =
-  liftIO (Internal.deleteObject conn req)
+deleteObject (Handle withConn _) req =
+  liftIO (withConn (\conn -> Internal.deleteObject conn req))
 
 
 -- | Fetch a counter.
@@ -666,12 +683,12 @@ fetchSomeDataType
   -> FetchDataTypeParams
   -> m (Either RpbErrorResp DataType)
 fetchSomeDataType
-    handle@(Handle conn _) loc@(Location (Namespace type' bucket) key)
+    handle@(Handle withConn _) loc@(Location (Namespace type' bucket) key)
     (FetchDataTypeParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
   response :: DtFetchResp <-
-    ExceptT (Internal.fetchDataType conn request)
+    ExceptT (withConn (\conn -> Internal.fetchDataType conn request))
 
   let
     doCacheVclock =
@@ -889,12 +906,12 @@ updateDataType
   -> UpdateDataTypeParams
   -> m (Either RpbErrorResp (Key, DtUpdateResp))
 updateDataType
-    (Handle conn _) (Namespace type' bucket) key context op
+    (Handle withConn _) (Namespace type' bucket) key context op
     (UpdateDataTypeParams dw n pw return_body sloppy_quorum timeout w) =
     liftIO . runExceptT $ do
 
   response :: DtUpdateResp <-
-    ExceptT (Internal.updateDataType conn request)
+    ExceptT (withConn (\conn -> Internal.updateDataType conn request))
 
   theKey :: Key <-
     maybe
@@ -937,9 +954,9 @@ getBucketTypeProps
   => Handle
   -> BucketType ty
   -> m (Either RpbErrorResp RpbBucketProps)
-getBucketTypeProps (Handle conn _) type' = runExceptT $ do
+getBucketTypeProps (Handle withConn _) type' = liftIO . runExceptT $ do
   response :: RpbGetBucketResp <-
-    ExceptT (liftIO (Internal.getBucketTypeProps conn request))
+    ExceptT (withConn (\conn -> Internal.getBucketTypeProps conn request))
   pure (response ^. #props)
 
  where
@@ -958,8 +975,10 @@ setBucketTypeProps
   -> BucketType ty
   -> RpbBucketProps
   -> m (Either RpbErrorResp ())
-setBucketTypeProps (Handle conn _) type' props =
-  liftIO (emptyResponse @RpbSetBucketTypeResp (exchange conn request))
+setBucketTypeProps (Handle withConn _) type' props =
+  liftIO
+    (emptyResponse @RpbSetBucketTypeResp
+      (withConn (\conn -> exchange conn request)))
  where
   request :: RpbSetBucketTypeReq
   request =
@@ -976,9 +995,9 @@ getBucketProps
   => Handle
   -> Namespace ty
   -> m (Either RpbErrorResp RpbBucketProps)
-getBucketProps (Handle conn _) (Namespace type' bucket) = runExceptT $ do
+getBucketProps (Handle withConn _) (Namespace type' bucket) = liftIO . runExceptT $ do
   response :: RpbGetBucketResp <-
-    ExceptT (liftIO (Internal.getBucketProps conn request))
+    ExceptT (withConn (\conn -> Internal.getBucketProps conn request))
   pure (response ^. #props)
 
  where
@@ -997,8 +1016,8 @@ setBucketProps
   => Handle
   -> RpbSetBucketReq
   -> m (Either RpbErrorResp ())
-setBucketProps (Handle conn _) req =
-  liftIO (emptyResponse @RpbSetBucketResp (exchange conn req))
+setBucketProps (Handle withConn _) req =
+  liftIO (emptyResponse @RpbSetBucketResp (withConn (\conn -> exchange conn req)))
 
 
 resetBucketProps
@@ -1006,32 +1025,33 @@ resetBucketProps
   => Handle
   -> RpbResetBucketReq
   -> m (Either RpbErrorResp ())
-resetBucketProps (Handle conn _) req =
-  liftIO (emptyResponse @RpbResetBucketResp (exchange conn req))
+resetBucketProps (Handle withConn _) req =
+  liftIO (emptyResponse @RpbResetBucketResp (withConn (\conn -> exchange conn req)))
 
 
 -- TODO listBuckets param timeout
 listBuckets
-  :: MonadIO m
-  => Handle
+  :: Handle
   -> BucketType ty
-  -> ListT (ExceptT RpbErrorResp m) Bucket
-listBuckets (Handle conn _) type' = do
-  liftIO (send conn request)
+  -> (ListT (ExceptT RpbErrorResp IO) Bucket -> IO r)
+  -> IO r
+listBuckets (Handle withConn _) type' k =
+  withConn $ \conn -> k $ do
+    liftIO (send conn request)
 
-  fix $ \loop -> do
-    resp :: RpbListBucketsResp <-
-      lift (ExceptT (liftIO (recv conn >>= parseResponse)))
+    fix $ \loop -> do
+      resp :: RpbListBucketsResp <-
+        lift (ExceptT (recv conn >>= parseResponse))
 
-    let
-      buckets :: [Bucket]
-      buckets =
-        coerce (resp ^. #buckets)
+      let
+        buckets :: [Bucket]
+        buckets =
+          coerce (resp ^. #buckets)
 
-    ListT.select buckets <|>
-      if resp ^. #done
-        then empty
-        else loop
+      ListT.select buckets <|>
+        if resp ^. #done
+          then empty
+          else loop
  where
   request :: RpbListBucketsReq
   request =
@@ -1044,27 +1064,27 @@ listBuckets (Handle conn _) type' = do
 
 -- TODO listKeys param timeout
 listKeys
-  :: forall m ty.
-     MonadIO m
-  => Handle
+  :: Handle
   -> Namespace ty
-  -> ListT (ExceptT RpbErrorResp m) Key
-listKeys (Handle conn _) (Namespace type' bucket) = do
-  liftIO (send conn request)
+  -> (ListT (ExceptT RpbErrorResp IO) Key -> IO r)
+  -> IO r
+listKeys (Handle withConn _) (Namespace type' bucket) k =
+  withConn $ \conn -> k $ do
+    liftIO (send conn request)
 
-  fix $ \loop -> do
-    resp :: RpbListKeysResp <-
-      lift (ExceptT (liftIO (recv conn >>= parseResponse)))
+    fix $ \loop -> do
+      resp :: RpbListKeysResp <-
+        lift (ExceptT (recv conn >>= parseResponse))
 
-    let
-      keys :: [Key]
-      keys =
-        coerce (resp ^. #keys)
+      let
+        keys :: [Key]
+        keys =
+          coerce (resp ^. #keys)
 
-    ListT.select keys <|>
-      if resp ^. #done
-        then empty
-        else loop
+      ListT.select keys <|>
+        if resp ^. #done
+          then empty
+          else loop
  where
   request :: RpbListKeysReq
   request =
@@ -1076,24 +1096,24 @@ listKeys (Handle conn _) (Namespace type' bucket) = do
       }
 
 mapReduce
-  :: MonadIO m
-  => Handle
+  :: Handle
   -> RpbMapRedReq
-  -> m (Either RpbErrorResp [RpbMapRedResp])
-mapReduce (Handle conn _) req = liftIO $ do
-  send conn req
+  -> IO (Either RpbErrorResp [RpbMapRedResp])
+mapReduce (Handle withConn _) req =
+  withConn $ \conn -> do
+    send conn req
 
-  let
-    loop :: ExceptT RpbErrorResp IO [RpbMapRedResp]
-    loop = do
-      resp :: RpbMapRedResp <-
-        ExceptT (recv conn >>= parseResponse)
+    let
+      loop :: ExceptT RpbErrorResp IO [RpbMapRedResp]
+      loop = do
+        resp :: RpbMapRedResp <-
+          ExceptT (recv conn >>= parseResponse)
 
-      if resp ^. #done
-        then pure [resp]
-        else (resp :) <$> loop
+        if resp ^. #done
+          then pure [resp]
+          else (resp :) <$> loop
 
-  runExceptT loop
+    runExceptT loop
 
 
 getSchema
@@ -1101,8 +1121,8 @@ getSchema
   => Handle
   -> RpbYokozunaSchemaGetReq
   -> m (Either RpbErrorResp RpbYokozunaSchemaGetResp)
-getSchema (Handle conn _) req =
-  liftIO (exchange conn req)
+getSchema (Handle withConn _) req =
+  liftIO (withConn (\conn -> exchange conn req))
 
 
 putSchema
@@ -1110,8 +1130,8 @@ putSchema
   => Handle
   -> RpbYokozunaSchemaPutReq
   -> m (Either RpbErrorResp RpbEmptyPutResp)
-putSchema (Handle conn _) req =
-  liftIO (exchange conn req)
+putSchema (Handle withConn _) req =
+  liftIO (withConn (\conn -> exchange conn req))
 
 
 getIndex
@@ -1119,8 +1139,8 @@ getIndex
   => Handle
   -> IndexName
   -> m (Either RpbErrorResp (Maybe RpbYokozunaIndex))
-getIndex (Handle conn _) name = runExceptT $ do
-  ExceptT (liftIO (Internal.getIndex conn request)) >>= \case
+getIndex (Handle withConn _) name = liftIO . runExceptT $ do
+  ExceptT (withConn (\conn -> Internal.getIndex conn request)) >>= \case
     RpbYokozunaIndexGetResp [] _ ->
       pure Nothing
     RpbYokozunaIndexGetResp (index:_) _ ->
@@ -1139,9 +1159,9 @@ getIndexes
   :: MonadIO m
   => Handle
   -> m (Either RpbErrorResp [RpbYokozunaIndex])
-getIndexes (Handle conn _) = runExceptT $ do
+getIndexes (Handle withConn _) = liftIO . runExceptT $ do
   RpbYokozunaIndexGetResp indexes _ <-
-    ExceptT (liftIO (Internal.getIndex conn request))
+    ExceptT (withConn (\conn -> Internal.getIndex conn request))
   pure indexes
 
  where
@@ -1158,8 +1178,8 @@ putIndex
   => Handle
   -> RpbYokozunaIndexPutReq
   -> m (Either RpbErrorResp RpbEmptyPutResp)
-putIndex (Handle conn _) req =
-  liftIO (exchange conn req)
+putIndex (Handle withConn _) req =
+  liftIO (withConn (\conn -> exchange conn req))
 
 
 deleteIndex
@@ -1167,21 +1187,21 @@ deleteIndex
   => Handle
   -> RpbYokozunaIndexDeleteReq
   -> m (Either RpbErrorResp RpbDelResp)
-deleteIndex (Handle conn _) req =
-  liftIO (exchange conn req)
+deleteIndex (Handle withConn _) req =
+  liftIO (withConn (\conn -> exchange conn req))
 
 
 ping :: MonadIO m => Handle -> m (Either RpbErrorResp ())
-ping (Handle conn _) =
-  liftIO (emptyResponse @RpbPingResp (exchange conn RpbPingReq))
+ping (Handle withConn _) =
+  liftIO (emptyResponse @RpbPingResp (withConn (\conn -> exchange conn RpbPingReq)))
 
 
 getServerInfo
   :: MonadIO m
   => Handle
   -> m (Either RpbErrorResp RpbGetServerInfoResp)
-getServerInfo (Handle conn _) =
-  liftIO (exchange conn RpbGetServerInfoReq)
+getServerInfo (Handle withConn _) =
+  liftIO (withConn (\conn -> exchange conn RpbGetServerInfoReq))
 
 
 --------------------------------------------------------------------------------

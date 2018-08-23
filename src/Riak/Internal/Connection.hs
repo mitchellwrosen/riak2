@@ -4,6 +4,8 @@
 module Riak.Internal.Connection
   ( Connection
   , withConnection
+  , connect
+  , disconnect
   , send
   , recv
   , exchange
@@ -43,7 +45,6 @@ data Connection
       !Socket                         -- Server socket
       !(IORef (Q.ByteString IO Void)) -- Infinite input from server
       (Lazy.ByteString -> IO ())      -- Send bytes to server
--- TODO Make Connection thread-safe
 
 withConnection
   :: MonadUnliftIO m

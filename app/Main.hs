@@ -258,9 +258,8 @@ doFetchCounter
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchCounter type' bucket key host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doFetchCounter type' bucket key host port =
+  withHandle host port $ \h ->
     either print print =<<
       fetchCounter h (Location (Namespace type' bucket) key) def
 
@@ -271,9 +270,8 @@ doFetchMap
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchMap type' bucket key host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doFetchMap type' bucket key host port =
+  withHandle host port $ \h ->
     either print print =<<
       fetchMap h (Location (Namespace type' bucket) key) def
 
@@ -294,9 +292,8 @@ doFetchObject
   -> IO ()
 doFetchObject
     type' bucket key basic_quorum head notfound_not_ok n pr r no_sloppy_quorum
-    timeout host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+    timeout host port =
+  withHandle host port $ \h ->
     if head
       then go (fetchObjectHead @Text h) (\_ _ -> pure ())
       else go (fetchObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
@@ -338,52 +335,49 @@ doFetchSet
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchSet type' bucket key host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doFetchSet type' bucket key host port =
+  withHandle host port $ \h ->
     fetchSet h (Location (Namespace type' bucket) key) def >>= \case
       Left err -> print err
       Right vals -> for_ vals print -- TODO encoding?
 
 doGetBucketProps :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
-doGetBucketProps type' bucket host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doGetBucketProps type' bucket host port =
+  withHandle host port $ \h ->
     either print printBucketProps =<< getBucketProps h (Namespace type' bucket)
 
 doGetBucketTypeProps :: BucketType ty -> HostName -> PortNumber -> IO ()
-doGetBucketTypeProps type' host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doGetBucketTypeProps type' host port =
+  withHandle host port $ \h ->
     either print printBucketProps
       =<< getBucketTypeProps h type'
 
 doGetIndex :: Maybe IndexName -> HostName -> PortNumber -> IO ()
-doGetIndex index host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doGetIndex index host port =
+  withHandle host port $ \h ->
     maybe
       (traverse_ print =<< getIndexes h)
       (print <=< getIndex h)
       index
 
 doListBuckets :: BucketType ty -> HostName -> PortNumber -> IO ()
-doListBuckets type' host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h -> do
+doListBuckets type' host port =
+  withHandle host port $ \h -> do
     result :: Either RpbErrorResp () <-
-      (runExceptT . runListT)
-        (listBuckets h type' >>= liftIO . Latin1.putStrLn . coerce)
+      listBuckets h type'
+        (\buckets ->
+          (runExceptT . runListT)
+            (buckets >>= liftIO . Latin1.putStrLn . coerce))
     either print (const (pure ())) result
 
 doListKeys :: BucketType ty -> Bucket -> HostName -> PortNumber -> IO ()
-doListKeys type' bucket host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h -> do
+doListKeys type' bucket host port =
+  withHandle host port $ \h -> do
     result :: Either RpbErrorResp () <-
-      (runExceptT . runListT)
-        (listKeys h (Namespace type' bucket) >>=
-          liftIO . Latin1.putStrLn . coerce)
+      listKeys h (Namespace type' bucket)
+        (\keys ->
+          (runExceptT . runListT)
+              (keys >>= liftIO . Latin1.putStrLn . coerce))
     either print (const (pure ())) result
 
 doStoreObject
@@ -403,9 +397,8 @@ doStoreObject
   -> IO ()
 doStoreObject
     type' bucket key content dw n pw return no_sloppy_quorum timeout w host
-    port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+    port =
+  withHandle host port $ \h ->
     case return of
       'a' ->
         go
@@ -454,9 +447,8 @@ doUpdateCounter
   -> HostName
   -> PortNumber
   -> IO ()
-doUpdateCounter type' bucket key incr host port = do
-  cache <- refVclockCache
-  withHandle host port cache $ \h ->
+doUpdateCounter type' bucket key incr host port =
+  withHandle host port $ \h ->
     either print print =<<
       updateCounter h (Location (Namespace type' bucket) key) incr def
 
