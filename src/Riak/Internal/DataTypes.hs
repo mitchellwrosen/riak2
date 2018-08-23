@@ -4,9 +4,7 @@
              TypeFamilies #-}
 
 module Riak.Internal.DataTypes
-  ( DataType(..)
-  , DataTypeError(..)
-  , DataTypeVal
+  ( DataTypeError(..)
   , IsDataType(..)
   , MapValue(..)
   , SetOp(..)
@@ -33,64 +31,42 @@ import Proto.Riak hiding (SetOp)
 import Riak.Internal.Types
 
 
-type family DataTypeVal (ty :: DataTypeTy) where
-  DataTypeVal 'CounterTy     = Int64
-  DataTypeVal 'GrowOnlySetTy = Set ByteString
-  DataTypeVal 'HyperLogLogTy = Word64
-  DataTypeVal 'MapTy         = HashMap ByteString MapValue
-  DataTypeVal 'SetTy         = Set ByteString
-
-
 class IsDataType (ty :: DataTypeTy) where
-  fetchRespTy  :: Proxy# ty -> DtFetchResp'DataType
+  type DataTypeVal ty :: *
 
-  fromDataType :: Proxy# ty -> DataType -> Either Text (DataTypeVal ty)
-
-  toDataType   :: Proxy# ty -> DtValue -> DataType
+  parseDtFetchResp :: Proxy# ty -> DtFetchResp -> Either Text (DataTypeVal ty)
 
 instance IsDataType 'CounterTy where
-  fetchRespTy _ =
-    DtFetchResp'COUNTER
+  type DataTypeVal 'CounterTy = Int64
 
-  fromDataType _ = \case
-    DataTypeCounter n -> Right n
-    x -> Left ("expected counter but found " <> dataTypeToText x)
-
-  toDataType _ =
-    DataTypeCounter . view #counterValue
+  parseDtFetchResp _ resp =
+    case resp ^. #type' of
+      DtFetchResp'COUNTER -> Right (resp ^. #value . #counterValue)
+      x -> Left ("expected counter but found " <> dataTypeToText x)
 
 instance IsDataType 'GrowOnlySetTy where
-  fetchRespTy _ =
-    DtFetchResp'GSET
+  type DataTypeVal 'GrowOnlySetTy = Set ByteString
 
-  fromDataType _ = \case
-    DataTypeGrowOnlySet n -> Right n
-    x -> Left ("expected gset but found " <> dataTypeToText x)
-
-  toDataType _ =
-    DataTypeGrowOnlySet . Set.fromList . view #gsetValue
+  parseDtFetchResp _ resp =
+    case resp ^. #type' of
+      DtFetchResp'GSET -> Right (Set.fromList (resp ^. #value . #gsetValue))
+      x -> Left ("expected gset but found " <>dataTypeToText x)
 
 instance IsDataType 'HyperLogLogTy where
-  fetchRespTy _ =
-    DtFetchResp'HLL
+  type DataTypeVal 'HyperLogLogTy = Word64
 
-  fromDataType _ = \case
-    DataTypeHyperLogLog n -> Right n
-    x -> Left ("expected hll but found " <> dataTypeToText x)
-
-  toDataType _ =
-    DataTypeHyperLogLog . view #hllValue
+  parseDtFetchResp _ resp =
+    case resp ^. #type' of
+      DtFetchResp'HLL -> Right (resp ^. #value . #hllValue)
+      x -> Left ("expected hll but found " <> dataTypeToText x)
 
 instance IsDataType 'MapTy where
-  fetchRespTy _ =
-    DtFetchResp'MAP
+  type DataTypeVal 'MapTy = HashMap ByteString MapValue
 
-  fromDataType _ = \case
-    DataTypeMap n -> Right n
-    x -> Left ("expected map but found " <> dataTypeToText x)
-
-  toDataType _ =
-    DataTypeMap . foldMap mapEntryToPair . view #mapValue
+  parseDtFetchResp _ resp =
+    case resp ^. #type' of
+      DtFetchResp'MAP -> Right (foldMap mapEntryToPair (resp ^. #value . #mapValue))
+      x -> Left ("expected map but found " <> dataTypeToText x)
    where
     mapEntryToPair :: MapEntry -> HashMap ByteString MapValue
     mapEntryToPair entry =
@@ -116,31 +92,21 @@ instance IsDataType 'MapTy where
               MapValueSet (Set.fromList (entry ^. #setValue))
 
 instance IsDataType 'SetTy where
-  fetchRespTy _ =
-    DtFetchResp'SET
+  type DataTypeVal 'SetTy = Set ByteString
 
-  fromDataType _ = \case
-    DataTypeSet n -> Right n
-    x -> Left ("expected set but found " <> dataTypeToText x)
-
-  toDataType _ =
-    DataTypeSet . Set.fromList . view #setValue
+  parseDtFetchResp _ resp =
+    case resp ^. #type' of
+      DtFetchResp'SET -> Right (Set.fromList (resp ^. #value . #setValue))
+      x -> Left ("expected set but found " <> dataTypeToText x)
 
 
-data DataType
-  = DataTypeCounter Int64
-  | DataTypeGrowOnlySet (Set ByteString)
-  | DataTypeHyperLogLog Word64
-  | DataTypeMap (HashMap ByteString MapValue)
-  | DataTypeSet (Set ByteString)
-
-dataTypeToText :: DataType -> Text
+dataTypeToText :: DtFetchResp'DataType -> Text
 dataTypeToText = \case
-  DataTypeCounter     _ -> "counter"
-  DataTypeGrowOnlySet _ -> "gset"
-  DataTypeHyperLogLog _ -> "hll"
-  DataTypeMap         _ -> "map"
-  DataTypeSet         _ -> "set"
+  DtFetchResp'COUNTER -> "counter"
+  DtFetchResp'GSET    -> "gset"
+  DtFetchResp'HLL     -> "hll"
+  DtFetchResp'MAP     -> "map"
+  DtFetchResp'SET     -> "set"
 
 
 data MapValue

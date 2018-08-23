@@ -39,8 +39,6 @@ module Riak
   , setRemoveOp
     -- ** Map
   , fetchMap
-    -- ** Unknown
-  , fetchSomeDataType
     -- * Bucket operations
   , getBucketTypeProps
   , setBucketTypeProps
@@ -71,7 +69,6 @@ module Riak
   , ContentEncoding
   , pattern ContentEncodingNone
   , ContentType(..)
-  , DataType(..)
   , DataTypeTy(..)
   , FetchDataTypeParams
   , FetchObjectParams
@@ -101,7 +98,7 @@ module Riak
   ) where
 
 import Control.Applicative
-import Control.Monad              (unless)
+import Control.Monad              (when)
 import Control.Monad.IO.Unlift
 import Control.Monad.Trans.Class
 import Control.Monad.Trans.Except (ExceptT(..), runExceptT)
@@ -630,7 +627,7 @@ fetchHyperLogLog =
   fetchDataType
 
 
--- | Fetch a HyperLogLog.
+-- | Fetch a map.
 --
 -- Throws a 'DataTypeError' if the given 'Location' does not contain maps.
 fetchMap
@@ -643,7 +640,7 @@ fetchMap =
   fetchDataType
 
 
--- | Fetch a HyperLogLog.
+-- | Fetch a set.
 --
 -- Throws a 'DataTypeError' if the given 'Location' does not contain sets.
 fetchSet
@@ -663,26 +660,7 @@ fetchDataType
   -> Location ('Just ty)
   -> FetchDataTypeParams
   -> m (Either RpbErrorResp (DataTypeVal ty))
-fetchDataType handle loc params = liftIO . runExceptT $ do
-  value :: DataType <-
-    ExceptT (fetchSomeDataType handle loc params)
-
-  case fromDataType @ty proxy# value of
-    Left err ->
-      throwIO (DataTypeError loc err)
-
-    Right value' ->
-      pure value'
-
-
--- | Fetch some data type.
-fetchSomeDataType
-  :: MonadIO m
-  => Handle -- ^
-  -> Location ('Just ty) -- ^
-  -> FetchDataTypeParams
-  -> m (Either RpbErrorResp DataType)
-fetchSomeDataType
+fetchDataType
     handle@(Handle withConn _) loc@(Location (Namespace type' bucket) key)
     (FetchDataTypeParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
@@ -690,33 +668,25 @@ fetchSomeDataType
   response :: DtFetchResp <-
     ExceptT (withConn (\conn -> Internal.fetchDataType conn request))
 
-  let
-    doCacheVclock =
-      unless (include_context == Just False) $
+  case parseDtFetchResp @ty proxy# response of
+    Left err ->
+      throwIO (DataTypeError loc err)
+
+    Right value -> do
+      -- Only counters don't have a causal context
+      let
+        shouldCache :: Bool
+        shouldCache =
+          response ^. #type' /= DtFetchResp'COUNTER &&
+            include_context /= Just False
+
+      when shouldCache $
         cacheVclock
           handle
           loc
           (coerce (response ^. #maybe'context))
 
-  case response ^. #type' of
-    DtFetchResp'COUNTER ->
-      pure (toDataType @'CounterTy proxy# (response ^. #value))
-
-    DtFetchResp'GSET -> do
-      doCacheVclock
-      pure (toDataType @'GrowOnlySetTy proxy# (response ^. #value))
-
-    DtFetchResp'HLL -> do
-      doCacheVclock
-      pure (toDataType @'HyperLogLogTy proxy# (response ^. #value))
-
-    DtFetchResp'MAP -> do
-      doCacheVclock
-      pure (toDataType @'MapTy proxy# (response ^. #value))
-
-    DtFetchResp'SET -> do
-      doCacheVclock
-      pure (toDataType @'SetTy proxy# (response ^. #value))
+      pure value
 
  where
   request :: DtFetchReq
@@ -1330,8 +1300,8 @@ unSetOp (SetOp (adds, removes)) =
 -- | @Just 'SetTy'@         | Sets.           |
 -- +------------------------+-----------------+
 --
--- Normally, you should know ahead of time what kind of data corresponds to each
--- bucket type, and define these bucket types as top-level definitions.
+-- You should know ahead of time what kind of data corresponds to each bucket
+-- type, and may define these bucket types as top-level definitions.
 --
 -- For example,
 --
@@ -1339,9 +1309,6 @@ unSetOp (SetOp (adds, removes)) =
 -- countersBucketType :: 'BucketType' ''CounterTy'
 -- countersBucketType = 'BucketType' "counters"
 -- @
---
--- However, you may always dynamically create bucket types on the fly at any
--- type you wish by using the 'BucketType' newtype constructor.
 --
 -- = Content
 --
