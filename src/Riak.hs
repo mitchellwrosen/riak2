@@ -66,7 +66,7 @@ module Riak
   , putRiakIndex
   , deleteRiakIndex
     -- * Server info
-  , riakPing
+  , pingRiak
   , getRiakServerInfo
     -- * Types
   , Charset(..)
@@ -140,9 +140,9 @@ import           Riak.Internal.Types
 -- RiakHandle
 --------------------------------------------------------------------------------
 
--- | A non-thread-safe handle to Riak.
+-- | A thread-safe handle to Riak.
 --
--- TODO: RiakHandle improvement: cluster abstraction, backpressure, enqueueing
+-- TODO: RiakHandle improvement: connection pools, cluster
 data RiakHandle
   = RiakHandle
       !RiakConnection
@@ -1263,11 +1263,11 @@ deleteRiakIndex (RiakHandle conn _) req =
   liftIO (riakExchange conn req)
 
 
-riakPing
+pingRiak
   :: MonadIO m
   => RiakHandle -- ^
   -> m (Either RpbErrorResp ())
-riakPing (RiakHandle conn _) =
+pingRiak (RiakHandle conn _) =
   liftIO (emptyResponse @RpbPingResp (riakExchange conn RpbPingReq))
 
 

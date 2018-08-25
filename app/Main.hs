@@ -85,7 +85,7 @@ parser =
         , getIndexParser
         ]
       , [ commandGroup "Server info"
-        , command "TODO" (info empty mempty)
+        , pingParser
         ]
       ]
 
@@ -204,6 +204,12 @@ listKeysParser =
         <$> bucketTypeArgument
         <*> bucketArgument)
       (progDesc "List all keys in a bucket"))
+
+pingParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+pingParser =
+  command
+    "ping"
+    (info (pure doPing) (progDesc "Ping the server"))
 
 storeObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 storeObjectParser =
@@ -395,6 +401,12 @@ doListKeys type' bucket host port =
         (listRiakKeys h (RiakNamespace type' bucket) >>=
           liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
+
+doPing :: HostName -> PortNumber -> IO ()
+doPing host port =
+  withRiakHandle host port $ \h ->
+    either print (const (putStrLn "pong")) =<<
+      pingRiak h
 
 doStoreObject
   :: RiakBucketType 'Nothing
