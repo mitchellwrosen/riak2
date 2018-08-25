@@ -5,7 +5,6 @@ module Riak.Internal.Prelude
 import Control.Applicative        as X
 import Control.Category           as X
 import Control.Concurrent         as X
-import Control.Concurrent.Async   as X
 import Control.Concurrent.STM     as X
 import Control.Monad              as X hiding (return)
 import Control.Monad.IO.Unlift    as X

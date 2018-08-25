@@ -1,11 +1,11 @@
-{-# LANGUAGE LambdaCase, NoImplicitPrelude, OverloadedStrings,
-             ScopedTypeVariables #-}
+{-# LANGUAGE DeriveAnyClass, DerivingStrategies, LambdaCase, NoImplicitPrelude,
+             OverloadedStrings, ScopedTypeVariables #-}
 
 module Riak.Internal.ConcurrentConnection
-  ( Connection
-  , connect
-  , close
-  , exchange
+  ( RiakConnection
+  , riakConnect
+  , riakDisconnect
+  , riakExchange
   ) where
 
 import Control.Exception (BlockedIndefinitelyOnMVar(..))
@@ -20,24 +20,32 @@ import qualified Data.ByteString.Streaming      as Q
 import qualified Network.Socket                 as Socket hiding (recv)
 import qualified Network.Socket.ByteString      as Socket (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
+import qualified Streaming                      as Streaming
 import qualified Streaming.Prelude              as Streaming
 
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
+import Riak.Internal.Protobuf
+import Riak.Internal.Request
+import Riak.Internal.Response
 
 -- | A thread-safe connection to Riak.
-data Connection
-  = Connection
+data RiakConnection
+  = RiakConnection
       !Socket
       !(TQueue Lazy.ByteString)
-      !(TQueue (Message -> IO ()))
+      !(TQueue (Stream ((->) Message) IO ()))
       !ThreadId
       !ThreadId
       !(STM SomeException)
 
-connect :: HostName -> PortNumber -> IO Connection
-connect host port = do
+data EOF = EOF
+  deriving stock (Show)
+  deriving anyclass (Exception)
+
+riakConnect :: HostName -> PortNumber -> IO RiakConnection
+riakConnect host port = do
   info : _ <-
     let
       hints =
@@ -53,7 +61,7 @@ connect host port = do
   sendQueue :: TQueue Lazy.ByteString <-
     newTQueueIO
 
-  recvQueue :: TQueue (Message -> IO ()) <-
+  recvQueue :: TQueue (Stream ((->) Message) IO ()) <-
     newTQueueIO
 
   exVar :: TMVar SomeException <-
@@ -62,34 +70,34 @@ connect host port = do
   sendThreadId :: ThreadId <-
     forkIOWithUnmask $ \unmask ->
       let
-        loop :: IO r
+        loop :: IO ()
         loop =
-          forever $
-            atomically (readTQueue sendQueue) >>=
-              Socket.sendAll socket
+          atomically (readTQueue sendQueue) >>=
+            Socket.sendAll socket
       in
-        unmask loop
+        unmask (forever loop)
           `catch` (void . atomically . tryPutTMVar exVar)
 
   recvThreadId :: ThreadId <-
     forkIOWithUnmask $ \unmask ->
       let
         loop :: Stream (Of Message) IO () -> IO ()
-        loop messages =
-          Streaming.uncons messages >>= \case
-            Nothing ->
-              pure ()
+        loop messages = do
+          consumer :: Stream ((->) Message) IO () <-
+            atomically (readTQueue recvQueue)
 
-            Just (message, messages') -> do
-              consume :: Message -> IO () <-
-                atomically (readTQueue recvQueue)
-              consume message
+          feed messages consumer >>= \case
+            Nothing ->
+              throwIO EOF
+
+            Just messages' ->
               loop messages'
+
       in
         unmask (loop (messageStream (socketStream socket)))
           `catch` (void . atomically . tryPutTMVar exVar)
 
-  pure $ Connection
+  pure $ RiakConnection
     socket
     sendQueue
     recvQueue
@@ -97,25 +105,34 @@ connect host port = do
     recvThreadId
     (readTMVar exVar)
 
-close :: Connection -> IO ()
-close (Connection socket _ _ sendTid recvTid _) = do
+riakDisconnect :: RiakConnection -> IO ()
+riakDisconnect (RiakConnection socket _ _ sendTid recvTid _) = do
   killThread sendTid
   killThread recvTid
   Socket.close socket
 
-exchange :: Connection -> Message -> (Message -> IO a) -> IO (Maybe a)
-exchange (Connection _ sendQueue recvQueue _ _ ex) request consume = do
-  resultVar :: MVar a <-
+riakExchange
+  :: (Request a, Response b)
+  => RiakConnection
+  -> a
+  -> IO (Either RpbErrorResp b)
+riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
+  resultVar :: MVar Message <-
     newEmptyMVar
 
   payload :: Lazy.ByteString <-
-    pure $! encodeMessage request
+    pure $! encodeMessage (requestToMessage request)
+
+  let
+    consumer :: Stream ((->) Message) IO ()
+    consumer =
+      Streaming.wrap (lift . putMVar resultVar)
 
   atomically $ do
     writeTQueue sendQueue payload
-    writeTQueue recvQueue (consume >=> putMVar resultVar)
+    writeTQueue recvQueue consumer
 
-  (Just <$> takeMVar resultVar)
+  (takeMVar resultVar >>= parseResponse)
     `catch` \BlockedIndefinitelyOnMVar ->
       (atomically ex >>= throwIO)
 
@@ -124,11 +141,9 @@ socketStream socket =
   fix $ \loop -> do
     bytes :: ByteString <-
       liftIO (Socket.recv socket 4096)
-    if ByteString.null bytes
-      then pure ()
-      else do
-        Q.chunk bytes
-        loop
+    unless (ByteString.null bytes) $ do
+      Q.chunk bytes
+      loop
 
 messageStream :: Q.ByteString IO a -> Stream (Of Message) IO a
 messageStream bytes0 =
@@ -187,3 +202,21 @@ parseByteStream parser bytes0 =
               pure (SuccessfulParse x (Q.chunk leftover *> bytes))
       in
         loop (Atto.parse parser chunk0) bytes1
+
+feed
+  :: Monad m
+  => Stream (Of a) m ()
+  -> Stream ((->) a) m ()
+  -> m (Maybe (Stream (Of a) m ()))
+feed xs fs =
+  Streaming.inspect fs >>= \case
+    Left _ ->
+      pure (Just xs)
+
+    Right f ->
+      Streaming.next xs >>= \case
+        Left _ ->
+          pure Nothing
+
+        Right (x, xs') ->
+          feed xs' (f x)

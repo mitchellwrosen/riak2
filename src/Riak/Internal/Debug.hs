@@ -15,4 +15,5 @@ lock =
 -- TODO: add cabal flag to control debugging
 debug :: String -> IO ()
 debug msg =
-  withMVar lock (\_ -> hPutStrLn stderr msg)
+  -- withMVar lock (\_ -> hPutStrLn stderr msg)
+  pure ()

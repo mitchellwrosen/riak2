@@ -1,6 +1,7 @@
 module Riak.Internal
   ( RiakConnection
-  , withRiakConnection
+  , riakConnect
+  , riakDisconnect
   , deleteRiakObject
   , fetchRiakDataType
   , fetchRiakObject
@@ -12,7 +13,7 @@ module Riak.Internal
   ) where
 
 import Proto.Riak
-import Riak.Internal.Connection
+import Riak.Internal.ConcurrentConnection
 import Riak.Internal.Response
 
 deleteRiakObject
