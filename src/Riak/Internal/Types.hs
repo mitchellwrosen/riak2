@@ -170,15 +170,20 @@ pattern RiakQuorumQuorum :: RiakQuorum
 pattern RiakQuorumQuorum = 4294967293
 
 
-data SBool :: Bool -> Type where
-  STrue  :: SBool 'True
-  SFalse :: SBool 'False
+-- | A Solr schema name.
+newtype RiakSchemaName
+  = RiakSchemaName { unRiakSchemaName :: ByteString }
 
 
 data RiakSecondaryIndex
   = RiakSecondaryIndexInt !ByteString !Int64
   | RiakSecondaryIndexBin !ByteString !ByteString
   deriving (Show)
+
+
+data SBool :: Bool -> Type where
+  STrue  :: SBool 'True
+  SFalse :: SBool 'False
 
 
 data SomeRiakLocation where

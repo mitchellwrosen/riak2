@@ -82,6 +82,7 @@ parser =
         , command "TODO" (info empty mempty)
         ]
       , [ commandGroup "Search 2.0"
+        , getSchemaParser
         , getIndexParser
         ]
       , [ commandGroup "Server info"
@@ -187,6 +188,19 @@ getIndexParser =
                 , metavar "INDEX"
                 ]))
       (progDesc "Get a Solr index, or all Solr indexes"))
+
+getSchemaParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getSchemaParser =
+  command
+    "get-schema"
+    (info
+      (doGetSchema
+        <$> (fmap RiakSchemaName . strArgument)
+              (mconcat
+                [ help "Schema name"
+                , metavar "SCHEMA"
+                ]))
+      (progDesc "Get a Solr schema"))
 
 infoParser' :: Mod CommandFields (HostName -> PortNumber -> IO ())
 infoParser' =
@@ -390,6 +404,12 @@ doGetIndex index host port =
       (traverse_ print =<< getRiakIndexes h)
       (print <=< getRiakIndex h)
       index
+
+doGetSchema :: RiakSchemaName -> HostName -> PortNumber -> IO ()
+doGetSchema schema host port =
+  withRiakHandle host port $ \h ->
+    either print print =<<
+      getRiakSchema h schema
 
 doGetServerInfo :: HostName -> PortNumber -> IO ()
 doGetServerInfo host port =

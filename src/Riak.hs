@@ -52,15 +52,17 @@ module Riak
   , setRiakBucketTypeProps
   , getRiakBucketProps
   , setRiakBucketProps
-  , resetBucketProps
+  , resetRiakBucketProps
   , listRiakBuckets
   , listRiakKeys
     -- * MapReduce
   , riakMapReduce
     -- * Secondary indexes (2i)
     -- * Search 2.0
+    -- ** Schema
   , getRiakSchema
   , putRiakSchema
+    -- ** Index
   , getRiakIndex
   , getRiakIndexes
   , putRiakIndex
@@ -96,6 +98,7 @@ module Riak
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
+  , RiakSchemaName(..)
   , RiakSecondaryIndex(..)
   , RiakSetOp
   , RiakVtag(..)
@@ -1129,12 +1132,12 @@ setRiakBucketProps (RiakHandle conn _) req =
   liftIO (emptyResponse @RpbSetBucketResp (riakExchange conn req))
 
 
-resetBucketProps
+resetRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^
   -> RpbResetBucketReq -- ^
   -> m (Either RpbErrorResp ())
-resetBucketProps (RiakHandle conn _) req =
+resetRiakBucketProps (RiakHandle conn _) req =
   liftIO (emptyResponse @RpbResetBucketResp (riakExchange conn req))
 
 
@@ -1191,11 +1194,17 @@ riakMapReduce (RiakHandle conn _) request =
 getRiakSchema
   :: MonadIO m
   => RiakHandle -- ^
-  -> RpbYokozunaSchemaGetReq -- ^
+  -> RiakSchemaName -- ^
   -> m (Either RpbErrorResp RpbYokozunaSchemaGetResp)
-getRiakSchema (RiakHandle conn _) req =
-  liftIO (riakExchange conn req)
-
+getRiakSchema (RiakHandle conn _) schema =
+  liftIO (Internal.getRiakSchema conn request)
+ where
+  request :: RpbYokozunaSchemaGetReq
+  request =
+    RpbYokozunaSchemaGetReq
+      { _RpbYokozunaSchemaGetReq'_unknownFields = []
+      , _RpbYokozunaSchemaGetReq'name           = unRiakSchemaName schema
+      }
 
 putRiakSchema
   :: MonadIO m

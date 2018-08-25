@@ -8,6 +8,7 @@ module Riak.Internal
   , getRiakBucketProps
   , getRiakBucketTypeProps
   , getRiakIndex
+  , getRiakSchema
   , storeRiakObject
   , updateRiakDataType
   ) where
@@ -56,6 +57,13 @@ getRiakIndex
   -> RpbYokozunaIndexGetReq
   -> IO (Either RpbErrorResp RpbYokozunaIndexGetResp)
 getRiakIndex =
+  riakExchange
+
+getRiakSchema
+  :: RiakConnection
+  -> RpbYokozunaSchemaGetReq
+  -> IO (Either RpbErrorResp RpbYokozunaSchemaGetResp)
+getRiakSchema =
   riakExchange
 
 storeRiakObject
