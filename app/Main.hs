@@ -86,6 +86,7 @@ parser =
         ]
       , [ commandGroup "Server info"
         , pingParser
+        , infoParser'
         ]
       ]
 
@@ -186,6 +187,12 @@ getIndexParser =
                 , metavar "INDEX"
                 ]))
       (progDesc "Get a Solr index, or all Solr indexes"))
+
+infoParser' :: Mod CommandFields (HostName -> PortNumber -> IO ())
+infoParser' =
+  command
+    "info"
+    (info (pure doGetServerInfo) (progDesc "Get server info"))
 
 listBucketsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 listBucketsParser =
@@ -384,6 +391,12 @@ doGetIndex index host port =
       (print <=< getRiakIndex h)
       index
 
+doGetServerInfo :: HostName -> PortNumber -> IO ()
+doGetServerInfo host port =
+  withRiakHandle host port $ \h ->
+    either print printServerInfo =<<
+      getRiakServerInfo h
+
 doListBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port =
   withRiakHandle host port $ \h -> do
@@ -550,6 +563,10 @@ showBool = \case
   False -> "false"
   True  -> "true"
 
+showLocation :: RiakLocation ty -> String
+showLocation (RiakLocation (RiakNamespace type' bucket) key) =
+  show type' ++ "/" ++ show bucket ++ "/" ++ show key
+
 showModFun :: RpbModFun -> String
 showModFun fun =
   Latin1.unpack (fun ^. L.module') ++ ":" ++ Latin1.unpack (fun ^. L.function)
@@ -562,9 +579,13 @@ showQuorum = \case
   4294967294 -> "one"
   n          -> show n
 
-showLocation :: RiakLocation ty -> String
-showLocation (RiakLocation (RiakNamespace type' bucket) key) =
-  show type' ++ "/" ++ show bucket ++ "/" ++ show key
+printServerInfo :: RpbGetServerInfoResp -> IO ()
+printServerInfo info' = do
+  for_ (info' ^. L.maybe'node)
+    (putStrLn . ("node = " ++) . Latin1.unpack)
+
+  for_ (info' ^. L.maybe'serverVersion)
+    (putStrLn . ("version = " ++) . Latin1.unpack)
 
 bucketArgument :: Parser RiakBucket
 bucketArgument =
