@@ -99,6 +99,7 @@ module Riak
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
   , RiakSchemaName(..)
+  , pattern DefaultRiakSchemaName
   , RiakSecondaryIndex(..)
   , RiakSetOp
   , RiakVtag(..)
@@ -1212,9 +1213,9 @@ putRiakSchema
   => RiakHandle -- ^
   -> RiakSchemaName -- ^
   -> ByteString -- ^
-  -> m (Either RpbErrorResp RpbEmptyPutResp)
+  -> m (Either RpbErrorResp ())
 putRiakSchema (RiakHandle conn _) name bytes =
-  liftIO (Internal.putRiakSchema conn request)
+  liftIO (emptyResponse @RpbEmptyPutResp (Internal.putRiakSchema conn request))
  where
   request :: RpbYokozunaSchemaPutReq
   request =
@@ -1271,10 +1272,25 @@ getRiakIndexes (RiakHandle conn _) = liftIO . runExceptT $ do
 putRiakIndex
   :: MonadIO m
   => RiakHandle -- ^
-  -> RpbYokozunaIndexPutReq -- ^
-  -> m (Either RpbErrorResp RpbEmptyPutResp)
-putRiakIndex (RiakHandle conn _) req =
-  liftIO (riakExchange conn req)
+  -> RiakIndexName -- ^
+  -> RiakSchemaName -- ^
+  -> m (Either RpbErrorResp ())
+putRiakIndex (RiakHandle conn _) index schema =
+  liftIO (emptyResponse @RpbEmptyPutResp (Internal.putRiakIndex conn request))
+ where
+  request :: RpbYokozunaIndexPutReq
+  request =
+    RpbYokozunaIndexPutReq
+      { _RpbYokozunaIndexPutReq'_unknownFields  = []
+      , _RpbYokozunaIndexPutReq'index           =
+          RpbYokozunaIndex
+             { _RpbYokozunaIndex'_unknownFields = []
+             , _RpbYokozunaIndex'nVal           = Nothing -- TODO putRiakIndex n_val
+             , _RpbYokozunaIndex'name           = unRiakIndexName index
+             , _RpbYokozunaIndex'schema         = Just (unRiakSchemaName schema)
+             }
+      , _RpbYokozunaIndexPutReq'timeout         = Nothing -- TODO putRiakIndex timeout
+      }
 
 
 deleteRiakIndex

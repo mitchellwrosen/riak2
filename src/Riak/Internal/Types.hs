@@ -174,6 +174,10 @@ pattern RiakQuorumQuorum = 4294967293
 newtype RiakSchemaName
   = RiakSchemaName { unRiakSchemaName :: ByteString }
 
+pattern DefaultRiakSchemaName :: RiakSchemaName
+pattern DefaultRiakSchemaName =
+  RiakSchemaName "_yz_default"
+
 
 data RiakSecondaryIndex
   = RiakSecondaryIndexInt !ByteString !Int64
