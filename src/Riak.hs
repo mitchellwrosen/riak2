@@ -81,7 +81,7 @@ module Riak
   , Modified(..)
   , RiakBucket(..)
   , RiakBucketType(..)
-  , pattern RiakBucketTypeDefault
+  , pattern DefaultRiakBucketType
   , RiakContent(..)
   , RiakDataTypeTy(..)
   , RiakHandle
@@ -135,6 +135,8 @@ import           Riak.Internal.Response
 import           Riak.Internal.Types
 
 
+-- TODO _ variants that don't decode replies
+
 --------------------------------------------------------------------------------
 -- RiakHandle
 --------------------------------------------------------------------------------
@@ -161,9 +163,10 @@ withRiakHandle host port f = do
     Pool.createPool
       (riakConnect host port)
       riakDisconnect
-      5
-      5
-      10
+      1 1 1
+      -- 5
+      -- 5
+      -- 10
 
   let
     handle :: RiakHandle

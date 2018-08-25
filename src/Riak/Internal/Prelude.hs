@@ -4,6 +4,9 @@ module Riak.Internal.Prelude
 
 import Control.Applicative        as X
 import Control.Category           as X
+import Control.Concurrent         as X
+import Control.Concurrent.Async   as X
+import Control.Concurrent.STM     as X
 import Control.Monad              as X hiding (return)
 import Control.Monad.IO.Unlift    as X
 import Control.Monad.Trans.Class  as X
@@ -11,7 +14,7 @@ import Control.Monad.Trans.Except as X (ExceptT(..), runExceptT)
 import Data.Bifunctor             as X (bimap)
 import Data.ByteString            as X (ByteString)
 import Data.Coerce                as X (coerce)
-import Data.Foldable              as X (for_, toList)
+import Data.Foldable              as X (for_, toList, traverse_)
 import Data.Function              as X (fix)
 import Data.Hashable              as X (Hashable)
 import Data.HashMap.Strict        as X (HashMap)
@@ -32,5 +35,5 @@ import List.Transformer           as X (ListT)
 import Prelude                    as X hiding (head, id, return, (.))
 import Text.Read                  as X (readMaybe)
 import UnliftIO.Exception         as X (Exception, SomeException, bracket,
-                                        displayException, finally, throwIO,
-                                        toException)
+                                        catch, displayException, finally,
+                                        throwIO, toException)

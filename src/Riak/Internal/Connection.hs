@@ -37,6 +37,7 @@ data RiakConnection
   = RiakConnection
       !Socket                         -- Server socket
       !(IORef (Q.ByteString IO Void)) -- Infinite input from server
+      -- TODO input isn't infinite
       (Lazy.ByteString -> IO ())      -- Send bytes to server
 
 withRiakConnection

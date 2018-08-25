@@ -93,8 +93,8 @@ instance Show (RiakBucketType ty) where
   show =
     Text.unpack . decodeUtf8 . unRiakBucketType
 
-pattern RiakBucketTypeDefault :: RiakBucketType 'Nothing
-pattern RiakBucketTypeDefault =
+pattern DefaultRiakBucketType :: RiakBucketType 'Nothing
+pattern DefaultRiakBucketType =
   RiakBucketType "default"
 
 
