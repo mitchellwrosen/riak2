@@ -1206,13 +1206,27 @@ getRiakSchema (RiakHandle conn _) schema =
       , _RpbYokozunaSchemaGetReq'name           = unRiakSchemaName schema
       }
 
+
 putRiakSchema
   :: MonadIO m
   => RiakHandle -- ^
-  -> RpbYokozunaSchemaPutReq -- ^
+  -> RiakSchemaName -- ^
+  -> ByteString -- ^
   -> m (Either RpbErrorResp RpbEmptyPutResp)
-putRiakSchema (RiakHandle conn _) req =
-  liftIO (riakExchange conn req)
+putRiakSchema (RiakHandle conn _) name bytes =
+  liftIO (Internal.putRiakSchema conn request)
+ where
+  request :: RpbYokozunaSchemaPutReq
+  request =
+    RpbYokozunaSchemaPutReq
+      { _RpbYokozunaSchemaPutReq'_unknownFields = []
+      , _RpbYokozunaSchemaPutReq'schema         =
+          RpbYokozunaSchema
+            { _RpbYokozunaSchema'_unknownFields = []
+            , _RpbYokozunaSchema'content        = Just bytes
+            , _RpbYokozunaSchema'name           = unRiakSchemaName name
+            }
+      }
 
 
 getRiakIndex
