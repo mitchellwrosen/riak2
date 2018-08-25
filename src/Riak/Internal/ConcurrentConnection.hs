@@ -9,7 +9,8 @@ module Riak.Internal.ConcurrentConnection
   , riakStream
   ) where
 
-import Control.Exception (BlockedIndefinitelyOnMVar(..))
+import Control.Exception (BlockedIndefinitelyOnMVar(..),
+                          BlockedIndefinitelyOnSTM(..))
 import Network.Socket    (AddrInfo(..), HostName, PortNumber, Socket,
                           SocketType(Stream), defaultHints, getAddrInfo)
 import Streaming         (Of, Stream)
@@ -171,7 +172,11 @@ riakStream (RiakConnection _ sendQueue recvQueue _ _ ex) done request = do
 
   fix $ \loop -> do
     response :: b <-
-      lift (ExceptT (atomically (readTQueue responseQueue)))
+      (lift . ExceptT)
+        (atomically (readTQueue responseQueue)
+          `catch` \BlockedIndefinitelyOnSTM ->
+            (atomically ex >>= throwIO))
+
     if done response
       then pure response
       else pure response <|> loop

@@ -1183,23 +1183,9 @@ listRiakKeys (RiakHandle conn _) (RiakNamespace type' bucket) = do
 riakMapReduce
   :: RiakHandle -- ^
   -> RpbMapRedReq -- ^
-  -> IO (Either RpbErrorResp [RpbMapRedResp])
-riakMapReduce (RiakHandle conn _) req =
-  undefined
-  -- withConn $ \conn -> do
-  --   riakSend conn req
-
-  --   let
-  --     loop :: ExceptT RpbErrorResp IO [RpbMapRedResp]
-  --     loop = do
-  --       resp :: RpbMapRedResp <-
-  --         ExceptT (riakRecv conn >>= parseResponse)
-
-  --       if resp ^. #done
-  --         then pure [resp]
-  --         else (resp :) <$> loop
-
-  --   runExceptT loop
+  -> ListT (ExceptT RpbErrorResp IO) RpbMapRedResp
+riakMapReduce (RiakHandle conn _) request =
+  riakStream conn (view #done) request
 
 
 getRiakSchema
