@@ -6,6 +6,7 @@ module Riak.Internal.ConcurrentConnection
   , riakConnect
   , riakDisconnect
   , riakExchange
+  , riakStream
   ) where
 
 import Control.Exception (BlockedIndefinitelyOnMVar(..))
@@ -135,6 +136,45 @@ riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
   (takeMVar resultVar >>= parseResponse)
     `catch` \BlockedIndefinitelyOnMVar ->
       (atomically ex >>= throwIO)
+
+riakStream
+  :: forall a b.
+     (Request a, Response b)
+  => RiakConnection -- ^
+  -> (b -> Bool) -- ^ Done?
+  -> a -- ^
+  -> ListT (ExceptT RpbErrorResp IO) b
+riakStream (RiakConnection _ sendQueue recvQueue _ _ ex) done request = do
+  responseQueue :: TQueue (Either RpbErrorResp b) <-
+    liftIO newTQueueIO
+
+  payload :: Lazy.ByteString <-
+    pure $! encodeMessage (requestToMessage request)
+
+  let
+    -- We have to decode the payloads to know when the stream is done, so just
+    -- do the decoding on the recv thread.
+    consumer :: Stream ((->) Message) IO ()
+    consumer =
+      Streaming.wrap $ \message -> do
+        response :: Either RpbErrorResp b <-
+          lift (parseResponse message)
+
+        lift (atomically (writeTQueue responseQueue response))
+
+        unless (either (\_ -> True) done response)
+          consumer
+
+  liftIO . atomically $ do
+    writeTQueue sendQueue payload
+    writeTQueue recvQueue consumer
+
+  fix $ \loop -> do
+    response :: b <-
+      lift (ExceptT (atomically (readTQueue responseQueue)))
+    if done response
+      then pure response
+      else pure response <|> loop
 
 socketStream :: Socket -> Q.ByteString IO ()
 socketStream socket =

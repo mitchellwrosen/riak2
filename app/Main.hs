@@ -382,20 +382,18 @@ doListBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port =
   withRiakHandle host port $ \h -> do
     result :: Either RpbErrorResp () <-
-      listRiakBuckets h type'
-        (\buckets ->
-          (runExceptT . runListT)
-            (buckets >>= liftIO . Latin1.putStrLn . coerce))
+      (runExceptT . runListT)
+        (listRiakBuckets h type' >>=
+          liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
 
 doListKeys :: RiakBucketType ty -> RiakBucket -> HostName -> PortNumber -> IO ()
 doListKeys type' bucket host port =
   withRiakHandle host port $ \h -> do
     result :: Either RpbErrorResp () <-
-      listRiakKeys h (RiakNamespace type' bucket)
-        (\keys ->
-          (runExceptT . runListT)
-              (keys >>= liftIO . Latin1.putStrLn . coerce))
+      (runExceptT . runListT)
+        (listRiakKeys h (RiakNamespace type' bucket) >>=
+          liftIO . Latin1.putStrLn . coerce)
     either print (const (pure ())) result
 
 doStoreObject

@@ -1142,26 +1142,13 @@ resetBucketProps (RiakHandle conn _) req =
 listRiakBuckets
   :: RiakHandle -- ^
   -> RiakBucketType ty -- ^
-  -> (ListT (ExceptT RpbErrorResp IO) RiakBucket -> IO r) -- ^
-  -> IO r
-listRiakBuckets (RiakHandle conn _) type' k =
-  undefined
-  -- withConn $ \conn -> k $ do
-  --   liftIO (riakSend conn request)
+  -> ListT (ExceptT RpbErrorResp IO) RiakBucket
+listRiakBuckets (RiakHandle conn _) type' = do
+  response :: RpbListBucketsResp <-
+    riakStream conn (view #done) request
 
-  --   fix $ \loop -> do
-  --     resp :: RpbListBucketsResp <-
-  --       lift (ExceptT (riakRecv conn >>= parseResponse))
+  ListT.select (coerce (response ^. #buckets) :: [RiakBucket])
 
-  --     let
-  --       buckets :: [RiakBucket]
-  --       buckets =
-  --         coerce (resp ^. #buckets)
-
-  --     ListT.select buckets <|>
-  --       if resp ^. #done
-  --         then empty
-  --         else loop
  where
   request :: RpbListBucketsReq
   request =
@@ -1176,26 +1163,13 @@ listRiakBuckets (RiakHandle conn _) type' k =
 listRiakKeys
   :: RiakHandle -- ^
   -> RiakNamespace ty -- ^
-  -> (ListT (ExceptT RpbErrorResp IO) RiakKey -> IO r) -- ^
-  -> IO r
-listRiakKeys (RiakHandle conn _) (RiakNamespace type' bucket) k =
-  undefined
-  -- withConn $ \conn -> k $ do
-  --   liftIO (riakSend conn request)
+  -> ListT (ExceptT RpbErrorResp IO) RiakKey
+listRiakKeys (RiakHandle conn _) (RiakNamespace type' bucket) = do
+  response :: RpbListKeysResp <-
+    riakStream conn (view #done) request
 
-  --   fix $ \loop -> do
-  --     resp :: RpbListKeysResp <-
-  --       lift (ExceptT (riakRecv conn >>= parseResponse))
+  ListT.select (coerce (response ^. #keys) :: [RiakKey])
 
-  --     let
-  --       keys :: [RiakKey]
-  --       keys =
-  --         coerce (resp ^. #keys)
-
-  --     ListT.select keys <|>
-  --       if resp ^. #done
-  --         then empty
-  --         else loop
  where
   request :: RpbListKeysReq
   request =
