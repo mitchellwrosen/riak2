@@ -1,56 +1,53 @@
-{-# LANGUAGE LambdaCase, NoImplicitPrelude, OverloadedStrings,
-             ScopedTypeVariables, ViewPatterns #-}
+{-# LANGUAGE DeriveAnyClass, DerivingStrategies, LambdaCase, NoImplicitPrelude,
+             OverloadedStrings, ScopedTypeVariables #-}
 
 module Riak.Internal.Connection
   ( RiakConnection
-  , withRiakConnection
   , riakConnect
   , riakDisconnect
-  , riakSend
-  , riakRecv
   , riakExchange
+  , riakStream
   ) where
 
-import Data.Bits      (shiftL, (.|.))
-import Network.Socket (AddrInfo(..), HostName, PortNumber, Socket,
-                       SocketType(Stream), defaultHints, getAddrInfo)
+import Control.Exception (BlockedIndefinitelyOnMVar(..),
+                          BlockedIndefinitelyOnSTM(..))
+import Network.Socket    (AddrInfo(..), HostName, PortNumber, Socket,
+                          SocketType(Stream), defaultHints, getAddrInfo)
+import Streaming         (Of, Stream)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
-import qualified Data.ByteString.Builder        as Builder
 import qualified Data.ByteString.Lazy           as Lazy (ByteString)
 import qualified Data.ByteString.Streaming      as Q
 import qualified Network.Socket                 as Socket hiding (recv)
 import qualified Network.Socket.ByteString      as Socket (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
+import qualified Streaming                      as Streaming
+import qualified Streaming.Prelude              as Streaming
 
-import Proto.Riak
-import Riak.Internal.Debug
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
-import Riak.Internal.Request  (Request, requestToMessage)
-import Riak.Internal.Response (Response, parseResponse)
+import Riak.Internal.Protobuf
+import Riak.Internal.Request
+import Riak.Internal.Response
 
--- | A non-thread-safe connection to Riak.
+-- | A thread-safe connection to Riak.
 data RiakConnection
   = RiakConnection
-      !Socket                         -- Server socket
-      !(IORef (Q.ByteString IO Void)) -- Infinite input from server
-      -- TODO input isn't infinite
-      (Lazy.ByteString -> IO ())      -- Send bytes to server
+      !Socket
+      !(TQueue Lazy.ByteString)
+      !(TQueue (Stream ((->) Message) IO ()))
+      !ThreadId
+      !ThreadId
+      !(STM SomeException)
 
-withRiakConnection
-  :: MonadUnliftIO m
-  => HostName
-  -> PortNumber
-  -> (RiakConnection -> m a)
-  -> m a
-withRiakConnection host port =
-  bracket (riakConnect host port) riakDisconnect
+data EOF = EOF
+  deriving stock (Show)
+  deriving anyclass (Exception)
 
-riakConnect :: MonadIO m => HostName -> PortNumber -> m RiakConnection
-riakConnect host port = liftIO $ do
+riakConnect :: HostName -> PortNumber -> IO RiakConnection
+riakConnect host port = do
   info : _ <-
     let
       hints =
@@ -63,89 +60,141 @@ riakConnect host port = liftIO $ do
 
   Socket.connect socket (addrAddress info)
 
-  let
-    source :: Q.ByteString IO Void
-    source =
-      forever $ do
-        bytes :: ByteString <-
-          liftIO (Socket.recv socket 4096)
-        if ByteString.null bytes
-          -- TODO Properly handle Riak closing connection
-          then error "Riak closed the connection"
-          else Q.chunk bytes
+  sendQueue :: TQueue Lazy.ByteString <-
+    newTQueueIO
 
-  sourceRef :: IORef (Q.ByteString IO Void) <-
-    newIORef source
+  recvQueue :: TQueue (Stream ((->) Message) IO ()) <-
+    newTQueueIO
 
-  let
-    sink :: Lazy.ByteString -> IO ()
-    sink =
-      Socket.sendAll socket
+  exVar :: TMVar SomeException <-
+    newEmptyTMVarIO
 
-  pure (RiakConnection socket sourceRef sink)
+  sendThreadId :: ThreadId <-
+    forkIOWithUnmask $ \unmask ->
+      let
+        loop :: IO ()
+        loop =
+          atomically (readTQueue sendQueue) >>=
+            Socket.sendAll socket
+      in
+        unmask (forever loop)
+          `catch` (void . atomically . tryPutTMVar exVar)
 
-riakDisconnect :: MonadIO m => RiakConnection -> m ()
-riakDisconnect (RiakConnection socket _ _) =
-  liftIO (Socket.close socket)
+  recvThreadId :: ThreadId <-
+    forkIOWithUnmask $ \unmask ->
+      let
+        loop :: Stream (Of Message) IO () -> IO ()
+        loop messages = do
+          consumer :: Stream ((->) Message) IO () <-
+            atomically (readTQueue recvQueue)
 
--- | Send a 'Message' on a 'Connection'.
-riakSend :: Request a => RiakConnection -> a -> IO ()
-riakSend (RiakConnection _ _ sink) (requestToMessage -> Message code bytes) =
-  sink payload
- where
-  payload :: Lazy.ByteString
-  payload =
-    Builder.toLazyByteString
-      (Builder.int32BE (fromIntegral (ByteString.length bytes + 1))
-        <> Builder.word8 code
-        <> Builder.byteString bytes)
+          feed messages consumer >>= \case
+            Nothing ->
+              throwIO EOF
 
--- | Receive a 'Message' on a 'Connection'.
-riakRecv :: RiakConnection -> IO Message
-riakRecv (RiakConnection _ sourceRef _) = do
-  source0 :: Q.ByteString IO Void <-
-    readIORef sourceRef
+            Just messages' ->
+              loop messages'
 
-  (len, source1) <-
-    parsePanic int32be source0
+      in
+        unmask (loop (messageStream (socketStream socket)))
+          `catch` (void . atomically . tryPutTMVar exVar)
 
-  (code, source2) <-
-    parsePanic Atto.anyWord8 source1
+  pure $ RiakConnection
+    socket
+    sendQueue
+    recvQueue
+    sendThreadId
+    recvThreadId
+    (readTMVar exVar)
 
-  if len > 1
-    then do
-      (bytes, source3) <-
-        parsePanic (Atto.take (fromIntegral (len-1))) source2
-
-      writeIORef sourceRef source3
-
-      pure (Message code bytes)
-
-    else do
-      writeIORef sourceRef source2
-
-      pure (Message code mempty)
+riakDisconnect :: RiakConnection -> IO ()
+riakDisconnect (RiakConnection socket _ _ sendTid recvTid _) = do
+  killThread sendTid
+  killThread recvTid
+  Socket.close socket
 
 riakExchange
   :: (Request a, Response b)
   => RiakConnection
   -> a
   -> IO (Either RpbErrorResp b)
-riakExchange conn req = do
-  debug (">>> " ++ show req)
-  riakSend conn req
-  resp <- parseResponse =<< riakRecv conn
-  debug ("<<< " ++ show resp)
-  pure resp
+riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
+  resultVar :: MVar Message <-
+    newEmptyMVar
 
-parsePanic
-  :: Atto.Parser a
-  -> Q.ByteString IO Void
-  -> IO (a, Q.ByteString IO Void)
-parsePanic parser bytes =
-  parse parser bytes >>= \case
-    EndOfInput v ->
-      absurd v
+  payload :: Lazy.ByteString <-
+    pure $! encodeMessage (requestToMessage request)
+
+  let
+    consumer :: Stream ((->) Message) IO ()
+    consumer =
+      Streaming.wrap (lift . putMVar resultVar)
+
+  atomically $ do
+    writeTQueue sendQueue payload
+    writeTQueue recvQueue consumer
+
+  (takeMVar resultVar >>= parseResponse)
+    `catch` \BlockedIndefinitelyOnMVar ->
+      (atomically ex >>= throwIO)
+
+riakStream
+  :: forall a b.
+     (Request a, Response b)
+  => RiakConnection -- ^
+  -> (b -> Bool) -- ^ Done?
+  -> a -- ^
+  -> ListT (ExceptT RpbErrorResp IO) b
+riakStream (RiakConnection _ sendQueue recvQueue _ _ ex) done request = do
+  responseQueue :: TQueue (Either RpbErrorResp b) <-
+    liftIO newTQueueIO
+
+  payload :: Lazy.ByteString <-
+    pure $! encodeMessage (requestToMessage request)
+
+  let
+    -- We have to decode the payloads to know when the stream is done, so just
+    -- do the decoding on the recv thread.
+    consumer :: Stream ((->) Message) IO ()
+    consumer =
+      Streaming.wrap $ \message -> do
+        response :: Either RpbErrorResp b <-
+          lift (parseResponse message)
+
+        lift (atomically (writeTQueue responseQueue response))
+
+        unless (either (\_ -> True) done response)
+          consumer
+
+  liftIO . atomically $ do
+    writeTQueue sendQueue payload
+    writeTQueue recvQueue consumer
+
+  fix $ \loop -> do
+    response :: b <-
+      (lift . ExceptT)
+        (atomically (readTQueue responseQueue)
+          `catch` \BlockedIndefinitelyOnSTM ->
+            (atomically ex >>= throwIO))
+
+    if done response
+      then pure response
+      else pure response <|> loop
+
+socketStream :: Socket -> Q.ByteString IO ()
+socketStream socket =
+  fix $ \loop -> do
+    bytes :: ByteString <-
+      liftIO (Socket.recv socket 4096)
+    unless (ByteString.null bytes) $ do
+      Q.chunk bytes
+      loop
+
+messageStream :: Q.ByteString IO a -> Stream (Of Message) IO a
+messageStream bytes0 =
+  lift (parseByteStream messageParser bytes0) >>= \case
+    EndOfInput x ->
+      pure x
 
     FailedParse _unconsumed context reason ->
       panic "Riak parse failure"
@@ -153,10 +202,11 @@ parsePanic parser bytes =
         , ("reason", reason)
         )
 
-    SuccessfulParse x bytes' ->
-      pure (x, bytes')
+    SuccessfulParse message bytes1 -> do
+      Streaming.yield message
+      messageStream bytes1
 
--- | Throwaway 'parse' result type.
+-- | Throwaway 'parseByteStream' result type.
 data ParseResult a r
   = EndOfInput r
   | FailedParse !ByteString  ![String] !String
@@ -164,12 +214,12 @@ data ParseResult a r
 
 -- | Apply an attoparsec parser to a streaming bytestring. Return the parsed
 -- value and the remaining stream.
-parse
+parseByteStream
   :: forall a r.
      Atto.Parser a
   -> Q.ByteString IO r
   -> IO (ParseResult a r)
-parse parser bytes0 =
+parseByteStream parser bytes0 =
   Q.nextChunk bytes0 >>= \case
     Left r ->
       pure (EndOfInput r)
@@ -198,15 +248,20 @@ parse parser bytes0 =
       in
         loop (Atto.parse parser chunk0) bytes1
 
--- | Attoparsec parser for a 32-bit big-endian integer.
-int32be :: Atto.Parser Int32
-int32be = do
-  w0 <- Atto.anyWord8
-  w1 <- Atto.anyWord8
-  w2 <- Atto.anyWord8
-  w3 <- Atto.anyWord8
-  pure $
-    shiftL (fromIntegral w0) 24 .|.
-    shiftL (fromIntegral w1) 16 .|.
-    shiftL (fromIntegral w2)  8 .|.
-            fromIntegral w3
+feed
+  :: Monad m
+  => Stream (Of a) m ()
+  -> Stream ((->) a) m ()
+  -> m (Maybe (Stream (Of a) m ()))
+feed xs fs =
+  Streaming.inspect fs >>= \case
+    Left _ ->
+      pure (Just xs)
+
+    Right f ->
+      Streaming.next xs >>= \case
+        Left _ ->
+          pure Nothing
+
+        Right (x, xs') ->
+          feed xs' (f x)

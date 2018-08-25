@@ -13,7 +13,7 @@ module Riak.Internal
   ) where
 
 import Proto.Riak
-import Riak.Internal.ConcurrentConnection
+import Riak.Internal.Connection
 import Riak.Internal.Response
 
 deleteRiakObject

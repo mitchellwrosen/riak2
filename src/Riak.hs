@@ -123,7 +123,7 @@ import           Proto.Riak               hiding (SetOp)
 import qualified Proto.Riak               as Proto
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Cache
-import           Riak.Internal.ConcurrentConnection
+import           Riak.Internal.Connection
 import           Riak.Internal.Content
 import           Riak.Internal.DataTypes
 import           Riak.Internal.Panic

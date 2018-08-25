@@ -63,7 +63,6 @@ library
     src
   other-modules:
     Riak.Internal.Cache
-    Riak.Internal.ConcurrentConnection
     Riak.Internal.Connection
     Riak.Internal.Content
     Riak.Internal.DataTypes
