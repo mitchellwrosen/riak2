@@ -269,6 +269,7 @@ storeObjectParser =
         <*> wOption)
       (progDesc "Store an object"))
 
+-- TODO riak-cli allow decrementing counters
 updateCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 updateCounterParser =
   command
@@ -280,11 +281,11 @@ updateCounterParser =
         <*> keyArgument
         <*> argument auto
               (mconcat
-                [ help "Value"
-                , metavar "VALUE"
+                [ help "Amount"
+                , metavar "N"
                 ]))
         -- TODO other update-counter optional params
-      (progDesc "Update a counter"))
+      (progDesc "Increment or decrement a counter"))
 
 --------------------------------------------------------------------------------
 -- Implementations

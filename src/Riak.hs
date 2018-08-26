@@ -140,6 +140,7 @@ import           Riak.Internal.Types
 
 
 -- TODO _ variants that don't decode replies
+-- TODO rename "content" to "object"
 
 --------------------------------------------------------------------------------
 -- RiakHandle
@@ -580,8 +581,9 @@ deleteRiakObject (RiakHandle conn _) req =
 
 -- | Fetch a counter.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- counters.
+-- Throws:
+--
+-- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain counters.
 fetchRiakCounter
   :: MonadIO m
   => RiakHandle -- ^
@@ -595,8 +597,10 @@ fetchRiakCounter handle loc (FetchRiakObjectParams a b c d e f g) =
 
 -- | Fetch a grow-only set.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- grow-only sets.
+-- Throws:
+--
+-- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain grow-only
+--   sets.
 fetchRiakGrowOnlySet
   :: MonadIO m
   => RiakHandle -- ^
@@ -609,8 +613,10 @@ fetchRiakGrowOnlySet =
 
 -- | Fetch a HyperLogLog.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- HyperLogLogs.
+-- Throws
+--
+-- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain
+--   HyperLogLogs.
 fetchRiakHyperLogLog
   :: MonadIO m
   => RiakHandle -- ^
@@ -621,10 +627,13 @@ fetchRiakHyperLogLog =
   fetchDataType
 
 
--- | Fetch a map.
+-- | Fetch and decode a map.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- maps.
+-- Throws:
+--
+-- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain maps.
+--
+-- * 'RiakMapParseError' if decoding fails.
 fetchRiakMap
   :: (IsRiakMap a, MonadIO m)
   => RiakHandle -- ^
@@ -635,10 +644,14 @@ fetchRiakMap =
   fetchDataType
 
 
--- | Fetch a set.
+-- | Fetch and decode a set.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- sets.
+-- Throws:
+--
+-- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain sets.
+--
+-- * 'SomeException' if decoding fails. The exception thrown is provided by the
+--   implementation of 'decodeRiakRegister'.
 fetchRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^

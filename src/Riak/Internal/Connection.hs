@@ -25,6 +25,7 @@ import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 import qualified Streaming                      as Streaming
 import qualified Streaming.Prelude              as Streaming
 
+import Riak.Internal.Debug
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
@@ -114,13 +115,16 @@ riakDisconnect (RiakConnection socket _ _ sendTid recvTid _) = do
   Socket.close socket
 
 riakExchange
-  :: (Request a, Response b)
+  :: forall a b.
+     (Request a, Response b)
   => RiakConnection
   -> a
   -> IO (Either RiakError b)
 riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
   resultVar :: MVar Message <-
     newEmptyMVar
+
+  debug (">>> " ++ show request)
 
   payload :: Lazy.ByteString <-
     pure $! encodeMessage (requestToMessage request)
@@ -134,9 +138,16 @@ riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
     writeTQueue sendQueue payload
     writeTQueue recvQueue consumer
 
-  (takeMVar resultVar >>= parseResponse)
-    `catch` \BlockedIndefinitelyOnMVar ->
-      (atomically ex >>= throwIO)
+  let
+    recv :: IO (Either RiakError b)
+    recv = do
+      result :: Either RiakError b <-
+        parseResponse =<< takeMVar resultVar
+      debug ("<<< " ++ either show show result)
+      pure result
+
+  recv `catch`
+    \BlockedIndefinitelyOnMVar -> atomically ex >>= throwIO
 
 riakStream
   :: forall a b.
