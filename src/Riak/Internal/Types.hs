@@ -106,8 +106,11 @@ data RiakDataTypeTy
   | forall a. RiakSetTy a
 
 
+-- | Riak returned some error.
+--
+-- http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/#error-response
 data RiakError
-  = RiakError !Word32 !Text
+  = RiakError !Text
   deriving (Show)
 
 

@@ -109,9 +109,10 @@ parseResponse (Message actual bytes)
   expected =
     unMessageCode (responseCode @a)
 
+  -- Code as of 2.2.3 is currently always 0, so just just toss it
   toRiakError :: RpbErrorResp -> RiakError
-  toRiakError (RpbErrorResp a b _) =
-    RiakError b (decodeUtf8 a)
+  toRiakError (RpbErrorResp msg _code _) =
+    RiakError (decodeUtf8 msg)
 
 
 decodeResponse :: Response a => Word8 -> ByteString -> IO a
