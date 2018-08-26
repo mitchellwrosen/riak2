@@ -1,8 +1,9 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies, FlexibleInstances,
-             GADTs, GeneralizedNewtypeDeriving, InstanceSigs, KindSignatures,
-             LambdaCase, MagicHash, NoImplicitPrelude, OverloadedLabels,
-             OverloadedStrings, ScopedTypeVariables, StandaloneDeriving,
-             TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DerivingStrategies,
+             FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
+             InstanceSigs, KindSignatures, LambdaCase, MagicHash,
+             NoImplicitPrelude, OverloadedLabels, OverloadedStrings,
+             ScopedTypeVariables, StandaloneDeriving, TypeFamilies,
+             UndecidableInstances #-}
 
 module Riak.Internal.DataTypes
   ( RiakDataTypeError(..)
@@ -30,20 +31,24 @@ import Lens.Labels
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set            as Set
-import qualified Data.Text           as Text
 
 import Proto.Riak
 import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 
--- TODO not either text
 class IsRiakDataType (ty :: RiakDataTypeTy) where
   type DataTypeVal    ty :: *
 
-  parseDtFetchResp :: Proxy# ty -> DtFetchResp -> Either Text (DataTypeVal ty)
+  parseDtFetchResp
+    :: RiakLocation ('Just ty)
+    -> DtFetchResp
+    -> Either SomeException (DataTypeVal ty)
 
-  parseDtUpdateResp :: Proxy# ty -> DtUpdateResp -> Either Text (DataTypeVal ty)
+  parseDtUpdateResp
+    :: RiakLocation ('Just ty)
+    -> DtUpdateResp
+    -> Either SomeException (DataTypeVal ty)
 
 
 -- | A 'RiakDataTypeError' is thrown when a data type operation is performed on
@@ -73,13 +78,23 @@ dataTypeToText = \case
 instance IsRiakDataType 'RiakCounterTy where
   type DataTypeVal 'RiakCounterTy = Int64
 
-  parseDtFetchResp :: Proxy# 'RiakCounterTy -> DtFetchResp -> Either Text Int64
-  parseDtFetchResp _ resp =
+  parseDtFetchResp
+    :: RiakLocation ('Just 'RiakCounterTy)
+    -> DtFetchResp
+    -> Either SomeException Int64
+  parseDtFetchResp loc resp =
     case resp ^. #type' of
-      DtFetchResp'COUNTER -> Right (resp ^. #value . #counterValue)
-      x -> Left ("expected counter but found " <> dataTypeToText x)
+      DtFetchResp'COUNTER ->
+        Right (resp ^. #value . #counterValue)
 
-  parseDtUpdateResp :: Proxy# 'RiakCounterTy -> DtUpdateResp -> Either Text Int64
+      x ->
+        (Left . toException . RiakDataTypeError loc)
+          ("expected counter but found " <> dataTypeToText x)
+
+  parseDtUpdateResp
+    :: RiakLocation ('Just 'RiakCounterTy)
+    -> DtUpdateResp
+    -> Either SomeException Int64
   parseDtUpdateResp _ resp =
     Right (resp ^. #counterValue)
 
@@ -92,18 +107,22 @@ instance IsRiakDataType 'RiakGrowOnlySetTy where
   type DataTypeVal 'RiakGrowOnlySetTy = Set ByteString
 
   parseDtFetchResp
-    :: Proxy# 'RiakGrowOnlySetTy
+    :: RiakLocation ('Just 'RiakGrowOnlySetTy)
     -> DtFetchResp
-    -> Either Text (Set ByteString)
-  parseDtFetchResp _ resp =
+    -> Either SomeException (Set ByteString)
+  parseDtFetchResp loc resp =
     case resp ^. #type' of
-      DtFetchResp'GSET -> Right (Set.fromList (resp ^. #value . #gsetValue))
-      x -> Left ("expected gset but found " <>dataTypeToText x)
+      DtFetchResp'GSET ->
+        Right (Set.fromList (resp ^. #value . #gsetValue))
+
+      x ->
+        (Left . toException . RiakDataTypeError loc)
+          ("expected gset but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: Proxy# 'RiakGrowOnlySetTy
+    :: RiakLocation ('Just 'RiakGrowOnlySetTy)
     -> DtUpdateResp
-    -> Either Text (Set ByteString)
+    -> Either SomeException (Set ByteString)
   parseDtUpdateResp _ resp =
     Right (Set.fromList (resp ^. #gsetValue))
 
@@ -116,20 +135,25 @@ instance IsRiakDataType 'RiakHyperLogLogTy where
   type DataTypeVal 'RiakHyperLogLogTy = Word64
 
   parseDtFetchResp
-    :: Proxy# 'RiakHyperLogLogTy
+    :: RiakLocation ('Just 'RiakHyperLogLogTy)
     -> DtFetchResp
-    -> Either Text Word64
-  parseDtFetchResp _ resp =
+    -> Either SomeException Word64
+  parseDtFetchResp loc resp =
     case resp ^. #type' of
-      DtFetchResp'HLL -> Right (resp ^. #value . #hllValue)
-      x               -> Left ("expected hll but found " <> dataTypeToText x)
+      DtFetchResp'HLL ->
+        Right (resp ^. #value . #hllValue)
+
+      x ->
+        (Left . toException . RiakDataTypeError loc)
+          ("expected hll but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: Proxy# 'RiakHyperLogLogTy
+    :: RiakLocation ('Just 'RiakHyperLogLogTy)
     -> DtUpdateResp
-    -> Either Text Word64
+    -> Either SomeException Word64
   parseDtUpdateResp _ resp =
     Right (resp ^. #hllValue)
+
 
 --------------------------------------------------------------------------------
 -- Map
@@ -139,21 +163,30 @@ instance IsRiakMap a => IsRiakDataType ('RiakMapTy a) where
   type DataTypeVal ('RiakMapTy a) = a
 
   parseDtFetchResp
-    :: Proxy# ('RiakMapTy a)
+    :: RiakLocation ('Just ('RiakMapTy a))
     -> DtFetchResp
-    -> Either Text a
-  parseDtFetchResp _ resp =
+    -> Either SomeException a
+  parseDtFetchResp loc resp =
     case resp ^. #type' of
       DtFetchResp'MAP ->
-        undefined
-        -- runParser decodeRiakMap (parseMapEntries (resp ^. #value . #mapValue))
-      x ->
-        Left ("expected map but found " <> dataTypeToText x)
+        first toException
+          (runParser
+            decodeRiakMap
+            (parseMapEntries (resp ^. #value . #mapValue)))
 
-  parseDtUpdateResp :: Proxy# ('RiakMapTy a) -> DtUpdateResp -> Either Text a
+      x ->
+        (Left . toException . RiakDataTypeError loc)
+          ("expected map but found " <> dataTypeToText x)
+
+  parseDtUpdateResp
+    :: RiakLocation ('Just ('RiakMapTy a))
+    -> DtUpdateResp
+    -> Either SomeException a
   parseDtUpdateResp _ resp =
-    undefined
-    -- Right (parseMapEntries (resp ^. #mapValue))
+    first toException
+      (runParser
+        decodeRiakMap
+        (parseMapEntries (resp ^. #mapValue)))
 
 parseMapEntries :: [MapEntry] -> HashMap ByteString RiakMapValue
 parseMapEntries =
@@ -189,21 +222,23 @@ data RiakMapValue
   deriving (Show)
 
 
--- WIP parsing primitives
-
 data RiakMapParseError
-  = TypeMismatch
-  | UnexpectedKeys
-  | ParseFailure Text
+  = TypeMismatch -- TODO more informative TypeMismatch
+  | UnexpectedKeys -- TODO more informative UnexpectedKeys
+  | ParseFailure SomeException
+  deriving stock (Show)
+  deriving anyclass (Exception)
 
 data RiakMapParser a
   = RiakMapParser
       (HashMap ByteString RiakMapValue -> Either RiakMapParseError a)
       (Maybe (HashMap ByteString ()))
+  deriving (Functor)
 
-instance Functor RiakMapParser where
-
-runParser :: RiakMapParser a -> HashMap ByteString RiakMapValue -> Either RiakMapParseError a
+runParser
+  :: RiakMapParser a
+  -> HashMap ByteString RiakMapValue
+  -> Either RiakMapParseError a
 runParser (RiakMapParser f expected) m = do
   for_ expected $ \expected' ->
     unless (null (HashMap.differenceWith (\_ _ -> Nothing) m expected'))
@@ -309,12 +344,12 @@ instance IsRiakMap (HashMap ByteString RiakMapValue) where
 --------------------------------------------------------------------------------
 
 class IsRiakRegister a where
-  decodeRiakRegister :: ByteString -> Either Text a
+  decodeRiakRegister :: ByteString -> Either SomeException a
 
   encodeRiakRegister :: a -> ByteString
 
 instance IsRiakRegister ByteString where
-  decodeRiakRegister :: ByteString -> Either Text ByteString
+  decodeRiakRegister :: ByteString -> Either SomeException ByteString
   decodeRiakRegister =
     Right
 
@@ -323,9 +358,9 @@ instance IsRiakRegister ByteString where
     id
 
 instance IsRiakRegister Text where
-  decodeRiakRegister :: ByteString -> Either Text Text
+  decodeRiakRegister :: ByteString -> Either SomeException Text
   decodeRiakRegister =
-    first (Text.pack . displayException) . decodeUtf8'
+    first toException . decodeUtf8'
 
   encodeRiakRegister :: Text -> ByteString
   encodeRiakRegister =
@@ -342,16 +377,23 @@ instance (IsRiakRegister a, Ord a) => IsRiakSet a
 instance IsRiakSet a => IsRiakDataType ('RiakSetTy a) where
   type DataTypeVal ('RiakSetTy a) = Set a
 
-  parseDtFetchResp :: Proxy# ty -> DtFetchResp -> Either Text (Set a)
-  parseDtFetchResp _ resp =
+  parseDtFetchResp
+    :: RiakLocation ('Just ('RiakSetTy a))
+    -> DtFetchResp
+    -> Either SomeException (Set a)
+  parseDtFetchResp loc resp =
     case resp ^. #type' of
       DtFetchResp'SET ->
         Set.fromList <$> for (resp ^. #value . #setValue) decodeRiakRegister
 
       x ->
-        Left ("expected set but found " <> dataTypeToText x)
+        (Left . toException . RiakDataTypeError loc)
+          ("expected set but found " <> dataTypeToText x)
 
-  parseDtUpdateResp :: Proxy# ty -> DtUpdateResp -> Either Text (Set a)
+  parseDtUpdateResp
+    :: RiakLocation ('Just ('RiakSetTy a))
+    -> DtUpdateResp
+    -> Either SomeException (Set a)
   parseDtUpdateResp _ resp =
     Set.fromList <$> for (resp ^. #setValue) decodeRiakRegister
 

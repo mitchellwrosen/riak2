@@ -807,9 +807,9 @@ fetchDataType
   response :: DtFetchResp <-
     ExceptT (Internal.fetchRiakDataType conn request)
 
-  case parseDtFetchResp @ty proxy# response of
+  case parseDtFetchResp loc response of
     Left err ->
-      throwIO (RiakDataTypeError loc err)
+      throwIO err
 
     Right value -> do
       -- Only counters don't have a causal context
@@ -995,9 +995,17 @@ _updateSet
   (key', value) <-
     ExceptT (updateDataType handle namespace key context op params)
 
-  case parseDtUpdateResp @('RiakSetTy a) proxy# value of
-    Left err     -> undefined -- TODO _updateSet error handling
-    Right value' -> pure (key', value')
+  let
+    loc :: RiakLocation ('Just ('RiakSetTy a))
+    loc =
+      RiakLocation namespace key'
+
+  case parseDtUpdateResp loc value of
+    Left err ->
+      throwIO err
+
+    Right value' ->
+      pure (key', value')
 
  where
   op :: DtOp
