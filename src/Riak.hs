@@ -86,6 +86,7 @@ module Riak
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
   , RiakContent(..)
+  , RiakDataTypeError(..)
   , RiakDataTypeTy(..)
   , RiakError(..)
   , RiakHandle
@@ -393,7 +394,7 @@ storeNewRiakObject2
   -> m (Either RiakError RiakKey)
 storeNewRiakObject2
     handle namespace content (StoreRiakObjectParams a b c d e f g h) =
-  _storeRiakObject2 handle namespace Nothing content a b c d e
+  _storeRiakObject handle namespace Nothing content a b c d e
     ParamObjectReturnNone f g h
 
 -- | Store an new object and return its metadata.
@@ -456,9 +457,6 @@ _storeRiakObject
       key
 
   let
-    (content_type, charset, content_encoding, bytes) =
-      contentEncode value
-
     request :: RpbPutReq
     request =
       RpbPutReq
@@ -468,9 +466,9 @@ _storeRiakObject
         , _RpbPutReq'content        =
             RpbContent
               { _RpbContent'_unknownFields  = []
-              , _RpbContent'charset         = unCharset charset
-              , _RpbContent'contentEncoding = unContentEncoding content_encoding
-              , _RpbContent'contentType     = Just (unContentType content_type)
+              , _RpbContent'charset         = unCharset (riakCharset value)
+              , _RpbContent'contentEncoding = unContentEncoding (riakContentEncoding value)
+              , _RpbContent'contentType     = Just (unContentType (riakContentType value))
               , _RpbContent'deleted         = Nothing
               , _RpbContent'indexes         = map indexToRpbPair (coerce indexes)
               , _RpbContent'lastMod         = Nothing
@@ -478,7 +476,7 @@ _storeRiakObject
               , _RpbContent'links           = []
               , _RpbContent'ttl             = Nothing
               , _RpbContent'usermeta        = map rpbPair (coerce metadata)
-              , _RpbContent'value           = bytes
+              , _RpbContent'value           = encodeRiakContent value
               , _RpbContent'vtag            = Nothing
               }
         , _RpbPutReq'dw             = coerce dw
@@ -568,148 +566,6 @@ _storeRiakObject
 
   lift theValue
 
-_storeRiakObject2
-  :: forall a m return.
-     (IsRiakContent a, MonadIO m)
-  => RiakHandle
-  -> RiakNamespace 'Nothing
-  -> Maybe RiakKey
-  -> a
-  -> DW
-  -> [RiakSecondaryIndex]
-  -> RiakMetadata
-  -> N
-  -> PW
-  -> ParamObjectReturn return
-  -> SloppyQuorum
-  -> Timeout
-  -> W
-  -> m (Either RiakError (ObjectReturnTy a return))
-_storeRiakObject2
-    handle@(RiakHandle conn cache) namespace@(RiakNamespace type' bucket) key
-    value dw indexes metadata n pw return sloppy_quorum timeout
-    w = liftIO . runExceptT $ do
-
-  -- Get the cached vclock of this object to pass in the put request.
-  vclock :: Maybe RiakVclock <-
-    maybe
-      (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (lift . cacheLookup cache . RiakLocation namespace)
-      key
-
-  let
-    (content_type, charset, content_encoding, bytes) =
-      contentEncode value
-
-    request :: RpbPutReq
-    request =
-      RpbPutReq
-        { _RpbPutReq'_unknownFields = []
-        , _RpbPutReq'asis           = Nothing
-        , _RpbPutReq'bucket         = unRiakBucket bucket
-        , _RpbPutReq'content        =
-            RpbContent
-              { _RpbContent'_unknownFields  = []
-              , _RpbContent'charset         = unCharset charset
-              , _RpbContent'contentEncoding = unContentEncoding content_encoding
-              , _RpbContent'contentType     = Just (unContentType content_type)
-              , _RpbContent'deleted         = Nothing
-              , _RpbContent'indexes         = map indexToRpbPair (coerce indexes)
-              , _RpbContent'lastMod         = Nothing
-              , _RpbContent'lastModUsecs    = Nothing
-              , _RpbContent'links           = []
-              , _RpbContent'ttl             = Nothing
-              , _RpbContent'usermeta        = map rpbPair (coerce metadata)
-              , _RpbContent'value           = bytes
-              , _RpbContent'vtag            = Nothing
-              }
-        , _RpbPutReq'dw             = coerce dw
-        , _RpbPutReq'ifNoneMatch    = Nothing
-        , _RpbPutReq'ifNotModified  = Nothing
-        , _RpbPutReq'key            = coerce key
-        , _RpbPutReq'nVal           = unN n
-        , _RpbPutReq'pw             = coerce pw
-        , _RpbPutReq'returnBody     =
-            case return of
-              ParamObjectReturnNone -> Nothing
-              ParamObjectReturnHead -> Nothing
-              ParamObjectReturnBody -> Just True
-        , _RpbPutReq'returnHead     =
-            case return of
-              ParamObjectReturnNone -> Nothing
-              ParamObjectReturnHead -> Just True
-              ParamObjectReturnBody -> Nothing
-        , _RpbPutReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-        , _RpbPutReq'timeout        = unTimeout timeout
-        , _RpbPutReq'type'          = Just (unRiakBucketType type')
-        , _RpbPutReq'vclock         = coerce vclock
-        , _RpbPutReq'w              = coerce w
-        }
-
-  response :: RpbPutResp <-
-    ExceptT (riakExchange conn request)
-
-  let
-    nonsense :: Text -> ExceptT RiakError IO void
-    nonsense s =
-      panic s
-        ( ( "request",  request  )
-        , ( "response", response )
-        )
-
-  theKey :: RiakKey <-
-    maybe
-      (maybe
-        (nonsense "missing key")
-        pure
-        (coerce (response ^. #maybe'key)))
-      pure
-      key
-
-  let
-    loc :: RiakLocation 'Nothing
-    loc =
-      RiakLocation (RiakNamespace type' bucket) theKey
-
-  -- Cache the vclock if asked for it with return_head or return_body.
-  do
-    let
-      doCacheVclock :: ExceptT RiakError IO ()
-      doCacheVclock =
-        case response ^. #maybe'vclock of
-          Nothing ->
-            nonsense "missing vclock"
-
-          Just theVclock ->
-            cacheVclock handle loc (Just (coerce theVclock))
-
-    () <-
-      case return of
-        ParamObjectReturnNone -> pure ()
-        ParamObjectReturnHead -> doCacheVclock
-        ParamObjectReturnBody -> doCacheVclock
-
-    pure ()
-
-  let
-    theValue :: IO (ObjectReturnTy a return)
-    theValue =
-      case return of
-        ParamObjectReturnNone ->
-          pure theKey
-
-        ParamObjectReturnHead ->
-          traverse
-            (parseContent @a proxy# loc STrue)
-            (List1.fromList (response ^. #content))
-
-        ParamObjectReturnBody ->
-          traverse
-            (parseContent @a proxy# loc SFalse)
-            (List1.fromList (response ^. #content))
-
-  lift theValue
-
 
 -- TODO deleteRiakObject figure out when vclock is required (always?)
 -- TODO don't use rw (deprecated)
@@ -724,7 +580,7 @@ deleteRiakObject (RiakHandle conn _) req =
 
 -- | Fetch a counter.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- counters.
 fetchRiakCounter
   :: MonadIO m
@@ -739,7 +595,7 @@ fetchRiakCounter handle loc (FetchRiakObjectParams a b c d e f g) =
 
 -- | Fetch a grow-only set.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- grow-only sets.
 fetchRiakGrowOnlySet
   :: MonadIO m
@@ -753,7 +609,7 @@ fetchRiakGrowOnlySet =
 
 -- | Fetch a HyperLogLog.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- HyperLogLogs.
 fetchRiakHyperLogLog
   :: MonadIO m
@@ -767,7 +623,8 @@ fetchRiakHyperLogLog =
 
 -- | Fetch a map.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain maps.
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
+-- maps.
 fetchRiakMap
   :: (IsRiakMap a, MonadIO m)
   => RiakHandle -- ^
@@ -780,7 +637,8 @@ fetchRiakMap =
 
 -- | Fetch a set.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain sets.
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
+-- sets.
 fetchRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^
@@ -848,7 +706,7 @@ fetchDataType
 
 -- | Update a counter and its updated value if @return_body@ is set, else 0.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- counters.
 updateRiakCounter
   :: MonadIO m
@@ -863,7 +721,7 @@ updateRiakCounter handle (RiakLocation namespace key) incr params =
 
 -- | Update a new counter and return its randomly-generated key.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- counters.
 updateNewRiakCounter
   :: MonadIO m
@@ -902,7 +760,7 @@ _updateRiakCounter handle namespace key incr params =
 -- | Update a set and return its updated value if @return_body@ is set, else
 -- the empty set.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- counters.
 updateRiakSet
   :: (IsRiakSet a, MonadIO m)
@@ -916,7 +774,7 @@ updateRiakSet handle (RiakLocation namespace key) op params =
 
 -- | Update a new set and return its randomly-generated key.
 --
--- Throws a 'DataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
 -- counters.
 updateNewRiakSet
   :: (IsRiakSet a, MonadIO m)
@@ -1363,7 +1221,7 @@ parseContent _ loc head
         either
           throwIO
           pure
-          (contentDecode
+          (decodeRiakContent
             (coerce content_type)
             (Charset charset)
             (ContentEncoding content_encoding)

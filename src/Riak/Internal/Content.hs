@@ -58,9 +58,15 @@ instance Functor f => HasLens' f (RiakContent a)                 "ttl"      TTL 
 
 
 class IsRiakContent a where
-  contentEncode :: a -> (ContentType, Charset, ContentEncoding, ByteString)
+  riakContentType :: a -> ContentType
 
-  contentDecode
+  riakCharset :: a -> Charset
+
+  riakContentEncoding :: a -> ContentEncoding
+
+  encodeRiakContent :: a -> ByteString
+
+  decodeRiakContent
     :: Maybe ContentType
     -> Charset
     -> ContentEncoding
@@ -68,42 +74,56 @@ class IsRiakContent a where
     -> Either SomeException a
 
 instance IsRiakContent ByteString where
-  contentEncode
-    :: ByteString
-    -> (ContentType, Charset, ContentEncoding, ByteString)
-  contentEncode bytes =
-    ( ContentTypeApplicationOctetStream
-    , CharsetNone
-    , ContentEncodingNone
-    , bytes
-    )
+  riakContentType :: ByteString -> ContentType
+  riakContentType _ =
+    ContentTypeApplicationOctetStream
 
-  contentDecode
+  riakCharset :: ByteString -> Charset
+  riakCharset _ =
+    CharsetNone
+
+  riakContentEncoding :: ByteString -> ContentEncoding
+  riakContentEncoding _ =
+    ContentEncodingNone
+
+  encodeRiakContent :: ByteString -> ByteString
+  encodeRiakContent =
+    id
+
+  decodeRiakContent
     :: Maybe ContentType
     -> Charset
     -> ContentEncoding
     -> ByteString
     -> Either SomeException ByteString
-  contentDecode _ _ _ =
+  decodeRiakContent _ _ _ =
     Right
 
 instance IsRiakContent Text where
-  contentEncode :: Text -> (ContentType, Charset, ContentEncoding, ByteString)
-  contentEncode bytes =
-    ( ContentTypeTextPlain
-    , CharsetNone
-    , ContentEncodingNone
-    , Text.encodeUtf8 bytes
-    )
+  riakContentType :: Text -> ContentType
+  riakContentType _ =
+    ContentTypeTextPlain
+
+  riakCharset :: Text -> Charset
+  riakCharset _ =
+    CharsetNone
+
+  riakContentEncoding :: Text -> ContentEncoding
+  riakContentEncoding _ =
+    ContentEncodingNone
+
+  encodeRiakContent :: Text -> ByteString
+  encodeRiakContent =
+    Text.encodeUtf8
 
   -- TODO text parse errors
-  contentDecode
+  decodeRiakContent
     :: Maybe ContentType
     -> Charset
     -> ContentEncoding
     -> ByteString
     -> Either SomeException Text
-  contentDecode type' charset encoding =
+  decodeRiakContent type' charset encoding =
     case type' of
       Just ContentTypeTextPlain ->
         decode <=< decompress
