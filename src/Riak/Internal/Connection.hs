@@ -28,9 +28,9 @@ import qualified Streaming.Prelude              as Streaming
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
-import Riak.Internal.Protobuf
 import Riak.Internal.Request
 import Riak.Internal.Response
+import Riak.Internal.Types
 
 -- | A thread-safe connection to Riak.
 data RiakConnection
@@ -117,7 +117,7 @@ riakExchange
   :: (Request a, Response b)
   => RiakConnection
   -> a
-  -> IO (Either RpbErrorResp b)
+  -> IO (Either RiakError b)
 riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
   resultVar :: MVar Message <-
     newEmptyMVar
@@ -144,9 +144,9 @@ riakStream
   => RiakConnection -- ^
   -> (b -> Bool) -- ^ Done?
   -> a -- ^
-  -> ListT (ExceptT RpbErrorResp IO) b
+  -> ListT (ExceptT RiakError IO) b
 riakStream (RiakConnection _ sendQueue recvQueue _ _ ex) done request = do
-  responseQueue :: TQueue (Either RpbErrorResp b) <-
+  responseQueue :: TQueue (Either RiakError b) <-
     liftIO newTQueueIO
 
   payload :: Lazy.ByteString <-
@@ -158,7 +158,7 @@ riakStream (RiakConnection _ sendQueue recvQueue _ _ ex) done request = do
     consumer :: Stream ((->) Message) IO ()
     consumer =
       Streaming.wrap $ \message -> do
-        response :: Either RpbErrorResp b <-
+        response :: Either RiakError b <-
           lift (parseResponse message)
 
         lift (atomically (writeTQueue responseQueue response))

@@ -106,6 +106,11 @@ data RiakDataTypeTy
   | forall a. RiakSetTy a
 
 
+data RiakError
+  = RiakError !Word32 !Text
+  deriving (Show)
+
+
 -- | A Solr index name.
 newtype RiakIndexName
   = RiakIndexName { unRiakIndexName :: ByteString }

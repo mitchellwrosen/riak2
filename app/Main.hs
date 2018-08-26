@@ -339,7 +339,7 @@ doFetchObject
 
  where
   go
-    :: (RiakLocation 'Nothing -> FetchRiakObjectParams -> IO (Either RpbErrorResp [RiakContent a]))
+    :: (RiakLocation 'Nothing -> FetchRiakObjectParams -> IO (Either RiakError [RiakContent a]))
     -> (Int -> a -> IO ())
     -> IO ()
   go fetch f = do
@@ -420,7 +420,7 @@ doGetServerInfo host port =
 doListBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port =
   withRiakHandle host port $ \h -> do
-    result :: Either RpbErrorResp () <-
+    result :: Either RiakError () <-
       (runExceptT . runListT)
         (listRiakBuckets h type' >>=
           liftIO . Latin1.putStrLn . coerce)
@@ -429,7 +429,7 @@ doListBuckets type' host port =
 doListKeys :: RiakBucketType ty -> RiakBucket -> HostName -> PortNumber -> IO ()
 doListKeys type' bucket host port =
   withRiakHandle host port $ \h -> do
-    result :: Either RpbErrorResp () <-
+    result :: Either RiakError () <-
       (runExceptT . runListT)
         (listRiakKeys h (RiakNamespace type' bucket) >>=
           liftIO . Latin1.putStrLn . coerce)
@@ -482,7 +482,7 @@ doStoreObject
       _   -> undefined
  where
   go
-    :: (RiakLocation 'Nothing -> Text -> StoreRiakObjectParams -> IO (Either RpbErrorResp a))
+    :: (RiakLocation 'Nothing -> Text -> StoreRiakObjectParams -> IO (Either RiakError a))
     -> (a -> IO ())
     -> IO ()
   go store f = do

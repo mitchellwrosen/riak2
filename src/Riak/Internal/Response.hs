@@ -13,12 +13,15 @@ module Riak.Internal.Response
   , RpbEmptyPutResp(..)
   ) where
 
+import Data.Text.Encoding (decodeUtf8)
+
 import qualified Data.ProtoLens as Proto
 
 import Proto.Riak
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
+import Riak.Internal.Types
 
 class Show a => Response a where
   responseCode :: MessageCode a
@@ -88,13 +91,13 @@ instance Response RpbSetBucketTypeResp where
   responseCode = 32
   responseDecode _ = pure RpbSetBucketTypeResp
 
-parseResponse :: forall a. Response a => Message -> IO (Either RpbErrorResp a)
+parseResponse :: forall a. Response a => Message -> IO (Either RiakError a)
 parseResponse (Message actual bytes)
   | actual == expected =
       Right <$> decodeResponse actual bytes
 
   | actual == 0 =
-      Left <$> decodeResponse actual bytes
+      Left . toRiakError <$> decodeResponse actual bytes
 
   | otherwise =
       panic "Unexpected message code"
@@ -105,6 +108,11 @@ parseResponse (Message actual bytes)
   expected :: Word8
   expected =
     unMessageCode (responseCode @a)
+
+  toRiakError :: RpbErrorResp -> RiakError
+  toRiakError (RpbErrorResp a b _) =
+    RiakError b (decodeUtf8 a)
+
 
 decodeResponse :: Response a => Word8 -> ByteString -> IO a
 decodeResponse code bytes =
