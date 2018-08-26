@@ -1,0 +1,24 @@
+#!/bin/bash
+
+set -e
+
+if [ $# -eq 0 ]; then
+  ls benchmarks | sed 's/\.hs//'
+else
+  NAME=$1
+  DIR=./dist/benchmarks/$NAME
+  mkdir -p $DIR
+
+  shift
+
+  cabal new-build
+  ghc -threaded -O benchmarks/$NAME.hs -hidir $DIR -odir $DIR -o $DIR/$NAME
+
+  echo -n '===== '
+  echo -n $NAME
+  echo ' ====='
+  perf stat $DIR/$NAME $@
+  echo -n '===== '
+  echo -n $NAME
+  echo ' ====='
+fi
