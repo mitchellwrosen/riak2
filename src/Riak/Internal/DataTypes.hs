@@ -11,13 +11,14 @@ module Riak.Internal.DataTypes
   , IsRiakMap(..)
   , IsRiakRegister(..)
   , IsRiakSet
-  , RiakMapParser
+  , RiakMapFieldParser
   , riakCounterField
   , riakFlagField
   , riakMapField
   , riakRegisterField
   , riakSetField
   , allowExtraKeys
+  , RiakMapEntries(..)
   , RiakMapValue(..)
   , RiakSetOp(..)
   , riakSetAddOp
@@ -170,7 +171,7 @@ instance IsRiakMap a => IsRiakDataType ('RiakMapTy a) where
     case resp ^. #type' of
       DtFetchResp'MAP ->
         first toException
-          (runParser
+          (runFieldParser
             decodeRiakMap
             (parseMapEntries' (resp ^. #value . #mapValue)))
 
@@ -184,7 +185,7 @@ instance IsRiakMap a => IsRiakDataType ('RiakMapTy a) where
     -> Either SomeException a
   parseDtUpdateResp _ resp =
     first toException
-      (runParser
+      (runFieldParser
         decodeRiakMap
         (parseMapEntries' (resp ^. #mapValue)))
 
@@ -268,6 +269,7 @@ data RiakMapEntries
       !(HashMap ByteString RiakMapEntries)
       !(HashMap ByteString ByteString)
       !(HashMap ByteString (Set ByteString))
+  deriving (Show)
 
 instance Monoid RiakMapEntries where
   mempty = RiakMapEntries mempty mempty mempty mempty mempty
@@ -303,17 +305,17 @@ data RiakMapParseError
   deriving stock (Show)
   deriving anyclass (Exception)
 
-data RiakMapParser a
-  = RiakMapParser
+data RiakMapFieldParser a
+  = RiakMapFieldParser
       (RiakMapEntries -> Either RiakMapParseError a)
       (Maybe (HashMap ByteString ()))
   deriving (Functor)
 
-runParser
-  :: RiakMapParser a
+runFieldParser
+  :: RiakMapFieldParser a
   -> RiakMapEntries
   -> Either RiakMapParseError a
-runParser (RiakMapParser f expected) m =
+runFieldParser (RiakMapFieldParser f expected) m =
   undefined
   -- for_ expected $ \expected' ->
   --   let
@@ -324,13 +326,13 @@ runParser (RiakMapParser f expected) m =
   --       (Left (UnexpectedKeys (HashMap.keys unexpected)))
   -- f m
 
-allowExtraKeys :: RiakMapParser a -> RiakMapParser a
-allowExtraKeys (RiakMapParser f _) =
-  RiakMapParser f Nothing
+allowExtraKeys :: RiakMapFieldParser a -> RiakMapFieldParser a
+allowExtraKeys (RiakMapFieldParser f _) =
+  RiakMapFieldParser f Nothing
 
-riakCounterField :: ByteString -> RiakMapParser Int64
+riakCounterField :: ByteString -> RiakMapFieldParser Int64
 riakCounterField key =
-  RiakMapParser f (Just (HashMap.singleton key ()))
+  RiakMapFieldParser f (Just (HashMap.singleton key ()))
  where
   f :: RiakMapEntries -> Either RiakMapParseError Int64
   f m =
@@ -345,9 +347,9 @@ riakCounterField key =
     --   Just x ->
     --     Left (TypeMismatch (riakMapValueToText x) "counter")
 
-riakFlagField :: ByteString -> RiakMapParser Bool
+riakFlagField :: ByteString -> RiakMapFieldParser Bool
 riakFlagField key =
-  RiakMapParser f (Just (HashMap.singleton key ()))
+  RiakMapFieldParser f (Just (HashMap.singleton key ()))
  where
   f :: RiakMapEntries -> Either RiakMapParseError Bool
   f m =
@@ -362,9 +364,9 @@ riakFlagField key =
     --   Just x ->
     --     Left (TypeMismatch (riakMapValueToText x) "flag")
 
-riakRegisterField :: forall a. IsRiakRegister a => ByteString -> RiakMapParser a
+riakRegisterField :: forall a. IsRiakRegister a => ByteString -> RiakMapFieldParser a
 riakRegisterField key =
-  RiakMapParser f (Just (HashMap.singleton key ()))
+  RiakMapFieldParser f (Just (HashMap.singleton key ()))
  where
   f :: RiakMapEntries -> Either RiakMapParseError a
   f m =
@@ -379,9 +381,9 @@ riakRegisterField key =
     --   Just x ->
     --     Left (TypeMismatch (riakMapValueToText x) "register")
 
-riakSetField :: forall a. IsRiakSet a => ByteString -> RiakMapParser (Set a)
+riakSetField :: forall a. IsRiakSet a => ByteString -> RiakMapFieldParser (Set a)
 riakSetField key =
-  RiakMapParser f (Just (HashMap.singleton key ()))
+  RiakMapFieldParser f (Just (HashMap.singleton key ()))
  where
   f :: RiakMapEntries -> Either RiakMapParseError (Set a)
   f m =
@@ -398,19 +400,19 @@ riakSetField key =
     --   Just x ->
     --     Left (TypeMismatch (riakMapValueToText x) "set")
 
-riakMapField :: forall a. IsRiakMap a => ByteString -> RiakMapParser a
+riakMapField :: forall a. IsRiakMap a => ByteString -> RiakMapFieldParser a
 riakMapField key =
-  RiakMapParser f (Just (HashMap.singleton key ()))
+  RiakMapFieldParser f (Just (HashMap.singleton key ()))
  where
   f :: RiakMapEntries -> Either RiakMapParseError a
   f outer =
     undefined
     -- case HashMap.lookup key outer of
     --   Nothing ->
-    --     runParser decodeRiakMap mempty
+    --     runFieldParser decodeRiakMap mempty
 
     --   Just (RiakMapValueMap inner) ->
-    --     runParser decodeRiakMap inner
+    --     runFieldParser decodeRiakMap inner
 
     --   Just x ->
     --     Left (TypeMismatch (riakMapValueToText x) "map")
@@ -436,12 +438,12 @@ riakMapField key =
 -- By default, when parsing a heterogeneous map, any unexpected keys will be
 -- treated as an error. For more lenient parsing, use 'allowExtraKeys'.
 class IsRiakMap a where
-  decodeRiakMap :: RiakMapParser a
+  decodeRiakMap :: RiakMapFieldParser a
 
 instance IsRiakMap RiakMapEntries where
-  decodeRiakMap :: RiakMapParser RiakMapEntries
+  decodeRiakMap :: RiakMapFieldParser RiakMapEntries
   decodeRiakMap =
-    RiakMapParser Right Nothing
+    RiakMapFieldParser Right Nothing
 
 --------------------------------------------------------------------------------
 -- Register

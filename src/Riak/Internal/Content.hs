@@ -36,7 +36,7 @@ data RiakContent a
       [RiakSecondaryIndex] -- Secondary indexes
       Bool                 -- Deleted
       TTL                  -- TTL
-  deriving (Show)
+  deriving (Eq, Show)
 
 instance {-# OVERLAPPABLE #-}
     ( HasLens' f (RiakContent s) x a

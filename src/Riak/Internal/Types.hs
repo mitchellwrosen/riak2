@@ -111,7 +111,8 @@ data RiakDataTypeTy
 -- http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/#error-response
 data RiakError
   = RiakError !Text
-  deriving (Show)
+  deriving stock (Eq, Show)
+  deriving anyclass (Exception)
 
 
 -- | A Solr index name.
@@ -147,7 +148,7 @@ instance Hashable (RiakLocation ty) where
 
 newtype RiakMetadata
   = RiakMetadata { unRiakMetadata :: [(ByteString, Maybe ByteString)] }
-  deriving (Show)
+  deriving (Eq, Show)
 
 
 data RiakNamespace (ty :: Maybe RiakDataTypeTy)
@@ -190,7 +191,7 @@ pattern DefaultRiakSchemaName =
 data RiakSecondaryIndex
   = RiakSecondaryIndexInt !ByteString !Int64
   | RiakSecondaryIndexBin !ByteString !ByteString
-  deriving (Show)
+  deriving (Eq, Show)
 
 
 data SBool :: Bool -> Type where
@@ -215,7 +216,7 @@ instance Hashable SomeRiakLocation where
 
 newtype TTL
   = TTL { unTTL :: Maybe Word32 }
-  deriving Show
+  deriving (Eq, Show)
 
 
 newtype RiakVclock
@@ -229,7 +230,7 @@ instance Show RiakVclock where
 
 newtype RiakVtag
   = RiakVtag { unRiakVtag :: ByteString }
-  deriving (Show)
+  deriving (Eq, Show)
 
 
 --------------------------------------------------------------------------------

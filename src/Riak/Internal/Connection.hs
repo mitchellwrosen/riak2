@@ -17,7 +17,6 @@ import Streaming         (Of, Stream)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
-import qualified Data.ByteString.Lazy           as Lazy (ByteString)
 import qualified Data.ByteString.Streaming      as Q
 import qualified Network.Socket                 as Socket hiding (recv)
 import qualified Network.Socket.ByteString      as Socket (recv)
@@ -37,11 +36,10 @@ import Riak.Internal.Types
 data RiakConnection
   = RiakConnection
       !Socket
-      !(TQueue Lazy.ByteString)
+      !(MVar ())
       !(TQueue (Stream ((->) Message) IO ()))
       !ThreadId
-      !ThreadId
-      !(STM SomeException)
+      !(TMVar SomeException)
 
 data EOF = EOF
   deriving stock (Show)
@@ -61,25 +59,14 @@ riakConnect host port = do
 
   Socket.connect socket (addrAddress info)
 
-  sendQueue :: TQueue Lazy.ByteString <-
-    newTQueueIO
+  sem :: MVar () <-
+    newMVar ()
 
   recvQueue :: TQueue (Stream ((->) Message) IO ()) <-
     newTQueueIO
 
   exVar :: TMVar SomeException <-
     newEmptyTMVarIO
-
-  sendThreadId :: ThreadId <-
-    forkIOWithUnmask $ \unmask ->
-      let
-        loop :: IO ()
-        loop =
-          atomically (readTQueue sendQueue) >>=
-            Socket.sendAll socket
-      in
-        unmask (forever loop)
-          `catch` (void . atomically . tryPutTMVar exVar)
 
   recvThreadId :: ThreadId <-
     forkIOWithUnmask $ \unmask ->
@@ -100,19 +87,26 @@ riakConnect host port = do
         unmask (loop (messageStream (socketStream socket)))
           `catch` (void . atomically . tryPutTMVar exVar)
 
-  pure $ RiakConnection
-    socket
-    sendQueue
-    recvQueue
-    sendThreadId
-    recvThreadId
-    (readTMVar exVar)
+  let
+    conn :: RiakConnection
+    conn =
+      RiakConnection socket sem recvQueue recvThreadId exVar
+
+  void (mkWeakMVar sem (riakDisconnect conn))
+
+  pure conn
 
 riakDisconnect :: RiakConnection -> IO ()
-riakDisconnect (RiakConnection socket _ _ sendTid recvTid _) = do
-  killThread sendTid
+riakDisconnect (RiakConnection socket _ _ recvTid _) = do
   killThread recvTid
   Socket.close socket
+
+riakSend :: Request a => RiakConnection -> a -> IO ()
+riakSend (RiakConnection socket _ _ _ exVar) request =
+  Socket.sendAll socket (encodeMessage (requestToMessage request))
+    `catch` \e -> do
+      void (atomically (tryPutTMVar exVar e))
+      throwIO e
 
 riakExchange
   :: forall a b.
@@ -120,23 +114,21 @@ riakExchange
   => RiakConnection
   -> a
   -> IO (Either RiakError b)
-riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
+riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
   resultVar :: MVar Message <-
     newEmptyMVar
 
   debug (">>> " ++ show request)
 
-  payload :: Lazy.ByteString <-
-    pure $! encodeMessage (requestToMessage request)
+  withMVar sem $ \() -> do
+    riakSend conn request
 
-  let
-    consumer :: Stream ((->) Message) IO ()
-    consumer =
-      Streaming.wrap (lift . putMVar resultVar)
+    let
+      consumer :: Stream ((->) Message) IO ()
+      consumer =
+        Streaming.wrap (lift . putMVar resultVar)
 
-  atomically $ do
-    writeTQueue sendQueue payload
-    writeTQueue recvQueue consumer
+    atomically (writeTQueue recvQueue consumer)
 
   let
     recv :: IO (Either RiakError b)
@@ -147,7 +139,7 @@ riakExchange (RiakConnection _ sendQueue recvQueue _ _ ex) request = do
       pure result
 
   recv `catch`
-    \BlockedIndefinitelyOnMVar -> atomically ex >>= throwIO
+    \BlockedIndefinitelyOnMVar -> atomically (readTMVar exVar) >>= throwIO
 
 riakStream
   :: forall a b.
@@ -156,37 +148,35 @@ riakStream
   -> (b -> Bool) -- ^ Done?
   -> a -- ^
   -> ListT (ExceptT RiakError IO) b
-riakStream (RiakConnection _ sendQueue recvQueue _ _ ex) done request = do
+riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request = do
   responseQueue :: TQueue (Either RiakError b) <-
     liftIO newTQueueIO
 
-  payload :: Lazy.ByteString <-
-    pure $! encodeMessage (requestToMessage request)
+  liftIO . withMVar sem $ \() -> do
+    riakSend conn request
 
-  let
-    -- We have to decode the payloads to know when the stream is done, so just
-    -- do the decoding on the recv thread.
-    consumer :: Stream ((->) Message) IO ()
-    consumer =
-      Streaming.wrap $ \message -> do
-        response :: Either RiakError b <-
-          lift (parseResponse message)
+    let
+      -- We have to decode the payloads to know when the stream is done, so just
+      -- do the decoding on the recv thread.
+      consumer :: Stream ((->) Message) IO ()
+      consumer =
+        Streaming.wrap $ \message -> do
+          response :: Either RiakError b <-
+            lift (parseResponse message)
 
-        lift (atomically (writeTQueue responseQueue response))
+          lift (atomically (writeTQueue responseQueue response))
 
-        unless (either (\_ -> True) done response)
-          consumer
+          unless (either (\_ -> True) done response)
+            consumer
 
-  liftIO . atomically $ do
-    writeTQueue sendQueue payload
-    writeTQueue recvQueue consumer
+    atomically (writeTQueue recvQueue consumer)
 
   fix $ \loop -> do
     response :: b <-
       (lift . ExceptT)
         (atomically (readTQueue responseQueue)
           `catch` \BlockedIndefinitelyOnSTM ->
-            (atomically ex >>= throwIO))
+            (atomically (readTMVar exVar) >>= throwIO))
 
     if done response
       then pure response

@@ -93,7 +93,8 @@ module Riak
   , RiakIndexName(..)
   , RiakKey(..)
   , RiakLocation(..)
-  , RiakMapParser
+  , RiakMapEntries(..)
+  , RiakMapFieldParser
   , RiakMapValue(..)
   , RiakMetadata(..)
   , RiakNamespace(..)

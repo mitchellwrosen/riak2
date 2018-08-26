@@ -304,7 +304,7 @@ doFetchCounter type' bucket key host port =
       fetchRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
 
 doFetchMap
-  :: RiakBucketType ('Just ('RiakMapTy (HashMap ByteString RiakMapValue)))
+  :: RiakBucketType ('Just ('RiakMapTy RiakMapEntries))
   -> RiakBucket
   -> RiakKey
   -> HostName
