@@ -75,7 +75,7 @@ module Riak
   , ContentEncoding
   , pattern ContentEncodingNone
   , ContentType(..)
-  , FetchRiakDataTypeParams
+  , FetchRiakCrdtParams
   , FetchRiakObjectParams
   , IsRiakContent(..)
   , IsRiakMap(..)
@@ -86,8 +86,8 @@ module Riak
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
   , RiakContent(..)
-  , RiakDataTypeError(..)
-  , RiakDataTypeTy(..)
+  , RiakCrdtError(..)
+  , RiakCrdtTy(..)
   , RiakError(..)
   , RiakHandle
   , RiakIndexName(..)
@@ -108,7 +108,7 @@ module Riak
   , RiakVtag(..)
   , StoreRiakObjectParams
   , TTL(..)
-  , UpdateRiakDataTypeParams
+  , UpdateRiakCrdtParams
     -- * Re-exports
   , def
     -- * Documentation
@@ -132,7 +132,7 @@ import qualified Riak.Internal            as Internal
 import           Riak.Internal.Cache
 import           Riak.Internal.Connection
 import           Riak.Internal.Content
-import           Riak.Internal.DataTypes
+import           Riak.Internal.Crdts
 import           Riak.Internal.Panic
 import           Riak.Internal.Params
 import           Riak.Internal.Prelude
@@ -584,7 +584,7 @@ deleteRiakObject (RiakHandle conn _) req =
 --
 -- Throws:
 --
--- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain counters.
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain counters.
 fetchRiakCounter
   :: MonadIO m
   => RiakHandle -- ^
@@ -592,64 +592,63 @@ fetchRiakCounter
   -> FetchRiakObjectParams -- ^
   -> m (Either RiakError Int64)
 fetchRiakCounter handle loc (FetchRiakObjectParams a b c d e f g) =
-  fetchDataType handle loc
-    (FetchRiakDataTypeParams a (IncludeContext Nothing) b c d e f g)
+  fetchCrdt handle loc
+    (FetchRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
 
 
 -- | Fetch a grow-only set.
 --
 -- Throws:
 --
--- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain grow-only
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain grow-only
 --   sets.
 fetchRiakGrowOnlySet
   :: MonadIO m
   => RiakHandle -- ^
   -> RiakLocation ('Just 'RiakGrowOnlySetTy) -- ^
-  -> FetchRiakDataTypeParams -- ^
+  -> FetchRiakCrdtParams -- ^
   -> m (Either RiakError (Set ByteString))
 fetchRiakGrowOnlySet =
-  fetchDataType
+  fetchCrdt
 
 
 -- | Fetch a HyperLogLog.
 --
 -- Throws
 --
--- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain
---   HyperLogLogs.
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain HyperLogLogs.
 fetchRiakHyperLogLog
   :: MonadIO m
   => RiakHandle -- ^
   -> RiakLocation ('Just 'RiakHyperLogLogTy) -- ^
-  -> FetchRiakDataTypeParams -- ^
+  -> FetchRiakCrdtParams -- ^
   -> m (Either RiakError Word64)
 fetchRiakHyperLogLog =
-  fetchDataType
+  fetchCrdt
 
 
 -- | Fetch and decode a map.
 --
 -- Throws:
 --
--- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain maps.
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain maps.
 --
 -- * 'RiakMapParseError' if decoding fails.
 fetchRiakMap
   :: (IsRiakMap a, MonadIO m)
   => RiakHandle -- ^
   -> RiakLocation ('Just ('RiakMapTy a)) -- ^
-  -> FetchRiakDataTypeParams -- ^
+  -> FetchRiakCrdtParams -- ^
   -> m (Either RiakError a)
 fetchRiakMap =
-  fetchDataType
+  fetchCrdt
 
 
 -- | Fetch and decode a set.
 --
 -- Throws:
 --
--- * 'RiakDataTypeError' if the given 'RiakLocation' does not contain sets.
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain sets.
 --
 -- * 'SomeException' if decoding fails. The exception thrown is provided by the
 --   implementation of 'decodeRiakRegister'.
@@ -657,27 +656,27 @@ fetchRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^
   -> RiakLocation ('Just ('RiakSetTy a)) -- ^
-  -> FetchRiakDataTypeParams -- ^
+  -> FetchRiakCrdtParams -- ^
   -> m (Either RiakError (Set a))
 fetchRiakSet =
-  fetchDataType
+  fetchCrdt
 
 
-fetchDataType
+fetchCrdt
   :: forall m ty.
-     (IsRiakDataType ty, MonadIO m)
+     (IsRiakCrdt ty, MonadIO m)
   => RiakHandle
   -> RiakLocation ('Just ty)
-  -> FetchRiakDataTypeParams
-  -> m (Either RiakError (DataTypeVal ty))
-fetchDataType
+  -> FetchRiakCrdtParams
+  -> m (Either RiakError (CrdtVal ty))
+fetchCrdt
     handle@(RiakHandle conn _)
     loc@(RiakLocation (RiakNamespace type' bucket) key)
-    (FetchRiakDataTypeParams basic_quorum (IncludeContext include_context) n
+    (FetchRiakCrdtParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
   response :: DtFetchResp <-
-    ExceptT (Internal.fetchRiakDataType conn request)
+    ExceptT (Internal.fetchRiakCrdt conn request)
 
   case parseDtFetchResp loc response of
     Left err ->
@@ -720,14 +719,15 @@ fetchDataType
 
 -- | Update a counter and its updated value if @return_body@ is set, else 0.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- counters.
+-- Throws:
+--
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain counters.
 updateRiakCounter
   :: MonadIO m
   => RiakHandle -- ^
   -> RiakLocation ('Just 'RiakCounterTy) -- ^
   -> Int64 -- ^
-  -> UpdateRiakDataTypeParams -- ^
+  -> UpdateRiakCrdtParams -- ^
   -> m (Either RiakError Int64)
 updateRiakCounter handle (RiakLocation namespace key) incr params =
   (fmap.fmap) snd (_updateRiakCounter handle namespace (Just key) incr params)
@@ -735,14 +735,15 @@ updateRiakCounter handle (RiakLocation namespace key) incr params =
 
 -- | Update a new counter and return its randomly-generated key.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- counters.
+-- Throws:
+--
+-- * 'RiakCrdtError' if the given 'RiakLocation' does not contain counters.
 updateNewRiakCounter
   :: MonadIO m
   => RiakHandle -- ^
   -> RiakNamespace ('Just 'RiakCounterTy) -- ^
   -> Int64 -- ^
-  -> UpdateRiakDataTypeParams -- ^
+  -> UpdateRiakCrdtParams -- ^
   -> m (Either RiakError RiakKey)
 updateNewRiakCounter handle namespace incr params =
   (fmap.fmap) fst (_updateRiakCounter handle namespace Nothing incr params)
@@ -753,11 +754,11 @@ _updateRiakCounter
   -> RiakNamespace ('Just 'RiakCounterTy)
   -> Maybe RiakKey
   -> Int64
-  -> UpdateRiakDataTypeParams
+  -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey, Int64))
 _updateRiakCounter handle namespace key incr params =
   (fmap.fmap.fmap) (view #counterValue)
-    (updateDataType handle namespace key Nothing op params)
+    (updateCrdt handle namespace key Nothing op params)
  where
   op :: DtOp
   op =
@@ -774,28 +775,28 @@ _updateRiakCounter handle namespace key incr params =
 -- | Update a set and return its updated value if @return_body@ is set, else
 -- the empty set.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
--- counters.
+-- Throws a 'RiakCrdtError' if the given 'RiakLocation' does not contain
+-- sets.
 updateRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^
   -> RiakLocation ('Just ('RiakSetTy a)) -- ^
   -> RiakSetOp a -- ^
-  -> UpdateRiakDataTypeParams -- ^
+  -> UpdateRiakCrdtParams -- ^
   -> m (Either RiakError (Set a))
 updateRiakSet handle (RiakLocation namespace key) op params =
   (fmap.fmap) snd (_updateSet handle namespace (Just key) op params)
 
 -- | Update a new set and return its randomly-generated key.
 --
--- Throws a 'RiakDataTypeError' if the given 'RiakLocation' does not contain
+-- Throws a 'RiakCrdtError' if the given 'RiakLocation' does not contain
 -- counters.
 updateNewRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^
   -> RiakNamespace ('Just ('RiakSetTy a)) -- ^
   -> RiakSetOp a -- ^
-  -> UpdateRiakDataTypeParams -- ^
+  -> UpdateRiakCrdtParams -- ^
   -> m (Either RiakError RiakKey)
 updateNewRiakSet handle namespace op params =
   (fmap.fmap) fst (_updateSet handle namespace Nothing op params)
@@ -808,7 +809,7 @@ _updateSet
   -> RiakNamespace ('Just ('RiakSetTy a))
   -> Maybe RiakKey
   -> RiakSetOp a
-  -> UpdateRiakDataTypeParams
+  -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey, Set a))
 _updateSet
     handle@(RiakHandle _ cache) namespace key (unSetOp -> (adds, removes))
@@ -865,7 +866,7 @@ _updateSet
                   pure (Just context')
 
   (key', value) <-
-    ExceptT (updateDataType handle namespace key context op params)
+    ExceptT (updateCrdt handle namespace key context op params)
 
   let
     loc :: RiakLocation ('Just ('RiakSetTy a))
@@ -891,22 +892,22 @@ _updateSet
       , _DtOp'setOp          = Just (Proto.SetOp adds removes [])
       }
 
-updateDataType
+updateCrdt
   :: MonadIO m
   => RiakHandle
   -> RiakNamespace ('Just ty)
   -> Maybe RiakKey
   -> Maybe RiakVclock
   -> DtOp
-  -> UpdateRiakDataTypeParams
+  -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey, DtUpdateResp))
-updateDataType
+updateCrdt
     (RiakHandle conn _) (RiakNamespace type' bucket) key context op
-    (UpdateRiakDataTypeParams dw n pw return_body sloppy_quorum timeout w) =
+    (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
     liftIO . runExceptT $ do
 
   response :: DtUpdateResp <-
-    ExceptT (Internal.updateRiakDataType conn request)
+    ExceptT (Internal.updateRiakCrdt conn request)
 
   theKey :: RiakKey <-
     maybe

@@ -5,9 +5,9 @@
              ScopedTypeVariables, StandaloneDeriving, TypeFamilies,
              UndecidableInstances #-}
 
-module Riak.Internal.DataTypes
-  ( RiakDataTypeError(..)
-  , IsRiakDataType(..)
+module Riak.Internal.Crdts
+  ( RiakCrdtError(..)
+  , IsRiakCrdt(..)
   , IsRiakMap(..)
   , IsRiakRegister(..)
   , IsRiakSet
@@ -38,29 +38,29 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 
-class IsRiakDataType (ty :: RiakDataTypeTy) where
-  type DataTypeVal    ty :: *
+class IsRiakCrdt (ty :: RiakCrdtTy) where
+  type CrdtVal    ty :: *
 
   parseDtFetchResp
     :: RiakLocation ('Just ty)
     -> DtFetchResp
-    -> Either SomeException (DataTypeVal ty)
+    -> Either SomeException (CrdtVal ty)
 
   parseDtUpdateResp
     :: RiakLocation ('Just ty)
     -> DtUpdateResp
-    -> Either SomeException (DataTypeVal ty)
+    -> Either SomeException (CrdtVal ty)
 
 
--- | A 'RiakDataTypeError' is thrown when a data type operation is performed on
+-- | A 'RiakCrdtError' is thrown when a data type operation is performed on
 -- an incompatible bucket type (for example, attempting to fetch a counter from
 -- a bucket type that contains sets).
-data RiakDataTypeError where
-  RiakDataTypeError :: RiakLocation ty -> Text -> RiakDataTypeError
+data RiakCrdtError where
+  RiakCrdtError :: RiakLocation ty -> Text -> RiakCrdtError
 
-deriving instance Show RiakDataTypeError
+deriving instance Show RiakCrdtError
 
-instance Exception RiakDataTypeError
+instance Exception RiakCrdtError
 
 
 dataTypeToText :: DtFetchResp'DataType -> Text
@@ -76,8 +76,8 @@ dataTypeToText = \case
 -- Counter
 --------------------------------------------------------------------------------
 
-instance IsRiakDataType 'RiakCounterTy where
-  type DataTypeVal 'RiakCounterTy = Int64
+instance IsRiakCrdt 'RiakCounterTy where
+  type CrdtVal 'RiakCounterTy = Int64
 
   parseDtFetchResp
     :: RiakLocation ('Just 'RiakCounterTy)
@@ -89,7 +89,7 @@ instance IsRiakDataType 'RiakCounterTy where
         Right (resp ^. #value . #counterValue)
 
       x ->
-        (Left . toException . RiakDataTypeError loc)
+        (Left . toException . RiakCrdtError loc)
           ("expected counter but found " <> dataTypeToText x)
 
   parseDtUpdateResp
@@ -104,8 +104,8 @@ instance IsRiakDataType 'RiakCounterTy where
 -- Grow-only set
 --------------------------------------------------------------------------------
 
-instance IsRiakDataType 'RiakGrowOnlySetTy where
-  type DataTypeVal 'RiakGrowOnlySetTy = Set ByteString
+instance IsRiakCrdt 'RiakGrowOnlySetTy where
+  type CrdtVal 'RiakGrowOnlySetTy = Set ByteString
 
   parseDtFetchResp
     :: RiakLocation ('Just 'RiakGrowOnlySetTy)
@@ -117,7 +117,7 @@ instance IsRiakDataType 'RiakGrowOnlySetTy where
         Right (Set.fromList (resp ^. #value . #gsetValue))
 
       x ->
-        (Left . toException . RiakDataTypeError loc)
+        (Left . toException . RiakCrdtError loc)
           ("expected gset but found " <> dataTypeToText x)
 
   parseDtUpdateResp
@@ -132,8 +132,8 @@ instance IsRiakDataType 'RiakGrowOnlySetTy where
 -- HyperLogLog
 --------------------------------------------------------------------------------
 
-instance IsRiakDataType 'RiakHyperLogLogTy where
-  type DataTypeVal 'RiakHyperLogLogTy = Word64
+instance IsRiakCrdt 'RiakHyperLogLogTy where
+  type CrdtVal 'RiakHyperLogLogTy = Word64
 
   parseDtFetchResp
     :: RiakLocation ('Just 'RiakHyperLogLogTy)
@@ -145,7 +145,7 @@ instance IsRiakDataType 'RiakHyperLogLogTy where
         Right (resp ^. #value . #hllValue)
 
       x ->
-        (Left . toException . RiakDataTypeError loc)
+        (Left . toException . RiakCrdtError loc)
           ("expected hll but found " <> dataTypeToText x)
 
   parseDtUpdateResp
@@ -160,8 +160,8 @@ instance IsRiakDataType 'RiakHyperLogLogTy where
 -- Map
 --------------------------------------------------------------------------------
 
-instance IsRiakMap a => IsRiakDataType ('RiakMapTy a) where
-  type DataTypeVal ('RiakMapTy a) = a
+instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
+  type CrdtVal ('RiakMapTy a) = a
 
   parseDtFetchResp
     :: RiakLocation ('Just ('RiakMapTy a))
@@ -176,7 +176,7 @@ instance IsRiakMap a => IsRiakDataType ('RiakMapTy a) where
             (parseMapEntries' (resp ^. #value . #mapValue)))
 
       x ->
-        (Left . toException . RiakDataTypeError loc)
+        (Left . toException . RiakCrdtError loc)
           ("expected map but found " <> dataTypeToText x)
 
   parseDtUpdateResp
@@ -487,8 +487,8 @@ instance IsRiakRegister Text where
 class (IsRiakRegister a, Ord a) => IsRiakSet a
 instance (IsRiakRegister a, Ord a) => IsRiakSet a
 
-instance IsRiakSet a => IsRiakDataType ('RiakSetTy a) where
-  type DataTypeVal ('RiakSetTy a) = Set a
+instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
+  type CrdtVal ('RiakSetTy a) = Set a
 
   parseDtFetchResp
     :: RiakLocation ('Just ('RiakSetTy a))
@@ -500,7 +500,7 @@ instance IsRiakSet a => IsRiakDataType ('RiakSetTy a) where
         Set.fromList <$> for (resp ^. #value . #setValue) decodeRiakRegister
 
       x ->
-        (Left . toException . RiakDataTypeError loc)
+        (Left . toException . RiakCrdtError loc)
           ("expected set but found " <> dataTypeToText x)
 
   parseDtUpdateResp

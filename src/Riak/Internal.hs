@@ -6,7 +6,7 @@ module Riak.Internal
   , riakDisconnect
   , deleteRiakIndex
   , deleteRiakObject
-  , fetchRiakDataType
+  , fetchRiakCrdt
   , fetchRiakObject
   , getRiakBucketProps
   , getRiakBucketTypeProps
@@ -23,7 +23,7 @@ module Riak.Internal
   , setRiakBucketProps
   , setRiakBucketTypeProps
   , storeRiakObject
-  , updateRiakDataType
+  , updateRiakCrdt
   ) where
 
 import Lens.Labels (view)
@@ -49,11 +49,11 @@ deleteRiakObject
 deleteRiakObject =
   riakExchange
 
-fetchRiakDataType
+fetchRiakCrdt
   :: RiakConnection -- ^
   -> DtFetchReq -- ^
   -> IO (Either RiakError DtFetchResp)
-fetchRiakDataType
+fetchRiakCrdt
   = riakExchange
 
 fetchRiakObject
@@ -166,9 +166,9 @@ storeRiakObject
 storeRiakObject =
   riakExchange
 
-updateRiakDataType
+updateRiakCrdt
   :: RiakConnection -- ^
   -> DtUpdateReq -- ^
   -> IO (Either RiakError DtUpdateResp)
-updateRiakDataType =
+updateRiakCrdt =
   riakExchange

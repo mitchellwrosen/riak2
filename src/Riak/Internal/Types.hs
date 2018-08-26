@@ -83,7 +83,7 @@ data RiakBucketProps
 -- | A Riak bucket type, tagged with the data type it contains.
 --
 -- /Note/: Must be UTF-8 encoded.
-newtype RiakBucketType (ty :: Maybe RiakDataTypeTy)
+newtype RiakBucketType (ty :: Maybe RiakCrdtTy)
   = RiakBucketType { unRiakBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
@@ -98,7 +98,7 @@ pattern DefaultRiakBucketType =
   RiakBucketType "default"
 
 
-data RiakDataTypeTy
+data RiakCrdtTy
   = RiakCounterTy
   | RiakGrowOnlySetTy -- TODO better GrowOnlySetTy
   | RiakHyperLogLogTy
@@ -137,7 +137,7 @@ instance Show RiakKey where
       (decodeUtf8' key)
 
 
-data RiakLocation (ty :: Maybe RiakDataTypeTy)
+data RiakLocation (ty :: Maybe RiakCrdtTy)
   = RiakLocation !(RiakNamespace ty) !RiakKey
   deriving stock (Eq, Show)
 
@@ -151,7 +151,7 @@ newtype RiakMetadata
   deriving (Eq, Show)
 
 
-data RiakNamespace (ty :: Maybe RiakDataTypeTy)
+data RiakNamespace (ty :: Maybe RiakCrdtTy)
   = RiakNamespace !(RiakBucketType ty) !RiakBucket
   deriving stock (Eq, Show)
 

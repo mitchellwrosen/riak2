@@ -65,7 +65,7 @@ library
     Riak.Internal.Cache
     Riak.Internal.Connection
     Riak.Internal.Content
-    Riak.Internal.DataTypes
+    Riak.Internal.Crdts
     Riak.Internal.Debug
     Riak.Internal.Message
     Riak.Internal.Panic
