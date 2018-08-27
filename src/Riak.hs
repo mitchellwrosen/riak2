@@ -46,7 +46,7 @@ module Riak
   , riakMapField
   , riakRegisterField
   , riakSetField
-  , allowExtraKeys
+  -- , allowExtraKeys
     -- * Bucket operations
   , getRiakBucketTypeProps
   , setRiakBucketTypeProps
@@ -94,7 +94,6 @@ module Riak
   , RiakLocation(..)
   , RiakMapEntries(..)
   , RiakMapFieldParser
-  , RiakMapValue(..)
   , RiakMetadata(..)
   , RiakNamespace(..)
   , RiakQuorum(..)
