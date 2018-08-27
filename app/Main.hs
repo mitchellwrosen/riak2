@@ -5,10 +5,8 @@
 import Control.Monad              (join, when, (<=<))
 import Control.Monad.IO.Class
 import Control.Monad.Trans.Except
-import Data.ByteString            (ByteString)
 import Data.Coerce
 import Data.Foldable              (asum, for_, toList, traverse_)
-import Data.HashMap.Strict        (HashMap)
 import Data.Int
 import Data.Text                  (Text)
 import Data.Word
@@ -72,8 +70,7 @@ parser =
       , [ commandGroup "Bucket operations"
         , getBucketTypePropsParser
         , getBucketPropsParser
-        , listBucketsParser
-        , listKeysParser
+        , listParser
         ]
       , [ commandGroup "MapReduce"
         , command "TODO" (info empty mempty)
@@ -208,23 +205,13 @@ infoParser' =
     "info"
     (info (pure doGetServerInfo) (progDesc "Get server info"))
 
-listBucketsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-listBucketsParser =
+listParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+listParser =
   command
-    "list-buckets"
+    "list"
     (info
-      (doListBuckets <$> bucketTypeArgument)
-      (progDesc "List all buckets in a bucket type"))
-
-listKeysParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-listKeysParser =
-  command
-    "list-keys"
-    (info
-      (doListKeys
-        <$> bucketTypeArgument
-        <*> bucketArgument)
-      (progDesc "List all keys in a bucket"))
+      (doList <$> bucketTypeArgument <*> optional bucketArgument)
+      (progDesc "List all buckets or keys"))
 
 pingParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 pingParser =
@@ -417,6 +404,15 @@ doGetServerInfo host port =
   withRiakHandle host port $ \h ->
     either print printServerInfo =<<
       getRiakServerInfo h
+
+doList
+  :: RiakBucketType ty
+  -> Maybe RiakBucket
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doList type' =
+  maybe (doListBuckets type') (doListKeys type')
 
 doListBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
 doListBuckets type' host port =
