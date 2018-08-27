@@ -55,13 +55,13 @@ parser =
         , updateCounterParser
           -- TODO riak-cli update-new-counter
         ]
-      , [ commandGroup "Grow-only set opeations"
+      , [ commandGroup "Grow-only set operations"
         , command "TODO" (info empty mempty)
         ]
-      , [ commandGroup "HyperLogLog opeations"
+      , [ commandGroup "HyperLogLog operations"
         , command "TODO" (info empty mempty)
         ]
-      , [ commandGroup "Map operators"
+      , [ commandGroup "Map operations"
         , fetchMapParser
         ]
       , [ commandGroup "Set operations"
