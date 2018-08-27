@@ -78,7 +78,7 @@ library
     Riak.Internal.Response
     Riak.Internal.Types
 
-executable riak-cli
+executable riakc
   build-depends:
       base
     , bytestring

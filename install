@@ -3,4 +3,4 @@
 set -e
 
 cabal new-build
-cp $(cabal-plan list-bin riak-cli) ~/.local/bin
+cp $(cabal-plan list-bin riakc) ~/.local/bin
