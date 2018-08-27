@@ -351,7 +351,6 @@ doFetchObject
         putStrLn "Not found"
 
       Right contents -> do
-        -- printContents f contents
         for_ (zip [(0::Int)..] contents) $ \(i, content) ->
           printContent (f i) (Just i) content
 
@@ -556,6 +555,9 @@ printContent f mi content = do
 
   f (content ^. L.value)
 
+  for_ (content ^. L.contentType) (tag "content_type")
+  for_ (content ^. L.charset) (tag "charset")
+  for_ (content ^. L.contentEncoding) (tag "contentEncoding")
   for_ (content ^. L.lastMod) (tag "last_mod")
 
   case unRiakMetadata (content ^. L.usermeta) of

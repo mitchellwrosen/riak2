@@ -7,7 +7,6 @@ module Riak.Internal.Content
   ( Charset(..)
   , RiakContent(..)
   , ContentEncoding(..)
-  , pattern ContentEncodingNone
   , ContentType(..)
   , pattern ContentTypeApplicationOctetStream
   , pattern ContentTypeTextPlain
@@ -25,17 +24,19 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 
--- TODO add back content type, charset, content encoding
 data RiakContent a
   = RiakContent
       !(RiakLocation 'Nothing)
-      a                    -- Value
-      (Maybe RiakVtag)     -- Vtag
-      (Maybe UTCTime)      -- Last modified
-      RiakMetadata         -- User metadata
-      [RiakSecondaryIndex] -- Secondary indexes
-      Bool                 -- Deleted
-      TTL                  -- TTL
+      a                       -- Value
+      (Maybe ContentType)     -- Content type
+      (Maybe Charset)         -- Charset
+      (Maybe ContentEncoding) -- Content encoding
+      (Maybe RiakVtag)        -- Vtag
+      (Maybe UTCTime)         -- Last modified
+      RiakMetadata            -- User metadata
+      [RiakSecondaryIndex]    -- Secondary indexes
+      Bool                    -- Deleted
+      TTL                     -- TTL
   deriving (Eq, Show)
 
 instance {-# OVERLAPPABLE #-}
@@ -47,29 +48,41 @@ instance {-# OVERLAPPABLE #-}
 
 -- TODO content lenses for location, namespace, type, bucket, key
 
-instance Functor f => HasLens' f (RiakContent a)                 "location" (RiakLocation 'Nothing)   where lensOf' _ = lens (\(RiakContent x _ _ _ _ _ _ _) -> x) (\(RiakContent _ b c d e f g h) x -> RiakContent x b c d e f g h)
-instance Functor f => HasLens  f (RiakContent a) (RiakContent b) "value"    a                       b where lensOf  _ = lens (\(RiakContent _ x _ _ _ _ _ _) -> x) (\(RiakContent a _ c d e f g h) x -> RiakContent a x c d e f g h)
-instance Functor f => HasLens' f (RiakContent a)                 "vtag"     (Maybe RiakVtag)          where lensOf' _ = lens (\(RiakContent _ _ x _ _ _ _ _) -> x) (\(RiakContent a b _ d e f g h) x -> RiakContent a b x d e f g h)
-instance Functor f => HasLens' f (RiakContent a)                 "lastMod"  (Maybe UTCTime)           where lensOf' _ = lens (\(RiakContent _ _ _ x _ _ _ _) -> x) (\(RiakContent a b c _ e f g h) x -> RiakContent a b c x e f g h)
-instance Functor f => HasLens' f (RiakContent a)                 "usermeta" RiakMetadata              where lensOf' _ = lens (\(RiakContent _ _ _ _ x _ _ _) -> x) (\(RiakContent a b c d _ f g h) x -> RiakContent a b c d x f g h)
-instance Functor f => HasLens' f (RiakContent a)                 "indexes"  [RiakSecondaryIndex]      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ x _ _) -> x) (\(RiakContent a b c d e _ g h) x -> RiakContent a b c d e x g h)
-instance Functor f => HasLens' f (RiakContent a)                 "deleted"  Bool                      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ x _) -> x) (\(RiakContent a b c d e f _ h) x -> RiakContent a b c d e f x h)
-instance Functor f => HasLens' f (RiakContent a)                 "ttl"      TTL                       where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ x) -> x) (\(RiakContent a b c d e f g _) x -> RiakContent a b c d e f g x)
+instance Functor f => HasLens' f (RiakContent a)                 "location"        (RiakLocation 'Nothing)   where lensOf' _ = lens (\(RiakContent x _ _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent _ b c d e f g h i j k) x -> RiakContent x b c d e f g h i j k)
+instance Functor f => HasLens  f (RiakContent a) (RiakContent b) "value"           a                       b where lensOf  _ = lens (\(RiakContent _ x _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent a _ c d e f g h i j k) x -> RiakContent a x c d e f g h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "contentType"     (Maybe ContentType)       where lensOf' _ = lens (\(RiakContent _ _ x _ _ _ _ _ _ _ _) -> x) (\(RiakContent a b _ d e f g h i j k) x -> RiakContent a b x d e f g h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "charset"         (Maybe Charset)           where lensOf' _ = lens (\(RiakContent _ _ _ x _ _ _ _ _ _ _) -> x) (\(RiakContent a b c _ e f g h i j k) x -> RiakContent a b c x e f g h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "contentEncoding" (Maybe ContentEncoding)   where lensOf' _ = lens (\(RiakContent _ _ _ _ x _ _ _ _ _ _) -> x) (\(RiakContent a b c d _ f g h i j k) x -> RiakContent a b c d x f g h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "vtag"            (Maybe RiakVtag)          where lensOf' _ = lens (\(RiakContent _ _ _ _ _ x _ _ _ _ _) -> x) (\(RiakContent a b c d e _ g h i j k) x -> RiakContent a b c d e x g h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "lastMod"         (Maybe UTCTime)           where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ x _ _ _ _) -> x) (\(RiakContent a b c d e f _ h i j k) x -> RiakContent a b c d e f x h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "usermeta"        RiakMetadata              where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ x _ _ _) -> x) (\(RiakContent a b c d e f g _ i j k) x -> RiakContent a b c d e f g x i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "indexes"         [RiakSecondaryIndex]      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ x _ _) -> x) (\(RiakContent a b c d e f g h _ j k) x -> RiakContent a b c d e f g h x j k)
+instance Functor f => HasLens' f (RiakContent a)                 "deleted"         Bool                      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ _ x _) -> x) (\(RiakContent a b c d e f g h i _ k) x -> RiakContent a b c d e f g h i x k)
+instance Functor f => HasLens' f (RiakContent a)                 "ttl"             TTL                       where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ _ _ x) -> x) (\(RiakContent a b c d e f g h i j _) x -> RiakContent a b c d e f g h i j x)
 
 
+-- | 'IsRiakContent' classifies types that are stored in Riak objects. Every
+-- object must have a content type, and may optionally have a character set and
+-- encoding.
 class IsRiakContent a where
   riakContentType :: a -> ContentType
 
-  riakCharset :: a -> Charset
+  -- | The character set of the content. Defaults to 'Nothing'.
+  riakCharset :: a -> Maybe Charset
+  riakCharset _ =
+    Nothing
 
-  riakContentEncoding :: a -> ContentEncoding
+  -- | The encoding of the content. Defaults to 'Nothing'.
+  riakContentEncoding :: a -> Maybe ContentEncoding
+  riakContentEncoding _ =
+    Nothing
 
   encodeRiakContent :: a -> ByteString
 
   decodeRiakContent
     :: Maybe ContentType
-    -> Charset
-    -> ContentEncoding
+    -> Maybe Charset
+    -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException a
 
@@ -78,22 +91,14 @@ instance IsRiakContent ByteString where
   riakContentType _ =
     ContentTypeApplicationOctetStream
 
-  riakCharset :: ByteString -> Charset
-  riakCharset _ =
-    CharsetNone
-
-  riakContentEncoding :: ByteString -> ContentEncoding
-  riakContentEncoding _ =
-    ContentEncodingNone
-
   encodeRiakContent :: ByteString -> ByteString
   encodeRiakContent =
     id
 
   decodeRiakContent
     :: Maybe ContentType
-    -> Charset
-    -> ContentEncoding
+    -> Maybe Charset
+    -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException ByteString
   decodeRiakContent _ _ _ =
@@ -104,13 +109,13 @@ instance IsRiakContent Text where
   riakContentType _ =
     ContentTypeTextPlain
 
-  riakCharset :: Text -> Charset
+  riakCharset :: Text -> Maybe Charset
   riakCharset _ =
-    CharsetNone
+    Just CharsetUtf8
 
-  riakContentEncoding :: Text -> ContentEncoding
+  riakContentEncoding :: Text -> Maybe ContentEncoding
   riakContentEncoding _ =
-    ContentEncodingNone
+    Just ContentEncodingUtf8
 
   encodeRiakContent :: Text -> ByteString
   encodeRiakContent =
@@ -119,8 +124,8 @@ instance IsRiakContent Text where
   -- TODO text parse errors
   decodeRiakContent
     :: Maybe ContentType
-    -> Charset
-    -> ContentEncoding
+    -> Maybe Charset
+    -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException Text
   decodeRiakContent type' charset encoding =
@@ -135,13 +140,13 @@ instance IsRiakContent Text where
     decompress :: ByteString -> Either SomeException ByteString
     decompress =
       case encoding of
-        ContentEncodingNone ->
+        Nothing ->
           pure
 
-        ContentEncodingAscii ->
+        Just ContentEncodingAscii ->
           pure
 
-        ContentEncodingUtf8 ->
+        Just ContentEncodingUtf8 ->
           pure
 
         _ ->
@@ -150,13 +155,13 @@ instance IsRiakContent Text where
     decode :: ByteString -> Either SomeException Text
     decode =
       case charset of
-        CharsetNone ->
+        Nothing ->
           first toException . Text.decodeUtf8'
 
-        CharsetAscii ->
+        Just CharsetAscii ->
           first toException . Text.decodeUtf8'
 
-        CharsetUtf8 ->
+        Just CharsetUtf8 ->
           first toException . Text.decodeUtf8'
 
         _ ->
@@ -164,11 +169,8 @@ instance IsRiakContent Text where
 
 
 newtype Charset
-  = Charset { unCharset :: Maybe ByteString }
-
-pattern CharsetNone :: Charset
-pattern CharsetNone =
-  Charset Nothing
+  = Charset { unCharset :: ByteString }
+  deriving (Eq, Show)
 
 pattern CharsetAscii :: Charset
 pattern CharsetAscii =
@@ -181,11 +183,8 @@ pattern CharsetUtf8 =
 
 -- TODO ContentEncodingGzip
 newtype ContentEncoding
-  = ContentEncoding { unContentEncoding :: Maybe ByteString }
-
-pattern ContentEncodingNone :: ContentEncoding
-pattern ContentEncodingNone =
-  ContentEncoding Nothing
+  = ContentEncoding { unContentEncoding :: ByteString }
+  deriving (Eq, Show)
 
 pattern ContentEncodingAscii :: ContentEncoding
 pattern ContentEncodingAscii =
@@ -210,10 +209,10 @@ pattern ContentTypeTextPlain =
   ContentType "text/plain"
 
 
-pattern Ascii :: Maybe ByteString
+pattern Ascii :: ByteString
 pattern Ascii =
-  Just "ascii"
+  "ascii"
 
-pattern Utf8 :: Maybe ByteString
+pattern Utf8 :: ByteString
 pattern Utf8 =
-  Just "utf-8"
+  "utf-8"
