@@ -22,11 +22,13 @@ library
     , containers ^>= 0.5.11 || ^>= 0.6.0
     , data-default-class ^>= 0.1.2
     , dlist ^>= 0.8.0
+    -- , ghc-prim ^>= 0.5.2
     , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
     , lens-labels ^>= 0.2.0
     , list-transformer ^>= 1.0.4
     , network ^>= 2.7.0
+    , primitive ^>= 0.6.4
     , proto-lens ^>= 0.3.1
     , proto-lens-protoc == 0.3.1.0
     , stm ^>= 2.4.5
@@ -67,6 +69,7 @@ library
     Riak.Internal.Content
     Riak.Internal.Crdts
     Riak.Internal.Debug
+    Riak.Internal.Manager
     Riak.Internal.Message
     Riak.Internal.Panic
     Riak.Internal.Params

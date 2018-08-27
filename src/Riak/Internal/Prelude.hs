@@ -35,4 +35,4 @@ import Prelude                    as X hiding (head, id, return, (.))
 import Text.Read                  as X (readMaybe)
 import UnliftIO.Exception         as X (Exception, SomeException, bracket,
                                         catch, displayException, finally,
-                                        throwIO, toException)
+                                        throwIO, toException, tryAny)

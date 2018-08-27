@@ -85,7 +85,9 @@ riakConnect host port = do
 
       in
         unmask (loop (messageStream (socketStream socket)))
-          `catch` (void . atomically . tryPutTMVar exVar)
+          `catch` \ex -> do
+            (void . atomically . tryPutTMVar exVar) ex
+            void (tryAny (Socket.close socket))
 
   let
     conn :: RiakConnection
@@ -106,6 +108,7 @@ riakSend (RiakConnection socket _ _ _ exVar) request =
   Socket.sendAll socket (encodeMessage (requestToMessage request))
     `catch` \e -> do
       void (atomically (tryPutTMVar exVar e))
+      void (tryAny (Socket.close socket))
       throwIO e
 
 riakExchange
