@@ -9,16 +9,17 @@ module Riak.Internal.Crdts
   ( RiakCrdtError(..)
   , IsRiakCrdt(..)
   , IsRiakMap(..)
-  , IsRiakRegister(..)
-  , IsRiakSet
+  , RiakMapEntries(..)
   , RiakMapFieldParser
   , riakCounterField
   , riakFlagField
   , riakMapField
   , riakRegisterField
   , riakSetField
+  , RiakMapParseError(..)
   -- , allowExtraKeys
-  , RiakMapEntries(..)
+  , IsRiakRegister(..)
+  , IsRiakSet
   , RiakSetOp(..)
   , riakSetAddOp
   , riakSetRemoveOp

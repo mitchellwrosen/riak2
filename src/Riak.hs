@@ -7,7 +7,7 @@
 
 module Riak
   ( -- * Handle
-    withRiakHandle
+    createRiakHandle
     -- * Object operations
     -- ** Fetch object
   , fetchRiakObject
@@ -72,7 +72,7 @@ module Riak
   , getRiakServerInfo
     -- * Types
   , Charset(..)
-  , ContentEncoding
+  , ContentEncoding(..)
   , ContentType(..)
   , FetchRiakCrdtParams
   , FetchRiakObjectParams
@@ -94,6 +94,7 @@ module Riak
   , RiakLocation(..)
   , RiakMapEntries(..)
   , RiakMapFieldParser
+  , RiakMapParseError(..)
   , RiakMetadata(..)
   , RiakNamespace(..)
   , RiakQuorum(..)
@@ -128,9 +129,9 @@ import           Proto.Riak               hiding (SetOp)
 import qualified Proto.Riak               as Proto
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Cache
-import           Riak.Internal.Connection
 import           Riak.Internal.Content
 import           Riak.Internal.Crdts
+import           Riak.Internal.Manager
 import           Riak.Internal.Panic
 import           Riak.Internal.Params
 import           Riak.Internal.Prelude
@@ -147,26 +148,28 @@ import           Riak.Internal.Types
 
 -- | A thread-safe handle to Riak.
 --
--- TODO: RiakHandle improvement: connection pools, cluster
+-- TODO: RiakHandle improvement: cluster
 data RiakHandle
   = RiakHandle
-      !RiakConnection
+      !RiakManager
       !Cache
 
-withRiakHandle
-  :: MonadUnliftIO m
+
+-- TODO createRiakHandle configurable maximum number of sockets
+-- TODO createRiakHandle close connections after
+createRiakHandle
+  :: MonadIO m
   => HostName -- ^
   -> PortNumber -- ^
-  -> (RiakHandle -> m a) -- ^
-  -> m a -- ^
-withRiakHandle host port f = do
+  -> m RiakHandle
+createRiakHandle host port = do
   cache :: Cache <-
     liftIO newCache
 
-  bracket
-    (liftIO (riakConnect host port))
-    (liftIO . riakDisconnect)
-    (\conn -> f (RiakHandle conn cache))
+  manager :: RiakManager <-
+    liftIO (createRiakManager host port 20)
+
+  pure (RiakHandle manager cache)
 
 
 --------------------------------------------------------------------------------
@@ -243,7 +246,7 @@ _fetchRiakObject
   -> Timeout
   -> m (Either RiakError (FetchRiakObjectResp head if_modified a))
 _fetchRiakObject
-    handle@(RiakHandle conn cache)
+    handle@(RiakHandle manager cache)
     loc@(RiakLocation (RiakNamespace type' bucket) key)
     basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
     liftIO . runExceptT $ do
@@ -280,7 +283,9 @@ _fetchRiakObject
         }
 
   response :: RpbGetResp <-
-    ExceptT (Internal.fetchRiakObject conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.fetchRiakObject conn request))
 
   -- Only cache the vclock if we didn't received an "unmodified" response (which
   -- doesn't contain a vclock)
@@ -445,8 +450,8 @@ _storeRiakObject
   -> W
   -> m (Either RiakError (ObjectReturnTy a return))
 _storeRiakObject
-    handle@(RiakHandle conn cache) namespace@(RiakNamespace type' bucket)
-    key value dw indexes metadata n pw return sloppy_quorum timeout
+    handle@(RiakHandle manager cache) namespace@(RiakNamespace type' bucket) key
+    value dw indexes metadata n pw return sloppy_quorum timeout
     w = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
@@ -503,7 +508,9 @@ _storeRiakObject
         }
 
   response :: RpbPutResp <-
-    ExceptT (Internal.storeRiakObject conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.storeRiakObject conn request))
 
   let
     nonsense :: Text -> ExceptT RiakError IO void
@@ -574,8 +581,8 @@ deleteRiakObject
   => RiakHandle -- ^ Riak handle.
   -> RpbDelReq -- ^
   -> m (Either RiakError RpbDelResp)
-deleteRiakObject (RiakHandle conn _) req =
-  liftIO (Internal.deleteRiakObject conn req)
+deleteRiakObject (RiakHandle manager _) req = liftIO $
+  withRiakConnection manager (\conn -> Internal.deleteRiakObject conn req)
 
 
 -- | Fetch a counter.
@@ -668,13 +675,15 @@ fetchCrdt
   -> FetchRiakCrdtParams
   -> m (Either RiakError (CrdtVal ty))
 fetchCrdt
-    handle@(RiakHandle conn _)
+    handle@(RiakHandle manager _)
     loc@(RiakLocation (RiakNamespace type' bucket) key)
     (FetchRiakCrdtParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
   response :: DtFetchResp <-
-    ExceptT (Internal.fetchRiakCrdt conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.fetchRiakCrdt conn request))
 
   case parseDtFetchResp loc response of
     Left err ->
@@ -900,12 +909,14 @@ updateCrdt
   -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey, DtUpdateResp))
 updateCrdt
-    (RiakHandle conn _) (RiakNamespace type' bucket) key context op
+    (RiakHandle manager _) (RiakNamespace type' bucket) key context op
     (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
     liftIO . runExceptT $ do
 
   response :: DtUpdateResp <-
-    ExceptT (Internal.updateRiakCrdt conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.updateRiakCrdt conn request))
 
   theKey :: RiakKey <-
     maybe
@@ -948,9 +959,11 @@ getRiakBucketTypeProps
   => RiakHandle -- ^ Riak handle.
   -> RiakBucketType ty -- ^
   -> m (Either RiakError RpbBucketProps)
-getRiakBucketTypeProps (RiakHandle conn _) type' = liftIO . runExceptT $ do
+getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO . runExceptT $ do
   response :: RpbGetBucketResp <-
-    ExceptT (Internal.getRiakBucketTypeProps conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.getRiakBucketTypeProps conn request))
   pure (response ^. #props)
 
  where
@@ -969,8 +982,10 @@ setRiakBucketTypeProps
   -> RiakBucketType ty -- ^
   -> RpbBucketProps -- ^
   -> m (Either RiakError ())
-setRiakBucketTypeProps (RiakHandle conn _) type' props =
-  liftIO (fmap (() <$) (Internal.setRiakBucketTypeProps conn request))
+setRiakBucketTypeProps (RiakHandle manager _) type' props =
+  liftIO (fmap (() <$)
+    (withRiakConnection manager
+      (\conn -> (Internal.setRiakBucketTypeProps conn request))))
  where
   request :: RpbSetBucketTypeReq
   request =
@@ -987,9 +1002,11 @@ getRiakBucketProps
   => RiakHandle -- ^ Riak handle.
   -> RiakNamespace ty -- ^
   -> m (Either RiakError RpbBucketProps)
-getRiakBucketProps (RiakHandle conn _) (RiakNamespace type' bucket) = liftIO . runExceptT $ do
+getRiakBucketProps (RiakHandle manager _) (RiakNamespace type' bucket) = liftIO . runExceptT $ do
   response :: RpbGetBucketResp <-
-    ExceptT (Internal.getRiakBucketProps conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.getRiakBucketProps conn request))
   pure (response ^. #props)
 
  where
@@ -1008,8 +1025,10 @@ setRiakBucketProps
   => RiakHandle -- ^ Riak handle.
   -> RpbSetBucketReq -- ^
   -> m (Either RiakError ())
-setRiakBucketProps (RiakHandle conn _) req =
-  liftIO (fmap (() <$) (Internal.setRiakBucketProps conn req))
+setRiakBucketProps (RiakHandle manager _) req =
+  liftIO (fmap (() <$)
+    (withRiakConnection manager
+      (\conn -> Internal.setRiakBucketProps conn req)))
 
 
 resetRiakBucketProps
@@ -1017,20 +1036,24 @@ resetRiakBucketProps
   => RiakHandle -- ^ Riak handle.
   -> RpbResetBucketReq -- ^
   -> m (Either RiakError ())
-resetRiakBucketProps (RiakHandle conn _) req =
-  liftIO (fmap (() <$) (Internal.resetRiakBucketProps conn req))
+resetRiakBucketProps (RiakHandle manager _) req = liftIO $
+  fmap (() <$)
+    (withRiakConnection manager
+      (\conn -> Internal.resetRiakBucketProps conn req))
 
 
 -- TODO listRiakBuckets param timeout
 listRiakBuckets
   :: RiakHandle -- ^ Riak handle.
   -> RiakBucketType ty -- ^
-  -> ListT (ExceptT RiakError IO) RiakBucket
-listRiakBuckets (RiakHandle conn _) type' = do
-  response :: RpbListBucketsResp <-
-    Internal.listRiakBuckets conn request
+  -> (ListT (ExceptT RiakError IO) RiakBucket -> IO r)
+  -> IO r
+listRiakBuckets (RiakHandle manager _) type' k =
+  withRiakConnection manager $ \conn -> k $ do
+    response :: RpbListBucketsResp <-
+      Internal.listRiakBuckets conn request
 
-  ListT.select (coerce (response ^. #buckets) :: [RiakBucket])
+    ListT.select (coerce (response ^. #buckets) :: [RiakBucket])
 
  where
   request :: RpbListBucketsReq
@@ -1046,12 +1069,14 @@ listRiakBuckets (RiakHandle conn _) type' = do
 listRiakKeys
   :: RiakHandle -- ^ Riak handle.
   -> RiakNamespace ty -- ^
-  -> ListT (ExceptT RiakError IO) RiakKey
-listRiakKeys (RiakHandle conn _) (RiakNamespace type' bucket) = do
-  response :: RpbListKeysResp <-
-    Internal.listRiakKeys conn request
+  -> (ListT (ExceptT RiakError IO) RiakKey -> IO r)
+  -> IO r
+listRiakKeys (RiakHandle manager _) (RiakNamespace type' bucket) k =
+  withRiakConnection manager $ \conn -> k $ do
+    response :: RpbListKeysResp <-
+      Internal.listRiakKeys conn request
 
-  ListT.select (coerce (response ^. #keys) :: [RiakKey])
+    ListT.select (coerce (response ^. #keys) :: [RiakKey])
 
  where
   request :: RpbListKeysReq
@@ -1066,9 +1091,11 @@ listRiakKeys (RiakHandle conn _) (RiakNamespace type' bucket) = do
 riakMapReduce
   :: RiakHandle -- ^ Riak handle.
   -> RpbMapRedReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbMapRedResp
-riakMapReduce (RiakHandle conn _) request =
-  Internal.riakMapReduce conn request
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
+  -> IO r
+riakMapReduce (RiakHandle manager _) request k =
+  withRiakConnection manager $ \conn -> k $
+    Internal.riakMapReduce conn request
 
 
 getRiakSchema
@@ -1076,8 +1103,9 @@ getRiakSchema
   => RiakHandle -- ^ Riak handle.
   -> RiakSchemaName -- ^
   -> m (Either RiakError RpbYokozunaSchemaGetResp)
-getRiakSchema (RiakHandle conn _) schema =
-  liftIO (Internal.getRiakSchema conn request)
+getRiakSchema (RiakHandle manager _) schema = liftIO $
+  withRiakConnection manager
+    (\conn -> Internal.getRiakSchema conn request)
  where
   request :: RpbYokozunaSchemaGetReq
   request =
@@ -1093,8 +1121,10 @@ putRiakSchema
   -> RiakSchemaName -- ^
   -> ByteString -- ^
   -> m (Either RiakError ())
-putRiakSchema (RiakHandle conn _) name bytes =
-  liftIO (fmap (() <$) (Internal.putRiakSchema conn request))
+putRiakSchema (RiakHandle manager _) name bytes = liftIO $
+  fmap (() <$)
+    (withRiakConnection manager
+      (\conn -> Internal.putRiakSchema conn request))
  where
   request :: RpbYokozunaSchemaPutReq
   request =
@@ -1114,8 +1144,11 @@ getRiakIndex
   => RiakHandle -- ^ Riak handle.
   -> RiakIndexName -- ^
   -> m (Either RiakError (Maybe RpbYokozunaIndex))
-getRiakIndex (RiakHandle conn _) name = liftIO . runExceptT $ do
-  ExceptT (Internal.getRiakIndex conn request) >>= \case
+getRiakIndex (RiakHandle manager _) name = liftIO . runExceptT $ do
+  ExceptT
+    (withRiakConnection manager
+      (\conn -> Internal.getRiakIndex conn request)) >>= \case
+
     RpbYokozunaIndexGetResp [] _ ->
       pure Nothing
     RpbYokozunaIndexGetResp (index:_) _ ->
@@ -1134,9 +1167,11 @@ getRiakIndexes
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
   -> m (Either RiakError [RpbYokozunaIndex])
-getRiakIndexes (RiakHandle conn _) = liftIO . runExceptT $ do
+getRiakIndexes (RiakHandle manager _) = liftIO . runExceptT $ do
   RpbYokozunaIndexGetResp indexes _ <-
-    ExceptT (Internal.getRiakIndex conn request)
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> Internal.getRiakIndex conn request))
   pure indexes
 
  where
@@ -1154,8 +1189,10 @@ putRiakIndex
   -> RiakIndexName -- ^
   -> RiakSchemaName -- ^
   -> m (Either RiakError ())
-putRiakIndex (RiakHandle conn _) index schema =
-  liftIO (fmap (() <$) (Internal.putRiakIndex conn request))
+putRiakIndex (RiakHandle manager _) index schema = liftIO $
+  fmap (() <$)
+    (withRiakConnection manager
+      (\conn -> Internal.putRiakIndex conn request))
  where
   request :: RpbYokozunaIndexPutReq
   request =
@@ -1177,24 +1214,28 @@ deleteRiakIndex
   => RiakHandle -- ^ Riak handle.
   -> RpbYokozunaIndexDeleteReq -- ^
   -> m (Either RiakError RpbDelResp)
-deleteRiakIndex (RiakHandle conn _) req =
-  liftIO (Internal.deleteRiakIndex conn req)
+deleteRiakIndex (RiakHandle manager _) req = liftIO $
+  withRiakConnection manager
+    (\conn -> Internal.deleteRiakIndex conn req)
 
 
 pingRiak
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
   -> m (Either RiakError ())
-pingRiak (RiakHandle conn _) =
-  liftIO (fmap (() <$) (Internal.pingRiak conn))
+pingRiak (RiakHandle manager _) = liftIO $
+  fmap (() <$)
+    (withRiakConnection manager
+      (\conn -> Internal.pingRiak conn))
 
 
 getRiakServerInfo
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
   -> m (Either RiakError RpbGetServerInfoResp)
-getRiakServerInfo (RiakHandle conn _) =
-  liftIO (Internal.getRiakServerInfo conn)
+getRiakServerInfo (RiakHandle manager _) = liftIO $
+  withRiakConnection manager
+    (\conn -> Internal.getRiakServerInfo conn)
 
 
 --------------------------------------------------------------------------------

@@ -20,9 +20,9 @@ import           Riak
 import qualified Riak.Lenses as L
 
 main :: IO ()
-main =
-  withRiakHandle "localhost" 8087
-    (defaultMain . testGroup "Tests" . tests)
+main = do
+  riakh <- createRiakHandle "localhost" 8087
+  defaultMain (testGroup "Tests" (tests riakh))
 
 tests :: RiakHandle -> [TestTree]
 tests h =
@@ -38,16 +38,19 @@ tests h =
       key <- randomKey
       fetchRiakObject @Text h (objectLoc bucket key) def `shouldReturn` Right []
 
-  , testCase "fetch Text object" $ do
+  , testCase "fetch Text object w/o charset" $ do
       bucket <- randomBucketString
       key <- randomKeyString
       let val = "foo" :: [Char]
       curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
       let loc = objectLoc (RiakBucket (Latin1.pack bucket)) (RiakKey (Latin1.pack key))
-      Right [RiakContent loc' val' vtag ts meta ixs deleted ttl] <-
+      Right [RiakContent loc' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
         fetchRiakObject h loc def
       loc' `shouldBe` loc
       val' `shouldBe` Text.pack val
+      ctype `shouldBe` Just (ContentType "text/plain")
+      charset `shouldBe` Nothing
+      encoding `shouldBe` Nothing
       vtag `shouldSatisfy` isJust
       ts `shouldSatisfy` isJust
       meta `shouldBe` RiakMetadata []
@@ -61,10 +64,13 @@ tests h =
       let val = "foo" :: [Char]
       curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s" bucket key val)
       let loc = objectLoc (RiakBucket (Latin1.pack bucket)) (RiakKey (Latin1.pack key))
-      Right [RiakContent loc' val' vtag ts meta ixs deleted ttl] <-
+      Right [RiakContent loc' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
         fetchRiakObject h loc def
       loc' `shouldBe` loc
       val' `shouldBe` Latin1.pack val
+      ctype `shouldBe` Just (ContentType "application/octet-stream")
+      charset `shouldBe` Nothing
+      encoding `shouldBe` Nothing
       vtag `shouldSatisfy` isJust
       ts `shouldSatisfy` isJust
       meta `shouldBe` RiakMetadata []

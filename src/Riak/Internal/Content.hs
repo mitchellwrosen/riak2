@@ -8,8 +8,6 @@ module Riak.Internal.Content
   , RiakContent(..)
   , ContentEncoding(..)
   , ContentType(..)
-  , pattern ContentTypeApplicationOctetStream
-  , pattern ContentTypeTextPlain
   , IsRiakContent(..)
   ) where
 
@@ -64,7 +62,49 @@ instance Functor f => HasLens' f (RiakContent a)                 "ttl"          
 -- | 'IsRiakContent' classifies types that are stored in Riak objects. Every
 -- object must have a content type, and may optionally have a character set and
 -- encoding.
+--
+-- Two instances are provided by this library.
+--
+-- [__@ByteString@__]
+--
+-- * When reading,
+--
+--     * Content type is ignored.
+--
+--     * Charset is ignored.
+--
+--     * Content encoding is ignored.
+--
+--     This allows you to read any Riak object as a raw 'ByteString',
+--     regardless of its type.
+--
+-- * When writing,
+--
+--     * Content type is set to @application/octet-stream@.
+--
+--     * Charset is empty.
+--
+--     * Content encoding is empty.
+--
+-- [__@Text@__]
+--
+-- * When reading,
+--
+--     * Content type must be @text/plain@.
+--
+--     * Charset must be empty, @ascii@, or @utf-8@.
+--
+--     * Content encoding must be empty, @ascii@, or @utf-8@.
+--
+-- * When writing,
+--
+--     * Content type is set to @text/plain@.
+--
+--     * Charset is set to @utf-8@.
+--
+--     * Content encoding is set to @utf-8@.
 class IsRiakContent a where
+  -- | The content type.
   riakContentType :: a -> ContentType
 
   -- | The character set of the content. Defaults to 'Nothing'.
@@ -77,8 +117,11 @@ class IsRiakContent a where
   riakContentEncoding _ =
     Nothing
 
+  -- | Encode a Riak object.
   encodeRiakContent :: a -> ByteString
 
+  -- | Decode a Riak object, given its content type, charset, encoding, and
+  -- encoded value.
   decodeRiakContent
     :: Maybe ContentType
     -> Maybe Charset
@@ -89,7 +132,7 @@ class IsRiakContent a where
 instance IsRiakContent ByteString where
   riakContentType :: ByteString -> ContentType
   riakContentType _ =
-    ContentTypeApplicationOctetStream
+    ContentType "application/octet-stream"
 
   encodeRiakContent :: ByteString -> ByteString
   encodeRiakContent =
@@ -107,15 +150,15 @@ instance IsRiakContent ByteString where
 instance IsRiakContent Text where
   riakContentType :: Text -> ContentType
   riakContentType _ =
-    ContentTypeTextPlain
+    ContentType "text/plain"
 
   riakCharset :: Text -> Maybe Charset
   riakCharset _ =
-    Just CharsetUtf8
+    Just (Charset "utf-8")
 
   riakContentEncoding :: Text -> Maybe ContentEncoding
   riakContentEncoding _ =
-    Just ContentEncodingUtf8
+    Just (ContentEncoding "utf-8")
 
   encodeRiakContent :: Text -> ByteString
   encodeRiakContent =
@@ -130,7 +173,7 @@ instance IsRiakContent Text where
     -> Either SomeException Text
   decodeRiakContent type' charset encoding =
     case type' of
-      Just ContentTypeTextPlain ->
+      Just (ContentType "text/plain") ->
         decode <=< decompress
 
       _ ->
@@ -143,14 +186,14 @@ instance IsRiakContent Text where
         Nothing ->
           pure
 
-        Just ContentEncodingAscii ->
+        Just (ContentEncoding "ascii") ->
           pure
 
-        Just ContentEncodingUtf8 ->
+        Just (ContentEncoding "utf-8") ->
           pure
 
-        _ ->
-          undefined
+        x ->
+          error (show x)
 
     decode :: ByteString -> Either SomeException Text
     decode =
@@ -158,27 +201,19 @@ instance IsRiakContent Text where
         Nothing ->
           first toException . Text.decodeUtf8'
 
-        Just CharsetAscii ->
+        Just (Charset "ascii") ->
           first toException . Text.decodeUtf8'
 
-        Just CharsetUtf8 ->
+        Just (Charset "utf-8") ->
           first toException . Text.decodeUtf8'
 
-        _ ->
-          undefined
+        x ->
+          error (show x)
 
 
 newtype Charset
   = Charset { unCharset :: ByteString }
   deriving (Eq, Show)
-
-pattern CharsetAscii :: Charset
-pattern CharsetAscii =
-  Charset Ascii
-
-pattern CharsetUtf8 :: Charset
-pattern CharsetUtf8 =
-  Charset Utf8
 
 
 -- TODO ContentEncodingGzip
@@ -186,33 +221,8 @@ newtype ContentEncoding
   = ContentEncoding { unContentEncoding :: ByteString }
   deriving (Eq, Show)
 
-pattern ContentEncodingAscii :: ContentEncoding
-pattern ContentEncodingAscii =
-  ContentEncoding Ascii
-
-pattern ContentEncodingUtf8 :: ContentEncoding
-pattern ContentEncodingUtf8 =
-  ContentEncoding Utf8
-
 
 newtype ContentType
   = ContentType { unContentType :: ByteString }
   deriving stock (Eq, Show)
   deriving newtype (IsString)
-
-pattern ContentTypeApplicationOctetStream :: ContentType
-pattern ContentTypeApplicationOctetStream =
-  ContentType "application/octet-stream"
-
-pattern ContentTypeTextPlain :: ContentType
-pattern ContentTypeTextPlain =
-  ContentType "text/plain"
-
-
-pattern Ascii :: ByteString
-pattern Ascii =
-  "ascii"
-
-pattern Utf8 :: ByteString
-pattern Utf8 =
-  "utf-8"

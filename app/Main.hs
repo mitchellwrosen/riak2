@@ -285,10 +285,10 @@ doFetchCounter
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchCounter type' bucket key host port =
-  withRiakHandle host port $ \h ->
-    either print print =<<
-      fetchRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
+doFetchCounter type' bucket key host port = do
+  h <- createRiakHandle host port
+  either print print =<<
+    fetchRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
 
 doFetchMap
   :: RiakBucketType ('Just ('RiakMapTy RiakMapEntries))
@@ -297,10 +297,10 @@ doFetchMap
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchMap type' bucket key host port =
-  withRiakHandle host port $ \h ->
-    either print print =<<
-      fetchRiakMap h (RiakLocation (RiakNamespace type' bucket) key) def
+doFetchMap type' bucket key host port = do
+  h <- createRiakHandle host port
+  either print print =<<
+    fetchRiakMap h (RiakLocation (RiakNamespace type' bucket) key) def
 
 doFetchObject
   :: RiakBucketType 'Nothing
@@ -319,11 +319,11 @@ doFetchObject
   -> IO ()
 doFetchObject
     type' bucket key basic_quorum head notfound_not_ok n pr r no_sloppy_quorum
-    timeout host port =
-  withRiakHandle host port $ \h ->
-    if head
-      then go (fetchRiakObjectHead @Text h) (\_ _ -> pure ())
-      else go (fetchRiakObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
+    timeout host port = do
+  h <- createRiakHandle host port
+  if head
+    then go (fetchRiakObjectHead @Text h) (\_ _ -> pure ())
+    else go (fetchRiakObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
 
  where
   go
@@ -361,11 +361,11 @@ doFetchSet
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchSet type' bucket key host port =
-  withRiakHandle host port $ \h ->
-    fetchRiakSet h (RiakLocation (RiakNamespace type' bucket) key) def >>= \case
-      Left err -> print err
-      Right vals -> for_ vals print -- TODO encoding?
+doFetchSet type' bucket key host port = do
+  h <- createRiakHandle host port
+  fetchRiakSet h (RiakLocation (RiakNamespace type' bucket) key) def >>= \case
+    Left err -> print err
+    Right vals -> for_ vals print -- TODO encoding?
 
 doGetBucketProps
   :: RiakBucketType ty
@@ -373,36 +373,36 @@ doGetBucketProps
   -> HostName
   -> PortNumber
   -> IO ()
-doGetBucketProps type' bucket host port =
-  withRiakHandle host port $ \h ->
-    either print printBucketProps =<<
-      getRiakBucketProps h (RiakNamespace type' bucket)
+doGetBucketProps type' bucket host port = do
+  h <- createRiakHandle host port
+  either print printBucketProps =<<
+    getRiakBucketProps h (RiakNamespace type' bucket)
 
 doGetBucketTypeProps :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
-doGetBucketTypeProps type' host port =
-  withRiakHandle host port $ \h ->
-    either print printBucketProps =<<
-      getRiakBucketTypeProps h type'
+doGetBucketTypeProps type' host port = do
+  h <- createRiakHandle host port
+  either print printBucketProps =<<
+    getRiakBucketTypeProps h type'
 
 doGetIndex :: Maybe RiakIndexName -> HostName -> PortNumber -> IO ()
-doGetIndex index host port =
-  withRiakHandle host port $ \h ->
-    maybe
-      (traverse_ print =<< getRiakIndexes h)
-      (print <=< getRiakIndex h)
-      index
+doGetIndex index host port = do
+  h <- createRiakHandle host port
+  maybe
+    (traverse_ print =<< getRiakIndexes h)
+    (print <=< getRiakIndex h)
+    index
 
 doGetSchema :: RiakSchemaName -> HostName -> PortNumber -> IO ()
-doGetSchema schema host port =
-  withRiakHandle host port $ \h ->
-    either print print =<<
-      getRiakSchema h schema
+doGetSchema schema host port = do
+  h <- createRiakHandle host port
+  either print print =<<
+    getRiakSchema h schema
 
 doGetServerInfo :: HostName -> PortNumber -> IO ()
-doGetServerInfo host port =
-  withRiakHandle host port $ \h ->
-    either print printServerInfo =<<
-      getRiakServerInfo h
+doGetServerInfo host port = do
+  h <- createRiakHandle host port
+  either print printServerInfo =<<
+    getRiakServerInfo h
 
 doList
   :: RiakBucketType ty
@@ -414,28 +414,26 @@ doList type' =
   maybe (doListBuckets type') (doListKeys type')
 
 doListBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
-doListBuckets type' host port =
-  withRiakHandle host port $ \h -> do
-    result :: Either RiakError () <-
-      (runExceptT . runListT)
-        (listRiakBuckets h type' >>=
-          liftIO . Latin1.putStrLn . coerce)
-    either print (const (pure ())) result
+doListBuckets type' host port = do
+  h <- createRiakHandle host port
+  result :: Either RiakError () <-
+    listRiakBuckets h type' $ \buckets ->
+      (runExceptT . runListT) (buckets >>= liftIO . Latin1.putStrLn . coerce)
+  either print (const (pure ())) result
 
 doListKeys :: RiakBucketType ty -> RiakBucket -> HostName -> PortNumber -> IO ()
-doListKeys type' bucket host port =
-  withRiakHandle host port $ \h -> do
-    result :: Either RiakError () <-
-      (runExceptT . runListT)
-        (listRiakKeys h (RiakNamespace type' bucket) >>=
-          liftIO . Latin1.putStrLn . coerce)
-    either print (const (pure ())) result
+doListKeys type' bucket host port = do
+  h <- createRiakHandle host port
+  result :: Either RiakError () <-
+    listRiakKeys h (RiakNamespace type' bucket) $ \keys ->
+      (runExceptT . runListT) (keys >>= liftIO . Latin1.putStrLn . coerce)
+  either print (const (pure ())) result
 
 doPing :: HostName -> PortNumber -> IO ()
-doPing host port =
-  withRiakHandle host port $ \h ->
-    either print (const (putStrLn "pong")) =<<
-      pingRiak h
+doPing host port = do
+  h <- createRiakHandle host port
+  either print (const (putStrLn "pong")) =<<
+    pingRiak h
 
 doStoreObject
   :: RiakBucketType 'Nothing
@@ -454,28 +452,28 @@ doStoreObject
   -> IO ()
 doStoreObject
     type' bucket key content dw n pw return no_sloppy_quorum timeout w host
-    port =
-  withRiakHandle host port $ \h ->
-    case return of
-      'a' ->
-        go
-          (storeRiakObjectHead h)
-          (\contents ->
-            (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
-              printContent (\_ -> pure ()) (Just i) content'))
-      'b' ->
-        go
-          (storeRiakObjectBody h)
-          (\contents ->
-            (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
-              printContent
-                (\s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
-                (Just i)
-                content'))
+    port = do
+  h <- createRiakHandle host port
+  case return of
+    'a' ->
+      go
+        (storeRiakObjectHead h)
+        (\contents ->
+          (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
+            printContent (\_ -> pure ()) (Just i) content'))
+    'b' ->
+      go
+        (storeRiakObjectBody h)
+        (\contents ->
+          (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
+            printContent
+              (\s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
+              (Just i)
+              content'))
 
-      'c' ->
-        go (storeRiakObject h) pure
-      _   -> undefined
+    'c' ->
+      go (storeRiakObject h) pure
+    _   -> undefined
  where
   go
     :: (RiakLocation 'Nothing -> Text -> StoreRiakObjectParams -> IO (Either RiakError a))
@@ -504,10 +502,10 @@ doUpdateCounter
   -> HostName
   -> PortNumber
   -> IO ()
-doUpdateCounter type' bucket key incr host port =
-  withRiakHandle host port $ \h ->
-    either print print =<<
-      updateRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) incr def
+doUpdateCounter type' bucket key incr host port = do
+  h <- createRiakHandle host port
+  either print print =<<
+    updateRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) incr def
 
 --------------------------------------------------------------------------------
 -- Misc. helpers

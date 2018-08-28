@@ -22,7 +22,7 @@ library
     , containers ^>= 0.5.11 || ^>= 0.6.0
     , data-default-class ^>= 0.1.2
     , dlist ^>= 0.8.0
-    -- , ghc-prim ^>= 0.5.2
+    , ghc-prim ^>= 0.5.2
     , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
     , lens-labels ^>= 0.2.0

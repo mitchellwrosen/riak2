@@ -1,19 +1,21 @@
 {-# LANGUAGE NoImplicitPrelude #-}
 
-module Riak.Internal.Debug where
+module Riak.Internal.Debug
+  ( debug
+  ) where
 
 import System.IO
 import System.IO.Unsafe
 
 import Riak.Internal.Prelude
 
-lock :: MVar ()
-lock =
+_lock :: MVar ()
+_lock =
   unsafePerformIO (newMVar ())
-{-# NOINLINE lock #-}
+{-# NOINLINE _lock #-}
 
 -- TODO: add cabal flag to control debugging
 debug :: String -> IO ()
 debug _msg =
-  -- withMVar lock (\_ -> hPutStrLn stderr msg)
+  -- withMVar _lock (\_ -> hPutStrLn stderr _msg)
   pure ()
