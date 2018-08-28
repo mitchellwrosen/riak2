@@ -33,19 +33,19 @@ tests h =
       Right _ <- getRiakServerInfo h
       pure ()
 
-  , testCase "fetch object 404" $ do
+  , testCase "get object 404" $ do
       bucket <- randomBucket
       key <- randomKey
-      fetchRiakObject @Text h (objectLoc bucket key) def `shouldReturn` Right []
+      getRiakObject @Text h (objectLoc bucket key) def `shouldReturn` Right []
 
-  , testCase "fetch Text object w/o charset" $ do
+  , testCase "get Text object w/o charset" $ do
       bucket <- randomBucketString
       key <- randomKeyString
       let val = "foo" :: [Char]
       curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
       let loc = objectLoc (RiakBucket (Latin1.pack bucket)) (RiakKey (Latin1.pack key))
       Right [RiakContent loc' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
-        fetchRiakObject h loc def
+        getRiakObject h loc def
       loc' `shouldBe` loc
       val' `shouldBe` Text.pack val
       ctype `shouldBe` Just (ContentType "text/plain")
@@ -58,14 +58,14 @@ tests h =
       deleted `shouldBe` False
       ttl `shouldBe` TTL Nothing
 
-  , testCase "fetch ByteString object" $ do
+  , testCase "get ByteString object" $ do
       bucket <- randomBucketString
       key <- randomKeyString
       let val = "foo" :: [Char]
       curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s" bucket key val)
       let loc = objectLoc (RiakBucket (Latin1.pack bucket)) (RiakKey (Latin1.pack key))
       Right [RiakContent loc' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
-        fetchRiakObject h loc def
+        getRiakObject h loc def
       loc' `shouldBe` loc
       val' `shouldBe` Latin1.pack val
       ctype `shouldBe` Just (ContentType "application/octet-stream")
@@ -78,18 +78,18 @@ tests h =
       deleted `shouldBe` False
       ttl `shouldBe` TTL Nothing
 
-  , testCase "fetch two siblings" $ do
+  , testCase "get two siblings" $ do
       bucket <- randomBucketString
       key <- randomKeyString
       let val = "foo" :: [Char]
       curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
       curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
       let loc = objectLoc (RiakBucket (Latin1.pack bucket)) (RiakKey (Latin1.pack key))
-      Right xs <- fetchRiakObject @Text h loc def
+      Right xs <- getRiakObject @Text h loc def
       length xs `shouldBe` 2
 
-  , testCase "concurrent fetch/store" $ do
-      let n = 1000 -- objects stored+fetched =per thread
+  , testCase "concurrent get/put" $ do
+      let n = 1000 -- objects put+got per thread
       let t = 4    -- num threads
       done <- newEmptyMVar
       let
@@ -99,8 +99,8 @@ tests h =
             key <- randomKey
             val <- Text.pack <$> randomKeyString
             let loc = objectLoc bucket key
-            Right () <- storeRiakObject h loc val def
-            Right [x] <- fetchRiakObject h loc def
+            Right () <- putRiakObject h loc val def
+            Right [x] <- getRiakObject h loc def
             (x ^. L.value) `shouldBe` val
       replicateM_ t (forkFinally go (putMVar done))
       replicateM_ t (either throwIO (const (pure ())) =<< takeMVar done)
@@ -109,8 +109,8 @@ tests h =
   --     bucket <- randomBucket
   --     key <- randomKey
   --     let loc = defaultLocation bucket key
-  --     storeRiakObject h loc ("foo" :: Text) def `shouldReturn` Right ()
-  --     Right [x] <- fetchRiakObject @Text h loc def
+  --     putRiakObject h loc ("foo" :: Text) def `shouldReturn` Right ()
+  --     Right [x] <- getRiakObject @Text h loc def
   --     (x ^. L.contentType) `shouldBe` ContentType "text/plain"
   ]
 

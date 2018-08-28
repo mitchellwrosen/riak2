@@ -131,8 +131,6 @@ instance IsLabel "w"             (RiakQuorum -> UpdateRiakCrdtParams -> UpdateRi
 
 
 -- | Optional @search@ parameters.
---
--- TODO RiakSearchParams IsLabel
 data RiakSearchParams
   = RiakSearchParams
       !DF
@@ -143,3 +141,15 @@ data RiakSearchParams
       !Rows
       !Sort
       !Start
+
+instance Default RiakSearchParams where
+  def = RiakSearchParams (DF Nothing) (Filter Nothing) (FL []) (Op Nothing) (Presort Nothing) (Rows Nothing) (Sort Nothing) (Start Nothing)
+
+instance IsLabel "df"      (ByteString   -> RiakSearchParams -> RiakSearchParams) where fromLabel = \a (RiakSearchParams _ b c d e f g h) -> RiakSearchParams (coerce (Just a)) b c d e f g h
+instance IsLabel "filter"  (ByteString   -> RiakSearchParams -> RiakSearchParams) where fromLabel = \b (RiakSearchParams a _ c d e f g h) -> RiakSearchParams a (coerce (Just b)) c d e f g h
+instance IsLabel "fl"      ([ByteString] -> RiakSearchParams -> RiakSearchParams) where fromLabel = \c (RiakSearchParams a b _ d e f g h) -> RiakSearchParams a b (coerce c) d e f g h
+instance IsLabel "op"      (ByteString   -> RiakSearchParams -> RiakSearchParams) where fromLabel = \d (RiakSearchParams a b c _ e f g h) -> RiakSearchParams a b c (coerce (Just d)) e f g h
+instance IsLabel "presort" (ByteString   -> RiakSearchParams -> RiakSearchParams) where fromLabel = \e (RiakSearchParams a b c d _ f g h) -> RiakSearchParams a b c d (coerce (Just e)) f g h
+instance IsLabel "rows"    (Word32       -> RiakSearchParams -> RiakSearchParams) where fromLabel = \f (RiakSearchParams a b c d e _ g h) -> RiakSearchParams a b c d e (coerce (Just f)) g h
+instance IsLabel "sort"    (ByteString   -> RiakSearchParams -> RiakSearchParams) where fromLabel = \g (RiakSearchParams a b c d e f _ h) -> RiakSearchParams a b c d e f (coerce (Just g)) h
+instance IsLabel "start"   (Word32       -> RiakSearchParams -> RiakSearchParams) where fromLabel = \h (RiakSearchParams a b c d e f g _) -> RiakSearchParams a b c d e f g (coerce (Just h))
