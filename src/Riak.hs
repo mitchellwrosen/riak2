@@ -234,7 +234,7 @@ fetchRiakObjectIfModifiedHead handle loc (FetchRiakObjectParams a b c d e f g) =
     (_fetchRiakObject @ByteString handle loc a Head IfModified b c d e f g)
 
 type FetchRiakObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
-  = IfModifiedWrapper if_modified [(RiakContent (If head (Proxy a) a))]
+  = IfModifiedWrapper if_modified [(RiakContent (If head () a))]
 
 type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
   IfModifiedWrapper 'True  a = Modified a
@@ -326,7 +326,7 @@ _fetchRiakObject
         contents
 
    where
-    contents :: IO [RiakContent (If head (Proxy a) a)]
+    contents :: IO [RiakContent (If head () a)]
     contents =
       traverse (parseContent @a proxy# loc headAsBool) content
      where
@@ -349,7 +349,7 @@ _fetchRiakObject
 
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy _ 'ObjectReturnNone = RiakKey
-  ObjectReturnTy a 'ObjectReturnHead = NonEmpty (RiakContent (Proxy a))
+  ObjectReturnTy _ 'ObjectReturnHead = NonEmpty (RiakContent ())
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (RiakContent a)
 
 -- | Store an object.
@@ -358,7 +358,7 @@ storeRiakObject
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
   -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
-  -> a -- ^
+  -> a -- ^ Object.
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError ())
 storeRiakObject
@@ -373,13 +373,13 @@ storeRiakObjectHead
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
   -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
-  -> a -- ^
+  -> a -- ^ Object.
   -> StoreRiakObjectParams -- ^ Optional parameters.
-  -> m (Either RiakError (NonEmpty (RiakContent (Proxy a))))
+  -> m (Either RiakError (NonEmpty (RiakContent ())))
 storeRiakObjectHead
     handle (RiakLocation namespace key) content (StoreRiakObjectParams a b c d e f g h) =
-  _storeRiakObject handle namespace (Just key) content a b c d e
-    ParamObjectReturnHead f g h
+  (_storeRiakObject handle namespace (Just key) content a b c d e
+    ParamObjectReturnHead f g h)
 
 -- | Store an object and return it.
 storeRiakObjectBody
@@ -387,7 +387,7 @@ storeRiakObjectBody
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
   -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
-  -> a -- ^
+  -> a -- ^ Object.
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError (NonEmpty (RiakContent a)))
 storeRiakObjectBody
@@ -400,8 +400,8 @@ storeNewRiakObject
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakNamespace 'Nothing -- ^
-  -> a -- ^
+  -> RiakNamespace 'Nothing -- ^ Bucket type and bucket.
+  -> a -- ^ Object.
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError RiakKey)
 storeNewRiakObject
@@ -414,23 +414,23 @@ storeNewRiakObjectHead
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakNamespace 'Nothing -- ^
-  -> a -- ^
+  -> RiakNamespace 'Nothing -- ^ Bucket type and bucket.
+  -> a -- ^ Object.
   -> StoreRiakObjectParams -- ^ Optional parameters.
-  -> m (Either RiakError (RiakContent (Proxy a)))
+  -> m (Either RiakError (RiakContent ()))
 storeNewRiakObjectHead
     handle namespace content (StoreRiakObjectParams a b c d e f g h) =
-  (fmap.fmap) List1.head $
-    _storeRiakObject handle namespace Nothing content a b c d e
-      ParamObjectReturnHead f g h
+  (fmap.fmap) List1.head
+    (_storeRiakObject handle namespace Nothing content a b c d e
+      ParamObjectReturnHead f g h)
 
 -- | Store an new object and return it.
 storeNewRiakObjectBody
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakNamespace 'Nothing -- ^
-  -> a -- ^
+  -> RiakNamespace 'Nothing -- ^ Bucket type and bucket.
+  -> a -- ^ Object.
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError (RiakContent a))
 storeNewRiakObjectBody
@@ -1389,15 +1389,15 @@ parseContent
   -> RiakLocation 'Nothing
   -> SBool head
   -> RpbContent
-  -> IO (RiakContent (If head (Proxy a) a))
+  -> IO (RiakContent (If head () a))
 parseContent _ loc head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
-  theValue :: If head (Proxy a) a <-
+  theValue :: If head () a <-
     case head of
       STrue ->
-        pure Proxy
+        pure ()
 
       SFalse ->
         either
@@ -1447,9 +1447,9 @@ parseContentHead
   => Proxy# a
   -> RiakLocation 'Nothing
   -> RpbContent
-  -> IO (RiakContent (Proxy a))
+  -> IO (RiakContent ())
 parseContentHead _ =
-  _parseContent (\_ _ _ _ -> Right Proxy)
+  _parseContent (\_ _ _ _ -> Right ())
 
 
 _parseContent
