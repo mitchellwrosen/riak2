@@ -68,8 +68,9 @@ parser =
         , getSetParser
         ]
       , [ commandGroup "Bucket operations"
-        , getBucketTypePropsParser
         , getBucketPropsParser
+        ]
+      , [ commandGroup "Full key traversal operations"
         , listParser
         ]
       , [ commandGroup "MapReduce"
@@ -140,16 +141,8 @@ getBucketPropsParser =
     (info
       (doGetBucketProps
         <$> bucketTypeArgument
-        <*> bucketArgument)
-      (progDesc "Get a bucket's properties"))
-
-getBucketTypePropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-getBucketTypePropsParser =
-  command
-    "get-bucket-type"
-    (info
-      (doGetBucketTypeProps <$> bucketTypeArgument)
-      (progDesc "Get a bucket type's properties"))
+        <*> optional bucketArgument)
+      (progDesc "Get a bucket or bucket type's properties"))
 
 getIndexParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getIndexParser =
@@ -254,20 +247,17 @@ updateCounterParser =
 
 doGetBucketProps
   :: RiakBucketType ty
-  -> RiakBucket
+  -> Maybe RiakBucket
   -> HostName
   -> PortNumber
   -> IO ()
 doGetBucketProps type' bucket host port = do
   h <- createRiakHandle host port
   either print printBucketProps =<<
-    getRiakBucketProps h (RiakNamespace type' bucket)
-
-doGetBucketTypeProps :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
-doGetBucketTypeProps type' host port = do
-  h <- createRiakHandle host port
-  either print printBucketProps =<<
-    getRiakBucketTypeProps h type'
+    maybe
+      (getRiakBucketTypeProps h type')
+      (getRiakBucketProps h . RiakNamespace type')
+      bucket
 
 doGetCounter
   :: RiakLocation ('Just 'RiakCounterTy)
