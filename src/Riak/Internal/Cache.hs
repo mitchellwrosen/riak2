@@ -16,6 +16,9 @@ import qualified StmContainers.Map as STMMap
 import Riak.Internal.Prelude
 import Riak.Internal.Types
 
+-- TODO cache ttl
+-- TODO expose cache interface in .Internal
+
 newtype Cache
   = Cache (STM.Map SomeRiakLocation RiakVclock)
 

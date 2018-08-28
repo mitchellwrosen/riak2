@@ -44,13 +44,8 @@ library
   default-language:
     Haskell2010
   exposed-modules:
-    -- Temporarily exposed just to see them. These should be other-modules
-    -- eventually
-    Proto.Riak
-    Proto.Riak_Fields
     Riak
     Riak.Internal
-    Riak.Internal.Protobuf
     Riak.Lenses
   ghc-options:
     -Weverything
@@ -64,6 +59,8 @@ library
   hs-source-dirs:
     src
   other-modules:
+    Proto.Riak
+    Proto.Riak_Fields
     Riak.Internal.Cache
     Riak.Internal.Connection
     Riak.Internal.Content

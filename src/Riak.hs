@@ -159,12 +159,11 @@ data RiakHandle
       !Cache
 
 
--- TODO createRiakHandle configurable maximum number of sockets
 -- TODO createRiakHandle close connections after
 createRiakHandle
   :: MonadIO m
-  => HostName -- ^
-  -> PortNumber -- ^
+  => HostName -- ^ Host.
+  -> PortNumber -- ^ Port.
   -> m RiakHandle
 createRiakHandle host port = do
   cache :: Cache <-
@@ -1616,7 +1615,7 @@ unSetOp (RiakSetOp (adds, removes)) =
 --
 -- [__allow mult__]
 -- Whether siblings can be created. The legacy default bucket type defaults to
--- false, but other bucket types default to false, and false is the recommended
+-- false, but other bucket types default to true, and true is the recommended
 -- setting for most use cases.
 --
 -- [__basic quorum__]
@@ -1640,7 +1639,7 @@ unSetOp (RiakSetOp (adds, removes)) =
 --
 -- [__n__]
 -- The number of /primary vnodes/ responsible for each key, i.e. the number of
--- /replicas/ stores in the cluster.
+-- /replicas/ stored in the cluster.
 --
 --     * /Default/: 3.
 --
@@ -1693,4 +1692,4 @@ unSetOp (RiakSetOp (adds, removes)) =
 --
 --     * /Default/: @quorum@.
 --
---     * /Range/: 1 to __nN__.
+--     * /Range/: 1 to __n__.

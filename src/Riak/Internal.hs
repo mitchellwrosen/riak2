@@ -1,9 +1,16 @@
 {-# LANGUAGE NoImplicitPrelude, OverloadedLabels #-}
 
 module Riak.Internal
-  ( RiakConnection
+  ( -- * Handle
+    -- * Connection manager
+    -- * Connection
+    RiakConnection
   , riakConnect
   , riakDisconnect
+  , riakExchange
+  , riakStream
+    -- * Vclock cache
+    -- * API
   , deleteRiakIndex
   , deleteRiakObject
   , fetchRiakCrdt
@@ -24,6 +31,101 @@ module Riak.Internal
   , streamRiakBuckets
   , streamRiakKeys
   , updateRiakCrdt
+    -- * Protocol buffers
+  , CounterOp(..)
+  , DtFetchReq(..)
+  , DtFetchResp(..)
+  , DtFetchResp'DataType(..)
+  , DtOp(..)
+  , DtUpdateReq(..)
+  , DtUpdateResp(..)
+  , DtValue(..)
+  , GSetOp(..)
+  , HllOp(..)
+  , MapEntry(..)
+  , MapField(..)
+  , MapField'MapFieldType(..)
+  , MapOp(..)
+  , MapUpdate(..)
+  , MapUpdate'FlagOp(..)
+  , RpbAuthReq(..)
+  , RpbBucketKeyPreflistItem(..)
+  , RpbBucketProps(..)
+  , RpbBucketProps'RpbReplMode(..)
+  , RpbCSBucketReq(..)
+  , RpbCSBucketResp(..)
+  , RpbCommitHook(..)
+  , RpbContent(..)
+  , RpbCounterGetReq(..)
+  , RpbCounterGetResp(..)
+  , RpbCounterUpdateReq(..)
+  , RpbCounterUpdateResp(..)
+  , RpbCoverageEntry(..)
+  , RpbCoverageReq(..)
+  , RpbCoverageResp(..)
+  , RpbDelReq(..)
+  , RpbErrorResp(..)
+  , RpbGetBucketKeyPreflistReq(..)
+  , RpbGetBucketKeyPreflistResp(..)
+  , RpbGetBucketReq(..)
+  , RpbGetBucketResp(..)
+  , RpbGetBucketTypeReq(..)
+  , RpbGetClientIdResp(..)
+  , RpbGetReq(..)
+  , RpbGetResp(..)
+  , RpbGetServerInfoResp(..)
+  , RpbIndexBodyResp(..)
+  , RpbIndexObject(..)
+  , RpbIndexReq(..)
+  , RpbIndexReq'IndexQueryType(..)
+  , RpbIndexResp(..)
+  , RpbLink(..)
+  , RpbListBucketsReq(..)
+  , RpbListBucketsResp(..)
+  , RpbListKeysReq(..)
+  , RpbListKeysResp(..)
+  , RpbMapRedReq(..)
+  , RpbMapRedResp(..)
+  , RpbModFun(..)
+  , RpbPair(..)
+  , RpbPutReq(..)
+  , RpbPutResp(..)
+  , RpbResetBucketReq(..)
+  , RpbSearchDoc(..)
+  , RpbSearchQueryReq(..)
+  , RpbSearchQueryResp(..)
+  , RpbSetBucketReq(..)
+  , RpbSetBucketTypeReq(..)
+  , RpbSetClientIdReq(..)
+  , RpbYokozunaIndex(..)
+  , RpbYokozunaIndexDeleteReq(..)
+  , RpbYokozunaIndexGetReq(..)
+  , RpbYokozunaIndexGetResp(..)
+  , RpbYokozunaIndexPutReq(..)
+  , RpbYokozunaSchema(..)
+  , RpbYokozunaSchemaGetReq(..)
+  , RpbYokozunaSchemaGetResp(..)
+  , RpbYokozunaSchemaPutReq(..)
+  , SetOp(..)
+  , TsCell(..)
+  , TsColumnDescription(..)
+  , TsColumnType(..)
+  , TsCoverageEntry(..)
+  , TsCoverageReq(..)
+  , TsCoverageResp(..)
+  , TsDelReq(..)
+  , TsDelResp(..)
+  , TsGetReq(..)
+  , TsGetResp(..)
+  , TsInterpolation(..)
+  , TsListKeysReq(..)
+  , TsListKeysResp(..)
+  , TsPutReq(..)
+  , TsPutResp(..)
+  , TsQueryReq(..)
+  , TsQueryResp(..)
+  , TsRange(..)
+  , TsRow(..)
   ) where
 
 import Lens.Labels (view)

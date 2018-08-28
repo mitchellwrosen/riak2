@@ -60,11 +60,14 @@ instance Functor f => HasLens' f (RiakContent a)                 "deleted"      
 instance Functor f => HasLens' f (RiakContent a)                 "ttl"             TTL                       where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ _ _ x) -> x) (\(RiakContent a b c d e f g h i j _) x -> RiakContent a b c d e f g h i j x)
 
 
+-- TODO JsonRiakContent
+
 -- | 'IsRiakContent' classifies types that are stored in Riak objects. Every
 -- object must have a content type, and may optionally have a character set and
 -- encoding.
 --
--- Two instances are provided by this library.
+-- For convenience, two instances are provided by this library, to store binary
+-- and textual data.
 --
 -- [__@ByteString@__]
 --
@@ -104,6 +107,10 @@ instance Functor f => HasLens' f (RiakContent a)                 "ttl"          
 --     * Charset is set to @utf-8@.
 --
 --     * Content encoding is set to @utf-8@.
+--
+-- When writing your own 'IsRiakContent' instances, use any content type,
+-- charset, and content encoding you wish. None of them are actually required by
+-- Riak, they are for you to help make sense of your own data.
 class IsRiakContent a where
   -- | The content type.
   riakContentType :: a -> ContentType

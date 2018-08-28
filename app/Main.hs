@@ -22,7 +22,7 @@ import qualified Data.Text             as Text
 import qualified Data.Text.IO          as Text
 
 import Riak
-import Riak.Internal.Protobuf
+import Riak.Internal (RpbBucketProps, RpbGetServerInfoResp, RpbModFun)
 
 import qualified Riak.Lenses as L
 
@@ -322,7 +322,7 @@ doFetchObject
     timeout host port = do
   h <- createRiakHandle host port
   if head
-    then go (fetchRiakObjectHead @Text h) (\_ _ -> pure ())
+    then go (fetchRiakObjectHead h) (\_ _ -> pure ())
     else go (fetchRiakObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
 
  where
