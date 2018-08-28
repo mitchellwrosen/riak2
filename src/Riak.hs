@@ -129,6 +129,7 @@ import           Proto.Riak               hiding (SetOp)
 import qualified Proto.Riak               as Proto
 import qualified Riak.Internal            as Internal
 import           Riak.Internal.Cache
+import           Riak.Internal.Connection (RiakConnection)
 import           Riak.Internal.Content
 import           Riak.Internal.Crdts
 import           Riak.Internal.Manager
@@ -267,7 +268,7 @@ _fetchRiakObject
         , _RpbGetReq'head           =
             case head of
               Head   -> Just True
-              NoHead -> Just False
+              NoHead -> Nothing
         , _RpbGetReq'ifModified     =
             case if_modified of
               IfModified   -> coerce vclock
@@ -324,6 +325,12 @@ _fetchRiakObject
         case head of
           Head   -> STrue
           NoHead -> SFalse
+
+      -- headAsBool' :: Bool
+      -- headAsBool' =
+      --   case head of
+      --     Head -> True
+      --     NoHead -> False
 
 
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
@@ -1101,11 +1108,12 @@ riakMapReduce (RiakHandle manager _) request k =
 getRiakSchema
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakSchemaName -- ^
-  -> m (Either RiakError RpbYokozunaSchemaGetResp)
+  -> RiakSchemaName -- ^ Schema name.
+  -> m (Either RiakError (Maybe RpbYokozunaSchemaGetResp))
 getRiakSchema (RiakHandle manager _) schema = liftIO $
   withRiakConnection manager
-    (\conn -> Internal.getRiakSchema conn request)
+    (\conn ->
+      translateNotfound <$> Internal.getRiakSchema conn request)
  where
   request :: RpbYokozunaSchemaGetReq
   request =
@@ -1118,8 +1126,8 @@ getRiakSchema (RiakHandle manager _) schema = liftIO $
 putRiakSchema
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakSchemaName -- ^
-  -> ByteString -- ^
+  -> RiakSchemaName -- ^ Schema name.
+  -> ByteString -- ^ Schema contents.
   -> m (Either RiakError ())
 putRiakSchema (RiakHandle manager _) name bytes = liftIO $
   fmap (() <$)
@@ -1144,16 +1152,8 @@ getRiakIndex
   => RiakHandle -- ^ Riak handle.
   -> RiakIndexName -- ^
   -> m (Either RiakError (Maybe RpbYokozunaIndex))
-getRiakIndex (RiakHandle manager _) name = liftIO . runExceptT $ do
-  ExceptT
-    (withRiakConnection manager
-      (\conn -> Internal.getRiakIndex conn request)) >>= \case
-
-    RpbYokozunaIndexGetResp [] _ ->
-      pure Nothing
-    RpbYokozunaIndexGetResp (index:_) _ ->
-      pure (Just index)
-
+getRiakIndex (RiakHandle manager _) name = liftIO $ do
+  withRiakConnection manager (runExceptT . runMaybeT . action)
  where
   request :: RpbYokozunaIndexGetReq
   request =
@@ -1162,6 +1162,23 @@ getRiakIndex (RiakHandle manager _) name = liftIO . runExceptT $ do
       , _RpbYokozunaIndexGetReq'name           = Just (unRiakIndexName name)
       }
 
+  action
+    :: RiakConnection
+    -> MaybeT (ExceptT RiakError IO) RpbYokozunaIndex
+  action conn =
+    MaybeT (ExceptT m) >>= \case
+      RpbYokozunaIndexGetResp [index] _ ->
+        pure index
+      response ->
+        panic "0 or 2+ indexes"
+          ( ( "request",  request  )
+          , ( "response", response )
+          )
+
+   where
+    m :: IO (Either RiakError (Maybe RpbYokozunaIndexGetResp))
+    m =
+      translateNotfound <$> Internal.getRiakIndex conn request
 
 getRiakIndexes
   :: MonadIO m
@@ -1302,6 +1319,72 @@ parseContent _ loc head
     (fromMaybe False deleted)
     (TTL ttl)
 
+-- TODO replace parseContent with parseContent', parseContentHead
+
+parseContent'
+  :: forall a.
+     IsRiakContent a
+  => RiakLocation 'Nothing
+  -> RpbContent
+  -> IO (RiakContent a)
+parseContent' =
+  _parseContent decodeRiakContent
+
+parseContentHead
+  :: forall a.
+     IsRiakContent a
+  => Proxy# a
+  -> RiakLocation 'Nothing
+  -> RpbContent
+  -> IO (RiakContent (Proxy a))
+parseContentHead _ =
+  _parseContent (\_ _ _ _ -> Right Proxy)
+
+
+_parseContent
+  :: forall a.
+     (  Maybe ContentType
+     -> Maybe Charset
+     -> Maybe ContentEncoding
+     -> ByteString
+     -> Either SomeException a
+     )
+  -> RiakLocation 'Nothing
+  -> RpbContent
+  -> IO (RiakContent a)
+_parseContent parse loc
+    (RpbContent value content_type charset content_encoding vtag _ last_mod
+                last_mod_usecs usermeta indexes deleted ttl _) = do
+
+  theValue :: a <-
+    either throwIO pure
+      (parse
+        (coerce content_type)
+        (coerce charset)
+        (coerce content_encoding)
+        value)
+
+  let
+    theLastMod :: Maybe NominalDiffTime
+    theLastMod = do
+      secs  <- last_mod
+      usecs <- last_mod_usecs <|> pure 0
+      let usecs_d = realToFrac usecs / 1000000 :: Double
+      pure (fromIntegral secs + realToFrac usecs_d)
+
+  pure $ RiakContent
+    loc
+    theValue
+    (coerce content_type)
+    (coerce charset)
+    (coerce content_encoding)
+    (coerce vtag)
+    (posixSecondsToUTCTime <$> theLastMod)
+    (RiakMetadata (map unRpbPair usermeta))
+    (map rpbPairToIndex indexes)
+    (fromMaybe False deleted)
+    (TTL ttl)
+
 
 indexToRpbPair :: RiakSecondaryIndex -> RpbPair
 indexToRpbPair = \case
@@ -1326,6 +1409,11 @@ rpbPairToIndex = \case
   _ ->
     undefined
 
+translateNotfound :: Either RiakError a -> Either RiakError (Maybe a)
+translateNotfound = \case
+  Left (RiakError "notfound") -> Right Nothing
+  Left x                      -> Left x
+  Right x                     -> Right (Just x)
 
 rpbPair :: (ByteString, Maybe ByteString) -> RpbPair
 rpbPair (k, v) =

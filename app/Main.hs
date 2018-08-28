@@ -389,7 +389,7 @@ doGetIndex index host port = do
   h <- createRiakHandle host port
   maybe
     (traverse_ print =<< getRiakIndexes h)
-    (print <=< getRiakIndex h)
+    (either print print <=< getRiakIndex h)
     index
 
 doGetSchema :: RiakSchemaName -> HostName -> PortNumber -> IO ()
