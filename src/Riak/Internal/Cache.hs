@@ -1,11 +1,8 @@
 {-# LANGUAGE NoImplicitPrelude, RankNTypes, ScopedTypeVariables #-}
 
 module Riak.Internal.Cache
-  ( Cache
-  , newCache
-  , cacheLookup
-  , cacheInsert
-  , cacheDelete
+  ( RiakCache(..)
+  , newSTMRiakCache
   ) where
 
 import Control.Concurrent.STM
@@ -19,22 +16,29 @@ import Riak.Internal.Types
 -- TODO cache ttl
 -- TODO expose cache interface in .Internal
 
-newtype Cache
-  = Cache (STM.Map SomeRiakLocation RiakVclock)
+data RiakCache
+  = RiakCache
+  { riakCacheLookup :: forall ty. RiakLocation ty -> IO (Maybe RiakVclock)
+  , riakCacheInsert :: forall ty. RiakLocation ty -> RiakVclock -> IO ()
+  , riakCacheDelete :: forall ty. RiakLocation ty -> IO ()
+  }
 
+-- | Create a 'RiakCache' backed by an STM map.
+newSTMRiakCache :: IO RiakCache
+newSTMRiakCache = do
+  cache :: STM.Map SomeRiakLocation RiakVclock <-
+    STMMap.newIO
 
-newCache :: IO Cache
-newCache =
-  Cache <$> STMMap.newIO
+  pure RiakCache
+    { riakCacheLookup =
+        \loc ->
+          atomically (STMMap.lookup (SomeRiakLocation loc) cache)
 
-cacheLookup :: Cache -> RiakLocation ty -> IO (Maybe RiakVclock)
-cacheLookup (Cache cache) loc =
-  atomically (STMMap.lookup (SomeRiakLocation loc) cache)
+    , riakCacheInsert =
+        \loc vclock ->
+          atomically (STMMap.insert vclock (SomeRiakLocation loc) cache)
 
-cacheInsert :: Cache -> RiakLocation ty -> RiakVclock -> IO ()
-cacheInsert (Cache cache) loc vclock =
-  atomically (STMMap.insert vclock (SomeRiakLocation loc) cache)
-
-cacheDelete :: Cache -> RiakLocation ty -> IO ()
-cacheDelete (Cache cache) loc =
-  atomically (STMMap.delete (SomeRiakLocation loc) cache)
+    , riakCacheDelete =
+        \loc ->
+          atomically (STMMap.delete (SomeRiakLocation loc) cache)
+    }

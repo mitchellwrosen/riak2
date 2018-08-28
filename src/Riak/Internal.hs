@@ -1,36 +1,108 @@
-{-# LANGUAGE NoImplicitPrelude, OverloadedLabels #-}
+{-# LANGUAGE NoImplicitPrelude, OverloadedLabels, PatternSynonyms #-}
 
 module Riak.Internal
   ( -- * Handle
+    RiakHandle(..)
     -- * Connection manager
+  , RiakManager(..)
+  , createRiakManager
+  , withRiakConnection
     -- * Connection
-    RiakConnection
+  , RiakConnection(..)
   , riakConnect
   , riakDisconnect
   , riakExchange
   , riakStream
-    -- * Vclock cache
+  , Message(..)
+  , Request(..)
+  , requestToMessage
+  , Response(..)
+  , parseResponse
+    -- * Cache
+  , RiakCache(..)
+  , newSTMRiakCache
     -- * API
-  , deleteRiakIndex
-  , deleteRiakObject
-  , fetchRiakCrdt
-  , fetchRiakObject
-  , getRiakBucketProps
-  , getRiakBucketTypeProps
-  , getRiakIndex
-  , getRiakSchema
-  , getRiakServerInfo
-  , pingRiak
-  , putRiakIndex
-  , putRiakSchema
-  , resetRiakBucketProps
-  , riakMapReduce
-  , setRiakBucketProps
-  , setRiakBucketTypeProps
-  , storeRiakObject
-  , streamRiakBuckets
-  , streamRiakKeys
-  , updateRiakCrdt
+  , deleteRiakIndexPB
+  , deleteRiakObjectPB
+  , getRiakBucketPropsPB
+  , getRiakBucketTypePropsPB
+  , GetRiakCrdtParams(..)
+  , getRiakCrdtPB
+  , getRiakIndexPB
+  , GetRiakObjectParams(..)
+  , getRiakObjectPB
+  , getRiakSchemaPB
+  , getRiakServerInfoPB
+  , pingRiakPB
+  , putRiakIndexPB
+  , PutRiakObjectParams(..)
+  , putRiakObjectPB
+  , putRiakSchemaPB
+  , resetRiakBucketPropsPB
+  , riakMapReducePB
+  , setRiakBucketPropsPB
+  , setRiakBucketTypePropsPB
+  , streamRiakBucketsPB
+  , streamRiakKeysPB
+  , UpdateRiakCrdtParams(..)
+  , updateRiakCrdtPB
+    -- * Data types
+  , RiakCrdtTy(..)
+  , RiakCrdtError(..)
+    -- ** Map
+  , IsRiakMap(..)
+  , RiakMapEntries(..)
+  , RiakMapFieldParser
+  , RiakMapParseError(..)
+  , riakCounterField
+  , riakFlagField
+  , riakMapField
+  , riakRegisterField
+  , riakSetField
+    -- ** Register
+  , IsRiakRegister(..)
+    -- ** Set
+  , IsRiakSet
+  , RiakSetOp(..)
+  , riakSetAddOp
+  , riakSetRemoveOp
+    -- * Types
+  , BasicQuorum(..)
+  , Charset(..)
+  , ContentEncoding(..)
+  , ContentType(..)
+  , DW(..)
+  , IncludeContext(..)
+  , IsRiakContent(..)
+  , Modified(..)
+  , N(..)
+  , NotfoundOk(..)
+  , PR(..)
+  , PW(..)
+  , R(..)
+  , ReturnBody(..)
+  , RiakBucket(..)
+  , RiakBucketType(..)
+  , pattern DefaultRiakBucketType
+  , RiakContent(..)
+  , RiakError(..)
+  , RiakIndexName(..)
+  , RiakKey(..)
+  , RiakLocation(..)
+  , RiakMetadata(..)
+  , RiakNamespace(..)
+  , RiakQuorum(..)
+  , pattern RiakQuorumAll
+  , pattern RiakQuorumQuorum
+  , RiakSchemaName(..)
+  , pattern DefaultRiakSchemaName
+  , RiakSecondaryIndex(..)
+  , RiakVclock(..)
+  , RiakVtag(..)
+  , SloppyQuorum(..)
+  , Timeout(..)
+  , TTL(..)
+  , W(..)
     -- * Protocol buffers
   , CounterOp(..)
   , DtFetchReq(..)
@@ -64,6 +136,8 @@ module Riak.Internal
   , RpbCoverageReq(..)
   , RpbCoverageResp(..)
   , RpbDelReq(..)
+  , RpbDelResp(..)
+  , RpbEmptyPutResp(..)
   , RpbErrorResp(..)
   , RpbGetBucketKeyPreflistReq(..)
   , RpbGetBucketKeyPreflistResp(..)
@@ -88,14 +162,18 @@ module Riak.Internal
   , RpbMapRedResp(..)
   , RpbModFun(..)
   , RpbPair(..)
+  , RpbPingResp(..)
   , RpbPutReq(..)
   , RpbPutResp(..)
   , RpbResetBucketReq(..)
+  , RpbResetBucketResp(..)
   , RpbSearchDoc(..)
   , RpbSearchQueryReq(..)
   , RpbSearchQueryResp(..)
   , RpbSetBucketReq(..)
+  , RpbSetBucketResp(..)
   , RpbSetBucketTypeReq(..)
+  , RpbSetBucketTypeResp(..)
   , RpbSetClientIdReq(..)
   , RpbYokozunaIndex(..)
   , RpbYokozunaIndexDeleteReq(..)
@@ -131,146 +209,168 @@ module Riak.Internal
 import Lens.Labels (view)
 
 import Proto.Riak
+import Riak.Internal.Cache
 import Riak.Internal.Connection
+import Riak.Internal.Content
+import Riak.Internal.Crdts
+import Riak.Internal.Manager
+import Riak.Internal.Message
+import Riak.Internal.Params
 import Riak.Internal.Prelude
 import Riak.Internal.Request
 import Riak.Internal.Response
 import Riak.Internal.Types
 
-deleteRiakIndex
+
+--------------------------------------------------------------------------------
+-- Handle
+--------------------------------------------------------------------------------
+
+-- | A thread-safe handle to Riak.
+--
+-- TODO: RiakHandle improvement: cluster
+data RiakHandle
+  = RiakHandle !RiakManager !RiakCache
+
+
+--------------------------------------------------------------------------------
+-- API
+--------------------------------------------------------------------------------
+
+deleteRiakIndexPB
   :: RiakConnection
   -> RpbYokozunaIndexDeleteReq -- ^
   -> IO (Either RiakError RpbDelResp)
-deleteRiakIndex =
+deleteRiakIndexPB =
   riakExchange
 
-deleteRiakObject
+deleteRiakObjectPB
   :: RiakConnection -- ^
   -> RpbDelReq -- ^
   -> IO (Either RiakError RpbDelResp)
-deleteRiakObject =
+deleteRiakObjectPB =
   riakExchange
 
-fetchRiakCrdt
-  :: RiakConnection -- ^
-  -> DtFetchReq -- ^
-  -> IO (Either RiakError DtFetchResp)
-fetchRiakCrdt
-  = riakExchange
-
-fetchRiakObject
-  :: RiakConnection -- ^
-  -> RpbGetReq -- ^
-  -> IO (Either RiakError RpbGetResp)
-fetchRiakObject =
-  riakExchange
-
-getRiakBucketProps
+getRiakBucketPropsPB
   :: RiakConnection -- ^
   -> RpbGetBucketReq -- ^
   -> IO (Either RiakError RpbGetBucketResp)
-getRiakBucketProps =
+getRiakBucketPropsPB =
   riakExchange
 
-getRiakBucketTypeProps
+getRiakBucketTypePropsPB
   :: RiakConnection -- ^
   -> RpbGetBucketTypeReq -- ^
   -> IO (Either RiakError RpbGetBucketResp)
-getRiakBucketTypeProps =
+getRiakBucketTypePropsPB =
   riakExchange
 
-getRiakIndex
+getRiakCrdtPB
+  :: RiakConnection -- ^
+  -> DtFetchReq -- ^
+  -> IO (Either RiakError DtFetchResp)
+getRiakCrdtPB
+  = riakExchange
+
+getRiakIndexPB
   :: RiakConnection -- ^
   -> RpbYokozunaIndexGetReq -- ^
   -> IO (Either RiakError RpbYokozunaIndexGetResp)
-getRiakIndex =
+getRiakIndexPB =
   riakExchange
 
-getRiakSchema
+getRiakObjectPB
+  :: RiakConnection -- ^
+  -> RpbGetReq -- ^
+  -> IO (Either RiakError RpbGetResp)
+getRiakObjectPB =
+  riakExchange
+
+getRiakSchemaPB
   :: RiakConnection -- ^
   -> RpbYokozunaSchemaGetReq -- ^
   -> IO (Either RiakError RpbYokozunaSchemaGetResp)
-getRiakSchema =
+getRiakSchemaPB =
   riakExchange
 
-getRiakServerInfo
+getRiakServerInfoPB
   :: RiakConnection -- ^
   -> IO (Either RiakError RpbGetServerInfoResp)
-getRiakServerInfo conn =
+getRiakServerInfoPB conn =
   riakExchange conn RpbGetServerInfoReq
 
-pingRiak
+pingRiakPB
   :: RiakConnection -- ^
   -> IO (Either RiakError RpbPingResp)
-pingRiak conn =
+pingRiakPB conn =
   riakExchange conn RpbPingReq
 
-putRiakIndex
+putRiakIndexPB
   :: RiakConnection -- ^
   -> RpbYokozunaIndexPutReq -- ^
   -> IO (Either RiakError RpbEmptyPutResp)
-putRiakIndex =
+putRiakIndexPB =
   riakExchange
 
-putRiakSchema
-  :: RiakConnection -- ^
-  -> RpbYokozunaSchemaPutReq -- ^
-  -> IO (Either RiakError RpbEmptyPutResp)
-putRiakSchema =
-  riakExchange
-
-resetRiakBucketProps
-  :: RiakConnection -- ^
-  -> RpbResetBucketReq -- ^
-  -> IO (Either RiakError RpbResetBucketResp)
-resetRiakBucketProps =
-  riakExchange
-
-riakMapReduce
-  :: RiakConnection -- ^
-  -> RpbMapRedReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbMapRedResp
-riakMapReduce conn =
-  riakStream conn (view #done)
-
-setRiakBucketProps
-  :: RiakConnection -- ^
-  -> RpbSetBucketReq -- ^
-  -> IO (Either RiakError RpbSetBucketResp)
-setRiakBucketProps =
-  riakExchange
-
-setRiakBucketTypeProps
-  :: RiakConnection -- ^
-  -> RpbSetBucketTypeReq -- ^
-  -> IO (Either RiakError RpbSetBucketTypeResp)
-setRiakBucketTypeProps =
-  riakExchange
-
-storeRiakObject
+putRiakObjectPB
   :: RiakConnection -- ^
   -> RpbPutReq -- ^
   -> IO (Either RiakError RpbPutResp)
-storeRiakObject =
+putRiakObjectPB =
   riakExchange
 
-streamRiakBuckets
+putRiakSchemaPB
+  :: RiakConnection -- ^
+  -> RpbYokozunaSchemaPutReq -- ^
+  -> IO (Either RiakError RpbEmptyPutResp)
+putRiakSchemaPB =
+  riakExchange
+
+resetRiakBucketPropsPB
+  :: RiakConnection -- ^
+  -> RpbResetBucketReq -- ^
+  -> IO (Either RiakError RpbResetBucketResp)
+resetRiakBucketPropsPB =
+  riakExchange
+
+riakMapReducePB
+  :: RiakConnection -- ^
+  -> RpbMapRedReq -- ^
+  -> ListT (ExceptT RiakError IO) RpbMapRedResp
+riakMapReducePB conn =
+  riakStream conn (view #done)
+
+setRiakBucketPropsPB
+  :: RiakConnection -- ^
+  -> RpbSetBucketReq -- ^
+  -> IO (Either RiakError RpbSetBucketResp)
+setRiakBucketPropsPB =
+  riakExchange
+
+setRiakBucketTypePropsPB
+  :: RiakConnection -- ^
+  -> RpbSetBucketTypeReq -- ^
+  -> IO (Either RiakError RpbSetBucketTypeResp)
+setRiakBucketTypePropsPB =
+  riakExchange
+
+streamRiakBucketsPB
   :: RiakConnection -- ^
   -> RpbListBucketsReq -- ^
   -> ListT (ExceptT RiakError IO) RpbListBucketsResp
-streamRiakBuckets conn =
+streamRiakBucketsPB conn =
   riakStream conn (view #done)
 
-streamRiakKeys
+streamRiakKeysPB
   :: RiakConnection -- ^
   -> RpbListKeysReq -- ^
   -> ListT (ExceptT RiakError IO) RpbListKeysResp
-streamRiakKeys conn =
+streamRiakKeysPB conn =
   riakStream conn (view #done)
 
-updateRiakCrdt
+updateRiakCrdtPB
   :: RiakConnection -- ^
   -> DtUpdateReq -- ^
   -> IO (Either RiakError DtUpdateResp)
-updateRiakCrdt =
+updateRiakCrdtPB =
   riakExchange

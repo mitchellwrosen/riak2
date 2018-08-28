@@ -2,9 +2,8 @@
              TypeApplications #-}
 
 module Riak.Internal.Request
-  ( Request
+  ( Request(..)
   , requestToMessage
-
   , RpbPingReq(..)
   , RpbGetServerInfoReq(..)
   ) where

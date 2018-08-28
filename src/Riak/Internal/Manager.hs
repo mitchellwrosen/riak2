@@ -2,8 +2,8 @@
 --
 -- Some details about the implementation:
 --
--- * Contains a static array of @Maybe RiakConnection@, whose length is given
---   during manager creation. This is the maximum number of open sockets.
+-- * Contains a static array of one @Maybe RiakConnection@ per capability. This
+--   is the maximum number of open sockets.
 --
 -- * When a thread checks out a connection, its hashed thread id is used to
 --   select the connection. If the connection is not open yet, open it.
@@ -19,7 +19,7 @@
 {-# LANGUAGE LambdaCase, NoImplicitPrelude, ScopedTypeVariables #-}
 
 module Riak.Internal.Manager
-  ( RiakManager
+  ( RiakManager(..)
   , createRiakManager
   , withRiakConnection
   ) where

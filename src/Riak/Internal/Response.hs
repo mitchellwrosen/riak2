@@ -2,9 +2,8 @@
              ScopedTypeVariables, TypeApplications #-}
 
 module Riak.Internal.Response
-  ( Response
+  ( Response(..)
   , parseResponse
-
   , RpbDelResp(..)
   , RpbPingResp(..)
   , RpbResetBucketResp(..)

@@ -2,7 +2,7 @@
              OverloadedStrings, ScopedTypeVariables #-}
 
 module Riak.Internal.Connection
-  ( RiakConnection
+  ( RiakConnection(..)
   , riakConnect
   , riakDisconnect
   , riakExchange

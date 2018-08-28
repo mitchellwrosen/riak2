@@ -26,9 +26,9 @@ newtype Timeout        = Timeout        { unTimeout        :: Maybe Word32     }
 newtype W              = W              { unW              :: Maybe RiakQuorum }
 
 
--- | Optional @fetch data type@ parameters.
-data FetchRiakCrdtParams
-  = FetchRiakCrdtParams
+-- | Optional @get data type@ parameters.
+data GetRiakCrdtParams
+  = GetRiakCrdtParams
       !BasicQuorum
       !IncludeContext
       !N
@@ -38,22 +38,22 @@ data FetchRiakCrdtParams
       !SloppyQuorum
       !Timeout
 
-instance Default FetchRiakCrdtParams where
-  def = FetchRiakCrdtParams (BasicQuorum Nothing) (IncludeContext Nothing) (N Nothing) (NotfoundOk Nothing) (PR Nothing) (R Nothing) (SloppyQuorum Nothing) (Timeout Nothing)
+instance Default GetRiakCrdtParams where
+  def = GetRiakCrdtParams (BasicQuorum Nothing) (IncludeContext Nothing) (N Nothing) (NotfoundOk Nothing) (PR Nothing) (R Nothing) (SloppyQuorum Nothing) (Timeout Nothing)
 
-instance IsLabel "basic_quorum"    (Bool       -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \a (FetchRiakCrdtParams _ b c d e f g h) -> FetchRiakCrdtParams (coerce (Just a)) b c d e f g h
-instance IsLabel "include_context" (Bool       -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \b (FetchRiakCrdtParams a _ c d e f g h) -> FetchRiakCrdtParams a (coerce (Just b)) c d e f g h
-instance IsLabel "n"               (Word32     -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \c (FetchRiakCrdtParams a b _ d e f g h) -> FetchRiakCrdtParams a b (coerce (Just c)) d e f g h
-instance IsLabel "notfound_ok"     (Bool       -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \d (FetchRiakCrdtParams a b c _ e f g h) -> FetchRiakCrdtParams a b c (coerce (Just d)) e f g h
-instance IsLabel "pr"              (RiakQuorum -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \e (FetchRiakCrdtParams a b c d _ f g h) -> FetchRiakCrdtParams a b c d (coerce (Just e)) f g h
-instance IsLabel "r"               (RiakQuorum -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \f (FetchRiakCrdtParams a b c d e _ g h) -> FetchRiakCrdtParams a b c d e (coerce (Just f)) g h
-instance IsLabel "sloppy_quorum"   (Bool       -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \g (FetchRiakCrdtParams a b c d e f _ h) -> FetchRiakCrdtParams a b c d e f (coerce (Just g)) h
-instance IsLabel "timeout"         (Word32     -> FetchRiakCrdtParams -> FetchRiakCrdtParams) where fromLabel = \h (FetchRiakCrdtParams a b c d e f g _) -> FetchRiakCrdtParams a b c d e f g (coerce (Just h))
+instance IsLabel "basic_quorum"    (Bool       -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \a (GetRiakCrdtParams _ b c d e f g h) -> GetRiakCrdtParams (coerce (Just a)) b c d e f g h
+instance IsLabel "include_context" (Bool       -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \b (GetRiakCrdtParams a _ c d e f g h) -> GetRiakCrdtParams a (coerce (Just b)) c d e f g h
+instance IsLabel "n"               (Word32     -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \c (GetRiakCrdtParams a b _ d e f g h) -> GetRiakCrdtParams a b (coerce (Just c)) d e f g h
+instance IsLabel "notfound_ok"     (Bool       -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \d (GetRiakCrdtParams a b c _ e f g h) -> GetRiakCrdtParams a b c (coerce (Just d)) e f g h
+instance IsLabel "pr"              (RiakQuorum -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \e (GetRiakCrdtParams a b c d _ f g h) -> GetRiakCrdtParams a b c d (coerce (Just e)) f g h
+instance IsLabel "r"               (RiakQuorum -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \f (GetRiakCrdtParams a b c d e _ g h) -> GetRiakCrdtParams a b c d e (coerce (Just f)) g h
+instance IsLabel "sloppy_quorum"   (Bool       -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \g (GetRiakCrdtParams a b c d e f _ h) -> GetRiakCrdtParams a b c d e f (coerce (Just g)) h
+instance IsLabel "timeout"         (Word32     -> GetRiakCrdtParams -> GetRiakCrdtParams) where fromLabel = \h (GetRiakCrdtParams a b c d e f g _) -> GetRiakCrdtParams a b c d e f g (coerce (Just h))
 
 
--- | Optional @fetch object@ parameters.
-data FetchRiakObjectParams
-  = FetchRiakObjectParams
+-- | Optional @get object@ parameters.
+data GetRiakObjectParams
+  = GetRiakObjectParams
       !BasicQuorum
       !N
       !NotfoundOk
@@ -62,21 +62,21 @@ data FetchRiakObjectParams
       !SloppyQuorum
       !Timeout
 
-instance Default FetchRiakObjectParams where
-  def = FetchRiakObjectParams (BasicQuorum Nothing) (N Nothing) (NotfoundOk Nothing) (PR Nothing) (R Nothing) (SloppyQuorum Nothing) (Timeout Nothing)
+instance Default GetRiakObjectParams where
+  def = GetRiakObjectParams (BasicQuorum Nothing) (N Nothing) (NotfoundOk Nothing) (PR Nothing) (R Nothing) (SloppyQuorum Nothing) (Timeout Nothing)
 
-instance IsLabel "basic_quorum"  (Bool       -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \a (FetchRiakObjectParams _ b c d e f g) -> FetchRiakObjectParams (coerce (Just a)) b c d e f g
-instance IsLabel "n"             (Word32     -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \b (FetchRiakObjectParams a _ c d e f g) -> FetchRiakObjectParams a (coerce (Just b)) c d e f g
-instance IsLabel "notfound_ok"   (Bool       -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \c (FetchRiakObjectParams a b _ d e f g) -> FetchRiakObjectParams a b (coerce (Just c)) d e f g
-instance IsLabel "pr"            (RiakQuorum -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \d (FetchRiakObjectParams a b c _ e f g) -> FetchRiakObjectParams a b c (coerce (Just d)) e f g
-instance IsLabel "r"             (RiakQuorum -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \e (FetchRiakObjectParams a b c d _ f g) -> FetchRiakObjectParams a b c d (coerce (Just e)) f g
-instance IsLabel "sloppy_quorum" (Bool       -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \f (FetchRiakObjectParams a b c d e _ g) -> FetchRiakObjectParams a b c d e (coerce (Just f)) g
-instance IsLabel "timeout"       (Word32     -> FetchRiakObjectParams -> FetchRiakObjectParams) where fromLabel = \g (FetchRiakObjectParams a b c d e f _) -> FetchRiakObjectParams a b c d e f (coerce (Just g))
+instance IsLabel "basic_quorum"  (Bool       -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \a (GetRiakObjectParams _ b c d e f g) -> GetRiakObjectParams (coerce (Just a)) b c d e f g
+instance IsLabel "n"             (Word32     -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \b (GetRiakObjectParams a _ c d e f g) -> GetRiakObjectParams a (coerce (Just b)) c d e f g
+instance IsLabel "notfound_ok"   (Bool       -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \c (GetRiakObjectParams a b _ d e f g) -> GetRiakObjectParams a b (coerce (Just c)) d e f g
+instance IsLabel "pr"            (RiakQuorum -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \d (GetRiakObjectParams a b c _ e f g) -> GetRiakObjectParams a b c (coerce (Just d)) e f g
+instance IsLabel "r"             (RiakQuorum -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \e (GetRiakObjectParams a b c d _ f g) -> GetRiakObjectParams a b c d (coerce (Just e)) f g
+instance IsLabel "sloppy_quorum" (Bool       -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \f (GetRiakObjectParams a b c d e _ g) -> GetRiakObjectParams a b c d e (coerce (Just f)) g
+instance IsLabel "timeout"       (Word32     -> GetRiakObjectParams -> GetRiakObjectParams) where fromLabel = \g (GetRiakObjectParams a b c d e f _) -> GetRiakObjectParams a b c d e f (coerce (Just g))
 
 
 -- | Optional @store object@ parameters.
-data StoreRiakObjectParams
-  = StoreRiakObjectParams
+data PutRiakObjectParams
+  = PutRiakObjectParams
       !DW
       ![RiakSecondaryIndex]
       !RiakMetadata
@@ -86,17 +86,17 @@ data StoreRiakObjectParams
       !Timeout
       !W
 
-instance Default StoreRiakObjectParams where
-  def = StoreRiakObjectParams (DW Nothing) [] (RiakMetadata []) (N Nothing) (PW Nothing) (SloppyQuorum Nothing) (Timeout Nothing) (W Nothing)
+instance Default PutRiakObjectParams where
+  def = PutRiakObjectParams (DW Nothing) [] (RiakMetadata []) (N Nothing) (PW Nothing) (SloppyQuorum Nothing) (Timeout Nothing) (W Nothing)
 
-instance IsLabel "dw"            (RiakQuorum                       -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \a (StoreRiakObjectParams _ b c d e f g h) -> StoreRiakObjectParams (coerce (Just a)) b c d e f g h
-instance IsLabel "indexes"       ([RiakSecondaryIndex]             -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \b (StoreRiakObjectParams a _ c d e f g h) -> StoreRiakObjectParams a b c d e f g h
-instance IsLabel "metadata"      ([(ByteString, Maybe ByteString)] -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \c (StoreRiakObjectParams a b _ d e f g h) -> StoreRiakObjectParams a b (RiakMetadata c) d e f g h
-instance IsLabel "n"             (Word32                           -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \d (StoreRiakObjectParams a b c _ e f g h) -> StoreRiakObjectParams a b c (coerce (Just d)) e f g h
-instance IsLabel "pw"            (RiakQuorum                       -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \e (StoreRiakObjectParams a b c d _ f g h) -> StoreRiakObjectParams a b c d (coerce (Just e)) f g h
-instance IsLabel "sloppy_quorum" (Bool                             -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \f (StoreRiakObjectParams a b c d e _ g h) -> StoreRiakObjectParams a b c d e (coerce (Just f)) g h
-instance IsLabel "timeout"       (Word32                           -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \g (StoreRiakObjectParams a b c d e f _ h) -> StoreRiakObjectParams a b c d e f (coerce (Just g)) h
-instance IsLabel "w"             (RiakQuorum                       -> StoreRiakObjectParams -> StoreRiakObjectParams) where fromLabel = \h (StoreRiakObjectParams a b c d e f g _) -> StoreRiakObjectParams a b c d e f g (coerce (Just h))
+instance IsLabel "dw"            (RiakQuorum                       -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \a (PutRiakObjectParams _ b c d e f g h) -> PutRiakObjectParams (coerce (Just a)) b c d e f g h
+instance IsLabel "indexes"       ([RiakSecondaryIndex]             -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \b (PutRiakObjectParams a _ c d e f g h) -> PutRiakObjectParams a b c d e f g h
+instance IsLabel "metadata"      ([(ByteString, Maybe ByteString)] -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \c (PutRiakObjectParams a b _ d e f g h) -> PutRiakObjectParams a b (RiakMetadata c) d e f g h
+instance IsLabel "n"             (Word32                           -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \d (PutRiakObjectParams a b c _ e f g h) -> PutRiakObjectParams a b c (coerce (Just d)) e f g h
+instance IsLabel "pw"            (RiakQuorum                       -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \e (PutRiakObjectParams a b c d _ f g h) -> PutRiakObjectParams a b c d (coerce (Just e)) f g h
+instance IsLabel "sloppy_quorum" (Bool                             -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \f (PutRiakObjectParams a b c d e _ g h) -> PutRiakObjectParams a b c d e (coerce (Just f)) g h
+instance IsLabel "timeout"       (Word32                           -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \g (PutRiakObjectParams a b c d e f _ h) -> PutRiakObjectParams a b c d e f (coerce (Just g)) h
+instance IsLabel "w"             (RiakQuorum                       -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \h (PutRiakObjectParams a b c d e f g _) -> PutRiakObjectParams a b c d e f g (coerce (Just h))
 
 
 -- | Optional @update data type@ parameters.

@@ -46,12 +46,12 @@ parser =
     <*>
     (asum . map (hsubparser . mconcat))
       [ [ commandGroup "Object operations"
-        , fetchObjectParser
-        , storeObjectParser
-          -- TODO riak-cli store-new-object
+        , getObjectParser
+        , putObjectParser
+          -- TODO riak-cli put-new-object
         ]
       , [ commandGroup "Counter operations"
-        , fetchCounterParser
+        , getCounterParser
         , updateCounterParser
           -- TODO riak-cli update-new-counter
         ]
@@ -62,10 +62,10 @@ parser =
         , command "TODO" (info empty mempty)
         ]
       , [ commandGroup "Map operations"
-        , fetchMapParser
+        , getMapParser
         ]
       , [ commandGroup "Set operations"
-        , fetchSetParser
+        , getSetParser
         ]
       , [ commandGroup "Bucket operations"
         , getBucketTypePropsParser
@@ -88,36 +88,36 @@ parser =
         ]
       ]
 
-fetchCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-fetchCounterParser =
+getCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getCounterParser =
   command
     "get-counter"
     (info
-      (doFetchCounter
+      (doGetCounter
         <$> bucketTypeArgument
         <*> bucketArgument
         <*> keyArgument)
-        -- TODO fetch-counter optional params
-      (progDesc "Fetch a counter"))
+        -- TODO get-counter optional params
+      (progDesc "Get a counter"))
 
-fetchMapParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-fetchMapParser =
+getMapParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getMapParser =
   command
     "get-map"
     (info
-      (doFetchMap
+      (doGetMap
         <$> bucketTypeArgument
         <*> bucketArgument
         <*> keyArgument)
-        -- TODO fetch-map optional params
-      (progDesc "Fetch a map"))
+        -- TODO get-map optional params
+      (progDesc "Get a map"))
 
-fetchObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-fetchObjectParser =
+getObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getObjectParser =
   command
     "get"
     (info
-      (doFetchObject
+      (doGetObject
         <$> bucketTypeArgument
         <*> bucketArgument
         <*> keyArgument
@@ -141,19 +141,19 @@ fetchObjectParser =
         <*> rOption
         <*> sloppyQuorumOption
         <*> timeoutOption)
-      (progDesc "Fetch an object"))
+      (progDesc "Get an object"))
 
-fetchSetParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-fetchSetParser =
+getSetParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getSetParser =
   command
     "get-set"
     (info
-      (doFetchSet
+      (doGetSet
         <$> bucketTypeArgument
         <*> bucketArgument
         <*> keyArgument)
-        -- TODO fetch-set optional params
-      (progDesc "Fetch a set"))
+        -- TODO get-set optional params
+      (progDesc "Get a set"))
 
 getBucketPropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getBucketPropsParser =
@@ -219,12 +219,12 @@ pingParser =
     "ping"
     (info (pure doPing) (progDesc "Ping the server"))
 
-storeObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-storeObjectParser =
+putObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+putObjectParser =
   command
     "put"
     (info
-      (doStoreObject
+      (doPutObject
         <$> bucketTypeArgument
         <*> bucketArgument
         <*> keyArgument
@@ -254,7 +254,7 @@ storeObjectParser =
         <*> sloppyQuorumOption
         <*> timeoutOption
         <*> wOption)
-      (progDesc "Store an object"))
+      (progDesc "Put an object"))
 
 -- TODO riak-cli allow decrementing counters
 updateCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
@@ -278,31 +278,31 @@ updateCounterParser =
 -- Implementations
 --------------------------------------------------------------------------------
 
-doFetchCounter
+doGetCounter
   :: RiakBucketType ('Just 'RiakCounterTy)
   -> RiakBucket
   -> RiakKey
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchCounter type' bucket key host port = do
+doGetCounter type' bucket key host port = do
   h <- createRiakHandle host port
   either print print =<<
-    fetchRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
+    getRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
 
-doFetchMap
+doGetMap
   :: RiakBucketType ('Just ('RiakMapTy RiakMapEntries))
   -> RiakBucket
   -> RiakKey
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchMap type' bucket key host port = do
+doGetMap type' bucket key host port = do
   h <- createRiakHandle host port
   either print print =<<
-    fetchRiakMap h (RiakLocation (RiakNamespace type' bucket) key) def
+    getRiakMap h (RiakLocation (RiakNamespace type' bucket) key) def
 
-doFetchObject
+doGetObject
   :: RiakBucketType 'Nothing
   -> RiakBucket
   -> RiakKey
@@ -317,22 +317,22 @@ doFetchObject
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchObject
+doGetObject
     type' bucket key basic_quorum head notfound_not_ok n pr r no_sloppy_quorum
     timeout host port = do
   h <- createRiakHandle host port
   if head
-    then go (fetchRiakObjectHead h) (\_ _ -> pure ())
-    else go (fetchRiakObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
+    then go (getRiakObjectHead h) (\_ _ -> pure ())
+    else go (getRiakObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
 
  where
   go
-    :: (RiakLocation 'Nothing -> FetchRiakObjectParams -> IO (Either RiakError [RiakContent a]))
+    :: (RiakLocation 'Nothing -> GetRiakObjectParams -> IO (Either RiakError [RiakContent a]))
     -> (Int -> a -> IO ())
     -> IO ()
-  go fetch f = do
+  go get f = do
     eresponse <-
-      fetch
+      get
         (RiakLocation (RiakNamespace type' bucket) key)
         (def
           & (if basic_quorum then #basic_quorum True else id)
@@ -354,16 +354,16 @@ doFetchObject
         for_ (zip [(0::Int)..] contents) $ \(i, content) ->
           printContent (f i) (Just i) content
 
-doFetchSet
+doGetSet
   :: RiakBucketType ('Just ('RiakSetTy Text))
   -> RiakBucket
   -> RiakKey
   -> HostName
   -> PortNumber
   -> IO ()
-doFetchSet type' bucket key host port = do
+doGetSet type' bucket key host port = do
   h <- createRiakHandle host port
-  fetchRiakSet h (RiakLocation (RiakNamespace type' bucket) key) def >>= \case
+  getRiakSet h (RiakLocation (RiakNamespace type' bucket) key) def >>= \case
     Left err -> print err
     Right vals -> for_ vals print -- TODO encoding?
 
@@ -440,7 +440,7 @@ doPing host port = do
   either print (const (putStrLn "pong")) =<<
     pingRiak h
 
-doStoreObject
+doPutObject
   :: RiakBucketType 'Nothing
   -> RiakBucket
   -> RiakKey
@@ -455,20 +455,20 @@ doStoreObject
   -> HostName
   -> PortNumber
   -> IO ()
-doStoreObject
+doPutObject
     type' bucket key content dw n pw return no_sloppy_quorum timeout w host
     port = do
   h <- createRiakHandle host port
   case return of
     'a' ->
       go
-        (storeRiakObjectHead h)
+        (putRiakObjectHead h)
         (\contents ->
           (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
             printContent (\_ -> pure ()) (Just i) content'))
     'b' ->
       go
-        (storeRiakObjectBody h)
+        (putRiakObjectBody h)
         (\contents ->
           (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
             printContent
@@ -477,16 +477,16 @@ doStoreObject
               content'))
 
     'c' ->
-      go (storeRiakObject h) pure
+      go (putRiakObject h) pure
     _   -> undefined
  where
   go
-    :: (RiakLocation 'Nothing -> Text -> StoreRiakObjectParams -> IO (Either RiakError a))
+    :: (RiakLocation 'Nothing -> Text -> PutRiakObjectParams -> IO (Either RiakError a))
     -> (a -> IO ())
     -> IO ()
-  go store f = do
+  go put f = do
     eresponse <-
-      store
+      put
         (RiakLocation (RiakNamespace type' bucket) key)
         content
         (def
