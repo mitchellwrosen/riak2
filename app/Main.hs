@@ -46,7 +46,7 @@ parser =
     <*>
     (asum . map (hsubparser . mconcat))
       [ [ commandGroup "Object operations"
-        , getObjectParser
+        , getTextObjectParser
         , putObjectParser
           -- TODO riak-cli put-new-object
         ]
@@ -94,9 +94,7 @@ getCounterParser =
     "get-counter"
     (info
       (doGetCounter
-        <$> bucketTypeArgument
-        <*> bucketArgument
-        <*> keyArgument)
+        <$> locationArgument)
         -- TODO get-counter optional params
       (progDesc "Get a counter"))
 
@@ -106,42 +104,24 @@ getMapParser =
     "get-map"
     (info
       (doGetMap
-        <$> bucketTypeArgument
-        <*> bucketArgument
-        <*> keyArgument)
+        <$> locationArgument)
         -- TODO get-map optional params
       (progDesc "Get a map"))
 
-getObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
-getObjectParser =
+getTextObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getTextObjectParser =
   command
-    "get"
+    "get-text"
     (info
-      (doGetObject
-        <$> bucketTypeArgument
-        <*> bucketArgument
-        <*> keyArgument
-        <*> switch
-              (mconcat
-                [ long "basic-quorum"
-                , help "Basic quorum"
-                ])
+      (doGetTextObject
+        <$> locationArgument
         <*> switch
               (mconcat
                 [ long "head"
                 , help "Head"
                 ])
-        <*> switch
-              (mconcat
-                [ long "notfound-not-ok"
-                , help "notfound not ok"
-                ])
-        <*> nOption
-        <*> prOption
-        <*> rOption
-        <*> sloppyQuorumOption
-        <*> timeoutOption)
-      (progDesc "Get an object"))
+        <*> getObjectParamsOptions)
+      (progDesc "Get a text object"))
 
 getSetParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getSetParser =
@@ -149,9 +129,7 @@ getSetParser =
     "get-set"
     (info
       (doGetSet
-        <$> bucketTypeArgument
-        <*> bucketArgument
-        <*> keyArgument)
+        <$> locationArgument)
         -- TODO get-set optional params
       (progDesc "Get a set"))
 
@@ -225,9 +203,7 @@ putObjectParser =
     "put"
     (info
       (doPutObject
-        <$> bucketTypeArgument
-        <*> bucketArgument
-        <*> keyArgument
+        <$> locationArgument
         <*> strArgument
               (mconcat
                 [ help "Content"
@@ -263,9 +239,7 @@ updateCounterParser =
     "incr-counter"
     (info
       (doUpdateCounter
-        <$> bucketTypeArgument
-        <*> bucketArgument
-        <*> keyArgument
+        <$> locationArgument
         <*> argument auto
               (mconcat
                 [ help "Amount"
@@ -277,95 +251,6 @@ updateCounterParser =
 --------------------------------------------------------------------------------
 -- Implementations
 --------------------------------------------------------------------------------
-
-doGetCounter
-  :: RiakBucketType ('Just 'RiakCounterTy)
-  -> RiakBucket
-  -> RiakKey
-  -> HostName
-  -> PortNumber
-  -> IO ()
-doGetCounter type' bucket key host port = do
-  h <- createRiakHandle host port
-  either print print =<<
-    getRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) def
-
-doGetMap
-  :: RiakBucketType ('Just ('RiakMapTy RiakMapEntries))
-  -> RiakBucket
-  -> RiakKey
-  -> HostName
-  -> PortNumber
-  -> IO ()
-doGetMap type' bucket key host port = do
-  h <- createRiakHandle host port
-  either print print =<<
-    getRiakMap h (RiakLocation (RiakNamespace type' bucket) key) def
-
-doGetObject
-  :: RiakBucketType 'Nothing
-  -> RiakBucket
-  -> RiakKey
-  -> Bool
-  -> Bool
-  -> Bool
-  -> Maybe Word32
-  -> Maybe RiakQuorum
-  -> Maybe RiakQuorum
-  -> Bool
-  -> Maybe Word32
-  -> HostName
-  -> PortNumber
-  -> IO ()
-doGetObject
-    type' bucket key basic_quorum head notfound_not_ok n pr r no_sloppy_quorum
-    timeout host port = do
-  h <- createRiakHandle host port
-  if head
-    then go (getRiakObjectHead h) (\_ _ -> pure ())
-    else go (getRiakObject h) (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
-
- where
-  go
-    :: (RiakLocation 'Nothing -> GetRiakObjectParams -> IO (Either RiakError [RiakContent a]))
-    -> (Int -> a -> IO ())
-    -> IO ()
-  go get f = do
-    eresponse <-
-      get
-        (RiakLocation (RiakNamespace type' bucket) key)
-        (def
-          & (if basic_quorum then #basic_quorum True else id)
-          & (if notfound_not_ok then #notfound_ok False else id)
-          & maybe id #n n
-          & maybe id #pr pr
-          & maybe id #r r
-          & (if no_sloppy_quorum then #sloppy_quorum False else id)
-          & maybe id #timeout timeout)
-
-    case eresponse of
-      Left err ->
-        print err
-
-      Right [] ->
-        putStrLn "Not found"
-
-      Right contents -> do
-        for_ (zip [(0::Int)..] contents) $ \(i, content) ->
-          printContent (f i) (Just i) content
-
-doGetSet
-  :: RiakBucketType ('Just ('RiakSetTy Text))
-  -> RiakBucket
-  -> RiakKey
-  -> HostName
-  -> PortNumber
-  -> IO ()
-doGetSet type' bucket key host port = do
-  h <- createRiakHandle host port
-  getRiakSet h (RiakLocation (RiakNamespace type' bucket) key) def >>= \case
-    Left err -> print err
-    Right vals -> for_ vals print -- TODO encoding?
 
 doGetBucketProps
   :: RiakBucketType ty
@@ -384,6 +269,16 @@ doGetBucketTypeProps type' host port = do
   either print printBucketProps =<<
     getRiakBucketTypeProps h type'
 
+doGetCounter
+  :: RiakLocation ('Just 'RiakCounterTy)
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doGetCounter loc host port = do
+  h <- createRiakHandle host port
+  either print print =<<
+    getRiakCounter h loc def
+
 doGetIndex :: Maybe RiakIndexName -> HostName -> PortNumber -> IO ()
 doGetIndex index host port = do
   h <- createRiakHandle host port
@@ -392,17 +287,144 @@ doGetIndex index host port = do
     (either print print <=< getRiakIndex h)
     index
 
+doGetMap
+  :: RiakLocation ('Just ('RiakMapTy RiakMapEntries))
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doGetMap loc host port = do
+  h <- createRiakHandle host port
+  either print print =<<
+    getRiakMap h loc def
+
+doGetObject
+  :: IsRiakContent a
+  => (Int -> a -> IO ())
+  -> RiakLocation 'Nothing
+  -> Bool
+  -> GetRiakObjectParams
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doGetObject f loc head params host port = do
+  h <- createRiakHandle host port
+  if head
+    then go (getRiakObjectHead h loc params) (\_ _ -> pure ())
+    else go (getRiakObject h loc params) f
+ where
+  go
+    :: IO (Either RiakError [RiakContent a])
+    -> (Int -> a -> IO ())
+    -> IO ()
+  go get g = do
+    eresponse <-
+      get
+
+    case eresponse of
+      Left err ->
+        print err
+
+      Right [] ->
+        putStrLn "Not found"
+
+      Right contents -> do
+        for_ (zip [(0::Int)..] contents) $ \(i, content) ->
+          printContent (g i) (Just i) content
+
 doGetSchema :: RiakSchemaName -> HostName -> PortNumber -> IO ()
 doGetSchema schema host port = do
   h <- createRiakHandle host port
   either print print =<<
     getRiakSchema h schema
 
+doGetSet
+  :: RiakLocation ('Just ('RiakSetTy Text))
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doGetSet loc host port = do
+  h <- createRiakHandle host port
+  getRiakSet h loc def >>= \case
+    Left err -> print err
+    Right vals -> for_ vals print -- TODO encoding?
+
 doGetServerInfo :: HostName -> PortNumber -> IO ()
 doGetServerInfo host port = do
   h <- createRiakHandle host port
   either print printServerInfo =<<
     getRiakServerInfo h
+
+doGetTextObject
+  :: RiakLocation 'Nothing
+  -> Bool
+  -> GetRiakObjectParams
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doGetTextObject =
+  doGetObject
+    (\i s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
+
+doPing :: HostName -> PortNumber -> IO ()
+doPing host port = do
+  h <- createRiakHandle host port
+  either print (const (putStrLn "pong")) =<<
+    pingRiak h
+
+doPutObject
+  :: RiakLocation 'Nothing
+  -> Text
+  -> Maybe RiakQuorum
+  -> Maybe Word32
+  -> Maybe RiakQuorum
+  -> Char
+  -> Bool
+  -> Maybe Word32
+  -> Maybe RiakQuorum
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doPutObject loc content dw n pw return no_sloppy_quorum timeout w host port = do
+  h <- createRiakHandle host port
+  case return of
+    'a' ->
+      go
+        (putRiakObjectHead h)
+        (\contents ->
+          (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
+            printContent (\_ -> pure ()) (Just i) content'))
+    'b' ->
+      go
+        (putRiakObjectBody h)
+        (\contents ->
+          (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
+            printContent
+              (\s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
+              (Just i)
+              content'))
+
+    'c' ->
+      go (putRiakObject h) pure
+    _   -> undefined
+ where
+  go
+    :: (RiakLocation 'Nothing -> Text -> PutRiakObjectParams -> IO (Either RiakError a))
+    -> (a -> IO ())
+    -> IO ()
+  go put f = do
+    eresponse <-
+      put
+        loc
+        content
+        (def
+          & maybe id #dw dw
+          & maybe id #n n
+          & maybe id #pw pw
+          & (if no_sloppy_quorum then #sloppy_quorum False else id)
+          & maybe id #timeout timeout
+          & maybe id #w w)
+
+    either print f eresponse
 
 doStream
   :: RiakBucketType ty
@@ -434,83 +456,16 @@ doStreamKeys type' bucket host port = do
       (runExceptT . runListT) (keys >>= liftIO . Latin1.putStrLn . coerce)
   either print (const (pure ())) result
 
-doPing :: HostName -> PortNumber -> IO ()
-doPing host port = do
-  h <- createRiakHandle host port
-  either print (const (putStrLn "pong")) =<<
-    pingRiak h
-
-doPutObject
-  :: RiakBucketType 'Nothing
-  -> RiakBucket
-  -> RiakKey
-  -> Text
-  -> Maybe RiakQuorum
-  -> Maybe Word32
-  -> Maybe RiakQuorum
-  -> Char
-  -> Bool
-  -> Maybe Word32
-  -> Maybe RiakQuorum
-  -> HostName
-  -> PortNumber
-  -> IO ()
-doPutObject
-    type' bucket key content dw n pw return no_sloppy_quorum timeout w host
-    port = do
-  h <- createRiakHandle host port
-  case return of
-    'a' ->
-      go
-        (putRiakObjectHead h)
-        (\contents ->
-          (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
-            printContent (\_ -> pure ()) (Just i) content'))
-    'b' ->
-      go
-        (putRiakObjectBody h)
-        (\contents ->
-          (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
-            printContent
-              (\s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
-              (Just i)
-              content'))
-
-    'c' ->
-      go (putRiakObject h) pure
-    _   -> undefined
- where
-  go
-    :: (RiakLocation 'Nothing -> Text -> PutRiakObjectParams -> IO (Either RiakError a))
-    -> (a -> IO ())
-    -> IO ()
-  go put f = do
-    eresponse <-
-      put
-        (RiakLocation (RiakNamespace type' bucket) key)
-        content
-        (def
-          & maybe id #dw dw
-          & maybe id #n n
-          & maybe id #pw pw
-          & (if no_sloppy_quorum then #sloppy_quorum False else id)
-          & maybe id #timeout timeout
-          & maybe id #w w)
-
-    either print f eresponse
-
 doUpdateCounter
-  :: RiakBucketType ('Just 'RiakCounterTy)
-  -> RiakBucket
-  -> RiakKey
+  :: RiakLocation ('Just 'RiakCounterTy)
   -> Int64
   -> HostName
   -> PortNumber
   -> IO ()
-doUpdateCounter type' bucket key incr host port = do
+doUpdateCounter loc incr host port = do
   h <- createRiakHandle host port
   either print print =<<
-    updateRiakCounter h (RiakLocation (RiakNamespace type' bucket) key) incr def
+    updateRiakCounter h loc incr def
 
 --------------------------------------------------------------------------------
 -- Misc. helpers
@@ -625,6 +580,13 @@ bucketTypeArgument =
       , metavar "TYPE"
       ])
 
+locationArgument :: Parser (RiakLocation ty)
+locationArgument =
+  (\type' bucket -> RiakLocation (RiakNamespace type' bucket))
+    <$> bucketTypeArgument
+    <*> bucketArgument
+    <*> keyArgument
+
 keyArgument :: Parser RiakKey
 keyArgument =
   (fmap RiakKey . strArgument)
@@ -632,6 +594,36 @@ keyArgument =
       [ help "Key"
       , metavar "KEY"
       ])
+
+getObjectParamsOptions :: Parser GetRiakObjectParams
+getObjectParamsOptions =
+  f <$> switch
+          (mconcat
+            [ long "basic-quorum"
+            , help "Basic quorum"
+            ])
+    <*> switch
+          (mconcat
+            [ long "notfound-not-ok"
+            , help "notfound not ok"
+            ])
+    <*> nOption
+    <*> prOption
+    <*> rOption
+    <*> sloppyQuorumOption
+    <*> timeoutOption
+ where
+  f :: Bool -> Bool -> Maybe Word32 -> Maybe RiakQuorum -> Maybe RiakQuorum
+    -> Bool -> Maybe Word32 -> GetRiakObjectParams
+  f basic_quorum notfound_not_ok n pr r no_sloppy_quorum timeout =
+    def
+      & (if basic_quorum then #basic_quorum True else id)
+      & (if notfound_not_ok then #notfound_ok False else id)
+      & maybe id #n n
+      & maybe id #pr pr
+      & maybe id #r r
+      & (if no_sloppy_quorum then #sloppy_quorum False else id)
+      & maybe id #timeout timeout
 
 dwOption :: Parser (Maybe RiakQuorum)
 dwOption =
@@ -642,7 +634,7 @@ nodeArgument =
   argument
     (maybeReader readNode)
     (mconcat
-      [ help "Riak node"
+      [ help "Riak node, e.g. localhost:8087"
       , metavar "NODE"
       ])
  where
