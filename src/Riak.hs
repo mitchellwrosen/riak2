@@ -167,7 +167,7 @@ createRiakHandle host port = do
     liftIO newCache
 
   manager :: RiakManager <-
-    liftIO (createRiakManager host port 20)
+    liftIO (createRiakManager host port)
 
   pure (RiakHandle manager cache)
 

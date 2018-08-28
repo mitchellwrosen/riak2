@@ -25,6 +25,7 @@ module Riak.Internal.Manager
   ) where
 
 import Data.Hashable                (hash)
+import Data.Primitive.MutVar
 import Data.Primitive.UnliftedArray
 import GHC.Prim                     (RealWorld)
 import Network.Socket               (HostName, PortNumber)
@@ -39,19 +40,23 @@ data RiakManager
   = RiakManager
       !HostName
       !PortNumber
-      !(UnliftedArray (TVar (Maybe RiakConnection)))
+      !(UnliftedArray (MutVar RealWorld (Maybe RiakConnection)))
       !(MVar ()) -- Lock to prevent more than 1 connection from being opened
 
 
-createRiakManager :: HostName -> PortNumber -> Int -> IO RiakManager
-createRiakManager host port n = do
-  conns :: MutableUnliftedArray RealWorld (TVar (Maybe RiakConnection)) <-
-    unsafeNewUnliftedArray n
+createRiakManager :: HostName -> PortNumber -> IO RiakManager
+createRiakManager host port = do
+  caps :: Int <-
+    getNumCapabilities
 
-  for_ [0..n-1] $ \i ->
-    writeUnliftedArray conns i =<< newTVarIO Nothing
+  conns :: MutableUnliftedArray RealWorld
+            (MutVar RealWorld (Maybe RiakConnection)) <-
+    unsafeNewUnliftedArray caps
 
-  conns' :: UnliftedArray (TVar (Maybe RiakConnection)) <-
+  for_ [0..caps-1] $ \i ->
+    writeUnliftedArray conns i =<< newMutVar Nothing
+
+  conns' :: UnliftedArray (MutVar RealWorld (Maybe RiakConnection)) <-
     unsafeFreezeUnliftedArray conns
 
   lock :: MVar () <-
@@ -66,21 +71,21 @@ withRiakConnection (RiakManager host port conns lock) k = do
     (`mod` sizeofUnliftedArray conns) . hash <$> myThreadId
 
   let
-    connVar :: TVar (Maybe RiakConnection)
+    connVar :: MutVar RealWorld (Maybe RiakConnection)
     connVar =
       indexUnliftedArray conns which
 
   let
     acquire :: IO RiakConnection
     acquire =
-      readTVarIO connVar >>= \case
+      readMutVar connVar >>= \case
         Nothing ->
           withMVar lock $ \_ ->
-            readTVarIO connVar >>= \case
+            readMutVar connVar >>= \case
               Nothing -> do
                 debug ("[riak] manager: opening connection " ++ show which)
                 conn <- riakConnect host port
-                atomically (writeTVar connVar (Just conn))
+                writeMutVar connVar (Just conn)
                 pure conn
               Just conn ->
                 pure conn
@@ -91,7 +96,7 @@ withRiakConnection (RiakManager host port conns lock) k = do
     release :: RiakConnection -> IO ()
     release conn = do
       debug ("[riak] manager: exception on connection " ++ show which)
-      atomically (writeTVar connVar Nothing)
+      writeMutVar connVar Nothing
       riakDisconnect conn
 
   bracketOnError acquire release k
