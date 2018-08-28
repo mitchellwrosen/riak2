@@ -210,7 +210,7 @@ listParser =
   command
     "list"
     (info
-      (doList <$> bucketTypeArgument <*> optional bucketArgument)
+      (doStream <$> bucketTypeArgument <*> optional bucketArgument)
       (progDesc "List all buckets or keys"))
 
 pingParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
@@ -404,28 +404,33 @@ doGetServerInfo host port = do
   either print printServerInfo =<<
     getRiakServerInfo h
 
-doList
+doStream
   :: RiakBucketType ty
   -> Maybe RiakBucket
   -> HostName
   -> PortNumber
   -> IO ()
-doList type' =
-  maybe (doListBuckets type') (doListKeys type')
+doStream type' =
+  maybe (doStreamBuckets type') (doStreamKeys type')
 
-doListBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
-doListBuckets type' host port = do
+doStreamBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
+doStreamBuckets type' host port = do
   h <- createRiakHandle host port
   result :: Either RiakError () <-
-    listRiakBuckets h type' $ \buckets ->
+    streamRiakBuckets h type' $ \buckets ->
       (runExceptT . runListT) (buckets >>= liftIO . Latin1.putStrLn . coerce)
   either print (const (pure ())) result
 
-doListKeys :: RiakBucketType ty -> RiakBucket -> HostName -> PortNumber -> IO ()
-doListKeys type' bucket host port = do
+doStreamKeys
+  :: RiakBucketType ty
+  -> RiakBucket
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doStreamKeys type' bucket host port = do
   h <- createRiakHandle host port
   result :: Either RiakError () <-
-    listRiakKeys h (RiakNamespace type' bucket) $ \keys ->
+    streamRiakKeys h (RiakNamespace type' bucket) $ \keys ->
       (runExceptT . runListT) (keys >>= liftIO . Latin1.putStrLn . coerce)
   either print (const (pure ())) result
 

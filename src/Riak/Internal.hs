@@ -13,8 +13,6 @@ module Riak.Internal
   , getRiakIndex
   , getRiakSchema
   , getRiakServerInfo
-  , listRiakBuckets
-  , listRiakKeys
   , pingRiak
   , putRiakIndex
   , putRiakSchema
@@ -23,6 +21,8 @@ module Riak.Internal
   , setRiakBucketProps
   , setRiakBucketTypeProps
   , storeRiakObject
+  , streamRiakBuckets
+  , streamRiakKeys
   , updateRiakCrdt
   ) where
 
@@ -97,20 +97,6 @@ getRiakServerInfo
 getRiakServerInfo conn =
   riakExchange conn RpbGetServerInfoReq
 
-listRiakBuckets
-  :: RiakConnection -- ^
-  -> RpbListBucketsReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbListBucketsResp
-listRiakBuckets conn =
-  riakStream conn (view #done)
-
-listRiakKeys
-  :: RiakConnection -- ^
-  -> RpbListKeysReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbListKeysResp
-listRiakKeys conn =
-  riakStream conn (view #done)
-
 pingRiak
   :: RiakConnection -- ^
   -> IO (Either RiakError RpbPingResp)
@@ -165,6 +151,20 @@ storeRiakObject
   -> IO (Either RiakError RpbPutResp)
 storeRiakObject =
   riakExchange
+
+streamRiakBuckets
+  :: RiakConnection -- ^
+  -> RpbListBucketsReq -- ^
+  -> ListT (ExceptT RiakError IO) RpbListBucketsResp
+streamRiakBuckets conn =
+  riakStream conn (view #done)
+
+streamRiakKeys
+  :: RiakConnection -- ^
+  -> RpbListKeysReq -- ^
+  -> ListT (ExceptT RiakError IO) RpbListKeysResp
+streamRiakKeys conn =
+  riakStream conn (view #done)
 
 updateRiakCrdt
   :: RiakConnection -- ^
