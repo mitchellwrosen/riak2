@@ -577,15 +577,41 @@ _putRiakObject
 --------------------------------------------------------------------------------
 
 -- TODO deleteRiakObject figure out when vclock is required (always?)
--- TODO don't use rw (deprecated)
+-- TODO deleteRiakObject params
 deleteRiakObject
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RpbDelReq -- ^
-  -> m (Either RiakError RpbDelResp)
-deleteRiakObject (RiakHandle manager _) req = liftIO $
-  withRiakConnection manager (\conn -> deleteRiakObjectPB conn req)
+  -> RiakLocation ty -- ^ Bucket type, bucket, and key
+  -> m (Either RiakError ())
+deleteRiakObject
+    (RiakHandle manager cache)
+    loc@(RiakLocation (RiakNamespace type' bucket) key) = liftIO $ do
 
+  vclock :: Maybe RiakVclock <-
+    riakCacheLookup cache loc
+
+  let
+    request :: RpbDelReq
+    request =
+      RpbDelReq
+        { _RpbDelReq'_unknownFields = []
+        , _RpbDelReq'bucket         = unRiakBucket bucket
+        , _RpbDelReq'dw             = Nothing
+        , _RpbDelReq'key            = unRiakKey key
+        , _RpbDelReq'nVal           = Nothing
+        , _RpbDelReq'pr             = Nothing
+        , _RpbDelReq'pw             = Nothing
+        , _RpbDelReq'r              = Nothing
+        , _RpbDelReq'rw             = Nothing
+        , _RpbDelReq'sloppyQuorum   = Nothing
+        , _RpbDelReq'timeout        = Nothing
+        , _RpbDelReq'type'          = Just (unRiakBucketType type')
+        , _RpbDelReq'vclock         = coerce vclock
+        , _RpbDelReq'w              = Nothing
+        }
+
+  fmap (() <$)
+    (withRiakConnection manager (\conn -> deleteRiakObjectPB conn request))
 
 --------------------------------------------------------------------------------
 -- Get counter
