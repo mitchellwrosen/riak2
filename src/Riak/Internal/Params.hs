@@ -14,14 +14,22 @@ import Riak.Internal.Types
 
 newtype BasicQuorum    = BasicQuorum    { unBasicQuorum    :: Maybe Bool       }
 newtype IncludeContext = IncludeContext { unIncludeContext :: Maybe Bool       }
+newtype DF             = DF             { unDF             :: Maybe ByteString }
 newtype DW             = DW             { unDW             :: Maybe RiakQuorum }
+newtype Filter         = Filter         { unFilter         :: Maybe ByteString }
+newtype FL             = FL             { unFL             :: [ByteString]     }
 newtype N              = N              { unN              :: Maybe Word32     }
 newtype NotfoundOk     = NotfoundOk     { unNotfoundOk     :: Maybe Bool       }
+newtype Op             = Op             { unOp             :: Maybe ByteString }
 newtype PR             = PR             { unPR             :: Maybe RiakQuorum }
+newtype Presort        = Presort        { unPresort        :: Maybe ByteString }
 newtype PW             = PW             { unPW             :: Maybe RiakQuorum }
 newtype R              = R              { unR              :: Maybe RiakQuorum }
 newtype ReturnBody     = ReturnBody     { unReturnBody     :: Maybe Bool       }
+newtype Rows           = Rows           { unRows           :: Maybe Word32     }
 newtype SloppyQuorum   = SloppyQuorum   { unSloppyQuorum   :: Maybe Bool       }
+newtype Sort           = Sort           { unSort           :: Maybe ByteString }
+newtype Start          = Start          { unStart          :: Maybe Word32     }
 newtype Timeout        = Timeout        { unTimeout        :: Maybe Word32     }
 newtype W              = W              { unW              :: Maybe RiakQuorum }
 
@@ -120,3 +128,18 @@ instance IsLabel "return_body"   (Bool       -> UpdateRiakCrdtParams -> UpdateRi
 instance IsLabel "sloppy_quorum" (Bool       -> UpdateRiakCrdtParams -> UpdateRiakCrdtParams) where fromLabel = \e (UpdateRiakCrdtParams a b c d _ f g) -> UpdateRiakCrdtParams a b c d (coerce (Just e)) f g
 instance IsLabel "timeout"       (Word32     -> UpdateRiakCrdtParams -> UpdateRiakCrdtParams) where fromLabel = \f (UpdateRiakCrdtParams a b c d e _ g) -> UpdateRiakCrdtParams a b c d e (coerce (Just f)) g
 instance IsLabel "w"             (RiakQuorum -> UpdateRiakCrdtParams -> UpdateRiakCrdtParams) where fromLabel = \g (UpdateRiakCrdtParams a b c d e f _) -> UpdateRiakCrdtParams a b c d e f (coerce (Just g))
+
+
+-- | Optional @search@ parameters.
+--
+-- TODO RiakSearchParams IsLabel
+data RiakSearchParams
+  = RiakSearchParams
+      !DF
+      !Filter
+      !FL
+      !Op
+      !Presort
+      !Rows
+      !Sort
+      !Start

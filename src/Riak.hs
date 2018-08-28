@@ -52,6 +52,7 @@ module Riak
   , getRiakBucketProps
   , setRiakBucketProps
   , resetRiakBucketProps
+    -- * Full key traversals
   , streamRiakBuckets
   , listRiakBuckets
   , streamRiakKeys
@@ -60,6 +61,8 @@ module Riak
   , riakMapReduce
     -- * Secondary indexes (2i)
     -- * Search 2.0
+    -- ** Search
+  , riakSearch
     -- ** Schema
   , getRiakSchema
   , putRiakSchema
@@ -1119,6 +1122,9 @@ resetRiakBucketProps (RiakHandle manager _) req = liftIO $
 
 -- | Stream all of the buckets in a bucket type.
 --
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
+--
 -- TODO streamRiakBuckets param timeout
 streamRiakBuckets
   :: RiakHandle -- ^ Riak handle
@@ -1144,6 +1150,9 @@ streamRiakBuckets (RiakHandle manager _) type' k =
 
 -- | List all of the buckets in a bucket type. Provided for convenience when
 -- bringing all buckets into memory is okay.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
 listRiakBuckets
   :: RiakHandle -- ^ Riak handle
   -> RiakBucketType ty -- ^ Bucket type
@@ -1157,6 +1166,9 @@ listRiakBuckets h namespace =
 --------------------------------------------------------------------------------
 
 -- | Stream all of the keys in a bucket.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
 --
 -- TODO streamRiakKeys param timeout
 streamRiakKeys
@@ -1183,6 +1195,9 @@ streamRiakKeys (RiakHandle manager _) (RiakNamespace type' bucket) k =
 
 -- | List all of the keys in a bucket. Provided for convenience when bringing
 -- all keys into memory is okay.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
 listRiakKeys
   :: RiakHandle -- ^ Riak handle
   -> RiakNamespace ty -- ^ Bucket type and bucket
@@ -1191,7 +1206,10 @@ listRiakKeys h namespace =
   streamRiakKeys h namespace
     (runExceptT . ListT.fold (\x a -> x . (a:)) id ($ []))
 
--- (\x a -> x . (a:)) id ($ [])
+
+--------------------------------------------------------------------------------
+-- MapReduce
+--------------------------------------------------------------------------------
 
 riakMapReduce
   :: RiakHandle -- ^ Riak handle
@@ -1201,6 +1219,39 @@ riakMapReduce
 riakMapReduce (RiakHandle manager _) request k =
   withRiakConnection manager $ \conn -> k $
     riakMapReducePB conn request
+
+
+--------------------------------------------------------------------------------
+-- Search 2.0
+--------------------------------------------------------------------------------
+
+riakSearch
+  :: RiakHandle -- ^ Riak handle
+  -> ByteString -- ^ Query
+  -> ByteString -- ^ Index
+  -> RiakSearchParams -- ^ Optional parameters
+  -> IO (Either RiakError RpbSearchQueryResp)
+riakSearch (RiakHandle manager _)
+    query index
+    (RiakSearchParams df filter' fl op presort rows sort start) =
+  withRiakConnection manager $ \conn ->
+    riakSearchPB conn request
+ where
+  request :: RpbSearchQueryReq
+  request =
+    RpbSearchQueryReq
+      { _RpbSearchQueryReq'_unknownFields = []
+      , _RpbSearchQueryReq'df             = unDF df
+      , _RpbSearchQueryReq'filter         = unFilter filter'
+      , _RpbSearchQueryReq'fl             = unFL fl
+      , _RpbSearchQueryReq'index          = index
+      , _RpbSearchQueryReq'op             = unOp op
+      , _RpbSearchQueryReq'presort        = unPresort presort
+      , _RpbSearchQueryReq'q              = query
+      , _RpbSearchQueryReq'rows           = unRows rows
+      , _RpbSearchQueryReq'sort           = unSort sort
+      , _RpbSearchQueryReq'start          = unStart start
+      }
 
 
 getRiakSchema
@@ -1333,6 +1384,10 @@ deleteRiakIndex (RiakHandle manager _) req = liftIO $
   withRiakConnection manager
     (\conn -> deleteRiakIndexPB conn req)
 
+
+--------------------------------------------------------------------------------
+-- Server info
+--------------------------------------------------------------------------------
 
 pingRiak
   :: MonadIO m

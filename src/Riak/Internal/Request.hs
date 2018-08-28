@@ -32,6 +32,7 @@ instance Request RpbListKeysReq            where requestCode = 17
 instance Request RpbMapRedReq              where requestCode = 23
 instance Request RpbPutReq                 where requestCode = 11
 instance Request RpbResetBucketReq         where requestCode = 29
+instance Request RpbSearchQueryReq         where requestCode = 27
 instance Request RpbSetBucketReq           where requestCode = 21
 instance Request RpbSetBucketTypeReq       where requestCode = 31
 instance Request RpbYokozunaIndexDeleteReq where requestCode = 57

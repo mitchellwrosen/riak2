@@ -40,6 +40,8 @@ module Riak.Internal
   , putRiakSchemaPB
   , resetRiakBucketPropsPB
   , riakMapReducePB
+  , RiakSearchParams(..)
+  , riakSearchPB
   , setRiakBucketPropsPB
   , setRiakBucketTypePropsPB
   , streamRiakBucketsPB
@@ -71,15 +73,21 @@ module Riak.Internal
   , Charset(..)
   , ContentEncoding(..)
   , ContentType(..)
+  , DF(..)
   , DW(..)
+  , Filter(..)
+  , FL(..)
   , IncludeContext(..)
   , IsRiakContent(..)
   , Modified(..)
   , N(..)
   , NotfoundOk(..)
+  , Op(..)
   , PR(..)
+  , Presort(..)
   , PW(..)
   , R(..)
+  , Rows(..)
   , ReturnBody(..)
   , RiakBucket(..)
   , RiakBucketType(..)
@@ -100,6 +108,8 @@ module Riak.Internal
   , RiakVclock(..)
   , RiakVtag(..)
   , SloppyQuorum(..)
+  , Sort(..)
+  , Start(..)
   , Timeout(..)
   , TTL(..)
   , W(..)
@@ -339,6 +349,13 @@ riakMapReducePB
   -> ListT (ExceptT RiakError IO) RpbMapRedResp
 riakMapReducePB conn =
   riakStream conn (view #done)
+
+riakSearchPB
+  :: RiakConnection -- ^
+  -> RpbSearchQueryReq -- ^
+  -> IO (Either RiakError RpbSearchQueryResp)
+riakSearchPB =
+  riakExchange
 
 setRiakBucketPropsPB
   :: RiakConnection -- ^
