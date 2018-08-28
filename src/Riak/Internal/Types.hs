@@ -1,7 +1,7 @@
 {-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DerivingStrategies,
              ExistentialQuantification, GADTs, GeneralizedNewtypeDeriving,
              InstanceSigs, KindSignatures, NoImplicitPrelude,
-             OverloadedStrings, PatternSynonyms #-}
+             OverloadedStrings, PatternSynonyms, StandaloneDeriving #-}
 
 -- | Sin-bin of misc. types.
 
@@ -159,6 +159,14 @@ data RiakNamespace (ty :: Maybe RiakCrdtTy)
 instance Hashable (RiakNamespace ty) where
   hashWithSalt salt (RiakNamespace type' bucket) =
     salt `hashWithSalt` type' `hashWithSalt` bucket
+
+
+-- TODO make RiakMapParseError a sub-exception of RiakParseError
+data RiakParseError where
+  RiakParseError :: !(RiakLocation ty) -> !Text -> RiakParseError
+  deriving anyclass Exception
+
+deriving instance Show RiakParseError
 
 
 -- | How many vnodes must respond before an operation is considered successful.

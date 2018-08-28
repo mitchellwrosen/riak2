@@ -84,6 +84,7 @@ module Riak
   , IsRiakMap(..)
   , IsRiakRegister(..)
   , IsRiakSet
+  , JsonRiakContent(..)
   , Modified(..)
   , RiakBucket(..)
   , RiakBucketType(..)

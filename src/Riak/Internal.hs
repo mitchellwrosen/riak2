@@ -79,6 +79,7 @@ module Riak.Internal
   , FL(..)
   , IncludeContext(..)
   , IsRiakContent(..)
+  , JsonRiakContent(..)
   , Modified(..)
   , N(..)
   , NotfoundOk(..)

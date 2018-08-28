@@ -10,13 +10,18 @@ module Riak.Internal.Content
   , ContentEncoding(..)
   , ContentType(..)
   , IsRiakContent(..)
+  , JsonRiakContent(..)
   ) where
 
+import Data.Aeson             (FromJSON, ToJSON)
 import Data.Bifunctor         (first)
 import Data.Time
 import Lens.Family2.Unchecked (lens)
 import Lens.Labels
 
+import qualified Data.Aeson as Aeson
+import qualified Data.Aeson.Encoding as Aeson (encodingToLazyByteString)
+import qualified Data.ByteString.Lazy as LazyByteString
 import qualified Data.Text.Encoding as Text
 
 import Riak.Internal.Prelude
@@ -60,53 +65,40 @@ instance Functor f => HasLens' f (RiakContent a)                 "deleted"      
 instance Functor f => HasLens' f (RiakContent a)                 "ttl"             TTL                       where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ _ _ x) -> x) (\(RiakContent a b c d e f g h i j _) x -> RiakContent a b c d e f g h i j x)
 
 
--- TODO JsonRiakContent
-
 -- | 'IsRiakContent' classifies types that are stored in Riak objects. Every
 -- object must have a content type, and may optionally have a character set and
 -- encoding.
 --
--- For convenience, two instances are provided by this library, to store binary
--- and textual data.
+-- For convenience, three instances are provided by this library, to store
+-- binary, textual, and JSON data.
 --
--- [__@ByteString@__]
+-- +-----------------------------+----------------------------+------------------------------+------------------------------+
+-- |                             | Content type               | Charset                      | Content encoding             |
+-- +==================+==========+============================+==============================+==============================+
+-- | __@ByteString@__ | On read  | /ignored/                  | /ignored/                    | /ignored/                    |
+-- |                  +----------+----------------------------+------------------------------+------------------------------+
+-- |                  | On write | @application/octet-stream@ | /empty/                      | /empty/                      |
+-- +------------------+----------+----------------------------+------------------------------+------------------------------+
+-- | __@Text@__       | On read  | @text/plain@               | /empty/, @ascii@, or @utf-8@ | /empty/, @ascii@, or @utf-8@ |
+-- |                  +----------+----------------------------+------------------------------+------------------------------+
+-- |                  | On write | @text/plain@               | @utf-8@                      | @utf-8@                      |
+-- +------------------+----------+----------------------------+------------------------------+------------------------------+
+-- | __@JSON@__       | On read  | @application/json@         | /ignored/                    | /ignored/                    |
+-- |                  +----------+----------------------------+------------------------------+------------------------------+
+-- |                  | On write | @application/json@         | /empty/                      | /empty/                      |
+-- +------------------+----------+----------------------------+------------------------------+------------------------------+
 --
--- * When reading,
+-- The @ByteString@ instance allows you to read any Riak object's raw bytes,
+-- regardless of its type, as it ignores the content type, charset, and
+-- encoding.
 --
---     * Content type is ignored.
+-- JSON data can be stored using the 'JsonRiakContent' newtype wrapper, derived
+-- using the @DerivingVia@ language extension as
 --
---     * Charset is ignored.
---
---     * Content encoding is ignored.
---
---     This allows you to read any Riak object as a raw 'ByteString',
---     regardless of its type.
---
--- * When writing,
---
---     * Content type is set to @application/octet-stream@.
---
---     * Charset is empty.
---
---     * Content encoding is empty.
---
--- [__@Text@__]
---
--- * When reading,
---
---     * Content type must be @text/plain@.
---
---     * Charset must be empty, @ascii@, or @utf-8@.
---
---     * Content encoding must be empty, @ascii@, or @utf-8@.
---
--- * When writing,
---
---     * Content type is set to @text/plain@.
---
---     * Charset is set to @utf-8@.
---
---     * Content encoding is set to @utf-8@.
+-- @
+-- data MyType = MyType ...
+--   deriving 'IsRiakContent' via 'JsonRiakContent'
+-- @
 --
 -- When writing your own 'IsRiakContent' instances, use any content type,
 -- charset, and content encoding you wish. None of them are actually required by
@@ -233,4 +225,37 @@ newtype ContentEncoding
 newtype ContentType
   = ContentType { unContentType :: ByteString }
   deriving stock (Eq, Show)
-  deriving newtype (IsString)
+
+
+newtype JsonRiakContent a
+  = JsonRiakContent { unJsonRiakContent :: a }
+  deriving (Eq, Show)
+
+instance (FromJSON a, ToJSON a) => IsRiakContent (JsonRiakContent a) where
+  riakContentType :: JsonRiakContent a -> ContentType
+  riakContentType _ =
+    ContentType "application/json"
+
+  encodeRiakContent :: JsonRiakContent a -> ByteString
+  encodeRiakContent =
+    LazyByteString.toStrict . Aeson.encodingToLazyByteString .
+      Aeson.toEncoding . unJsonRiakContent
+
+  decodeRiakContent
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
+    -> Either SomeException (JsonRiakContent a)
+  decodeRiakContent type' _ _ bytes =
+    case type' of
+      Just (ContentType "application/json") ->
+        case Aeson.eitherDecodeStrict' bytes of
+          Left err ->
+            error err
+
+          Right value ->
+            Right (JsonRiakContent value)
+
+      x ->
+        error (show x)
