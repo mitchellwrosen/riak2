@@ -19,7 +19,6 @@ module Riak
   , storeRiakObjectHead
   , storeRiakObjectBody
   , storeNewRiakObject
-  , storeNewRiakObject2
   , storeNewRiakObjectHead
   , storeNewRiakObjectBody
     -- ** Delete object
@@ -112,6 +111,8 @@ module Riak
   , UpdateRiakCrdtParams
     -- * Re-exports
   , def
+  , HostName
+  , PortNumber
     -- * Documentation
     -- $documentation
   ) where
@@ -187,20 +188,24 @@ fetchRiakObject
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation 'Nothing -- ^ Location of the object.
+  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
   -> FetchRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError [RiakContent a])
-fetchRiakObject handle loc (FetchRiakObjectParams a b c d e f g) = _fetchRiakObject handle loc a NoHead NoIfModified b c d e f g
+fetchRiakObject handle loc (FetchRiakObjectParams a b c d e f g) =
+  _fetchRiakObject handle loc a NoHead NoIfModified b c d e f g
 
 -- | Fetch an object's metadata.
 fetchRiakObjectHead
-    :: forall a m.
-       (IsRiakContent a, MonadIO m)
+    :: forall m.
+       MonadIO m
     => RiakHandle -- ^ Riak handle.
     -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
     -> FetchRiakObjectParams -- ^ Optional parameters.
-    -> m (Either RiakError [RiakContent (Proxy a)])
-fetchRiakObjectHead handle loc (FetchRiakObjectParams a b c d e f g) = _fetchRiakObject handle loc a Head NoIfModified b c d e f g
+    -> m (Either RiakError [RiakContent ()])
+fetchRiakObjectHead handle loc (FetchRiakObjectParams a b c d e f g) =
+  -- TODO remove this fmap.fmap.fmap once _fetchRiakObject is refactored
+  (fmap.fmap.fmap) (() <$)
+    (_fetchRiakObject @ByteString handle loc a Head NoIfModified b c d e f g)
 
 -- | Fetch an object if it has been modified since the last fetch.
 --
@@ -213,17 +218,20 @@ fetchRiakObjectIfModified
   -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
   -> FetchRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError (Modified [RiakContent a]))
-fetchRiakObjectIfModified handle loc (FetchRiakObjectParams a b c d e f g) = _fetchRiakObject handle loc a NoHead IfModified b c d e f g
+fetchRiakObjectIfModified handle loc (FetchRiakObjectParams a b c d e f g) =
+  _fetchRiakObject handle loc a NoHead IfModified b c d e f g
 
 -- | Fetch an object's metadata if it has been modified since the last fetch.
 fetchRiakObjectIfModifiedHead
-  :: forall a m.
-     (IsRiakContent a, MonadIO m)
+  :: forall m.
+     MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation 'Nothing -- ^
+  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
   -> FetchRiakObjectParams -- ^ Optional parameters.
-  -> m (Either RiakError (Modified [RiakContent (Proxy a)]))
-fetchRiakObjectIfModifiedHead handle loc (FetchRiakObjectParams a b c d e f g) = _fetchRiakObject handle loc a Head IfModified b c d e f g
+  -> m (Either RiakError (Modified [RiakContent ()]))
+fetchRiakObjectIfModifiedHead handle loc (FetchRiakObjectParams a b c d e f g) =
+  (fmap.fmap.fmap.fmap) (() <$)
+    (_fetchRiakObject @ByteString handle loc a Head IfModified b c d e f g)
 
 type FetchRiakObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
   = IfModifiedWrapper if_modified [(RiakContent (If head (Proxy a) a))]
@@ -349,7 +357,7 @@ storeRiakObject
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation 'Nothing -- ^
+  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
   -> a -- ^
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError ())
@@ -364,7 +372,7 @@ storeRiakObjectHead
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation 'Nothing -- ^
+  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
   -> a -- ^
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError (NonEmpty (RiakContent (Proxy a))))
@@ -378,7 +386,7 @@ storeRiakObjectBody
   :: forall a m.
      (IsRiakContent a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation 'Nothing -- ^
+  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key.
   -> a -- ^
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError (NonEmpty (RiakContent a)))
@@ -397,20 +405,6 @@ storeNewRiakObject
   -> StoreRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError RiakKey)
 storeNewRiakObject
-    handle namespace content (StoreRiakObjectParams a b c d e f g h) =
-  _storeRiakObject handle namespace Nothing content a b c d e
-    ParamObjectReturnNone f g h
-
--- | Store a new object and return its randomly-generated key.
-storeNewRiakObject2
-  :: forall a m.
-     (IsRiakContent a, MonadIO m)
-  => RiakHandle -- ^ Riak handle.
-  -> RiakNamespace 'Nothing -- ^
-  -> a -- ^
-  -> StoreRiakObjectParams -- ^ Optional parameters.
-  -> m (Either RiakError RiakKey)
-storeNewRiakObject2
     handle namespace content (StoreRiakObjectParams a b c d e f g h) =
   _storeRiakObject handle namespace Nothing content a b c d e
     ParamObjectReturnNone f g h
@@ -614,7 +608,7 @@ deleteRiakObject (RiakHandle manager _) req = liftIO $
 fetchRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just 'RiakCounterTy) -- ^
+  -> RiakLocation ('Just 'RiakCounterTy) -- ^ Bucket type, bucket, and key.
   -> FetchRiakObjectParams -- ^ Optional parameters.
   -> m (Either RiakError Int64)
 fetchRiakCounter handle loc (FetchRiakObjectParams a b c d e f g) =
@@ -634,7 +628,7 @@ fetchRiakCounter handle loc (FetchRiakObjectParams a b c d e f g) =
 updateRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just 'RiakCounterTy) -- ^
+  -> RiakLocation ('Just 'RiakCounterTy) -- ^ Bucket type, bucket, and key.
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters.
   -> m (Either RiakError Int64)
@@ -695,7 +689,7 @@ _updateRiakCounter handle namespace key incr params =
 fetchRiakGrowOnlySet
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just 'RiakGrowOnlySetTy) -- ^
+  -> RiakLocation ('Just 'RiakGrowOnlySetTy) -- ^ Bucket type, bucket, and key.
   -> FetchRiakCrdtParams -- ^ Optional parameters.
   -> m (Either RiakError (Set ByteString))
 fetchRiakGrowOnlySet =
@@ -719,7 +713,7 @@ fetchRiakGrowOnlySet =
 fetchRiakHyperLogLog
   :: MonadIO m
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just 'RiakHyperLogLogTy) -- ^
+  -> RiakLocation ('Just 'RiakHyperLogLogTy) -- ^ Bucket type, bucket, and key.
   -> FetchRiakCrdtParams -- ^ Optional parameters.
   -> m (Either RiakError Word64)
 fetchRiakHyperLogLog =
@@ -745,7 +739,7 @@ fetchRiakHyperLogLog =
 fetchRiakMap
   :: (IsRiakMap a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just ('RiakMapTy a)) -- ^
+  -> RiakLocation ('Just ('RiakMapTy a)) -- ^ Bucket type, bucket, and key.
   -> FetchRiakCrdtParams -- ^ Optional parameters.
   -> m (Either RiakError a)
 fetchRiakMap =
@@ -772,7 +766,7 @@ fetchRiakMap =
 fetchRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just ('RiakSetTy a)) -- ^
+  -> RiakLocation ('Just ('RiakSetTy a)) -- ^ Bucket type, bucket, and key.
   -> FetchRiakCrdtParams -- ^ Optional parameters.
   -> m (Either RiakError (Set a))
 fetchRiakSet =
@@ -791,7 +785,7 @@ fetchRiakSet =
 updateRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle.
-  -> RiakLocation ('Just ('RiakSetTy a)) -- ^
+  -> RiakLocation ('Just ('RiakSetTy a)) -- ^ Bucket type, bucket, and key.
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters.
   -> m (Either RiakError (Set a))

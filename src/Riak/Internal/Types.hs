@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DerivingStrategies,
+{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DerivingStrategies,
              ExistentialQuantification, GADTs, GeneralizedNewtypeDeriving,
              InstanceSigs, KindSignatures, NoImplicitPrelude,
              OverloadedStrings, PatternSynonyms #-}
@@ -23,6 +23,7 @@ import Riak.Internal.Prelude
 data Modified a
   = Unmodified
   | Modified a
+  deriving (Eq, Functor, Show)
 
 
 data ObjectReturn

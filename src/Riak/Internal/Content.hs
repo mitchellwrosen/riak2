@@ -1,7 +1,8 @@
-{-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
-             GeneralizedNewtypeDeriving, InstanceSigs, LambdaCase, MagicHash,
-             MultiParamTypeClasses, NoImplicitPrelude, OverloadedStrings,
-             PatternSynonyms, TypeFamilies, UndecidableInstances #-}
+{-# LANGUAGE DataKinds, DeriveFunctor, DerivingStrategies, FlexibleContexts,
+             FlexibleInstances, GeneralizedNewtypeDeriving, InstanceSigs,
+             LambdaCase, MagicHash, MultiParamTypeClasses, NoImplicitPrelude,
+             OverloadedStrings, PatternSynonyms, TypeFamilies,
+             UndecidableInstances #-}
 
 module Riak.Internal.Content
   ( Charset(..)
@@ -35,7 +36,7 @@ data RiakContent a
       [RiakSecondaryIndex]    -- Secondary indexes
       Bool                    -- Deleted
       TTL                     -- TTL
-  deriving (Eq, Show)
+  deriving (Eq, Functor, Show)
 
 instance {-# OVERLAPPABLE #-}
     ( HasLens' f (RiakContent s) x a
