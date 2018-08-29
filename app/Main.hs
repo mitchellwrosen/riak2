@@ -520,36 +520,48 @@ printContent f mi content = do
 
   f (content ^. L.value)
 
-  for_ (content ^. L.contentType) (tag "content_type")
-  for_ (content ^. L.charset) (tag "charset")
-  for_ (content ^. L.contentEncoding) (tag "contentEncoding")
-  for_ (content ^. L.lastMod) (tag "last_mod")
+  for_ (content ^. L.contentType) (tag "content_type" . showContentType)
+  for_ (content ^. L.charset) (tag "charset" . showCharset)
+  for_ (content ^. L.contentEncoding) (tag "contentEncoding" . showContentEncoding)
+  for_ (content ^. L.lastMod) (tag "last_mod" . show)
 
   case unRiakMetadata (content ^. L.usermeta) of
     [] -> pure ()
-    xs -> tag "metadata" xs
+    xs -> tag "metadata" (show xs)
 
   case content ^. L.indexes of
     [] -> pure ()
-    xs -> tag "indexes" xs
+    xs -> tag "indexes" (show xs)
 
   when (content ^. L.deleted)
-    (tag "deleted" (content ^. L.deleted))
+    (tag "deleted" (show (content ^. L.deleted)))
 
-  for_ (unTTL (content ^. L.ttl)) (tag "ttl")
+  for_ (unTTL (content ^. L.ttl)) (tag "ttl" . show)
  where
-  tag :: Show a => String -> a -> IO ()
+  tag :: String -> String -> IO ()
   tag k v =
-    putStrLn (k ++ maybe "" (\i -> "[" ++ show i ++ "]") mi ++ " = " ++ show v)
+    putStrLn (k ++ maybe "" (\i -> "[" ++ show i ++ "]") mi ++ " = " ++ v)
 
 showBool :: Bool -> String
 showBool = \case
   False -> "false"
   True  -> "true"
 
+showCharset :: Charset -> String
+showCharset (Charset s) =
+  Latin1.unpack s
+
+showContentEncoding :: ContentEncoding -> String
+showContentEncoding (ContentEncoding s) =
+  Latin1.unpack s
+
+showContentType :: ContentType -> String
+showContentType (ContentType s) =
+  Latin1.unpack s
+
 showLocation :: RiakLocation ty -> String
 showLocation (RiakLocation (RiakNamespace type' bucket) key) =
-  show type' ++ "/" ++ show bucket ++ "/" ++ show key
+  show type' ++ " " ++ show bucket ++ " " ++ show key
 
 showModFun :: RpbModFun -> String
 showModFun fun =

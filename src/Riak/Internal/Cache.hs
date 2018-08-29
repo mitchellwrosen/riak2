@@ -10,6 +10,7 @@ import Control.Concurrent.STM
 import qualified StmContainers.Map as STM (Map)
 import qualified StmContainers.Map as STMMap
 
+import Riak.Internal.Debug
 import Riak.Internal.Prelude
 import Riak.Internal.Types
 
@@ -30,15 +31,27 @@ newSTMRiakCache = do
     STMMap.newIO
 
   pure RiakCache
-    { riakCacheLookup =
-        \loc ->
-          atomically (STMMap.lookup (SomeRiakLocation loc) cache)
+    { riakCacheLookup = do
+        \loc -> do
+          vclock <- atomically (STMMap.lookup (SomeRiakLocation loc) cache)
+          debug $
+            "[riak] cache lookup: " ++ show vclock ++ " <= " ++
+            debugShowLocation loc
+          pure vclock
 
     , riakCacheInsert =
-        \loc vclock ->
+        \loc vclock -> do
+          debug $
+            "[riak] cache insert: " ++ debugShowLocation loc ++ " => " ++
+            show vclock
           atomically (STMMap.insert vclock (SomeRiakLocation loc) cache)
 
     , riakCacheDelete =
-        \loc ->
+        \loc -> do
+          debug $ "[riak] cache delete: " ++ debugShowLocation loc
           atomically (STMMap.delete (SomeRiakLocation loc) cache)
     }
+
+debugShowLocation :: RiakLocation ty -> String
+debugShowLocation (RiakLocation (RiakNamespace type' bucket) key) =
+  show type' ++ " " ++ show bucket ++ " " ++ show key

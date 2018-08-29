@@ -118,7 +118,7 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
   resultVar :: MVar Message <-
     newEmptyMVar
 
-  debug (">>> " ++ show request)
+  debug ("[riak] send: " ++ show request)
 
   withMVar sem $ \() -> do
     riakSend conn request
@@ -135,7 +135,7 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
     recv = do
       result :: Either RiakError b <-
         parseResponse =<< takeMVar resultVar
-      debug ("<<< " ++ either show show result)
+      debug ("[riak] recv: " ++ either show show result)
       pure result
 
   recv `catch`
