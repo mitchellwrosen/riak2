@@ -117,8 +117,14 @@ data RiakError
 
 
 -- | A Solr index name.
+--
+-- /Note/: Must be ASCII.
 newtype RiakIndexName
   = RiakIndexName { unRiakIndexName :: ByteString }
+
+pattern RiakDontIndex :: RiakIndexName
+pattern RiakDontIndex
+  = RiakIndexName "_dont_index_"
 
 
 -- | A Riak key.

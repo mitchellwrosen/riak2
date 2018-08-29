@@ -96,6 +96,7 @@ module Riak.Internal
   , RiakContent(..)
   , RiakError(..)
   , RiakIndexName(..)
+  , pattern RiakDontIndex
   , RiakKey(..)
   , RiakLocation(..)
   , RiakMetadata(..)

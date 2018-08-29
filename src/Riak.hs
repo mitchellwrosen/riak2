@@ -95,6 +95,7 @@ module Riak
   , RiakError(..)
   , RiakHandle
   , RiakIndexName(..)
+  , pattern RiakDontIndex
   , RiakKey(..)
   , RiakLocation(..)
   , RiakMapEntries(..)
@@ -175,6 +176,31 @@ createRiakHandle host port = do
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'putRiakObject'.
+--
+-- == __Examples__
+--
+-- Get a 'Text' object at bucket type @"t"@, bucket @"b"@, key @"k"@. Note that
+-- the type application @\@Text@ is only necessary when type inference fails.
+--
+-- @
+-- let
+--   t = 'RiakBucketType' "t" :: 'RiakBucketType' ''Nothing'
+--   b = 'RiakBucket' "b"
+--   k = 'RiakKey' "k"
+-- in do
+--   result <-
+--     'getRiakObject' @'Text' h ('RiakLocation' ('RiakNamespace' t b) k) 'def'
+--
+--   case result of
+--     'Left' err ->
+--       {- Some Riak error -}
+--
+--     'Right' 'Nothing' ->
+--       {- The object does not exist -}
+--
+--     'Right' object ->
+--       {- The object does exist -}
+-- @
 getRiakObject
   :: forall a m.
      (IsRiakContent a, MonadIO m)
@@ -1503,24 +1529,24 @@ parseContent _ loc head
 
 -- TODO replace parseContent with parseContent', parseContentHead
 
-parseContent'
-  :: forall a.
-     IsRiakContent a
-  => RiakLocation 'Nothing
-  -> RpbContent
-  -> IO (RiakContent a)
-parseContent' =
-  _parseContent decodeRiakContent
+-- parseContent'
+--   :: forall a.
+--      IsRiakContent a
+--   => RiakLocation 'Nothing
+--   -> RpbContent
+--   -> IO (RiakContent a)
+-- parseContent' =
+--   _parseContent decodeRiakContent
 
-parseContentHead
-  :: forall a.
-     IsRiakContent a
-  => Proxy# a
-  -> RiakLocation 'Nothing
-  -> RpbContent
-  -> IO (RiakContent ())
-parseContentHead _ =
-  _parseContent (\_ _ _ _ -> Right ())
+-- parseContentHead
+--   :: forall a.
+--      IsRiakContent a
+--   => Proxy# a
+--   -> RiakLocation 'Nothing
+--   -> RpbContent
+--   -> IO (RiakContent ())
+-- parseContentHead _ =
+--   _parseContent (\_ _ _ _ -> Right ())
 
 
 _parseContent
@@ -1611,7 +1637,6 @@ unSetOp (RiakSetOp (adds, removes)) =
   ( map encodeRiakRegister (toList adds)
   , map encodeRiakRegister (toList removes)
   )
-
 
 -- $documentation
 --

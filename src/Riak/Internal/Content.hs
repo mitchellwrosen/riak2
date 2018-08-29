@@ -20,7 +20,6 @@ import Lens.Family2.Unchecked (lens)
 import Lens.Labels
 
 import qualified Data.Aeson as Aeson
-import qualified Data.Aeson.Encoding as Aeson (encodingToLazyByteString)
 import qualified Data.ByteString.Lazy as LazyByteString
 import qualified Data.Text.Encoding as Text
 
@@ -69,8 +68,8 @@ instance Functor f => HasLens' f (RiakContent a)                 "ttl"          
 -- object must have a content type, and may optionally have a character set and
 -- encoding.
 --
--- For convenience, three instances are provided by this library, to store
--- binary, textual, and JSON data.
+-- For convenience, instances are provided by this library, to store binary,
+-- textual, and JSON data.
 --
 -- +-----------------------------+----------------------------+------------------------------+------------------------------+
 -- |                             | Content type               | Charset                      | Content encoding             |
@@ -92,8 +91,8 @@ instance Functor f => HasLens' f (RiakContent a)                 "ttl"          
 -- regardless of its type, as it ignores the content type, charset, and
 -- encoding.
 --
--- JSON data can be stored using the 'JsonRiakContent' newtype wrapper, derived
--- using the @DerivingVia@ language extension as
+-- JSON data can be stored using a 'Aeson.Value' or the 'JsonRiakContent'
+-- newtype wrapper, which can be used in a @deriving via@ clause as e.g.
 --
 -- @
 -- data MyType = MyType ...
@@ -210,21 +209,33 @@ instance IsRiakContent Text where
         x ->
           error (show x)
 
+instance IsRiakContent Aeson.Value where
+  riakContentType :: Aeson.Value -> ContentType
+  riakContentType _ =
+    ContentType "application/json"
 
-newtype Charset
-  = Charset { unCharset :: ByteString }
-  deriving (Eq, Show)
+  encodeRiakContent :: Aeson.Value -> ByteString
+  encodeRiakContent =
+    LazyByteString.toStrict . Aeson.encode
 
+  decodeRiakContent
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
+    -> Either SomeException Aeson.Value
+  decodeRiakContent type' _ _ bytes =
+    case type' of
+      Just (ContentType "application/json") ->
+        case Aeson.eitherDecodeStrict' bytes of
+          Left err ->
+            error err
 
--- TODO ContentEncodingGzip
-newtype ContentEncoding
-  = ContentEncoding { unContentEncoding :: ByteString }
-  deriving (Eq, Show)
+          Right value ->
+            Right value
 
-
-newtype ContentType
-  = ContentType { unContentType :: ByteString }
-  deriving stock (Eq, Show)
+      x ->
+        error (show x)
 
 
 newtype JsonRiakContent a
@@ -238,8 +249,7 @@ instance (FromJSON a, ToJSON a) => IsRiakContent (JsonRiakContent a) where
 
   encodeRiakContent :: JsonRiakContent a -> ByteString
   encodeRiakContent =
-    LazyByteString.toStrict . Aeson.encodingToLazyByteString .
-      Aeson.toEncoding . unJsonRiakContent
+    LazyByteString.toStrict . Aeson.encode . unJsonRiakContent
 
   decodeRiakContent
     :: Maybe ContentType
@@ -259,3 +269,19 @@ instance (FromJSON a, ToJSON a) => IsRiakContent (JsonRiakContent a) where
 
       x ->
         error (show x)
+
+
+newtype Charset
+  = Charset { unCharset :: ByteString }
+  deriving (Eq, Show)
+
+
+-- TODO ContentEncodingGzip
+newtype ContentEncoding
+  = ContentEncoding { unContentEncoding :: ByteString }
+  deriving (Eq, Show)
+
+
+newtype ContentType
+  = ContentType { unContentType :: ByteString }
+  deriving stock (Eq, Show)
