@@ -27,6 +27,7 @@ instance Request RpbDelReq                 where requestCode = 13
 instance Request RpbGetBucketReq           where requestCode = 19
 instance Request RpbGetBucketTypeReq       where requestCode = 31
 instance Request RpbGetReq                 where requestCode =  9
+instance Request RpbIndexReq               where requestCode = 25
 instance Request RpbListBucketsReq         where requestCode = 15
 instance Request RpbListKeysReq            where requestCode = 17
 instance Request RpbMapRedReq              where requestCode = 23

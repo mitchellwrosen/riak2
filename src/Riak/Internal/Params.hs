@@ -1,5 +1,5 @@
 {-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses,
-             NoImplicitPrelude #-}
+             NoImplicitPrelude, TypeFamilies #-}
 
 module Riak.Internal.Params where
 
@@ -86,7 +86,7 @@ instance IsLabel "timeout"       (Word32     -> GetRiakObjectParams -> GetRiakOb
 data PutRiakObjectParams
   = PutRiakObjectParams
       !DW
-      ![RiakSecondaryIndex]
+      ![RiakIndex]
       !RiakMetadata
       !N
       !PW
@@ -97,14 +97,14 @@ data PutRiakObjectParams
 instance Default PutRiakObjectParams where
   def = PutRiakObjectParams (DW Nothing) [] (RiakMetadata []) (N Nothing) (PW Nothing) (SloppyQuorum Nothing) (Timeout Nothing) (W Nothing)
 
-instance IsLabel "dw"            (RiakQuorum                       -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \a (PutRiakObjectParams _ b c d e f g h) -> PutRiakObjectParams (coerce (Just a)) b c d e f g h
-instance IsLabel "indexes"       ([RiakSecondaryIndex]             -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \b (PutRiakObjectParams a _ c d e f g h) -> PutRiakObjectParams a b c d e f g h
-instance IsLabel "metadata"      ([(ByteString, Maybe ByteString)] -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \c (PutRiakObjectParams a b _ d e f g h) -> PutRiakObjectParams a b (RiakMetadata c) d e f g h
-instance IsLabel "n"             (Word32                           -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \d (PutRiakObjectParams a b c _ e f g h) -> PutRiakObjectParams a b c (coerce (Just d)) e f g h
-instance IsLabel "pw"            (RiakQuorum                       -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \e (PutRiakObjectParams a b c d _ f g h) -> PutRiakObjectParams a b c d (coerce (Just e)) f g h
-instance IsLabel "sloppy_quorum" (Bool                             -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \f (PutRiakObjectParams a b c d e _ g h) -> PutRiakObjectParams a b c d e (coerce (Just f)) g h
-instance IsLabel "timeout"       (Word32                           -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \g (PutRiakObjectParams a b c d e f _ h) -> PutRiakObjectParams a b c d e f (coerce (Just g)) h
-instance IsLabel "w"             (RiakQuorum                       -> PutRiakObjectParams -> PutRiakObjectParams) where fromLabel = \h (PutRiakObjectParams a b c d e f g _) -> PutRiakObjectParams a b c d e f g (coerce (Just h))
+instance (a ~ PutRiakObjectParams) => IsLabel "dw"            (RiakQuorum                       -> a -> PutRiakObjectParams) where fromLabel = \a (PutRiakObjectParams _ b c d e f g h) -> PutRiakObjectParams (coerce (Just a)) b c d e f g h
+instance (a ~ PutRiakObjectParams) => IsLabel "indexes"       ([RiakIndex]                      -> a -> PutRiakObjectParams) where fromLabel = \b (PutRiakObjectParams a _ c d e f g h) -> PutRiakObjectParams a b c d e f g h
+instance (a ~ PutRiakObjectParams) => IsLabel "metadata"      ([(ByteString, Maybe ByteString)] -> a -> PutRiakObjectParams) where fromLabel = \c (PutRiakObjectParams a b _ d e f g h) -> PutRiakObjectParams a b (RiakMetadata c) d e f g h
+instance (a ~ PutRiakObjectParams) => IsLabel "n"             (Word32                           -> a -> PutRiakObjectParams) where fromLabel = \d (PutRiakObjectParams a b c _ e f g h) -> PutRiakObjectParams a b c (coerce (Just d)) e f g h
+instance (a ~ PutRiakObjectParams) => IsLabel "pw"            (RiakQuorum                       -> a -> PutRiakObjectParams) where fromLabel = \e (PutRiakObjectParams a b c d _ f g h) -> PutRiakObjectParams a b c d (coerce (Just e)) f g h
+instance (a ~ PutRiakObjectParams) => IsLabel "sloppy_quorum" (Bool                             -> a -> PutRiakObjectParams) where fromLabel = \f (PutRiakObjectParams a b c d e _ g h) -> PutRiakObjectParams a b c d e (coerce (Just f)) g h
+instance (a ~ PutRiakObjectParams) => IsLabel "timeout"       (Word32                           -> a -> PutRiakObjectParams) where fromLabel = \g (PutRiakObjectParams a b c d e f _ h) -> PutRiakObjectParams a b c d e f (coerce (Just g)) h
+instance (a ~ PutRiakObjectParams) => IsLabel "w"             (RiakQuorum                       -> a -> PutRiakObjectParams) where fromLabel = \h (PutRiakObjectParams a b c d e f g _) -> PutRiakObjectParams a b c d e f g (coerce (Just h))
 
 
 -- | Optional @update data type@ parameters.
@@ -131,6 +131,24 @@ instance IsLabel "w"             (RiakQuorum -> UpdateRiakCrdtParams -> UpdateRi
 
 
 -- | Optional @search@ parameters.
+--
+-- +---------+--------------------------------------------------------------------+
+-- | df      | Default field                                                      |
+-- +---------+--------------------------------------------------------------------+
+-- | filter  | Filters search with additional query scoped to inline fields       |
+-- +---------+--------------------------------------------------------------------+
+-- | fl      | Fields to return information about                                 |
+-- +---------+--------------------------------------------------------------------+
+-- | op      | Default operator, @and@ or @or@                                    |
+-- +---------+--------------------------------------------------------------------+
+-- | presort | Presort, @key@ or @score@                                          |
+-- +---------+--------------------------------------------------------------------+
+-- | rows    | The maximum number of rows to return                               |
+-- +---------+--------------------------------------------------------------------+
+-- | sort    | How the search results are to be sorted, @asc@ or @desc@           |
+-- +---------+--------------------------------------------------------------------+
+-- | start   | A start offset; the number of keys to skip before returning values |
+-- +---------+--------------------------------------------------------------------+
 data RiakSearchParams
   = RiakSearchParams
       !DF

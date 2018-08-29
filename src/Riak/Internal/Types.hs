@@ -32,6 +32,11 @@ data ObjectReturn
   | ObjectReturnBody
 
 
+data RiakExactQuery
+  = RiakExactQueryInt !RiakIndexName !Int64
+  | RiakExactQueryBin !RiakIndexName !ByteString
+
+
 -- | A Riak bucket.
 newtype RiakBucket
   = RiakBucket { unRiakBucket :: ByteString }
@@ -116,15 +121,15 @@ data RiakError
   deriving anyclass (Exception)
 
 
--- | A Solr index name.
---
--- /Note/: Must be ASCII.
+data RiakIndex
+  = RiakIndexInt !RiakIndexName !Int64
+  | RiakIndexBin !RiakIndexName !ByteString
+  deriving (Eq, Show)
+
+
 newtype RiakIndexName
   = RiakIndexName { unRiakIndexName :: ByteString }
-
-pattern RiakDontIndex :: RiakIndexName
-pattern RiakDontIndex
-  = RiakIndexName "_dont_index_"
+  deriving (Eq, Show)
 
 
 -- | A Riak key.
@@ -194,19 +199,24 @@ pattern RiakQuorumQuorum :: RiakQuorum
 pattern RiakQuorumQuorum = 4294967293
 
 
+-- | A Solr index name.
+--
+-- /Note/: Must be ASCII.
+newtype SolrIndexName
+  = SolrIndexName { unSolrIndexName :: ByteString }
+
+pattern DontIndex :: SolrIndexName
+pattern DontIndex
+  = SolrIndexName "_dont_index_"
+
+
 -- | A Solr schema name.
-newtype RiakSchemaName
-  = RiakSchemaName { unRiakSchemaName :: ByteString }
+newtype SolrSchemaName
+  = SolrSchemaName { unSolrSchemaName :: ByteString }
 
-pattern DefaultRiakSchemaName :: RiakSchemaName
-pattern DefaultRiakSchemaName =
-  RiakSchemaName "_yz_default"
-
-
-data RiakSecondaryIndex
-  = RiakSecondaryIndexInt !ByteString !Int64
-  | RiakSecondaryIndexBin !ByteString !ByteString
-  deriving (Eq, Show)
+pattern DefaultSolrSchemaName :: SolrSchemaName
+pattern DefaultSolrSchemaName =
+  SolrSchemaName "_yz_default"
 
 
 data SBool :: Bool -> Type where

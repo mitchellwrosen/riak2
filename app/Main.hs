@@ -18,16 +18,15 @@ import Prelude                    hiding (head, return)
 import Text.Read                  (readMaybe)
 
 import qualified Data.ByteString.Base64 as Base64
-import qualified Data.ByteString.Char8 as Latin1
-import qualified Data.Text             as Text
-import qualified Data.Text.IO          as Text
+import qualified Data.ByteString.Char8  as Latin1
+import qualified Data.ByteString.UTF8   as Utf8
+import qualified Data.Text              as Text
+import qualified Data.Text.IO           as Text
 
 import Riak
 import Riak.Internal (RpbBucketProps, RpbGetServerInfoResp, RpbModFun)
 
 import qualified Riak.Lenses as L
-
--- TODO riak-cli take host/port as arguments
 
 main :: IO ()
 main =
@@ -80,7 +79,7 @@ parser =
         , command "TODO" (info empty mempty)
         ]
       , [ commandGroup "Secondary indexes (2i)"
-        , command "TODO" (info empty mempty)
+        , queryParser
         ]
       , [ commandGroup "Search 2.0"
         , getSchemaParser
@@ -191,7 +190,7 @@ getSchemaParser =
     "get-schema"
     (info
       (doGetSchema
-        <$> (fmap RiakSchemaName . strArgument)
+        <$> (fmap SolrSchemaName . strArgument)
               (mconcat
                 [ help "Schema name"
                 , metavar "SCHEMA"
@@ -253,6 +252,27 @@ putObjectParser =
         <*> wOption)
       (progDesc "Put an object"))
 
+queryParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+queryParser =
+  command
+    "2i"
+    (info
+      (do2i
+        <$> bucketTypeArgument
+        <*> bucketArgument
+        <*> (RiakIndexName <$>
+              strArgument
+                (mconcat
+                  [ help "Secondary index name"
+                  , metavar "INDEX"
+                  ]))
+        <*> strArgument
+              (mconcat
+                [ help "Value (integer or string)"
+                , metavar "VALUE"
+                ]))
+      (progDesc "Search using secondary indexes"))
+
 -- TODO riak-cli allow decrementing counters
 updateCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 updateCounterParser =
@@ -272,6 +292,26 @@ updateCounterParser =
 --------------------------------------------------------------------------------
 -- Implementations
 --------------------------------------------------------------------------------
+
+do2i
+  :: RiakBucketType 'Nothing
+  -> RiakBucket
+  -> RiakIndexName
+  -> [Char]
+  -> HostName
+  -> PortNumber
+  -> IO ()
+do2i type' bucket index bytes host port = do
+  h <- createRiakHandle host port
+  either print (\() -> pure ()) =<<
+    riakExactQuery h (RiakNamespace type' bucket) query
+      (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
+ where
+  query :: RiakExactQuery
+  query =
+    case readMaybe bytes of
+      Just n  -> RiakExactQueryInt index n
+      Nothing -> RiakExactQueryBin index (Utf8.fromString bytes)
 
 doDeleteObject :: RiakLocation ty -> HostName -> PortNumber -> IO ()
 doDeleteObject loc host port = do
@@ -368,7 +408,7 @@ doGetObject f loc head params host port = do
         for_ (zip [(0::Int)..] contents) $ \(i, content) ->
           printContent (g i) (Just i) content
 
-doGetSchema :: RiakSchemaName -> HostName -> PortNumber -> IO ()
+doGetSchema :: SolrSchemaName -> HostName -> PortNumber -> IO ()
 doGetSchema schema host port = do
   h <- createRiakHandle host port
   either print print =<<

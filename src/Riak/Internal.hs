@@ -39,6 +39,7 @@ module Riak.Internal
   , putRiakObjectPB
   , putRiakSchemaPB
   , resetRiakBucketPropsPB
+  , riakIndexPB
   , riakMapReducePB
   , RiakSearchParams(..)
   , riakSearchPB
@@ -95,8 +96,9 @@ module Riak.Internal
   , pattern DefaultRiakBucketType
   , RiakContent(..)
   , RiakError(..)
+  , RiakExactQuery(..)
+  , RiakIndex(..)
   , RiakIndexName(..)
-  , pattern RiakDontIndex
   , RiakKey(..)
   , RiakLocation(..)
   , RiakMetadata(..)
@@ -104,12 +106,13 @@ module Riak.Internal
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
-  , RiakSchemaName(..)
-  , pattern DefaultRiakSchemaName
-  , RiakSecondaryIndex(..)
   , RiakVclock(..)
   , RiakVtag(..)
   , SloppyQuorum(..)
+  , SolrIndexName(..)
+  , pattern DontIndex
+  , SolrSchemaName(..)
+  , pattern DefaultSolrSchemaName
   , Sort(..)
   , Start(..)
   , Timeout(..)
@@ -344,6 +347,13 @@ resetRiakBucketPropsPB
   -> IO (Either RiakError RpbResetBucketResp)
 resetRiakBucketPropsPB =
   riakExchange
+
+riakIndexPB
+  :: RiakConnection -- ^
+  -> RpbIndexReq -- ^
+  -> ListT (ExceptT RiakError IO) RpbIndexResp
+riakIndexPB conn =
+  riakStream conn (view #done)
 
 riakMapReducePB
   :: RiakConnection -- ^

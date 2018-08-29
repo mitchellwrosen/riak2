@@ -86,6 +86,7 @@ executable riakc
     , optparse-applicative
     , network
     , riak-but-better
+    , utf8-string
     , text
     , transformers
     , unordered-containers

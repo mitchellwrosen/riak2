@@ -23,28 +23,37 @@ module Riak
   , putNewRiakObjectBody
     -- ** Delete object
   , deleteRiakObject
-    -- * Data type operations
-    -- ** Counter
+    -- * Counter operations
+    -- ** Get counter
   , getRiakCounter
+    -- ** Update counter
   , updateRiakCounter
   , updateNewRiakCounter
-    -- ** Grow-only set
+    -- * Grow-only set operations
+    -- ** Get grow-only set
   , getRiakGrowOnlySet
-    -- ** HyperLogLog
+    -- ** Update grow-only set
+    -- * HyperLogLog operations
+    -- ** Get HyperLogLog
   , getRiakHyperLogLog
-    -- ** Set
+    -- ** Update HyperLogLog
+    -- * Set operations
+    -- ** Get set
   , getRiakSet
+    -- ** Update set
   , updateRiakSet
   , updateNewRiakSet
   , riakSetAddOp
   , riakSetRemoveOp
-    -- ** Map
+    -- * Map operations
   , getRiakMap
+    -- ** Get map
   , riakCounterField
   , riakFlagField
   , riakMapField
   , riakRegisterField
   , riakSetField
+    -- ** Update map
   -- , allowExtraKeys
     -- * Bucket operations
   , getRiakBucketTypeProps
@@ -60,6 +69,7 @@ module Riak
     -- * MapReduce
   , riakMapReduce
     -- * Secondary indexes (2i)
+  , riakExactQuery
     -- * Search 2.0
     -- ** Search
   , riakSearch
@@ -86,6 +96,7 @@ module Riak
   , IsRiakSet
   , JsonRiakContent(..)
   , Modified(..)
+  , PutRiakObjectParams
   , RiakBucket(..)
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
@@ -93,9 +104,10 @@ module Riak
   , RiakCrdtError(..)
   , RiakCrdtTy(..)
   , RiakError(..)
+  , RiakExactQuery(..)
   , RiakHandle
+  , RiakIndex(..)
   , RiakIndexName(..)
-  , pattern RiakDontIndex
   , RiakKey(..)
   , RiakLocation(..)
   , RiakMapEntries(..)
@@ -106,12 +118,13 @@ module Riak
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
-  , RiakSchemaName(..)
-  , pattern DefaultRiakSchemaName
-  , RiakSecondaryIndex(..)
+  , RiakSearchParams
   , RiakSetOp
   , RiakVtag(..)
-  , PutRiakObjectParams
+  , SolrIndexName(..)
+  , pattern DontIndex
+  , SolrSchemaName(..)
+  , pattern DefaultSolrSchemaName
   , TTL(..)
   , UpdateRiakCrdtParams
     -- * Re-exports
@@ -464,7 +477,7 @@ _putRiakObject
   -> Maybe RiakKey
   -> a
   -> DW
-  -> [RiakSecondaryIndex]
+  -> [RiakIndex]
   -> RiakMetadata
   -> N
   -> PW
@@ -1273,9 +1286,60 @@ riakMapReduce (RiakHandle manager _) request k =
 
 
 --------------------------------------------------------------------------------
+-- Secondary indexes
+--------------------------------------------------------------------------------
+
+riakExactQuery
+  :: RiakHandle
+  -> RiakNamespace 'Nothing
+  -> RiakExactQuery
+  -> (ListT (ExceptT RiakError IO) RiakKey -> IO r)
+  -> IO r
+riakExactQuery
+    (RiakHandle manager _) (RiakNamespace type' bucket) query k =
+  withRiakConnection manager $ \conn -> k $ do
+    response :: RpbIndexResp <-
+      riakIndexPB conn request
+    ListT.select (coerce (response ^. #keys) :: [RiakKey])
+ where
+  request :: RpbIndexReq
+  request =
+    RpbIndexReq
+      { _RpbIndexReq'_unknownFields = []
+      , _RpbIndexReq'bucket         = unRiakBucket bucket
+      , _RpbIndexReq'continuation   = Nothing
+      , _RpbIndexReq'coverContext   = Nothing
+      , _RpbIndexReq'index          = unRiakIndexName index
+      , _RpbIndexReq'key            = Just key
+      , _RpbIndexReq'maxResults     = Nothing
+      , _RpbIndexReq'paginationSort = Nothing
+      , _RpbIndexReq'qtype          = RpbIndexReq'eq
+      , _RpbIndexReq'rangeMax       = Nothing
+      , _RpbIndexReq'rangeMin       = Nothing
+      , _RpbIndexReq'returnBody     = Nothing
+      , _RpbIndexReq'returnTerms    = Nothing
+      , _RpbIndexReq'stream         = Just True
+      , _RpbIndexReq'termRegex      = Nothing
+      , _RpbIndexReq'timeout        = Nothing
+      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
+      }
+
+  index :: RiakIndexName
+  key :: ByteString
+  (index, key) =
+    case query of
+      -- TODO better int -> bytestring
+      RiakExactQueryInt (RiakIndexName idx) n ->
+        (RiakIndexName (idx <> "_int"), Latin1.pack (show n))
+
+      RiakExactQueryBin (RiakIndexName idx) val ->
+        (RiakIndexName (idx <> "_bin"), val)
+
+--------------------------------------------------------------------------------
 -- Search 2.0
 --------------------------------------------------------------------------------
 
+-- | Execute a search.
 riakSearch
   :: RiakHandle -- ^ Riak handle
   -> ByteString -- ^ Query
@@ -1308,7 +1372,7 @@ riakSearch (RiakHandle manager _)
 getRiakSchema
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakSchemaName -- ^ Schema name
+  -> SolrSchemaName -- ^ Schema name
   -> m (Either RiakError (Maybe RpbYokozunaSchemaGetResp))
 getRiakSchema (RiakHandle manager _) schema = liftIO $
   withRiakConnection manager
@@ -1319,14 +1383,14 @@ getRiakSchema (RiakHandle manager _) schema = liftIO $
   request =
     RpbYokozunaSchemaGetReq
       { _RpbYokozunaSchemaGetReq'_unknownFields = []
-      , _RpbYokozunaSchemaGetReq'name           = unRiakSchemaName schema
+      , _RpbYokozunaSchemaGetReq'name           = unSolrSchemaName schema
       }
 
 
 putRiakSchema
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakSchemaName -- ^ Schema name
+  -> SolrSchemaName -- ^ Schema name
   -> ByteString -- ^ Schema contents
   -> m (Either RiakError ())
 putRiakSchema (RiakHandle manager _) name bytes = liftIO $
@@ -1342,7 +1406,7 @@ putRiakSchema (RiakHandle manager _) name bytes = liftIO $
           RpbYokozunaSchema
             { _RpbYokozunaSchema'_unknownFields = []
             , _RpbYokozunaSchema'content        = Just bytes
-            , _RpbYokozunaSchema'name           = unRiakSchemaName name
+            , _RpbYokozunaSchema'name           = unSolrSchemaName name
             }
       }
 
@@ -1404,7 +1468,7 @@ putRiakIndex
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakIndexName -- ^
-  -> RiakSchemaName -- ^
+  -> SolrSchemaName -- ^
   -> m (Either RiakError ())
 putRiakIndex (RiakHandle manager _) index schema = liftIO $
   fmap (() <$)
@@ -1420,7 +1484,7 @@ putRiakIndex (RiakHandle manager _) index schema = liftIO $
              { _RpbYokozunaIndex'_unknownFields = []
              , _RpbYokozunaIndex'nVal           = Nothing -- TODO putRiakIndex n_val
              , _RpbYokozunaIndex'name           = unRiakIndexName index
-             , _RpbYokozunaIndex'schema         = Just (unRiakSchemaName schema)
+             , _RpbYokozunaIndex'schema         = Just (unSolrSchemaName schema)
              }
       , _RpbYokozunaIndexPutReq'timeout         = Nothing -- TODO putRiakIndex timeout
       }
@@ -1594,24 +1658,30 @@ _parseContent parse loc
     (TTL ttl)
 
 
-indexToRpbPair :: RiakSecondaryIndex -> RpbPair
+indexToRpbPair :: RiakIndex -> RpbPair
 indexToRpbPair = \case
-  RiakSecondaryIndexInt k v ->
-    RpbPair k (Just (Latin1.pack (show v))) [] -- TODO more efficient show
+  RiakIndexInt k v ->
+    RpbPair
+      (unRiakIndexName k <> "_int")
+      (Just (Latin1.pack (show v))) -- TODO more efficient show
+      []
 
-  RiakSecondaryIndexBin k v ->
-    RpbPair k (Just v) []
+  RiakIndexBin k v ->
+    RpbPair
+      (unRiakIndexName k <> "_bin")
+      (Just v)
+      []
 
 
-rpbPairToIndex :: RpbPair -> RiakSecondaryIndex
+rpbPairToIndex :: RpbPair -> RiakIndex
 rpbPairToIndex = \case
   RpbPair (ByteString.stripSuffix "_bin" -> Just k) (Just v) _ ->
-    RiakSecondaryIndexBin k v
+    RiakIndexBin (RiakIndexName k) v
 
   RpbPair
       (ByteString.stripSuffix "_int" -> Just k)
       (Just (readMaybe . Latin1.unpack -> Just v)) _ ->
-    RiakSecondaryIndexInt k v -- TODO better read
+    RiakIndexInt (RiakIndexName k) v -- TODO better read
 
   -- TODO what to do if index value is empty...?
   _ ->
