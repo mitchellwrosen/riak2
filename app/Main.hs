@@ -17,6 +17,7 @@ import Options.Applicative
 import Prelude                    hiding (head, return)
 import Text.Read                  (readMaybe)
 
+import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
 import qualified Data.Text.IO          as Text
@@ -46,6 +47,7 @@ parser =
     <*>
     (asum . map (hsubparser . mconcat))
       [ [ commandGroup "Object operations"
+        , getBinaryObjectParser
         , getTextObjectParser
         , putObjectParser
           -- TODO riak-cli put-new-object
@@ -99,6 +101,21 @@ deleteObjectParser =
         <$> locationArgument)
         -- TODO delete optional params
       (progDesc "Delete an object"))
+
+getBinaryObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+getBinaryObjectParser =
+  command
+    "get-binary"
+    (info
+      (doGetBinaryObject
+        <$> locationArgument
+        <*> switch
+              (mconcat
+                [ long "head"
+                , help "Head"
+                ])
+        <*> getObjectParamsOptions)
+      (progDesc "Get a binary object"))
 
 getCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getCounterParser =
@@ -261,6 +278,19 @@ doDeleteObject loc host port = do
   h <- createRiakHandle host port
   either print (\() -> pure ()) =<<
     deleteRiakObject h loc
+
+doGetBinaryObject
+  :: RiakLocation 'Nothing
+  -> Bool
+  -> GetRiakObjectParams
+  -> HostName
+  -> PortNumber
+  -> IO ()
+doGetBinaryObject =
+  doGetObject
+    (\i s ->
+      Latin1.putStrLn
+        ("value[" <> Latin1.pack (show i) <> "] = " <> Base64.encode s))
 
 doGetBucketProps
   :: RiakBucketType ty

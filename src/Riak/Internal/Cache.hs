@@ -16,6 +16,7 @@ import Riak.Internal.Types
 
 -- TODO cache ttl
 -- TODO expose cache interface in .Internal
+-- TODO don't accidentally cache data types' vclocks
 
 data RiakCache
   = RiakCache

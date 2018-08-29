@@ -79,6 +79,7 @@ library
 executable riakc
   build-depends:
       base
+    , base64-bytestring
     , bytestring
     , lens-family
     , list-transformer
