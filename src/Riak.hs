@@ -248,7 +248,7 @@ _getRiakObject
   -> Timeout
   -> m (Either RiakError (GetRiakObjectResp head if_modified a))
 _getRiakObject
-    handle@(RiakHandle manager cache)
+    h@(RiakHandle manager cache)
     loc@(RiakLocation (RiakNamespace type' bucket) key)
     basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
     liftIO . runExceptT $ do
@@ -295,7 +295,7 @@ _getRiakObject
     (IfModified, Just True) ->
       pure ()
     _ -> do
-      cacheVclock handle loc (coerce (response ^. #maybe'vclock))
+      cacheVclock h loc (coerce (response ^. #maybe'vclock))
 
   lift (mkResponse response)
 
@@ -303,7 +303,7 @@ _getRiakObject
   mkResponse
     :: RpbGetResp
     -> IO (GetRiakObjectResp head if_modified a)
-  mkResponse (RpbGetResp content _ unchanged _) =
+  mkResponse (RpbGetResp (filter notTombstone -> content) _ unchanged _) =
     case if_modified of
       IfModified ->
         case unchanged of
@@ -448,7 +448,7 @@ _putRiakObject
   -> W
   -> m (Either RiakError (ObjectReturnTy a return))
 _putRiakObject
-    handle@(RiakHandle manager cache) namespace@(RiakNamespace type' bucket) key
+    h@(RiakHandle manager cache) namespace@(RiakNamespace type' bucket) key
     value dw indexes metadata n pw return sloppy_quorum timeout
     w = liftIO . runExceptT $ do
 
@@ -542,7 +542,7 @@ _putRiakObject
             nonsense "missing vclock"
 
           Just theVclock ->
-            cacheVclock handle loc (Just (coerce theVclock))
+            cacheVclock h loc (Just (coerce theVclock))
 
     () <-
       case return of
@@ -576,8 +576,7 @@ _putRiakObject
 -- Delete object
 --------------------------------------------------------------------------------
 
--- TODO deleteRiakObject figure out when vclock is required (always?)
--- TODO deleteRiakObject params
+-- | Delete an object or data type.
 deleteRiakObject
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
@@ -613,6 +612,7 @@ deleteRiakObject
   fmap (() <$)
     (withRiakConnection manager (\conn -> deleteRiakObjectPB conn request))
 
+
 --------------------------------------------------------------------------------
 -- Get counter
 --------------------------------------------------------------------------------
@@ -628,9 +628,8 @@ getRiakCounter
   -> RiakLocation ('Just 'RiakCounterTy) -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError Int64)
-getRiakCounter handle loc (GetRiakObjectParams a b c d e f g) =
-  getCrdt handle loc
-    (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
+getRiakCounter h loc (GetRiakObjectParams a b c d e f g) =
+  getCrdt h loc (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
 
 
 --------------------------------------------------------------------------------
@@ -649,8 +648,8 @@ updateRiakCounter
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError Int64)
-updateRiakCounter handle (RiakLocation namespace key) incr params =
-  (fmap.fmap) snd (_updateRiakCounter handle namespace (Just key) incr params)
+updateRiakCounter h (RiakLocation namespace key) incr params =
+  (fmap.fmap) snd (_updateRiakCounter h namespace (Just key) incr params)
 
 
 -- | Update a new counter and return its randomly-generated key.
@@ -665,8 +664,8 @@ updateNewRiakCounter
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError RiakKey)
-updateNewRiakCounter handle namespace incr params =
-  (fmap.fmap) fst (_updateRiakCounter handle namespace Nothing incr params)
+updateNewRiakCounter h namespace incr params =
+  (fmap.fmap) fst (_updateRiakCounter h namespace Nothing incr params)
 
 _updateRiakCounter
   :: MonadIO m
@@ -676,9 +675,9 @@ _updateRiakCounter
   -> Int64
   -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey, Int64))
-_updateRiakCounter handle namespace key incr params =
+_updateRiakCounter h namespace key incr params =
   (fmap.fmap.fmap) (view #counterValue)
-    (updateCrdt handle namespace key Nothing op params)
+    (updateCrdt h namespace key Nothing op params)
  where
   op :: DtOp
   op =
@@ -806,8 +805,8 @@ updateRiakSet
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (Set a))
-updateRiakSet handle (RiakLocation namespace key) op params =
-  (fmap.fmap) snd (_updateSet handle namespace (Just key) op params)
+updateRiakSet h (RiakLocation namespace key) op params =
+  (fmap.fmap) snd (_updateSet h namespace (Just key) op params)
 
 -- | Update a new set and return its randomly-generated key.
 --
@@ -820,8 +819,8 @@ updateNewRiakSet
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError RiakKey)
-updateNewRiakSet handle namespace op params =
-  (fmap.fmap) fst (_updateSet handle namespace Nothing op params)
+updateNewRiakSet h namespace op params =
+  (fmap.fmap) fst (_updateSet h namespace Nothing op params)
 
 -- TODO _updateSet use same conn for get-put
 _updateSet
@@ -834,7 +833,7 @@ _updateSet
   -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey, Set a))
 _updateSet
-    handle@(RiakHandle _ cache) namespace key (unSetOp -> (adds, removes))
+    h@(RiakHandle _ cache) namespace key (unSetOp -> (adds, removes))
     params = liftIO . runExceptT $ do
 
   -- Be a good citizen and perhaps include the cached causal context with this
@@ -880,7 +879,7 @@ _updateSet
               case context of
                 -- (3b)
                 Nothing -> do
-                  _ <- ExceptT (getRiakSet handle loc def)
+                  _ <- ExceptT (getRiakSet h loc def)
                   lift (riakCacheLookup cache loc)
 
                 -- (3a)
@@ -888,7 +887,7 @@ _updateSet
                   pure (Just context')
 
   (key', value) <-
-    ExceptT (updateCrdt handle namespace key context op params)
+    ExceptT (updateCrdt h namespace key context op params)
 
   let
     loc :: RiakLocation ('Just ('RiakSetTy a))
@@ -927,8 +926,7 @@ getCrdt
   -> GetRiakCrdtParams
   -> m (Either RiakError (CrdtVal ty))
 getCrdt
-    handle@(RiakHandle manager _)
-    loc@(RiakLocation (RiakNamespace type' bucket) key)
+    h@(RiakHandle manager _) loc@(RiakLocation (RiakNamespace type' bucket) key)
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
@@ -951,7 +949,7 @@ getCrdt
 
       when shouldCache $
         cacheVclock
-          handle
+          h
           loc
           (coerce (response ^. #maybe'context))
 
@@ -1447,6 +1445,12 @@ cacheVclock
   -> m ()
 cacheVclock (RiakHandle _ cache) loc =
   liftIO . maybe (riakCacheDelete cache loc) (riakCacheInsert cache loc)
+
+
+notTombstone :: RpbContent -> Bool
+notTombstone content =
+  not (content ^. #deleted)
+
 
 
 parseContent

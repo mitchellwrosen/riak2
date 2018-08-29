@@ -24,7 +24,7 @@ import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 import qualified Streaming                      as Streaming
 import qualified Streaming.Prelude              as Streaming
 
--- import Riak.Internal.Debug
+import Riak.Internal.Debug
 import Riak.Internal.Message
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
@@ -118,7 +118,7 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
   resultVar :: MVar Message <-
     newEmptyMVar
 
-  -- debug (">>> " ++ show request)
+  debug (">>> " ++ show request)
 
   withMVar sem $ \() -> do
     riakSend conn request
@@ -135,7 +135,7 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
     recv = do
       result :: Either RiakError b <-
         parseResponse =<< takeMVar resultVar
-      -- debug ("<<< " ++ either show show result)
+      debug ("<<< " ++ either show show result)
       pure result
 
   recv `catch`

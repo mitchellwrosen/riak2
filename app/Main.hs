@@ -49,6 +49,7 @@ parser =
         , getTextObjectParser
         , putObjectParser
           -- TODO riak-cli put-new-object
+        , deleteObjectParser
         ]
       , [ commandGroup "Counter operations"
         , getCounterParser
@@ -88,6 +89,16 @@ parser =
         , infoParser'
         ]
       ]
+
+deleteObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
+deleteObjectParser =
+  command
+    "delete"
+    (info
+      (doDeleteObject
+        <$> locationArgument)
+        -- TODO delete optional params
+      (progDesc "Delete an object"))
 
 getCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 getCounterParser =
@@ -244,6 +255,12 @@ updateCounterParser =
 --------------------------------------------------------------------------------
 -- Implementations
 --------------------------------------------------------------------------------
+
+doDeleteObject :: RiakLocation ty -> HostName -> PortNumber -> IO ()
+doDeleteObject loc host port = do
+  h <- createRiakHandle host port
+  either print (\() -> pure ()) =<<
+    deleteRiakObject h loc
 
 doGetBucketProps
   :: RiakBucketType ty
