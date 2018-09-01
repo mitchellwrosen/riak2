@@ -69,7 +69,9 @@ module Riak
     -- * MapReduce
   , riakMapReduce
     -- * Secondary indexes (2i)
+    -- $secondary-indexes
   , riakExactQuery
+  , riakRangeQuery
     -- * Search 2.0
     -- ** Search
   , riakSearch
@@ -118,6 +120,7 @@ module Riak
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
+  , RiakRangeQuery(..)
   , RiakSearchParams
   , RiakSetOp
   , RiakVtag(..)
@@ -190,7 +193,7 @@ createRiakHandle host port = do
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'putRiakObject'.
 --
--- == __Examples__
+-- === __Examples__
 --
 -- Get a 'Text' object at bucket type @"t"@, bucket @"b"@, key @"k"@. Note that
 -- the type application @\@Text@ is only necessary when type inference fails.
@@ -444,118 +447,6 @@ getRiakObjectIfModifiedHead
           lift (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
 
       pure (Modified contents)
-
--- -- TODO delete _getRiakObject and inline its logic in the 4 variants?
--- _getRiakObject
---   :: forall a head if_modified m.
---      (IsRiakContent a, MonadIO m)
---   => RiakHandle
---   -> RiakLocation 'Nothing
---   -> BasicQuorum
---   -> Head a head
---   -> IfModified if_modified
---   -> N
---   -> NotfoundOk
---   -> PR
---   -> R
---   -> SloppyQuorum
---   -> Timeout
---   -> m (Either RiakError (GetRiakObjectResp head if_modified a))
--- _getRiakObject
---     (RiakHandle manager cache)
---     loc@(RiakLocation (RiakNamespace type' bucket) key)
---     basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
---     liftIO . runExceptT $ do
-
---   vclock :: Maybe RiakVclock <-
---     case if_modified of
---       IfModified   -> lift (riakCacheLookup cache loc)
---       NoIfModified -> pure Nothing
-
---   let
---     request :: RpbGetReq
---     request =
---       RpbGetReq
---         { _RpbGetReq'_unknownFields = []
---         , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
---         , _RpbGetReq'bucket         = unRiakBucket bucket
---         , _RpbGetReq'deletedvclock  = Just True
---         , _RpbGetReq'head           =
---             case head of
---               Head   -> Just True
---               NoHead -> Nothing
---         , _RpbGetReq'ifModified     =
---             case if_modified of
---               IfModified   -> coerce vclock
---               NoIfModified -> Nothing
---         , _RpbGetReq'key            = unRiakKey key
---         , _RpbGetReq'nVal           = coerce n
---         , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
---         , _RpbGetReq'pr             = coerce pr
---         , _RpbGetReq'r              = coerce r
---         , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
---         , _RpbGetReq'timeout        = unTimeout timeout
---         , _RpbGetReq'type'          = Just (unRiakBucketType type')
---         }
-
---   response :: RpbGetResp <-
---     ExceptT
---       (withRiakConnection manager
---         (\conn -> getRiakObjectPB conn request))
-
---   lift (mkResponse response)
-
-  -- -- Only cache the vclock if we didn't receive an "unmodified" response (which
-  -- -- doesn't contain a vclock)
-  -- case (if_modified, response ^. #maybe'unchanged) of
-  --   (IfModified, Just True) ->
-  --     pure ()
-  --   _ ->
-  --     -- Whoops, one more check: don't overwrite CRDT causal context in case we
-  --     -- are weirdly fetching the binary blob as an object, for some reason.
-  --     unless (isDataTypeGetResp response)
-  --       (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
-
-  -- lift (mkResponse response)
-
- -- where
- --  mkResponse
- --    :: RpbGetResp
- --    -> IO (GetRiakObjectResp head if_modified a)
- --  mkResponse (RpbGetResp (filter notTombstone -> content) _ unchanged _) =
- --    case if_modified of
- --      IfModified ->
- --        case unchanged of
- --          Just True ->
- --            pure Unmodified
-
- --          _ ->
- --            Modified <$> contents
-
- --      NoIfModified ->
- --        contents
-
- --   where
- --    contents :: IO [RiakContent (If head () a)]
- --    contents =
- --      traverse (parseContent @a proxy# loc headAsBool) content
- --     where
- --      headAsBool :: SBool head
- --      headAsBool =
- --        case head of
- --          Head   -> STrue
- --          NoHead -> SFalse
-
-      -- headAsBool' :: Bool
-      -- headAsBool' =
-      --   case head of
-      --     Head -> True
-      --     NoHead -> False
-
-  -- -- Did we just get a data type?
-  -- isDataTypeGetResp :: RpbGetResp -> Bool
-  -- isDataTypeGetResp =
-  --   maybe False (`elem` crdtContentTypes) . (^. #maybe'contentType)
 
 --------------------------------------------------------------------------------
 -- Put object
@@ -1473,11 +1364,20 @@ riakMapReduce (RiakHandle manager _) request k =
 -- Secondary indexes
 --------------------------------------------------------------------------------
 
+-- $secondary-indexes
+--
+-- * <http://docs.basho.com/riak/kv/2.2.3/using/reference/secondary-indexes/>
+--
+-- * <http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/secondary-indexes/>
+
+-- | Perform an exact query on a secondary index.
+--
+-- TODO 2i query paging
 riakExactQuery
-  :: RiakHandle
-  -> RiakNamespace 'Nothing
-  -> RiakExactQuery
-  -> (ListT (ExceptT RiakError IO) RiakKey -> IO r)
+  :: RiakHandle -- ^
+  -> RiakNamespace 'Nothing -- ^
+  -> RiakExactQuery -- ^
+  -> (ListT (ExceptT RiakError IO) RiakKey -> IO r) -- ^
   -> IO r
 riakExactQuery
     (RiakHandle manager _) (RiakNamespace type' bucket) query k =
@@ -1509,15 +1409,84 @@ riakExactQuery
       }
 
   index :: RiakIndexName
-  key :: ByteString
-  (index, key) =
+  index =
     case query of
-      -- TODO better int -> bytestring
-      RiakExactQueryInt (RiakIndexName idx) n ->
-        (RiakIndexName (idx <> "_int"), Latin1.pack (show n))
+      RiakExactQueryBin (RiakIndexName idx) _ ->
+        RiakIndexName (idx <> "_bin")
 
-      RiakExactQueryBin (RiakIndexName idx) val ->
-        (RiakIndexName (idx <> "_bin"), val)
+      RiakExactQueryInt (RiakIndexName idx) _ ->
+        RiakIndexName (idx <> "_int")
+
+  key :: ByteString
+  key =
+    case query of
+      RiakExactQueryBin _ val ->
+        val
+
+      -- TODO better int -> bytestring
+      RiakExactQueryInt _ n ->
+        Latin1.pack (show n)
+
+
+riakRangeQuery
+  :: RiakHandle -- ^
+  -> RiakNamespace 'Nothing -- ^
+  -> RiakRangeQuery -- ^
+  -> (ListT (ExceptT RiakError IO) RiakKey -> IO r) -- ^
+  -> IO r
+riakRangeQuery
+    (RiakHandle manager _) (RiakNamespace type' bucket) query k =
+  withRiakConnection manager $ \conn -> k $ do
+    response :: RpbIndexResp <-
+      riakIndexPB conn request
+    ListT.select (coerce (response ^. #keys) :: [RiakKey])
+ where
+  request :: RpbIndexReq
+  request =
+    RpbIndexReq
+      { _RpbIndexReq'_unknownFields = []
+      , _RpbIndexReq'bucket         = unRiakBucket bucket
+      , _RpbIndexReq'continuation   = Nothing
+      , _RpbIndexReq'coverContext   = Nothing
+      , _RpbIndexReq'index          = unRiakIndexName index
+      , _RpbIndexReq'key            = Nothing
+      , _RpbIndexReq'maxResults     = Nothing
+      , _RpbIndexReq'paginationSort = Nothing
+      , _RpbIndexReq'qtype          = RpbIndexReq'range
+      , _RpbIndexReq'rangeMax       = Just rmax
+      , _RpbIndexReq'rangeMin       = Just rmin
+      , _RpbIndexReq'returnBody     = Nothing
+      , _RpbIndexReq'returnTerms    = Nothing
+      , _RpbIndexReq'stream         = Just True
+      , _RpbIndexReq'termRegex      = Nothing
+      , _RpbIndexReq'timeout        = Nothing
+      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
+      }
+
+  index :: RiakIndexName
+  index =
+    case query of
+      RiakRangeQueryBin (RiakIndexName idx) _ _ ->
+        RiakIndexName (idx <> "_bin")
+      RiakRangeQueryInt (RiakIndexName idx) _ _ ->
+        RiakIndexName (idx <> "_int")
+
+  rmin :: ByteString
+  rmin =
+    case query of
+      RiakRangeQueryBin _ n _ ->
+        n
+      RiakRangeQueryInt _ n _ ->
+        Latin1.pack (show n)
+
+  rmax :: ByteString
+  rmax =
+    case query of
+      RiakRangeQueryBin _ _ n ->
+        n
+      RiakRangeQueryInt _ _ n ->
+        Latin1.pack (show n)
+
 
 --------------------------------------------------------------------------------
 -- Search 2.0

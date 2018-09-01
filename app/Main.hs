@@ -229,6 +229,7 @@ putObjectParser =
                 [ help "Content"
                 , metavar "CONTENT"
                 ])
+        <*> many secondaryIndexOption
         <*> dwOption
         <*> nOption
         <*> pwOption
@@ -270,7 +271,13 @@ queryParser =
               (mconcat
                 [ help "Value (integer or string)"
                 , metavar "VALUE"
-                ]))
+                ])
+        <*> optional
+              (strArgument
+                (mconcat
+                  [ help "Value (integer or string)"
+                  , metavar "VALUE"
+                  ])))
       (progDesc "Search using secondary indexes"))
 
 -- TODO riak-cli allow decrementing counters
@@ -298,20 +305,37 @@ do2i
   -> RiakBucket
   -> RiakIndexName
   -> [Char]
+  -> Maybe [Char]
   -> HostName
   -> PortNumber
   -> IO ()
-do2i type' bucket index bytes host port = do
+do2i type' bucket index key1 key2 host port = do
   h <- createRiakHandle host port
   either print (\() -> pure ()) =<<
-    riakExactQuery h (RiakNamespace type' bucket) query
-      (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
- where
-  query :: RiakExactQuery
-  query =
-    case readMaybe bytes of
-      Just n  -> RiakExactQueryInt index n
-      Nothing -> RiakExactQueryBin index (Utf8.fromString bytes)
+    case key2 of
+      Nothing ->
+        let
+          query :: RiakExactQuery
+          query =
+            case readMaybe key1 of
+              Just n  -> RiakExactQueryInt index n
+              Nothing -> RiakExactQueryBin index (Utf8.fromString key1)
+        in
+          riakExactQuery h (RiakNamespace type' bucket) query
+            (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
+
+      Just key2' ->
+        let
+          query :: RiakRangeQuery
+          query =
+            case (readMaybe key1, readMaybe key2') of
+              (Just n, Just m) ->
+                RiakRangeQueryInt index n m
+              _ ->
+                RiakRangeQueryBin index (Utf8.fromString key1) (Utf8.fromString key2')
+        in
+          riakRangeQuery h (RiakNamespace type' bucket) query
+            (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
 
 doDeleteObject :: RiakLocation ty -> HostName -> PortNumber -> IO ()
 doDeleteObject loc host port = do
@@ -451,6 +475,7 @@ doPing host port = do
 doPutObject
   :: RiakLocation 'Nothing
   -> Text
+  -> [RiakIndex]
   -> Maybe RiakQuorum
   -> Maybe Word32
   -> Maybe RiakQuorum
@@ -461,7 +486,7 @@ doPutObject
   -> HostName
   -> PortNumber
   -> IO ()
-doPutObject loc content dw n pw return no_sloppy_quorum timeout w host port = do
+doPutObject loc content ixs dw n pw return no_sloppy_quorum timeout w host port = do
   h <- createRiakHandle host port
   case return of
     'a' ->
@@ -495,6 +520,7 @@ doPutObject loc content dw n pw return no_sloppy_quorum timeout w host port = do
         content
         (def
           & maybe id #dw dw
+          & #indexes ixs
           & maybe id #n n
           & maybe id #pw pw
           & (if no_sloppy_quorum then #sloppy_quorum False else id)
@@ -772,6 +798,30 @@ quorumOption s1 s2 =
 rOption :: Parser (Maybe RiakQuorum)
 rOption =
   quorumOption "r" "R value"
+
+secondaryIndexOption :: Parser RiakIndex
+secondaryIndexOption =
+  option (maybeReader read2i)
+    (mconcat
+      [ long "ix"
+      , metavar "INDEX"
+      ])
+ where
+  read2i :: [Char] -> Maybe RiakIndex
+  read2i s = do
+    (key, ':':val) <-
+      pure (span (/= ':') s)
+
+    let
+      key' :: RiakIndexName
+      key' =
+        RiakIndexName (Utf8.fromString key)
+
+    Just $
+      maybe
+        (RiakIndexBin key' (Utf8.fromString val))
+        (RiakIndexInt key')
+        (readMaybe val)
 
 sloppyQuorumOption :: Parser Bool
 sloppyQuorumOption =

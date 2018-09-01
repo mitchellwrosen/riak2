@@ -33,8 +33,8 @@ data ObjectReturn
 
 
 data RiakExactQuery
-  = RiakExactQueryInt !RiakIndexName !Int64
-  | RiakExactQueryBin !RiakIndexName !ByteString
+  = RiakExactQueryBin !RiakIndexName !ByteString
+  | RiakExactQueryInt !RiakIndexName !Int64
 
 
 -- | A Riak bucket.
@@ -199,6 +199,25 @@ pattern RiakQuorumQuorum :: RiakQuorum
 pattern RiakQuorumQuorum = 4294967293
 
 
+data RiakRangeQuery
+  = RiakRangeQueryBin !RiakIndexName !ByteString !ByteString
+  | RiakRangeQueryInt !RiakIndexName !Int64 !Int64
+
+
+newtype RiakVclock
+  = RiakVclock { unRiakVclock :: ByteString }
+
+instance Show RiakVclock where
+  show :: RiakVclock -> String
+  show =
+    show . Base64.encode . unRiakVclock
+
+
+newtype RiakVtag
+  = RiakVtag { unRiakVtag :: ByteString }
+  deriving (Eq, Show)
+
+
 -- | A Solr index name.
 --
 -- /Note/: Must be ASCII.
@@ -243,20 +262,6 @@ instance Hashable SomeRiakLocation where
 
 newtype TTL
   = TTL { unTTL :: Maybe Word32 }
-  deriving (Eq, Show)
-
-
-newtype RiakVclock
-  = RiakVclock { unRiakVclock :: ByteString }
-
-instance Show RiakVclock where
-  show :: RiakVclock -> String
-  show =
-    show . Base64.encode . unRiakVclock
-
-
-newtype RiakVtag
-  = RiakVtag { unRiakVtag :: ByteString }
   deriving (Eq, Show)
 
 

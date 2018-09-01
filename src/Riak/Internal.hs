@@ -106,6 +106,7 @@ module Riak.Internal
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
+  , RiakRangeQuery(..)
   , RiakVclock(..)
   , RiakVtag(..)
   , SloppyQuorum(..)
