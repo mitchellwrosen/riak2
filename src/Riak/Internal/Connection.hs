@@ -115,10 +115,10 @@ riakExchange
   -> a
   -> IO (Either RiakError b)
 riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
+  debug ("[riak] send: " ++ show request)
+
   resultVar :: MVar Message <-
     newEmptyMVar
-
-  debug ("[riak] send: " ++ show request)
 
   withMVar sem $ \() -> do
     riakSend conn request
@@ -149,6 +149,8 @@ riakStream
   -> a -- ^
   -> ListT (ExceptT RiakError IO) b
 riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request = do
+  debug ("[riak] send: " ++ show request)
+
   responseQueue :: TQueue (Either RiakError b) <-
     liftIO newTQueueIO
 
@@ -163,6 +165,7 @@ riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request = do
         Streaming.wrap $ \message -> do
           response :: Either RiakError b <-
             lift (parseResponse message)
+          debug ("[riak] recv: " ++ either show show response)
 
           lift (atomically (writeTQueue responseQueue response))
 

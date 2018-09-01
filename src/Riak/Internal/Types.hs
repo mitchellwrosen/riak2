@@ -199,9 +199,18 @@ pattern RiakQuorumQuorum :: RiakQuorum
 pattern RiakQuorumQuorum = 4294967293
 
 
-data RiakRangeQuery
-  = RiakRangeQueryBin !RiakIndexName !ByteString !ByteString
-  | RiakRangeQueryInt !RiakIndexName !Int64 !Int64
+data RiakRangeQuery :: Type -> Type where
+  RiakRangeQueryBin
+    :: !RiakIndexName
+    -> !ByteString
+    -> !ByteString
+    -> RiakRangeQuery ByteString
+
+  RiakRangeQueryInt
+    :: !RiakIndexName
+    -> !Int64
+    -> !Int64
+    -> RiakRangeQuery Int64
 
 
 newtype RiakVclock

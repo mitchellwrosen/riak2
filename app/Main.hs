@@ -325,17 +325,29 @@ do2i type' bucket index key1 key2 host port = do
             (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
 
       Just key2' ->
-        let
-          query :: RiakRangeQuery
-          query =
-            case (readMaybe key1, readMaybe key2') of
-              (Just n, Just m) ->
-                RiakRangeQueryInt index n m
-              _ ->
-                RiakRangeQueryBin index (Utf8.fromString key1) (Utf8.fromString key2')
-        in
-          riakRangeQuery h (RiakNamespace type' bucket) query
-            (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
+        case (readMaybe key1, readMaybe key2') of
+          (Just n, Just m) ->
+            riakRangeQueryTerms
+              h
+              (RiakNamespace type' bucket)
+              (RiakRangeQueryInt index n m)
+              (\resp ->
+                (runExceptT . runListT)
+                (resp >>=
+                  liftIO . (\(x, y) -> putStrLn (show x ++ " " ++ show y))))
+
+          _ ->
+            riakRangeQueryTerms
+              h
+              (RiakNamespace type' bucket)
+              (RiakRangeQueryBin
+                index
+                (Utf8.fromString key1)
+                (Utf8.fromString key2'))
+              (\resp ->
+                (runExceptT . runListT)
+                (resp >>=
+                  liftIO . (\(x, y) -> putStrLn (show x ++ " " ++ show y))))
 
 doDeleteObject :: RiakLocation ty -> HostName -> PortNumber -> IO ()
 doDeleteObject loc host port = do

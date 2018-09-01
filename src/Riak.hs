@@ -72,6 +72,7 @@ module Riak
     -- $secondary-indexes
   , riakExactQuery
   , riakRangeQuery
+  , riakRangeQueryTerms
     -- * Search 2.0
     -- ** Search
   , riakSearch
@@ -1370,9 +1371,9 @@ riakMapReduce (RiakHandle manager _) request k =
 --
 -- * <http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/secondary-indexes/>
 
--- | Perform an exact query on a secondary index.
---
 -- TODO 2i query paging
+
+-- | Perform an exact query on a secondary index.
 riakExactQuery
   :: RiakHandle -- ^
   -> RiakNamespace 'Nothing -- ^
@@ -1428,10 +1429,11 @@ riakExactQuery
         Latin1.pack (show n)
 
 
+-- | Perform a range query on a secondary index.
 riakRangeQuery
   :: RiakHandle -- ^
   -> RiakNamespace 'Nothing -- ^
-  -> RiakRangeQuery -- ^
+  -> RiakRangeQuery a -- ^
   -> (ListT (ExceptT RiakError IO) RiakKey -> IO r) -- ^
   -> IO r
 riakRangeQuery
@@ -1486,6 +1488,82 @@ riakRangeQuery
         n
       RiakRangeQueryInt _ _ n ->
         Latin1.pack (show n)
+
+-- | Perform a range query on a secondary index, and return the indexed terms
+-- along with the keys.
+riakRangeQueryTerms
+  :: forall a r.
+     RiakHandle -- ^
+  -> RiakNamespace 'Nothing -- ^
+  -> RiakRangeQuery a -- ^
+  -> (ListT (ExceptT RiakError IO) (RiakKey, a) -> IO r) -- ^
+  -> IO r
+riakRangeQueryTerms
+    (RiakHandle manager _) (RiakNamespace type' bucket) query k =
+  withRiakConnection manager $ \conn -> k $ do
+    response :: RpbIndexResp <-
+      riakIndexPB conn request
+    ListT.select (map parse (response ^. #results))
+ where
+  request :: RpbIndexReq
+  request =
+    RpbIndexReq
+      { _RpbIndexReq'_unknownFields = []
+      , _RpbIndexReq'bucket         = unRiakBucket bucket
+      , _RpbIndexReq'continuation   = Nothing
+      , _RpbIndexReq'coverContext   = Nothing
+      , _RpbIndexReq'index          = unRiakIndexName index
+      , _RpbIndexReq'key            = Nothing
+      , _RpbIndexReq'maxResults     = Nothing
+      , _RpbIndexReq'paginationSort = Nothing
+      , _RpbIndexReq'qtype          = RpbIndexReq'range
+      , _RpbIndexReq'rangeMax       = Just rmax
+      , _RpbIndexReq'rangeMin       = Just rmin
+      , _RpbIndexReq'returnBody     = Nothing
+      , _RpbIndexReq'returnTerms    = Just True
+      , _RpbIndexReq'stream         = Just True
+      , _RpbIndexReq'termRegex      = Nothing
+      , _RpbIndexReq'timeout        = Nothing
+      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
+      }
+
+  index :: RiakIndexName
+  index =
+    case query of
+      RiakRangeQueryBin (RiakIndexName idx) _ _ ->
+        RiakIndexName (idx <> "_bin")
+      RiakRangeQueryInt (RiakIndexName idx) _ _ ->
+        RiakIndexName (idx <> "_int")
+
+  rmin :: ByteString
+  rmin =
+    case query of
+      RiakRangeQueryBin _ n _ ->
+        n
+      RiakRangeQueryInt _ n _ ->
+        Latin1.pack (show n)
+
+  rmax :: ByteString
+  rmax =
+    case query of
+      RiakRangeQueryBin _ _ n ->
+        n
+      RiakRangeQueryInt _ _ n ->
+        Latin1.pack (show n)
+
+  parse :: RpbPair -> (RiakKey, a)
+  parse = \case
+    RpbPair val (Just key) _ ->
+      (coerce key, parse1 val)
+    _ ->
+      undefined
+
+  parse1 :: ByteString -> a
+  parse1 =
+    case query of
+      RiakRangeQueryBin _ _ _ -> id
+      RiakRangeQueryInt _ _ _ -> read . Latin1.unpack
+
 
 
 --------------------------------------------------------------------------------
