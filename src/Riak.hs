@@ -143,6 +143,7 @@ import Network.Socket        (HostName, PortNumber)
 
 import qualified Data.ByteString       as ByteString
 import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.HashSet          as HashSet
 import qualified Data.List.NonEmpty    as List1
 import qualified List.Transformer      as ListT
 
@@ -153,8 +154,7 @@ import           Riak.Internal.Cache   (newSTMRiakCache)
 import           Riak.Internal.Crdts   (CrdtVal, IsRiakCrdt(..))
 import           Riak.Internal.Panic
 import           Riak.Internal.Prelude
-import           Riak.Internal.Types   (Head(..), IfModified(..),
-                                        ObjectReturn(..), ParamObjectReturn(..),
+import           Riak.Internal.Types   (ObjectReturn(..), ParamObjectReturn(..),
                                         SBool(..))
 
 
@@ -221,8 +221,51 @@ getRiakObject
   -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError [RiakContent a])
-getRiakObject handle loc (GetRiakObjectParams a b c d e f g) =
-  _getRiakObject handle loc a NoHead NoIfModified b c d e f g
+getRiakObject
+    h@(RiakHandle manager _)
+    loc@(RiakLocation (RiakNamespace type' bucket) key)
+    (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
+    = liftIO . runExceptT $ do
+
+  response :: RpbGetResp <-
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> getRiakObjectPB conn request))
+
+  contents :: [RiakContent a] <- lift $
+    traverse
+      (parseContent' loc)
+      (filter notTombstone (response ^. #content))
+
+  case contents of
+    c0 : _ | contentIsDataType c0 ->
+      pure ()
+
+    _ -> do
+      lift (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
+
+  pure contents
+
+ where
+  request :: RpbGetReq
+  request =
+    RpbGetReq
+      { _RpbGetReq'_unknownFields = []
+      , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
+      , _RpbGetReq'bucket         = unRiakBucket bucket
+      , _RpbGetReq'deletedvclock  = Just True
+      , _RpbGetReq'head           = Nothing
+      , _RpbGetReq'ifModified     = Nothing
+      , _RpbGetReq'key            = unRiakKey key
+      , _RpbGetReq'nVal           = coerce n
+      , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
+      , _RpbGetReq'pr             = coerce pr
+      , _RpbGetReq'r              = coerce r
+      , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
+      , _RpbGetReq'timeout        = unTimeout timeout
+      , _RpbGetReq'type'          = Just (unRiakBucketType type')
+      }
+
 
 -- | Get an object's metadata.
 getRiakObjectHead
@@ -232,10 +275,50 @@ getRiakObjectHead
     -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key
     -> GetRiakObjectParams -- ^ Optional parameters
     -> m (Either RiakError [RiakContent ()])
-getRiakObjectHead handle loc (GetRiakObjectParams a b c d e f g) =
-  -- TODO remove this fmap.fmap.fmap once _getRiakObject is refactored
-  (fmap.fmap.fmap) (() <$)
-    (_getRiakObject @ByteString handle loc a Head NoIfModified b c d e f g)
+getRiakObjectHead
+    h@(RiakHandle manager _)
+    loc@(RiakLocation (RiakNamespace type' bucket) key)
+    (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
+    = liftIO . runExceptT $ do
+
+  response :: RpbGetResp <-
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> getRiakObjectPB conn request))
+
+  contents :: [RiakContent ()] <- lift $
+    traverse
+      (parseContentHead loc)
+      (filter notTombstone (response ^. #content))
+
+  case contents of
+    c0 : _ | contentIsDataType c0 ->
+      pure ()
+
+    _ -> do
+      lift (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
+
+  pure contents
+
+ where
+  request :: RpbGetReq
+  request =
+    RpbGetReq
+      { _RpbGetReq'_unknownFields = []
+      , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
+      , _RpbGetReq'bucket         = unRiakBucket bucket
+      , _RpbGetReq'deletedvclock  = Just True
+      , _RpbGetReq'head           = Just True
+      , _RpbGetReq'ifModified     = Nothing
+      , _RpbGetReq'key            = unRiakKey key
+      , _RpbGetReq'nVal           = coerce n
+      , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
+      , _RpbGetReq'pr             = coerce pr
+      , _RpbGetReq'r              = coerce r
+      , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
+      , _RpbGetReq'timeout        = unTimeout timeout
+      , _RpbGetReq'type'          = Just (unRiakBucketType type')
+      }
 
 -- | Get an object if it has been modified since the last get.
 --
@@ -248,54 +331,14 @@ getRiakObjectIfModified
   -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (Modified [RiakContent a]))
-getRiakObjectIfModified handle loc (GetRiakObjectParams a b c d e f g) =
-  _getRiakObject handle loc a NoHead IfModified b c d e f g
-
--- | Get an object's metadata if it has been modified since the last get.
-getRiakObjectIfModifiedHead
-  :: forall m.
-     MonadIO m
-  => RiakHandle -- ^ Riak handle
-  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key
-  -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (Modified [RiakContent ()]))
-getRiakObjectIfModifiedHead handle loc (GetRiakObjectParams a b c d e f g) =
-  (fmap.fmap.fmap.fmap) (() <$)
-    (_getRiakObject @ByteString handle loc a Head IfModified b c d e f g)
-
-type GetRiakObjectResp (head :: Bool) (if_modified :: Bool) (a :: Type)
-  = IfModifiedWrapper if_modified [(RiakContent (If head () a))]
-
-type family IfModifiedWrapper (if_modified :: Bool) (a :: Type) where
-  IfModifiedWrapper 'True  a = Modified a
-  IfModifiedWrapper 'False a = a
-
--- TODO delete _getRiakObject and inline its logic in the 4 variants?
-_getRiakObject
-  :: forall a head if_modified m.
-     (IsRiakContent a, MonadIO m)
-  => RiakHandle
-  -> RiakLocation 'Nothing
-  -> BasicQuorum
-  -> Head a head
-  -> IfModified if_modified
-  -> N
-  -> NotfoundOk
-  -> PR
-  -> R
-  -> SloppyQuorum
-  -> Timeout
-  -> m (Either RiakError (GetRiakObjectResp head if_modified a))
-_getRiakObject
+getRiakObjectIfModified
     h@(RiakHandle manager cache)
     loc@(RiakLocation (RiakNamespace type' bucket) key)
-    basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
-    liftIO . runExceptT $ do
+    (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
+    = liftIO . runExceptT $ do
 
   vclock :: Maybe RiakVclock <-
-    case if_modified of
-      IfModified   -> lift (riakCacheLookup cache loc)
-      NoIfModified -> pure Nothing
+    lift (riakCacheLookup cache loc)
 
   let
     request :: RpbGetReq
@@ -305,14 +348,8 @@ _getRiakObject
         , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
         , _RpbGetReq'bucket         = unRiakBucket bucket
         , _RpbGetReq'deletedvclock  = Just True
-        , _RpbGetReq'head           =
-            case head of
-              Head   -> Just True
-              NoHead -> Nothing
-        , _RpbGetReq'ifModified     =
-            case if_modified of
-              IfModified   -> coerce vclock
-              NoIfModified -> Nothing
+        , _RpbGetReq'head           = Nothing
+        , _RpbGetReq'ifModified     = coerce vclock
         , _RpbGetReq'key            = unRiakKey key
         , _RpbGetReq'nVal           = coerce n
         , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
@@ -328,43 +365,186 @@ _getRiakObject
       (withRiakConnection manager
         (\conn -> getRiakObjectPB conn request))
 
-  -- Only cache the vclock if we didn't received an "unmodified" response (which
-  -- doesn't contain a vclock)
-  case (if_modified, response ^. #maybe'unchanged) of
-    (IfModified, Just True) ->
-      pure ()
-    _ -> do
-      cacheVclock h loc (coerce (response ^. #maybe'vclock))
+  if response ^. #unchanged
+    then
+      pure Unmodified
 
-  lift (mkResponse response)
+    else do
+      contents :: [RiakContent a] <- lift $
+        traverse
+          (parseContent' loc)
+          (filter notTombstone (response ^. #content))
 
- where
-  mkResponse
-    :: RpbGetResp
-    -> IO (GetRiakObjectResp head if_modified a)
-  mkResponse (RpbGetResp (filter notTombstone -> content) _ unchanged _) =
-    case if_modified of
-      IfModified ->
-        case unchanged of
-          Just True ->
-            pure Unmodified
+      case contents of
+        c0 : _ | contentIsDataType c0 ->
+          pure ()
 
-          _ ->
-            Modified <$> contents
+        _ -> do
+          lift (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
 
-      NoIfModified ->
-        contents
+      pure (Modified contents)
 
-   where
-    contents :: IO [RiakContent (If head () a)]
-    contents =
-      traverse (parseContent @a proxy# loc headAsBool) content
-     where
-      headAsBool :: SBool head
-      headAsBool =
-        case head of
-          Head   -> STrue
-          NoHead -> SFalse
+-- | Get an object's metadata if it has been modified since the last get.
+getRiakObjectIfModifiedHead
+  :: forall m.
+     MonadIO m
+  => RiakHandle -- ^ Riak handle
+  -> RiakLocation 'Nothing -- ^ Bucket type, bucket, and key
+  -> GetRiakObjectParams -- ^ Optional parameters
+  -> m (Either RiakError (Modified [RiakContent ()]))
+getRiakObjectIfModifiedHead
+    h@(RiakHandle manager cache)
+    loc@(RiakLocation (RiakNamespace type' bucket) key)
+    (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
+    = liftIO . runExceptT $ do
+
+  vclock :: Maybe RiakVclock <-
+    lift (riakCacheLookup cache loc)
+
+  let
+    request :: RpbGetReq
+    request =
+      RpbGetReq
+        { _RpbGetReq'_unknownFields = []
+        , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
+        , _RpbGetReq'bucket         = unRiakBucket bucket
+        , _RpbGetReq'deletedvclock  = Just True
+        , _RpbGetReq'head           = Nothing
+        , _RpbGetReq'ifModified     = coerce vclock
+        , _RpbGetReq'key            = unRiakKey key
+        , _RpbGetReq'nVal           = coerce n
+        , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
+        , _RpbGetReq'pr             = coerce pr
+        , _RpbGetReq'r              = coerce r
+        , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
+        , _RpbGetReq'timeout        = unTimeout timeout
+        , _RpbGetReq'type'          = Just (unRiakBucketType type')
+        }
+
+  response :: RpbGetResp <-
+    ExceptT
+      (withRiakConnection manager
+        (\conn -> getRiakObjectPB conn request))
+
+  if response ^. #unchanged
+    then
+      pure Unmodified
+
+    else do
+      contents :: [RiakContent ()] <- lift $
+        traverse
+          (parseContentHead loc)
+          (filter notTombstone (response ^. #content))
+
+      case contents of
+        c0 : _ | contentIsDataType c0 ->
+          pure ()
+
+        _ -> do
+          lift (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
+
+      pure (Modified contents)
+
+-- -- TODO delete _getRiakObject and inline its logic in the 4 variants?
+-- _getRiakObject
+--   :: forall a head if_modified m.
+--      (IsRiakContent a, MonadIO m)
+--   => RiakHandle
+--   -> RiakLocation 'Nothing
+--   -> BasicQuorum
+--   -> Head a head
+--   -> IfModified if_modified
+--   -> N
+--   -> NotfoundOk
+--   -> PR
+--   -> R
+--   -> SloppyQuorum
+--   -> Timeout
+--   -> m (Either RiakError (GetRiakObjectResp head if_modified a))
+-- _getRiakObject
+--     (RiakHandle manager cache)
+--     loc@(RiakLocation (RiakNamespace type' bucket) key)
+--     basic_quorum head if_modified n notfound_ok pr r sloppy_quorum timeout =
+--     liftIO . runExceptT $ do
+
+--   vclock :: Maybe RiakVclock <-
+--     case if_modified of
+--       IfModified   -> lift (riakCacheLookup cache loc)
+--       NoIfModified -> pure Nothing
+
+--   let
+--     request :: RpbGetReq
+--     request =
+--       RpbGetReq
+--         { _RpbGetReq'_unknownFields = []
+--         , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
+--         , _RpbGetReq'bucket         = unRiakBucket bucket
+--         , _RpbGetReq'deletedvclock  = Just True
+--         , _RpbGetReq'head           =
+--             case head of
+--               Head   -> Just True
+--               NoHead -> Nothing
+--         , _RpbGetReq'ifModified     =
+--             case if_modified of
+--               IfModified   -> coerce vclock
+--               NoIfModified -> Nothing
+--         , _RpbGetReq'key            = unRiakKey key
+--         , _RpbGetReq'nVal           = coerce n
+--         , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
+--         , _RpbGetReq'pr             = coerce pr
+--         , _RpbGetReq'r              = coerce r
+--         , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
+--         , _RpbGetReq'timeout        = unTimeout timeout
+--         , _RpbGetReq'type'          = Just (unRiakBucketType type')
+--         }
+
+--   response :: RpbGetResp <-
+--     ExceptT
+--       (withRiakConnection manager
+--         (\conn -> getRiakObjectPB conn request))
+
+--   lift (mkResponse response)
+
+  -- -- Only cache the vclock if we didn't receive an "unmodified" response (which
+  -- -- doesn't contain a vclock)
+  -- case (if_modified, response ^. #maybe'unchanged) of
+  --   (IfModified, Just True) ->
+  --     pure ()
+  --   _ ->
+  --     -- Whoops, one more check: don't overwrite CRDT causal context in case we
+  --     -- are weirdly fetching the binary blob as an object, for some reason.
+  --     unless (isDataTypeGetResp response)
+  --       (cacheVclock h loc (coerce (response ^. #maybe'vclock)))
+
+  -- lift (mkResponse response)
+
+ -- where
+ --  mkResponse
+ --    :: RpbGetResp
+ --    -> IO (GetRiakObjectResp head if_modified a)
+ --  mkResponse (RpbGetResp (filter notTombstone -> content) _ unchanged _) =
+ --    case if_modified of
+ --      IfModified ->
+ --        case unchanged of
+ --          Just True ->
+ --            pure Unmodified
+
+ --          _ ->
+ --            Modified <$> contents
+
+ --      NoIfModified ->
+ --        contents
+
+ --   where
+ --    contents :: IO [RiakContent (If head () a)]
+ --    contents =
+ --      traverse (parseContent @a proxy# loc headAsBool) content
+ --     where
+ --      headAsBool :: SBool head
+ --      headAsBool =
+ --        case head of
+ --          Head   -> STrue
+ --          NoHead -> SFalse
 
       -- headAsBool' :: Bool
       -- headAsBool' =
@@ -372,6 +552,10 @@ _getRiakObject
       --     Head -> True
       --     NoHead -> False
 
+  -- -- Did we just get a data type?
+  -- isDataTypeGetResp :: RpbGetResp -> Bool
+  -- isDataTypeGetResp =
+  --   maybe False (`elem` crdtContentTypes) . (^. #maybe'contentType)
 
 --------------------------------------------------------------------------------
 -- Put object
@@ -1537,6 +1721,21 @@ cacheVclock (RiakHandle _ cache) loc =
   liftIO . maybe (riakCacheDelete cache loc) (riakCacheInsert cache loc)
 
 
+contentIsDataType :: RiakContent a -> Bool
+contentIsDataType =
+  maybe False (`elem` crdtContentTypes) . (^. #contentType)
+
+crdtContentTypes :: HashSet ContentType
+crdtContentTypes =
+  HashSet.fromList
+    [ ContentType "application/riak_counter"
+    , ContentType "application/riak_gset"
+    , ContentType "application/riak_hll"
+    , ContentType "application/riak_map"
+    , ContentType "application/riak_set"
+    ]
+
+
 notTombstone :: RpbContent -> Bool
 notTombstone content =
   not (content ^. #deleted)
@@ -1593,24 +1792,21 @@ parseContent _ loc head
 
 -- TODO replace parseContent with parseContent', parseContentHead
 
--- parseContent'
---   :: forall a.
---      IsRiakContent a
---   => RiakLocation 'Nothing
---   -> RpbContent
---   -> IO (RiakContent a)
--- parseContent' =
---   _parseContent decodeRiakContent
+parseContent'
+  :: forall a.
+     IsRiakContent a
+  => RiakLocation 'Nothing
+  -> RpbContent
+  -> IO (RiakContent a)
+parseContent' =
+  _parseContent decodeRiakContent
 
--- parseContentHead
---   :: forall a.
---      IsRiakContent a
---   => Proxy# a
---   -> RiakLocation 'Nothing
---   -> RpbContent
---   -> IO (RiakContent ())
--- parseContentHead _ =
---   _parseContent (\_ _ _ _ -> Right ())
+parseContentHead
+  :: RiakLocation 'Nothing
+  -> RpbContent
+  -> IO (RiakContent ())
+parseContentHead =
+  _parseContent (\_ _ _ _ -> Right ())
 
 
 _parseContent

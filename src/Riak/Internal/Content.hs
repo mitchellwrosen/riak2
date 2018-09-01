@@ -285,3 +285,4 @@ newtype ContentEncoding
 newtype ContentType
   = ContentType { unContentType :: ByteString }
   deriving stock (Eq, Show)
+  deriving newtype (Hashable)

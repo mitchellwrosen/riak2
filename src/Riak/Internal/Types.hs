@@ -205,6 +205,7 @@ pattern RiakQuorumQuorum = 4294967293
 newtype SolrIndexName
   = SolrIndexName { unSolrIndexName :: ByteString }
 
+-- | @_dont_index_@
 pattern DontIndex :: SolrIndexName
 pattern DontIndex
   = SolrIndexName "_dont_index_"
@@ -214,6 +215,7 @@ pattern DontIndex
 newtype SolrSchemaName
   = SolrSchemaName { unSolrSchemaName :: ByteString }
 
+-- | @_yz_default@
 pattern DefaultSolrSchemaName :: SolrSchemaName
 pattern DefaultSolrSchemaName =
   SolrSchemaName "_yz_default"
@@ -261,19 +263,6 @@ newtype RiakVtag
 --------------------------------------------------------------------------------
 -- Params
 --------------------------------------------------------------------------------
-
-data Head a :: Bool -> Type where
-  Head   :: Head a 'True
-  NoHead :: Head a 'False
-
-
-data IfModified :: Bool -> Type where
-  IfModified   :: IfModified 'True
-  NoIfModified :: IfModified 'False
-
-instance (a ~ 'False) => Default (IfModified a) where
-  def = NoIfModified
-
 
 data ParamObjectReturn :: ObjectReturn -> Type where
   ParamObjectReturnNone :: ParamObjectReturn 'ObjectReturnNone

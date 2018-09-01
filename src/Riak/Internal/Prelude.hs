@@ -14,10 +14,11 @@ import Control.Monad.Trans.Maybe  as X
 import Data.Bifunctor             as X (bimap)
 import Data.ByteString            as X (ByteString)
 import Data.Coerce                as X (coerce)
-import Data.Foldable              as X (for_, toList, traverse_)
+import Data.Foldable              as X (elem, for_, toList, traverse_)
 import Data.Function              as X (fix)
 import Data.Hashable              as X (Hashable)
 import Data.HashMap.Strict        as X (HashMap)
+import Data.HashSet               as X (HashSet)
 import Data.Int                   as X
 import Data.IORef                 as X
 import Data.Kind                  as X (Type)
