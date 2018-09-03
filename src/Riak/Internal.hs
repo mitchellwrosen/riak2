@@ -41,7 +41,15 @@ module Riak.Internal
   , resetRiakBucketPropsPB
   , riakIndexPB
   , RiakMapReduceInputs(..)
+  , RiakMapReducePhase(..)
   , riakMapReducePB
+  , riakMapReducePhaseMapIdentity
+  , riakMapReducePhaseMapObjectValue
+  , riakMapReducePhaseReduceCount
+  , riakMapReducePhaseReduceIdentity
+  , riakMapReducePhaseReduceSetUnion
+  , riakMapReducePhaseReduceSort
+  , riakMapReducePhaseReduceSum
   , RiakSearchParams(..)
   , riakSearchPB
   , setRiakBucketPropsPB

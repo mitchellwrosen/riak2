@@ -69,6 +69,13 @@ module Riak
     -- * MapReduce
     -- $mapreduce
   , riakMapReduce
+  , riakMapReducePhaseMapIdentity
+  , riakMapReducePhaseMapObjectValue
+  , riakMapReducePhaseReduceCount
+  , riakMapReducePhaseReduceIdentity
+  , riakMapReducePhaseReduceSetUnion
+  , riakMapReducePhaseReduceSort
+  , riakMapReducePhaseReduceSum
     -- * Secondary indexes (2i)
     -- $secondary-indexes
   , riakExactQuery
@@ -117,6 +124,8 @@ module Riak
   , RiakMapEntries(..)
   , RiakMapFieldParser
   , RiakMapParseError(..)
+  , RiakMapReduceInputs(..)
+  , RiakMapReducePhase(..)
   , RiakMetadata(..)
   , RiakNamespace(..)
   , RiakQuorum(..)
@@ -1364,7 +1373,7 @@ listRiakKeys h namespace =
 riakMapReduce
   :: RiakHandle -- ^ Riak handle
   -> RiakMapReduceInputs -- ^ MapReduce inputs
-  -> () -- ^ MapReduce query
+  -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
   -> IO r
 riakMapReduce (RiakHandle manager _) inputs query k =
