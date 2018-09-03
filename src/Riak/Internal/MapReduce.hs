@@ -39,7 +39,7 @@ data RiakMapReduceInputs where
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsExactQuery
-    :: !(RiakNamespace 'Nothing )
+    :: !(RiakNamespace 'Nothing)
     -> !RiakExactQuery
     -> RiakMapReduceInputs
 

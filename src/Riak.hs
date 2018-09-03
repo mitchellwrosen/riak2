@@ -68,7 +68,11 @@ module Riak
   , listRiakKeys
     -- * MapReduce
     -- $mapreduce
-  , riakMapReduce
+  , riakMapReduceNamespace
+  , riakMapReduceLocations
+  , riakMapReduceFunction
+  , riakMapReduceExactQuery
+  , riakMapReduceRangeQuery
   , riakMapReducePhaseMapIdentity
   , riakMapReducePhaseMapObjectValue
   , riakMapReducePhaseReduceCount
@@ -1370,16 +1374,63 @@ listRiakKeys h namespace =
 --
 -- * <http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/mapreduce/>
 
-riakMapReduce
+riakMapReduceNamespace
+  :: RiakHandle -- ^ Riak handle
+  -> RiakNamespace 'Nothing -- ^ Bucket type and bucket
+  -> [RiakMapReducePhase] -- ^ MapReduce phases
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
+  -> IO r
+riakMapReduceNamespace h namespace =
+  _riakMapReduce h (RiakMapReduceInputsNamespace namespace)
+
+riakMapReduceLocations
+  :: RiakHandle -- ^ Riak handle
+  -> [RiakLocation 'Nothing] -- ^ Bucket types, buckets, and keys
+  -> [RiakMapReducePhase] -- ^ MapReduce phases
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
+  -> IO r
+riakMapReduceLocations h locs =
+  _riakMapReduce h (RiakMapReduceInputsLocations locs)
+
+riakMapReduceFunction
+  :: RiakHandle -- ^ Riak handle
+  -> Text -- ^ Erlang module.
+  -> Text -- ^ Erlang function.
+  -> [RiakMapReducePhase] -- ^ MapReduce phases
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
+  -> IO r
+riakMapReduceFunction h m f =
+  _riakMapReduce h (RiakMapReduceInputsFunction m f)
+
+riakMapReduceExactQuery
+  :: RiakHandle -- ^ Riak handle
+  -> RiakNamespace 'Nothing -- ^ Bucket type and bucket.
+  -> RiakExactQuery -- ^ Exact query.
+  -> [RiakMapReducePhase] -- ^ MapReduce phases
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
+  -> IO r
+riakMapReduceExactQuery h namespace query =
+  _riakMapReduce h (RiakMapReduceInputsExactQuery namespace query)
+
+riakMapReduceRangeQuery
+  :: RiakHandle -- ^ Riak handle
+  -> RiakNamespace 'Nothing -- ^ Bucket type and bucket.
+  -> RiakRangeQuery a -- ^ Range query.
+  -> [RiakMapReducePhase] -- ^ MapReduce phases
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
+  -> IO r
+riakMapReduceRangeQuery h namespace query =
+  _riakMapReduce h (RiakMapReduceInputsRangeQuery namespace query)
+
+_riakMapReduce
   :: RiakHandle -- ^ Riak handle
   -> RiakMapReduceInputs -- ^ MapReduce inputs
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
   -> IO r
-riakMapReduce (RiakHandle manager _) inputs query k =
+_riakMapReduce (RiakHandle manager _) inputs query k =
   withRiakConnection manager $ \conn -> k $
     riakMapReducePB conn (riakMapReduceRequest inputs query)
-
 
 --------------------------------------------------------------------------------
 -- Secondary indexes
