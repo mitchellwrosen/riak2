@@ -26,7 +26,6 @@ import qualified Data.Text.Encoding as Text
 import Riak.Internal.Prelude
 import Riak.Internal.Types
 
-
 data RiakContent a
   = RiakContent
       !(RiakLocation 'Nothing)

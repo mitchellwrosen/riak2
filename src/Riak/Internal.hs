@@ -40,6 +40,7 @@ module Riak.Internal
   , putRiakSchemaPB
   , resetRiakBucketPropsPB
   , riakIndexPB
+  , RiakMapReduceInputs(..)
   , riakMapReducePB
   , RiakSearchParams(..)
   , riakSearchPB
@@ -230,6 +231,7 @@ import Riak.Internal.Connection
 import Riak.Internal.Content
 import Riak.Internal.Crdts
 import Riak.Internal.Manager
+import Riak.Internal.MapReduce
 import Riak.Internal.Message
 import Riak.Internal.Params
 import Riak.Internal.Prelude

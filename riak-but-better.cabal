@@ -42,6 +42,7 @@ library
     , unliftio ^>= 0.2.7
     , unliftio-core ^>= 0.1.1
     , unordered-containers ^>= 0.2.9
+    , vector
   default-language:
     Haskell2010
   exposed-modules:
@@ -60,6 +61,7 @@ library
   hs-source-dirs:
     src
   other-modules:
+    Erlang
     Proto.Riak
     Proto.Riak_Fields
     Riak.Internal.Cache
@@ -68,6 +70,7 @@ library
     Riak.Internal.Crdts
     Riak.Internal.Debug
     Riak.Internal.Manager
+    Riak.Internal.MapReduce
     Riak.Internal.Message
     Riak.Internal.Panic
     Riak.Internal.Params
@@ -75,6 +78,7 @@ library
     Riak.Internal.Request
     Riak.Internal.Response
     Riak.Internal.Types
+    Riak.Internal.Utils
 
 executable riakc
   build-depends:

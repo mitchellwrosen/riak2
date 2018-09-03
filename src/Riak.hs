@@ -67,6 +67,7 @@ module Riak
   , streamRiakKeys
   , listRiakKeys
     -- * MapReduce
+    -- $mapreduce
   , riakMapReduce
     -- * Secondary indexes (2i)
     -- $secondary-indexes
@@ -145,21 +146,22 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Lens.Labels
 import Network.Socket        (HostName, PortNumber)
 
-import qualified Data.ByteString       as ByteString
-import qualified Data.ByteString.Char8 as Latin1
-import qualified Data.HashSet          as HashSet
-import qualified Data.List.NonEmpty    as List1
-import qualified List.Transformer      as ListT
+import qualified Data.ByteString         as ByteString
+import qualified Data.ByteString.Char8   as Latin1
+import qualified Data.HashSet            as HashSet
+import qualified Data.List.NonEmpty      as List1
+import qualified List.Transformer        as ListT
 
-import           Proto.Riak            hiding (SetOp)
-import qualified Proto.Riak            as Proto
+import           Proto.Riak              hiding (SetOp)
+import qualified Proto.Riak              as Proto
 import           Riak.Internal
-import           Riak.Internal.Cache   (newSTMRiakCache)
-import           Riak.Internal.Crdts   (CrdtVal, IsRiakCrdt(..))
+import           Riak.Internal.Cache     (newSTMRiakCache)
+import           Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
+import           Riak.Internal.MapReduce (riakMapReduceRequest)
 import           Riak.Internal.Panic
 import           Riak.Internal.Prelude
-import           Riak.Internal.Types   (ObjectReturn(..), ParamObjectReturn(..),
-                                        SBool(..))
+import           Riak.Internal.Types     (ObjectReturn(..),
+                                          ParamObjectReturn(..), SBool(..))
 
 
 -- TODO _ variants that don't decode replies
@@ -1351,14 +1353,23 @@ listRiakKeys h namespace =
 -- MapReduce
 --------------------------------------------------------------------------------
 
+-- $mapreduce
+--
+-- * <http://docs.basho.com/riak/kv/2.2.3/developing/usage/mapreduce/>
+--
+-- * <http://docs.basho.com/riak/kv/2.2.3/developing/app-guide/advanced-mapreduce/>
+--
+-- * <http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/mapreduce/>
+
 riakMapReduce
   :: RiakHandle -- ^ Riak handle
-  -> RpbMapRedReq -- ^
+  -> RiakMapReduceInputs -- ^ MapReduce inputs
+  -> () -- ^ MapReduce query
   -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
   -> IO r
-riakMapReduce (RiakHandle manager _) request k =
+riakMapReduce (RiakHandle manager _) inputs query k =
   withRiakConnection manager $ \conn -> k $
-    riakMapReducePB conn request
+    riakMapReducePB conn (riakMapReduceRequest inputs query)
 
 
 --------------------------------------------------------------------------------
@@ -1366,6 +1377,8 @@ riakMapReduce (RiakHandle manager _) request k =
 --------------------------------------------------------------------------------
 
 -- $secondary-indexes
+--
+-- * <http://docs.basho.com/riak/kv/2.2.3/developing/usage/secondary-indexes/>
 --
 -- * <http://docs.basho.com/riak/kv/2.2.3/using/reference/secondary-indexes/>
 --

@@ -5,6 +5,9 @@
 
 -- | Sin-bin of misc. types.
 
+-- TODO $bucket index, only supports equality queries
+-- TODO $key index, only supports range queries
+
 module Riak.Internal.Types where
 
 import Data.Default.Class
@@ -32,12 +35,13 @@ data ObjectReturn
   | ObjectReturnBody
 
 
+-- | An exact query on a secondary index.
 data RiakExactQuery
   = RiakExactQueryBin !RiakIndexName !ByteString
   | RiakExactQueryInt !RiakIndexName !Int64
 
 
--- | A Riak bucket.
+-- | A bucket.
 newtype RiakBucket
   = RiakBucket { unRiakBucket :: ByteString }
   deriving stock (Eq)
@@ -86,7 +90,7 @@ data RiakBucketProps
       !(Maybe Word32)                     -- hll_precision
       !(Maybe Word32)                     -- ttl
 
--- | A Riak bucket type, tagged with the data type it contains.
+-- | A bucket type, tagged with the data type it contains.
 --
 -- /Note/: Must be UTF-8 encoded.
 newtype RiakBucketType (ty :: Maybe RiakCrdtTy)
@@ -121,18 +125,20 @@ data RiakError
   deriving anyclass (Exception)
 
 
+-- TODO RiakIndex values should be a set
 data RiakIndex
   = RiakIndexInt !RiakIndexName !Int64
   | RiakIndexBin !RiakIndexName !ByteString
   deriving (Eq, Show)
 
 
+-- | A secondary index name.
 newtype RiakIndexName
   = RiakIndexName { unRiakIndexName :: ByteString }
   deriving (Eq, Show)
 
 
--- | A Riak key.
+-- | A key.
 newtype RiakKey
   = RiakKey { unRiakKey :: ByteString }
   deriving stock (Eq)
@@ -158,11 +164,13 @@ instance Hashable (RiakLocation ty) where
     salt `hashWithSalt` namespace `hashWithSalt` key
 
 
+-- | Arbitrary metadata.
 newtype RiakMetadata
   = RiakMetadata { unRiakMetadata :: [(ByteString, Maybe ByteString)] }
   deriving (Eq, Show)
 
 
+-- | A bucke type and bucket.
 data RiakNamespace (ty :: Maybe RiakCrdtTy)
   = RiakNamespace !(RiakBucketType ty) !RiakBucket
   deriving stock (Eq, Show)
@@ -199,6 +207,7 @@ pattern RiakQuorumQuorum :: RiakQuorum
 pattern RiakQuorumQuorum = 4294967293
 
 
+-- | A range query on a secondary index.
 data RiakRangeQuery :: Type -> Type where
   RiakRangeQueryBin
     :: !RiakIndexName
