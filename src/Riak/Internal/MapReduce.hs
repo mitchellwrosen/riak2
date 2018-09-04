@@ -25,12 +25,12 @@ import Erlang
 
 
 data RiakMapReduceInputs where
-  RiakMapReduceInputsNamespace
-    :: !(RiakNamespace 'Nothing)
+  RiakMapReduceInputsBucket
+    :: !(RiakBucket 'Nothing)
     -> RiakMapReduceInputs
 
-  RiakMapReduceInputsLocations
-    :: ![RiakLocation 'Nothing]
+  RiakMapReduceInputsKeys
+    :: ![RiakKey 'Nothing]
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsFunction
@@ -39,12 +39,12 @@ data RiakMapReduceInputs where
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsExactQuery
-    :: !(RiakNamespace 'Nothing)
+    :: !(RiakBucket 'Nothing)
     -> !RiakExactQuery
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsRangeQuery
-    :: !(RiakNamespace 'Nothing)
+    :: !(RiakBucket 'Nothing)
     -> !(RiakRangeQuery a)
     -> RiakMapReduceInputs
 
@@ -130,27 +130,27 @@ riakMapReduceRequest inputs phases =
 riakMapReduceInputsTerm :: RiakMapReduceInputs -> ErlTerm
 riakMapReduceInputsTerm = \case
   -- {T,B}
-  RiakMapReduceInputsNamespace (RiakNamespace type' bucket) ->
+  RiakMapReduceInputsBucket (RiakBucket type' bucket) ->
     erlTuple2
-      (ErlBinary (unRiakBucketType type'))
-      (ErlBinary (unRiakBucket bucket))
+      (ErlBinary type')
+      (ErlBinary bucket)
 
   -- [{{{T,B},K},_KeyData}]
-  RiakMapReduceInputsLocations locations ->
+  RiakMapReduceInputsKeys keys ->
     let
-      toTerm :: RiakLocation 'Nothing -> ErlTerm
-      toTerm (RiakLocation (RiakNamespace type' bucket) key) =
+      toTerm :: RiakKey 'Nothing -> ErlTerm
+      toTerm (RiakKey type' bucket key) =
         erlTuple2
           (erlTuple2
             (erlTuple2
-              (ErlBinary (unRiakBucketType type'))
-              (ErlBinary (unRiakBucket bucket)))
-            (ErlBinary (unRiakKey key)))
+              (ErlBinary type')
+              (ErlBinary bucket))
+            (ErlBinary key))
           atomNone
 
     in
       ErlList
-        (Vector.fromList (map toTerm locations))
+        (Vector.fromList (map toTerm keys))
         ErlNil
 
   -- {modfun, Module, Function, _Options}
@@ -162,12 +162,12 @@ riakMapReduceInputsTerm = \case
       (ErlList mempty ErlNil)
 
   -- {index, {Type, Bucket}, Index, Key}
-  RiakMapReduceInputsExactQuery (RiakNamespace type' bucket) query ->
+  RiakMapReduceInputsExactQuery (RiakBucket type' bucket) query ->
     erlTuple4
       (ErlAtomUtf8 "index")
       (erlTuple2
-        (ErlBinary (unRiakBucketType type'))
-        (ErlBinary (unRiakBucket bucket)))
+        (ErlBinary type')
+        (ErlBinary bucket))
       (case query of
         -- TODO centralize this _bin suffix business
         RiakExactQueryInt name _ ->
@@ -181,12 +181,12 @@ riakMapReduceInputsTerm = \case
           ErlBinary key)
 
   -- {index, {Type, Bucket}, Index, StartKey, EndKey}
-  RiakMapReduceInputsRangeQuery (RiakNamespace type' bucket) query ->
+  RiakMapReduceInputsRangeQuery (RiakBucket type' bucket) query ->
     erlTuple5
       (ErlAtomUtf8 "index")
       (erlTuple2
-        (ErlBinary (unRiakBucketType type'))
-        (ErlBinary (unRiakBucket bucket)))
+        (ErlBinary type')
+        (ErlBinary bucket))
       (case query of
         -- TODO centralize this _bin suffix business
         RiakRangeQueryInt name _ _ ->

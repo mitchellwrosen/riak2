@@ -20,39 +20,35 @@ import Riak.Internal.Types
 
 data RiakCache
   = RiakCache
-  { riakCacheLookup :: forall ty. RiakLocation ty -> IO (Maybe RiakVclock)
-  , riakCacheInsert :: forall ty. RiakLocation ty -> RiakVclock -> IO ()
-  , riakCacheDelete :: forall ty. RiakLocation ty -> IO ()
+  { riakCacheLookup :: forall ty. RiakKey ty -> IO (Maybe RiakVclock)
+  , riakCacheInsert :: forall ty. RiakKey ty -> RiakVclock -> IO ()
+  , riakCacheDelete :: forall ty. RiakKey ty -> IO ()
   }
 
 -- | Create a 'RiakCache' backed by an STM map.
 newSTMRiakCache :: IO RiakCache
 newSTMRiakCache = do
-  cache :: STM.Map SomeRiakLocation RiakVclock <-
+  cache :: STM.Map SomeRiakKey RiakVclock <-
     STMMap.newIO
 
   pure RiakCache
     { riakCacheLookup = do
         \loc -> do
-          vclock <- atomically (STMMap.lookup (SomeRiakLocation loc) cache)
+          vclock <- atomically (STMMap.lookup (SomeRiakKey loc) cache)
           debug $
             "[riak] cache lookup: " ++ show vclock ++ " <= " ++
-            debugShowLocation loc
+            show loc
           pure vclock
 
     , riakCacheInsert =
         \loc vclock -> do
           debug $
-            "[riak] cache insert: " ++ debugShowLocation loc ++ " => " ++
+            "[riak] cache insert: " ++ show loc ++ " => " ++
             show vclock
-          atomically (STMMap.insert vclock (SomeRiakLocation loc) cache)
+          atomically (STMMap.insert vclock (SomeRiakKey loc) cache)
 
     , riakCacheDelete =
         \loc -> do
-          debug $ "[riak] cache delete: " ++ debugShowLocation loc
-          atomically (STMMap.delete (SomeRiakLocation loc) cache)
+          debug $ "[riak] cache delete: " ++ show loc
+          atomically (STMMap.delete (SomeRiakKey loc) cache)
     }
-
-debugShowLocation :: RiakLocation ty -> String
-debugShowLocation (RiakLocation (RiakNamespace type' bucket) key) =
-  show type' ++ " " ++ show bucket ++ " " ++ show key

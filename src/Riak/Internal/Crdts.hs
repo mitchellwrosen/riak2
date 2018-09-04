@@ -43,12 +43,12 @@ class IsRiakCrdt (ty :: RiakCrdtTy) where
   type CrdtVal    ty :: *
 
   parseDtFetchResp
-    :: RiakLocation ('Just ty)
+    :: RiakKey ('Just ty)
     -> DtFetchResp
     -> Either SomeException (CrdtVal ty)
 
   parseDtUpdateResp
-    :: RiakLocation ('Just ty)
+    :: RiakKey ('Just ty)
     -> DtUpdateResp
     -> Either SomeException (CrdtVal ty)
 
@@ -57,7 +57,7 @@ class IsRiakCrdt (ty :: RiakCrdtTy) where
 -- an incompatible bucket type (for example, attempting to fetch a counter from
 -- a bucket type that contains sets).
 data RiakCrdtError where
-  RiakCrdtError :: RiakLocation ty -> Text -> RiakCrdtError
+  RiakCrdtError :: RiakKey ty -> Text -> RiakCrdtError
 
 deriving instance Show RiakCrdtError
 
@@ -81,7 +81,7 @@ instance IsRiakCrdt 'RiakCounterTy where
   type CrdtVal 'RiakCounterTy = Int64
 
   parseDtFetchResp
-    :: RiakLocation ('Just 'RiakCounterTy)
+    :: RiakKey ('Just 'RiakCounterTy)
     -> DtFetchResp
     -> Either SomeException Int64
   parseDtFetchResp loc resp =
@@ -94,7 +94,7 @@ instance IsRiakCrdt 'RiakCounterTy where
           ("expected counter but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakLocation ('Just 'RiakCounterTy)
+    :: RiakKey ('Just 'RiakCounterTy)
     -> DtUpdateResp
     -> Either SomeException Int64
   parseDtUpdateResp _ resp =
@@ -109,7 +109,7 @@ instance IsRiakCrdt 'RiakGrowOnlySetTy where
   type CrdtVal 'RiakGrowOnlySetTy = Set ByteString
 
   parseDtFetchResp
-    :: RiakLocation ('Just 'RiakGrowOnlySetTy)
+    :: RiakKey ('Just 'RiakGrowOnlySetTy)
     -> DtFetchResp
     -> Either SomeException (Set ByteString)
   parseDtFetchResp loc resp =
@@ -122,7 +122,7 @@ instance IsRiakCrdt 'RiakGrowOnlySetTy where
           ("expected gset but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakLocation ('Just 'RiakGrowOnlySetTy)
+    :: RiakKey ('Just 'RiakGrowOnlySetTy)
     -> DtUpdateResp
     -> Either SomeException (Set ByteString)
   parseDtUpdateResp _ resp =
@@ -137,7 +137,7 @@ instance IsRiakCrdt 'RiakHyperLogLogTy where
   type CrdtVal 'RiakHyperLogLogTy = Word64
 
   parseDtFetchResp
-    :: RiakLocation ('Just 'RiakHyperLogLogTy)
+    :: RiakKey ('Just 'RiakHyperLogLogTy)
     -> DtFetchResp
     -> Either SomeException Word64
   parseDtFetchResp loc resp =
@@ -150,7 +150,7 @@ instance IsRiakCrdt 'RiakHyperLogLogTy where
           ("expected hll but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakLocation ('Just 'RiakHyperLogLogTy)
+    :: RiakKey ('Just 'RiakHyperLogLogTy)
     -> DtUpdateResp
     -> Either SomeException Word64
   parseDtUpdateResp _ resp =
@@ -165,7 +165,7 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
   type CrdtVal ('RiakMapTy a) = a
 
   parseDtFetchResp
-    :: RiakLocation ('Just ('RiakMapTy a))
+    :: RiakKey ('Just ('RiakMapTy a))
     -> DtFetchResp
     -> Either SomeException a
   parseDtFetchResp loc resp =
@@ -181,7 +181,7 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
           ("expected map but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakLocation ('Just ('RiakMapTy a))
+    :: RiakKey ('Just ('RiakMapTy a))
     -> DtUpdateResp
     -> Either SomeException a
   parseDtUpdateResp _ resp =
@@ -410,7 +410,7 @@ instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
   type CrdtVal ('RiakSetTy a) = Set a
 
   parseDtFetchResp
-    :: RiakLocation ('Just ('RiakSetTy a))
+    :: RiakKey ('Just ('RiakSetTy a))
     -> DtFetchResp
     -> Either SomeException (Set a)
   parseDtFetchResp loc resp =
@@ -423,7 +423,7 @@ instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
           ("expected set but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakLocation ('Just ('RiakSetTy a))
+    :: RiakKey ('Just ('RiakSetTy a))
     -> DtUpdateResp
     -> Either SomeException (Set a)
   parseDtUpdateResp _ resp =

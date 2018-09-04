@@ -22,7 +22,7 @@ main = do
           replicateM_ (n `div` i) $ do
             Right _ <-
               putNewRiakObject h
-                (RiakNamespace DefaultRiakBucketType (RiakBucket "foo"))
+                (DefaultRiakBucket "foo")
                 ("bar" :: Text)
                 def
             pure ()

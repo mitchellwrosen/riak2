@@ -101,6 +101,7 @@ module Riak.Internal
   , Rows(..)
   , ReturnBody(..)
   , RiakBucket(..)
+  , pattern DefaultRiakBucket
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
   , RiakContent(..)
@@ -109,9 +110,7 @@ module Riak.Internal
   , RiakIndex(..)
   , RiakIndexName(..)
   , RiakKey(..)
-  , RiakLocation(..)
   , RiakMetadata(..)
-  , RiakNamespace(..)
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum

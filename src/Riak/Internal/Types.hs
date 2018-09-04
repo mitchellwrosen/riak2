@@ -35,27 +35,30 @@ data ObjectReturn
   | ObjectReturnBody
 
 
--- | An exact query on a secondary index.
-data RiakExactQuery
-  = RiakExactQueryBin !RiakIndexName !ByteString
-  | RiakExactQueryInt !RiakIndexName !Int64
-
-
--- | A bucket.
-newtype RiakBucket
-  = RiakBucket { unRiakBucket :: ByteString }
+-- | A bucket type and bucket.
+data RiakBucket (ty :: Maybe RiakCrdtTy)
+  = RiakBucket !ByteString !ByteString
   deriving stock (Eq)
-  deriving newtype (Hashable)
+
+instance Hashable (RiakBucket ty) where
+  hashWithSalt salt (RiakBucket type' bucket) =
+    salt `hashWithSalt` type' `hashWithSalt` bucket
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
-instance Show RiakBucket where
-  show :: RiakBucket -> String
-  show (RiakBucket bucket) =
+instance Show (RiakBucket ty) where
+  show :: RiakBucket ty -> String
+  show (RiakBucket type' bucket) =
+    Text.unpack (decodeUtf8 type')
+    ++ " " ++
     either
       (const ("base64:" ++ Latin1.unpack (Base64.encode bucket)))
       Text.unpack
       (decodeUtf8' bucket)
+
+pattern DefaultRiakBucket :: ByteString -> RiakBucket 'Nothing
+pattern DefaultRiakBucket name =
+  RiakBucket "default" name
 
 
 -- TODO better BucketProps types
@@ -125,6 +128,12 @@ data RiakError
   deriving anyclass (Exception)
 
 
+-- | An exact query on a secondary index.
+data RiakExactQuery
+  = RiakExactQueryBin !RiakIndexName !ByteString
+  | RiakExactQueryInt !RiakIndexName !Int64
+
+
 -- TODO RiakIndex values should be a set
 data RiakIndex
   = RiakIndexInt !RiakIndexName !Int64
@@ -138,30 +147,31 @@ newtype RiakIndexName
   deriving (Eq, Show)
 
 
--- | A key.
-newtype RiakKey
-  = RiakKey { unRiakKey :: ByteString }
+-- | A bucket type, bucket, and key.
+data RiakKey (ty :: Maybe RiakCrdtTy)
+  = RiakKey !ByteString !ByteString !ByteString
   deriving stock (Eq)
-  deriving newtype (Hashable)
+
+instance Hashable (RiakKey ty) where
+  hashWithSalt salt (RiakKey type' bucket key) =
+    salt `hashWithSalt` type' `hashWithSalt` bucket `hashWithSalt` key
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
-instance Show RiakKey where
-  show :: RiakKey -> String
-  show (RiakKey key) =
+instance Show (RiakKey ty) where
+  show :: RiakKey ty -> String
+  show (RiakKey type' bucket key) =
+    Text.unpack (decodeUtf8 type')
+    ++ " " ++
+    either
+      (const ("base64:" ++ Latin1.unpack (Base64.encode bucket)))
+      Text.unpack
+      (decodeUtf8' bucket)
+    ++ " " ++
     either
       (const ("base64:" ++ Latin1.unpack (Base64.encode key)))
       Text.unpack
       (decodeUtf8' key)
-
-
-data RiakLocation (ty :: Maybe RiakCrdtTy)
-  = RiakLocation !(RiakNamespace ty) !RiakKey
-  deriving stock (Eq, Show)
-
-instance Hashable (RiakLocation ty) where
-  hashWithSalt salt (RiakLocation namespace key) =
-    salt `hashWithSalt` namespace `hashWithSalt` key
 
 
 -- | Arbitrary metadata.
@@ -170,19 +180,9 @@ newtype RiakMetadata
   deriving (Eq, Show)
 
 
--- | A bucke type and bucket.
-data RiakNamespace (ty :: Maybe RiakCrdtTy)
-  = RiakNamespace !(RiakBucketType ty) !RiakBucket
-  deriving stock (Eq, Show)
-
-instance Hashable (RiakNamespace ty) where
-  hashWithSalt salt (RiakNamespace type' bucket) =
-    salt `hashWithSalt` type' `hashWithSalt` bucket
-
-
 -- TODO make RiakMapParseError a sub-exception of RiakParseError
 data RiakParseError where
-  RiakParseError :: !(RiakLocation ty) -> !Text -> RiakParseError
+  RiakParseError :: !(RiakKey ty) -> !Text -> RiakParseError
   deriving anyclass Exception
 
 deriving instance Show RiakParseError
@@ -263,18 +263,15 @@ data SBool :: Bool -> Type where
   SFalse :: SBool 'False
 
 
-data SomeRiakLocation where
-  SomeRiakLocation :: RiakLocation ty -> SomeRiakLocation
+data SomeRiakKey where
+  SomeRiakKey :: RiakKey ty -> SomeRiakKey
 
-instance Eq SomeRiakLocation where
-  SomeRiakLocation loc1 == SomeRiakLocation loc2 =
-    type1 == type2 && bucket1 == bucket2 && key1 == key2
-   where
-    RiakLocation (RiakNamespace (RiakBucketType type1) bucket1) key1 = loc1
-    RiakLocation (RiakNamespace (RiakBucketType type2) bucket2) key2 = loc2
+instance Eq SomeRiakKey where
+  SomeRiakKey (RiakKey t1 b1 k1) == SomeRiakKey (RiakKey t2 b2 k2) =
+    t1 == t2 && b1 == b2 && k1 == k2
 
-instance Hashable SomeRiakLocation where
-  hashWithSalt salt (SomeRiakLocation loc) =
+instance Hashable SomeRiakKey where
+  hashWithSalt salt (SomeRiakKey loc) =
     hashWithSalt salt loc
 
 

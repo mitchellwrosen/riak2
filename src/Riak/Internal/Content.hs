@@ -28,7 +28,7 @@ import Riak.Internal.Types
 
 data RiakContent a
   = RiakContent
-      !(RiakLocation 'Nothing)
+      !(RiakKey 'Nothing)
       a                       -- Value
       (Maybe ContentType)     -- Content type
       (Maybe Charset)         -- Charset
@@ -48,9 +48,7 @@ instance {-# OVERLAPPABLE #-}
     ) => HasLens f (RiakContent s) (RiakContent t) x a b where
   lensOf = lensOf'
 
--- TODO content lenses for namespace, bucket type, bucket, key
-
-instance Functor f => HasLens' f (RiakContent a)                 "location"        (RiakLocation 'Nothing)   where lensOf' _ = lens (\(RiakContent x _ _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent _ b c d e f g h i j k) x -> RiakContent x b c d e f g h i j k)
+instance Functor f => HasLens' f (RiakContent a)                 "key"             (RiakKey 'Nothing)        where lensOf' _ = lens (\(RiakContent x _ _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent _ b c d e f g h i j k) x -> RiakContent x b c d e f g h i j k)
 instance Functor f => HasLens  f (RiakContent a) (RiakContent b) "value"           a                       b where lensOf  _ = lens (\(RiakContent _ x _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent a _ c d e f g h i j k) x -> RiakContent a x c d e f g h i j k)
 instance Functor f => HasLens' f (RiakContent a)                 "contentType"     (Maybe ContentType)       where lensOf' _ = lens (\(RiakContent _ _ x _ _ _ _ _ _ _ _) -> x) (\(RiakContent a b _ d e f g h i j k) x -> RiakContent a b x d e f g h i j k)
 instance Functor f => HasLens' f (RiakContent a)                 "charset"         (Maybe Charset)           where lensOf' _ = lens (\(RiakContent _ _ _ x _ _ _ _ _ _ _) -> x) (\(RiakContent a b c _ e f g h i j k) x -> RiakContent a b c x e f g h i j k)
