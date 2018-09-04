@@ -132,14 +132,14 @@ riakMapReduceInputsTerm = \case
   -- {T,B}
   RiakMapReduceInputsBucket (RiakBucket type' bucket) ->
     erlTuple2
-      (ErlBinary type')
+      (ErlBinary (unRiakBucketType type'))
       (ErlBinary bucket)
 
   -- [{{{T,B},K},_KeyData}]
   RiakMapReduceInputsKeys keys ->
     let
       toTerm :: RiakKey 'Nothing -> ErlTerm
-      toTerm (RiakKey type' bucket key) =
+      toTerm (RiakKey (RiakBucket (RiakBucketType type') bucket) key) =
         erlTuple2
           (erlTuple2
             (erlTuple2
@@ -166,7 +166,7 @@ riakMapReduceInputsTerm = \case
     erlTuple4
       (ErlAtomUtf8 "index")
       (erlTuple2
-        (ErlBinary type')
+        (ErlBinary (unRiakBucketType type'))
         (ErlBinary bucket))
       (case query of
         -- TODO centralize this _bin suffix business
@@ -185,7 +185,7 @@ riakMapReduceInputsTerm = \case
     erlTuple5
       (ErlAtomUtf8 "index")
       (erlTuple2
-        (ErlBinary type')
+        (ErlBinary (unRiakBucketType type'))
         (ErlBinary bucket))
       (case query of
         -- TODO centralize this _bin suffix business

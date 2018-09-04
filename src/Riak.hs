@@ -237,7 +237,7 @@ getRiakObject
   -> m (Either RiakError [RiakContent a])
 getRiakObject
     h@(RiakHandle manager _)
-    loc@(RiakKey type' bucket key)
+    loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
     = liftIO . runExceptT $ do
 
@@ -291,7 +291,7 @@ getRiakObjectHead
     -> m (Either RiakError [RiakContent ()])
 getRiakObjectHead
     h@(RiakHandle manager _)
-    loc@(RiakKey type' bucket key)
+    loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
     = liftIO . runExceptT $ do
 
@@ -347,7 +347,7 @@ getRiakObjectIfModified
   -> m (Either RiakError (Modified [RiakContent a]))
 getRiakObjectIfModified
     h@(RiakHandle manager cache)
-    loc@(RiakKey type' bucket key)
+    loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
     = liftIO . runExceptT $ do
 
@@ -408,7 +408,7 @@ getRiakObjectIfModifiedHead
   -> m (Either RiakError (Modified [RiakContent ()]))
 getRiakObjectIfModifiedHead
     h@(RiakHandle manager cache)
-    loc@(RiakKey type' bucket key)
+    loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
     = liftIO . runExceptT $ do
 
@@ -478,9 +478,9 @@ putRiakObject
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError ())
 putRiakObject
-    handle (RiakKey type' bucket key) content (PutRiakObjectParams a b c d e f g h) =
+    handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   fmap (() <$)
-    (_putRiakObject handle (RiakBucket type' bucket) (Just key) content a b c d e
+    (_putRiakObject handle bucket (Just key) content a b c d e
       ParamObjectReturnNone f g h)
 
 -- | Put an object and return its metadata.
@@ -493,8 +493,8 @@ putRiakObjectHead
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (NonEmpty (RiakContent ())))
 putRiakObjectHead
-    handle (RiakKey type' bucket key) content (PutRiakObjectParams a b c d e f g h) =
-  (_putRiakObject handle (RiakBucket type' bucket) (Just key) content a b c d e
+    handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
+  (_putRiakObject handle bucket (Just key) content a b c d e
     ParamObjectReturnHead f g h)
 
 -- | Put an object and return it.
@@ -507,8 +507,8 @@ putRiakObjectBody
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (NonEmpty (RiakContent a)))
 putRiakObjectBody
-    handle (RiakKey type' bucket key) content (PutRiakObjectParams a b c d e f g h) =
-  _putRiakObject handle (RiakBucket type' bucket) (Just key) content a b c d e
+    handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
+  _putRiakObject handle bucket (Just key) content a b c d e
     ParamObjectReturnBody f g h
 
 -- | Put a new object and return its randomly-generated key.
@@ -573,14 +573,14 @@ _putRiakObject
   -> W
   -> m (Either RiakError (ObjectReturnTy a return))
 _putRiakObject
-    h@(RiakHandle manager cache) (RiakBucket type' bucket) key value dw indexes
-    metadata n pw return sloppy_quorum timeout w = liftIO . runExceptT $ do
+    h@(RiakHandle manager cache) namespace@(RiakBucket type' bucket) key value
+    dw indexes metadata n pw return sloppy_quorum timeout w = liftIO . runExceptT $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe RiakVclock <-
     maybe
       (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (lift . riakCacheLookup cache . RiakKey type' bucket)
+      (lift . riakCacheLookup cache . RiakKey namespace)
       key
 
   let
@@ -624,7 +624,7 @@ _putRiakObject
               ParamObjectReturnBody -> Nothing
         , _RpbPutReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
         , _RpbPutReq'timeout        = unTimeout timeout
-        , _RpbPutReq'type'          = Just type'
+        , _RpbPutReq'type'          = Just (unRiakBucketType type')
         , _RpbPutReq'vclock         = coerce vclock
         , _RpbPutReq'w              = coerce w
         }
@@ -654,7 +654,7 @@ _putRiakObject
   let
     loc :: RiakKey 'Nothing
     loc =
-      RiakKey type' bucket theKey
+      RiakKey namespace theKey
 
   -- Cache the vclock if asked for it with return_head or return_body.
   do
@@ -708,7 +708,7 @@ deleteRiakObject
   -> m (Either RiakError ())
 deleteRiakObject
     (RiakHandle manager cache)
-    loc@(RiakKey type' bucket key) = liftIO $ do
+    loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key) = liftIO $ do
 
   vclock :: Maybe RiakVclock <-
     riakCacheLookup cache loc
@@ -772,8 +772,8 @@ updateRiakCounter
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError Int64)
-updateRiakCounter h (RiakKey type' bucket key) incr params =
-  (fmap.fmap) snd (_updateRiakCounter h (RiakBucket type' bucket) (Just key) incr params)
+updateRiakCounter h (RiakKey bucket key) incr params =
+  (fmap.fmap) snd (_updateRiakCounter h bucket (Just key) incr params)
 
 
 -- | Update a new counter and return its randomly-generated key.
@@ -929,8 +929,8 @@ updateRiakSet
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (Set a))
-updateRiakSet h (RiakKey type' bucket key) op params =
-  (fmap.fmap) snd (_updateSet h (RiakBucket type' bucket) (Just key) op params)
+updateRiakSet h (RiakKey bucket key) op params =
+  (fmap.fmap) snd (_updateSet h bucket (Just key) op params)
 
 -- | Update a new set and return its randomly-generated key.
 --
@@ -957,8 +957,8 @@ _updateSet
   -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey ('Just ('RiakSetTy a)), Set a))
 _updateSet
-    h@(RiakHandle _ cache) namespace@(RiakBucket type' bucket) key
-    (unSetOp -> (adds, removes)) params = liftIO . runExceptT $ do
+    h@(RiakHandle _ cache) namespace key (unSetOp -> (adds, removes))
+    params = liftIO . runExceptT $ do
 
   -- Be a good citizen and perhaps include the cached causal context with this
   -- update request.
@@ -989,7 +989,7 @@ _updateSet
         let
           loc :: RiakKey ('Just ('RiakSetTy a))
           loc =
-            RiakKey type' bucket key'
+            RiakKey namespace key'
         in do
           context :: Maybe RiakVclock <-
             lift (riakCacheLookup cache loc)
@@ -1045,7 +1045,7 @@ getCrdt
   -> GetRiakCrdtParams
   -> m (Either RiakError (CrdtVal ty))
 getCrdt
-    h@(RiakHandle manager _) loc@(RiakKey type' bucket key)
+    h@(RiakHandle manager _) loc@(RiakKey (RiakBucket type' bucket) key)
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
@@ -1089,7 +1089,7 @@ getCrdt
       , _DtFetchReq'r              = coerce r
       , _DtFetchReq'sloppyQuorum   = coerce sloppy_quorum
       , _DtFetchReq'timeout        = coerce timeout
-      , _DtFetchReq'type'          = coerce type'
+      , _DtFetchReq'type'          = unRiakBucketType type'
       }
 
 
@@ -1107,7 +1107,7 @@ updateCrdt
   -> UpdateRiakCrdtParams
   -> m (Either RiakError (RiakKey ('Just ty), DtUpdateResp))
 updateCrdt
-    (RiakHandle manager _) (RiakBucket type' bucket) key context op
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) key context op
     (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
     liftIO . runExceptT $ do
 
@@ -1128,7 +1128,7 @@ updateCrdt
       pure
       key
 
-  pure (RiakKey type' bucket theKey, response)
+  pure (RiakKey namespace theKey, response)
 
  where
   request :: DtUpdateReq
@@ -1146,7 +1146,7 @@ updateCrdt
       , _DtUpdateReq'returnBody     = unReturnBody return_body
       , _DtUpdateReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
       , _DtUpdateReq'timeout        = unTimeout timeout
-      , _DtUpdateReq'type'          = type'
+      , _DtUpdateReq'type'          = unRiakBucketType type'
       , _DtUpdateReq'w              = coerce w
       }
 
@@ -1225,7 +1225,7 @@ getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO . r
     RpbGetBucketReq
       { _RpbGetBucketReq'_unknownFields = []
       , _RpbGetBucketReq'bucket         = bucket
-      , _RpbGetBucketReq'type'          = Just type'
+      , _RpbGetBucketReq'type'          = Just (unRiakBucketType type')
       }
 
 
@@ -1275,7 +1275,7 @@ streamRiakBuckets
   -> RiakBucketType ty -- ^ Bucket type
   -> (ListT (ExceptT RiakError IO) (RiakBucket ty) -> IO r)
   -> IO r
-streamRiakBuckets (RiakHandle manager _) (RiakBucketType type') k =
+streamRiakBuckets (RiakHandle manager _) type' k =
   withRiakConnection manager $ \conn -> k $ do
     response :: RpbListBucketsResp <-
       streamRiakBucketsPB conn request
@@ -1289,7 +1289,7 @@ streamRiakBuckets (RiakHandle manager _) (RiakBucketType type') k =
       { _RpbListBucketsReq'_unknownFields = []
       , _RpbListBucketsReq'stream = Just True
       , _RpbListBucketsReq'timeout = Nothing
-      , _RpbListBucketsReq'type' = Just type'
+      , _RpbListBucketsReq'type' = Just (unRiakBucketType type')
       }
 
 -- | List all of the buckets in a bucket type. Provided for convenience when
@@ -1320,12 +1320,12 @@ streamRiakKeys
   -> RiakBucket ty -- ^ Bucket type and bucket
   -> (ListT (ExceptT RiakError IO) (RiakKey ty) -> IO r)
   -> IO r
-streamRiakKeys (RiakHandle manager _) (RiakBucket type' bucket) k =
+streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) k =
   withRiakConnection manager $ \conn -> k $ do
     response :: RpbListKeysResp <-
       streamRiakKeysPB conn request
 
-    ListT.select (map (RiakKey type' bucket) (response ^. #keys))
+    ListT.select (map (RiakKey namespace) (response ^. #keys))
 
  where
   request :: RpbListKeysReq
@@ -1334,7 +1334,7 @@ streamRiakKeys (RiakHandle manager _) (RiakBucket type' bucket) k =
       { _RpbListKeysReq'_unknownFields = []
       , _RpbListKeysReq'bucket         = bucket
       , _RpbListKeysReq'timeout        = Nothing
-      , _RpbListKeysReq'type'          = Just type'
+      , _RpbListKeysReq'type'          = Just (unRiakBucketType type')
       }
 
 -- | List all of the keys in a bucket. Provided for convenience when bringing
@@ -1443,11 +1443,11 @@ riakExactQuery
   -> (ListT (ExceptT RiakError IO) (RiakKey 'Nothing) -> IO r) -- ^
   -> IO r
 riakExactQuery
-    (RiakHandle manager _) (RiakBucket type' bucket) query k =
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
   withRiakConnection manager $ \conn -> k $ do
     response :: RpbIndexResp <-
       riakIndexPB conn request
-    ListT.select (map (RiakKey type' bucket) (response ^. #keys))
+    ListT.select (map (RiakKey namespace ) (response ^. #keys))
  where
   request :: RpbIndexReq
   request =
@@ -1468,7 +1468,7 @@ riakExactQuery
       , _RpbIndexReq'stream         = Just True
       , _RpbIndexReq'termRegex      = Nothing
       , _RpbIndexReq'timeout        = Nothing
-      , _RpbIndexReq'type'          = Just type'
+      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
       }
 
   index :: RiakIndexName
@@ -1499,11 +1499,11 @@ riakRangeQuery
   -> (ListT (ExceptT RiakError IO) (RiakKey 'Nothing) -> IO r) -- ^
   -> IO r
 riakRangeQuery
-    (RiakHandle manager _) (RiakBucket type' bucket) query k =
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
   withRiakConnection manager $ \conn -> k $ do
     response :: RpbIndexResp <-
       riakIndexPB conn request
-    ListT.select (map (RiakKey type' bucket) (response ^. #keys))
+    ListT.select (map (RiakKey namespace) (response ^. #keys))
  where
   request :: RpbIndexReq
   request =
@@ -1524,7 +1524,7 @@ riakRangeQuery
       , _RpbIndexReq'stream         = Just True
       , _RpbIndexReq'termRegex      = Nothing
       , _RpbIndexReq'timeout        = Nothing
-      , _RpbIndexReq'type'          = Just type'
+      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
       }
 
   index :: RiakIndexName
@@ -1561,7 +1561,7 @@ riakRangeQueryTerms
   -> (ListT (ExceptT RiakError IO) (RiakKey 'Nothing, a) -> IO r) -- ^
   -> IO r
 riakRangeQueryTerms
-    (RiakHandle manager _) (RiakBucket type' bucket) query k =
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
   withRiakConnection manager $ \conn -> k $ do
     response :: RpbIndexResp <-
       riakIndexPB conn request
@@ -1586,7 +1586,7 @@ riakRangeQueryTerms
       , _RpbIndexReq'stream         = Just True
       , _RpbIndexReq'termRegex      = Nothing
       , _RpbIndexReq'timeout        = Nothing
-      , _RpbIndexReq'type'          = Just type'
+      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
       }
 
   index :: RiakIndexName
@@ -1616,7 +1616,7 @@ riakRangeQueryTerms
   parse :: RpbPair -> (RiakKey 'Nothing, a)
   parse = \case
     RpbPair val (Just key) _ ->
-      (RiakKey type' bucket key, parse1 val)
+      (RiakKey namespace key, parse1 val)
     _ ->
       undefined
 

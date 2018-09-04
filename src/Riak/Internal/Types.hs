@@ -37,7 +37,7 @@ data ObjectReturn
 
 -- | A bucket type and bucket.
 data RiakBucket (ty :: Maybe RiakCrdtTy)
-  = RiakBucket !ByteString !ByteString
+  = RiakBucket !(RiakBucketType ty) !ByteString
   deriving stock (Eq)
 
 instance Hashable (RiakBucket ty) where
@@ -49,7 +49,7 @@ instance Hashable (RiakBucket ty) where
 instance Show (RiakBucket ty) where
   show :: RiakBucket ty -> String
   show (RiakBucket type' bucket) =
-    Text.unpack (decodeUtf8 type')
+    show type'
     ++ " " ++
     either
       (const ("base64:" ++ Latin1.unpack (Base64.encode bucket)))
@@ -58,7 +58,7 @@ instance Show (RiakBucket ty) where
 
 pattern DefaultRiakBucket :: ByteString -> RiakBucket 'Nothing
 pattern DefaultRiakBucket name =
-  RiakBucket "default" name
+  RiakBucket DefaultRiakBucketType name
 
 
 -- TODO better BucketProps types
@@ -149,24 +149,19 @@ newtype RiakIndexName
 
 -- | A bucket type, bucket, and key.
 data RiakKey (ty :: Maybe RiakCrdtTy)
-  = RiakKey !ByteString !ByteString !ByteString
+  = RiakKey !(RiakBucket ty) !ByteString
   deriving stock (Eq)
 
 instance Hashable (RiakKey ty) where
-  hashWithSalt salt (RiakKey type' bucket key) =
-    salt `hashWithSalt` type' `hashWithSalt` bucket `hashWithSalt` key
+  hashWithSalt salt (RiakKey bucket key) =
+    salt `hashWithSalt` bucket `hashWithSalt` key
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
 instance Show (RiakKey ty) where
   show :: RiakKey ty -> String
-  show (RiakKey type' bucket key) =
-    Text.unpack (decodeUtf8 type')
-    ++ " " ++
-    either
-      (const ("base64:" ++ Latin1.unpack (Base64.encode bucket)))
-      Text.unpack
-      (decodeUtf8' bucket)
+  show (RiakKey bucket key) =
+    show bucket
     ++ " " ++
     either
       (const ("base64:" ++ Latin1.unpack (Base64.encode key)))
@@ -267,8 +262,11 @@ data SomeRiakKey where
   SomeRiakKey :: RiakKey ty -> SomeRiakKey
 
 instance Eq SomeRiakKey where
-  SomeRiakKey (RiakKey t1 b1 k1) == SomeRiakKey (RiakKey t2 b2 k2) =
+  SomeRiakKey (RiakKey n1 k1) == SomeRiakKey (RiakKey n2 k2) =
     t1 == t2 && b1 == b2 && k1 == k2
+   where
+    RiakBucket (RiakBucketType t1) b1 = n1
+    RiakBucket (RiakBucketType t2) b2 = n2
 
 instance Hashable SomeRiakKey where
   hashWithSalt salt (SomeRiakKey loc) =

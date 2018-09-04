@@ -377,7 +377,7 @@ doGetBucketProps type' bucket host port = do
   either print printBucketProps =<<
     maybe
       (getRiakBucketTypeProps h type')
-      (getRiakBucketProps h . RiakBucket (unRiakBucketType type'))
+      (getRiakBucketProps h . RiakBucket type')
       bucket
 
 doGetCounter
@@ -548,7 +548,7 @@ doStream
 doStream type' =
   maybe
     (doStreamBuckets type')
-    (doStreamKeys . RiakBucket (unRiakBucketType type'))
+    (doStreamKeys . RiakBucket type')
 
 doStreamBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
 doStreamBuckets type' host port = do
@@ -704,8 +704,8 @@ bucketTypeArgument =
 
 locationArgument :: Parser (RiakKey ty)
 locationArgument =
-  RiakKey
-    <$> (unRiakBucketType <$> bucketTypeArgument)
+  (\type' bucket -> RiakKey (RiakBucket type' bucket))
+    <$> bucketTypeArgument
     <*> bucketArgument
     <*> keyArgument
 
@@ -754,7 +754,7 @@ dwOption =
 namespaceArgument :: Parser (RiakBucket ty)
 namespaceArgument =
   RiakBucket
-    <$> (unRiakBucketType <$> bucketTypeArgument)
+    <$> bucketTypeArgument
     <*> bucketArgument
 
 nodeArgument :: Parser ((HostName -> PortNumber -> r) -> r)

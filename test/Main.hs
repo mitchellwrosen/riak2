@@ -168,8 +168,8 @@ randomKeyString :: IO [Char]
 randomKeyString = randomBucketString
 
 objectKey :: ByteString -> ByteString -> RiakKey 'Nothing
-objectKey =
-  RiakKey "objects"
+objectKey bucket =
+  RiakKey (RiakBucket (RiakBucketType "objects") bucket)
 
 shouldBe :: (Eq a, HasCallStack, Show a) => a -> a -> IO ()
 shouldBe = (@?=)
