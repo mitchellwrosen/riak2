@@ -110,12 +110,14 @@ test-suite tests
       base
     , bytestring
     , lens-family
+    , list-transformer
     , process
     , random
     , riak-but-better
     , tasty
     , tasty-hunit
     , text
+    , transformers
   default-language:
     Haskell2010
   ghc-options:

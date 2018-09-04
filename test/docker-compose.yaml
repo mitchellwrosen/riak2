@@ -6,8 +6,11 @@ services:
     ports: ["8087:8087", "8098:8098"]
     volumes:
       - type: "bind"
-        source: "./schemas"
-        target: "/etc/riak/schemas"
-      - type: "bind"
         source: "./02-bootstrap-datatypes.sh"
         target: "/etc/riak/poststart.d/02-bootstrap-datatypes.sh"
+      - type: "bind"
+        source: "./riak.conf"
+        target: "/etc/riak/riak.conf"
+      - type: "bind"
+        source: "./schemas"
+        target: "/etc/riak/schemas"

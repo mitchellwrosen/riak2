@@ -85,7 +85,9 @@ riakConnect host port = do
 
       in
         unmask (loop (messageStream (socketStream socket)))
-          `catch` (void . atomically . tryPutTMVar exVar)
+          `catch` \ex -> do
+            debug ("[riak] recv thread: " ++ show ex)
+            void (atomically (tryPutTMVar exVar ex))
 
   let
     conn :: RiakConnection
@@ -115,7 +117,8 @@ riakExchange
   -> a
   -> IO (Either RiakError b)
 riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
-  debug ("[riak] send: " ++ show request)
+  -- debug "[riak] send"
+  -- debug ("[riak] send: " ++ show request)
 
   resultVar :: MVar Message <-
     newEmptyMVar
@@ -135,27 +138,38 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
     recv = do
       result :: Either RiakError b <-
         parseResponse =<< takeMVar resultVar
-      debug ("[riak] recv: " ++ either show show result)
+      -- debug "[riak] recv"
+      -- debug ("[riak] recv: " ++ either show show result)
       pure result
 
   recv `catch`
     \BlockedIndefinitelyOnMVar -> atomically (readTMVar exVar) >>= throwIO
 
 riakStream
-  :: forall a b.
+  :: forall a b r.
      (Request a, Response b)
   => RiakConnection -- ^
   -> (b -> Bool) -- ^ Done?
   -> a -- ^
-  -> ListT (ExceptT RiakError IO) b
-riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request = do
-  debug ("[riak] send: " ++ show request)
+  -> (ListT (ExceptT RiakError IO) b -> IO r)
+  -> IO r
+riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request k = do
+  -- debug "[riak] send"
+  -- debug ("[riak] send: " ++ show request)
 
   responseQueue :: TQueue (Either RiakError b) <-
     liftIO newTQueueIO
 
+  -- Streaming responses are special; when one is active, no other requests can
+  -- be serviced on this socket by riak. I learned this the hard way by
+  -- reading riak source code.
+  --
+  -- So, hold a lock on the socket for the entirety of the request-response
+  -- exchange, not just during sending the request.
   liftIO . withMVar sem $ \() -> do
     riakSend conn request
+
+    -- TODO don't bother going to/from the recv thread here, just recv manually
 
     let
       -- We have to decode the payloads to know when the stream is done, so just
@@ -165,7 +179,8 @@ riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request = do
         Streaming.wrap $ \message -> do
           response :: Either RiakError b <-
             lift (parseResponse message)
-          debug ("[riak] recv: " ++ either show show response)
+          -- debug "[riak] recv"
+          -- debug ("[riak] recv: " ++ either show show response)
 
           lift (atomically (writeTQueue responseQueue response))
 
@@ -174,16 +189,16 @@ riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request = do
 
     atomically (writeTQueue recvQueue consumer)
 
-  fix $ \loop -> do
-    response :: b <-
-      (lift . ExceptT)
-        (atomically (readTQueue responseQueue)
-          `catch` \BlockedIndefinitelyOnSTM ->
-            (atomically (readTMVar exVar) >>= throwIO))
+    k $ fix $ \loop -> do
+      response :: b <-
+        (lift . ExceptT)
+          (atomically (readTQueue responseQueue)
+            `catch` \BlockedIndefinitelyOnSTM ->
+              (atomically (readTMVar exVar) >>= throwIO))
 
-    if done response
-      then pure response
-      else pure response <|> loop
+      if done response
+        then pure response
+        else pure response <|> loop
 
 socketStream :: Socket -> Q.ByteString IO ()
 socketStream socket =

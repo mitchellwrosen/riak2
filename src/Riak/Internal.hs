@@ -361,14 +361,16 @@ resetRiakBucketPropsPB =
 riakIndexPB
   :: RiakConnection -- ^
   -> RpbIndexReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbIndexResp
+  -> (ListT (ExceptT RiakError IO) RpbIndexResp -> IO r) -- ^
+  -> IO r
 riakIndexPB conn =
   riakStream conn (view #done)
 
 riakMapReducePB
   :: RiakConnection -- ^
   -> RpbMapRedReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbMapRedResp
+  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r) -- ^
+  -> IO r
 riakMapReducePB conn =
   riakStream conn (view #done)
 
@@ -396,14 +398,16 @@ setRiakBucketTypePropsPB =
 streamRiakBucketsPB
   :: RiakConnection -- ^
   -> RpbListBucketsReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbListBucketsResp
+  -> (ListT (ExceptT RiakError IO) RpbListBucketsResp -> IO r) -- ^
+  -> IO r
 streamRiakBucketsPB conn =
   riakStream conn (view #done)
 
 streamRiakKeysPB
   :: RiakConnection -- ^
   -> RpbListKeysReq -- ^
-  -> ListT (ExceptT RiakError IO) RpbListKeysResp
+  -> (ListT (ExceptT RiakError IO) RpbListKeysResp -> IO r) -- ^
+  -> IO r
 streamRiakKeysPB conn =
   riakStream conn (view #done)
 

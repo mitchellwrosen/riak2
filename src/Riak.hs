@@ -1276,11 +1276,11 @@ streamRiakBuckets
   -> (ListT (ExceptT RiakError IO) (RiakBucket ty) -> IO r)
   -> IO r
 streamRiakBuckets (RiakHandle manager _) type' k =
-  withRiakConnection manager $ \conn -> k $ do
-    response :: RpbListBucketsResp <-
-      streamRiakBucketsPB conn request
-
-    ListT.select (map (RiakBucket type') (response ^. #buckets))
+  withRiakConnection manager $ \conn -> do
+    streamRiakBucketsPB conn request $ \responses -> k $ do
+      response :: RpbListBucketsResp <-
+        responses
+      ListT.select (map (RiakBucket type') (response ^. #buckets))
 
  where
   request :: RpbListBucketsReq
@@ -1321,11 +1321,11 @@ streamRiakKeys
   -> (ListT (ExceptT RiakError IO) (RiakKey ty) -> IO r)
   -> IO r
 streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) k =
-  withRiakConnection manager $ \conn -> k $ do
-    response :: RpbListKeysResp <-
-      streamRiakKeysPB conn request
-
-    ListT.select (map (RiakKey namespace) (response ^. #keys))
+  withRiakConnection manager $ \conn -> do
+    streamRiakKeysPB conn request $ \responses -> k $ do
+      response :: RpbListKeysResp <-
+        responses
+      ListT.select (map (RiakKey namespace) (response ^. #keys))
 
  where
   request :: RpbListKeysReq
@@ -1418,8 +1418,8 @@ _riakMapReduce
   -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
   -> IO r
 _riakMapReduce (RiakHandle manager _) inputs query k =
-  withRiakConnection manager $ \conn -> k $
-    riakMapReducePB conn (riakMapReduceRequest inputs query)
+  withRiakConnection manager $ \conn ->
+    riakMapReducePB conn (riakMapReduceRequest inputs query) k
 
 --------------------------------------------------------------------------------
 -- Secondary indexes
@@ -1444,10 +1444,11 @@ riakExactQuery
   -> IO r
 riakExactQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
-  withRiakConnection manager $ \conn -> k $ do
-    response :: RpbIndexResp <-
-      riakIndexPB conn request
-    ListT.select (map (RiakKey namespace ) (response ^. #keys))
+  withRiakConnection manager $ \conn ->
+    riakIndexPB conn request $ \responses -> k $ do
+      response :: RpbIndexResp <-
+        responses
+      ListT.select (map (RiakKey namespace ) (response ^. #keys))
  where
   request :: RpbIndexReq
   request =
@@ -1500,10 +1501,11 @@ riakRangeQuery
   -> IO r
 riakRangeQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
-  withRiakConnection manager $ \conn -> k $ do
-    response :: RpbIndexResp <-
-      riakIndexPB conn request
-    ListT.select (map (RiakKey namespace) (response ^. #keys))
+  withRiakConnection manager $ \conn ->
+    riakIndexPB conn request $ \responses -> k $ do
+      response :: RpbIndexResp <-
+        responses
+      ListT.select (map (RiakKey namespace) (response ^. #keys))
  where
   request :: RpbIndexReq
   request =
@@ -1562,10 +1564,11 @@ riakRangeQueryTerms
   -> IO r
 riakRangeQueryTerms
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
-  withRiakConnection manager $ \conn -> k $ do
-    response :: RpbIndexResp <-
-      riakIndexPB conn request
-    ListT.select (map parse (response ^. #results))
+  withRiakConnection manager $ \conn ->
+    riakIndexPB conn request $ \responses -> k $ do
+      response :: RpbIndexResp <-
+        responses
+      ListT.select (map parse (response ^. #results))
  where
   request :: RpbIndexReq
   request =

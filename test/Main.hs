@@ -1,10 +1,12 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, OverloadedStrings,
+{-# LANGUAGE DataKinds, FlexibleContexts, OverloadedLabels, OverloadedStrings,
              TypeApplications #-}
 
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
+import Control.Monad.Trans.Except
 import Data.ByteString    (ByteString)
+import Data.Foldable
 import Data.Maybe         (isJust)
 import Data.Text          (Text)
 import Lens.Family2
@@ -16,6 +18,7 @@ import Text.Printf        (printf)
 
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
+import qualified List.Transformer      as ListT
 
 import           Riak
 import qualified Riak.Lenses as L
@@ -35,20 +38,17 @@ tests h =
       pure ()
 
   , testCase "get object 404" $ do
-      bucket <- randomBucket
-      key <- randomKey
-      getRiakObject @Text h (objectKey bucket key) def `shouldReturn` Right []
+      key <- randomObjectKey
+      getRiakObject @Text h key def `shouldReturn` Right []
 
   , testCase "get Text object w/o charset" $ do
-      bucket <- randomBucketString
-      key <- randomKeyString
-      let val = "foo" :: [Char]
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
-      let loc = objectKey (Latin1.pack bucket) (Latin1.pack key)
-      Right [RiakContent loc' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
-        getRiakObject h loc def
-      loc' `shouldBe` loc
-      val' `shouldBe` Text.pack val
+      key <- randomObjectKey
+      let val = "foo"
+      curlPutText  key val
+      Right [RiakContent key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
+        getRiakObject h key def
+      key' `shouldBe` key
+      val' `shouldBe` val
       ctype `shouldBe` Just (ContentType "text/plain")
       charset `shouldBe` Nothing
       encoding `shouldBe` Nothing
@@ -60,15 +60,13 @@ tests h =
       ttl `shouldBe` TTL Nothing
 
   , testCase "get ByteString object" $ do
-      bucket <- randomBucketString
-      key <- randomKeyString
-      let val = "foo" :: [Char]
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s" bucket key val)
-      let loc = objectKey (Latin1.pack bucket) (Latin1.pack key)
-      Right [RiakContent loc' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
-        getRiakObject h loc def
-      loc' `shouldBe` loc
-      val' `shouldBe` Latin1.pack val
+      key <- randomObjectKey
+      let val = "foo"
+      curlPutByteString key val
+      Right [RiakContent key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
+        getRiakObject h key def
+      key' `shouldBe` key
+      val' `shouldBe` val
       ctype `shouldBe` Just (ContentType "application/octet-stream")
       charset `shouldBe` Nothing
       encoding `shouldBe` Nothing
@@ -80,41 +78,34 @@ tests h =
       ttl `shouldBe` TTL Nothing
 
   , testCase "get two siblings" $ do
-      bucket <- randomBucketString
-      key <- randomKeyString
-      let val = "foo" :: [Char]
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s" bucket key val)
-      let loc = objectKey (Latin1.pack bucket) (Latin1.pack key)
-      Right xs <- getRiakObject @Text h loc def
+      key <- randomObjectKey
+      let val = "foo"
+      curlPutText key val
+      curlPutText key val
+      Right xs <- getRiakObject @Text h key def
       length xs `shouldBe` 2
 
   , testCase "concurrent get/put" $ do
-      let n = 1000 -- objects put+got per thread
-      let t = 4    -- num threads
+      let n = 250 -- objects put+got per thread
+      let t = 4   -- num threads
       done <- newEmptyMVar
       let
         go =
           replicateM_ n $ do
-            bucket <- randomBucket
-            key <- randomKey
-            val <- Text.pack <$> randomKeyString
-            let loc = objectKey bucket key
-            Right () <- putRiakObject h loc val def
-            Right [x] <- getRiakObject h loc def
+            key <- randomObjectKey
+            val <- Text.pack <$> randomKeyNameString
+            Right () <- putRiakObject h key val def
+            Right [x] <- getRiakObject h key def
             (x ^. L.value) `shouldBe` val
       replicateM_ t (forkFinally go (putMVar done))
       replicateM_ t (either throwIO (const (pure ())) =<< takeMVar done)
 
   , testCase "get object head" $ do
-      bucket <- randomBucketString
-      key <- randomKeyString
-      let val = "foo" :: [Char]
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s" bucket key val)
-      let loc = objectKey (Latin1.pack bucket) (Latin1.pack key)
-      Right [RiakContent loc' () ctype charset encoding vtag ts meta ixs deleted ttl] <-
-        getRiakObjectHead h loc def
-      loc' `shouldBe` loc
+      key <- randomObjectKey
+      curlPutByteString key "foo"
+      Right [RiakContent key' () ctype charset encoding vtag ts meta ixs deleted ttl] <-
+        getRiakObjectHead h key def
+      key' `shouldBe` key
       ctype `shouldBe` Just (ContentType "application/octet-stream")
       charset `shouldBe` Nothing
       encoding `shouldBe` Nothing
@@ -126,26 +117,62 @@ tests h =
       ttl `shouldBe` TTL Nothing
 
   , testCase "get object if modified (modified)" $ do
-      bucket <- randomBucketString
-      key <- randomKeyString
-      let val = "foo" :: [Char]
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s" bucket key val)
-      let loc = objectKey (Latin1.pack bucket) (Latin1.pack key)
-      Right (Modified [_]) <- getRiakObjectIfModified @ByteString h loc def
+      key <- randomObjectKey
+      curlPutByteString key "foo"
+      Right (Modified [_]) <- getRiakObjectIfModified @ByteString h key def
       pure ()
 
   , testCase "get object if modified (unmodified)" $ do
-      bucket <- randomBucketString
-      key <- randomKeyString
-      let val = "foo" :: [Char]
-      curl (printf "-XPUT localhost:8098/types/objects/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s" bucket key val)
-      let loc = objectKey (Latin1.pack bucket) (Latin1.pack key)
-      Right [_] <- getRiakObjectHead h loc def -- cache it
-      getRiakObjectIfModified @ByteString h loc def `shouldReturn` Right Unmodified
+      key <- randomObjectKey
+      curlPutByteString key "foo"
+      Right [_] <- getRiakObjectHead h key def -- cache it
+      getRiakObjectIfModified @ByteString h key def `shouldReturn`
+        Right Unmodified
+
+  , testCase "exact int query" $ do
+      let ixname = RiakIndexName "foo"
+      ns <- replicateM 100 (randomRIO (1, 5))
+      b <- randomBucketName
+      for_ ns $ \n -> do
+        key <- randomObjectKeyIn b
+        val <- randomText
+
+        putRiakObject h key val
+          (def & #indexes [RiakIndexInt ixname n])
+            `shouldReturn` Right ()
+
+      for_ [1..5] $ \i -> do
+        riakExactQuery h
+          (RiakBucket (RiakBucketType "objects") b)
+          (RiakExactQueryInt ixname i)
+          ((>>= either throwIO pure) . runExceptT . ListT.fold (\c _ -> c+1) 0 id)
+          `shouldReturn` length (filter (== i) ns)
+
+  , testCase "range int query" $ do
+      let ixname = RiakIndexName "foo"
+      ns <- replicateM 100 (randomRIO (1, 5))
+      b <- randomBucketName
+      for_ ns $ \n -> do
+        key <- randomObjectKeyIn b
+        val <- randomText
+
+        putRiakObject h key val
+          (def & #indexes [RiakIndexInt ixname n])
+            `shouldReturn` Right ()
+
+      for_ [1..4] $ \i -> do
+        riakRangeQuery h
+          (RiakBucket (RiakBucketType "objects") b)
+          (RiakRangeQueryInt ixname i (i+1))
+          ((>>= either throwIO pure) . runExceptT . ListT.fold (\c _ -> c+1) 0 id)
+          `shouldReturn` length (filter (\j -> j == i || j == i+1) ns)
+
+  -- , testCase "exact int query" $ do
+  --     putRiakObject
 
   -- , testCase "storing Text has correct content type, charset, and content encoding" $ do
-  --     bucket <- randomBucket
-  --     key <- randomKey
+  --     bucket <- randomBucketName
+  --     key <- randomKeyName
   --     let loc = defaultLocation bucket key
   --     putRiakObject h loc ("foo" :: Text) def `shouldReturn` Right ()
   --     Right [x] <- getRiakObject @Text h loc def
@@ -155,21 +182,51 @@ tests h =
 curl :: String -> IO ()
 curl = callCommand . ("curl -s " ++)
 
-randomBucket :: IO ByteString
-randomBucket = Latin1.pack <$> randomBucketString
+curlPutByteString :: RiakKey 'Nothing -> ByteString -> IO ()
+curlPutByteString (RiakKey (RiakBucket (RiakBucketType type') bucket) key) val =
+  curl $
+    printf
+      "-XPUT localhost:8098/types/%s/buckets/%s/keys/%s -H 'Content-Type: application/octet-stream' -d %s"
+      (Latin1.unpack type')
+      (Latin1.unpack bucket)
+      (Latin1.unpack key)
+      (Latin1.unpack val)
 
-randomBucketString :: IO [Char]
-randomBucketString = replicateM 32 (randomRIO ('a', 'z'))
+curlPutText :: RiakKey 'Nothing -> Text -> IO ()
+curlPutText (RiakKey (RiakBucket (RiakBucketType type') bucket) key) val =
+  curl $
+    printf
+      "-XPUT localhost:8098/types/%s/buckets/%s/keys/%s -H 'Content-Type: text/plain' -d %s"
+      (Latin1.unpack type')
+      (Latin1.unpack bucket)
+      (Latin1.unpack key)
+      (Text.unpack val)
 
-randomKey :: IO ByteString
-randomKey = Latin1.pack <$> randomKeyString
+randomBucketName :: IO ByteString
+randomBucketName = Latin1.pack <$> randomBucketNameString
 
-randomKeyString :: IO [Char]
-randomKeyString = randomBucketString
+randomBucketNameString :: IO [Char]
+randomBucketNameString = replicateM 32 (randomRIO ('a', 'z'))
 
-objectKey :: ByteString -> ByteString -> RiakKey 'Nothing
-objectKey bucket =
-  RiakKey (RiakBucket (RiakBucketType "objects") bucket)
+randomKeyName :: IO ByteString
+randomKeyName = Latin1.pack <$> randomKeyNameString
+
+randomKeyNameString :: IO [Char]
+randomKeyNameString = randomBucketNameString
+
+randomText :: IO Text
+randomText = Text.pack <$> replicateM 32 (randomRIO ('a', 'z'))
+
+randomObjectKey :: IO (RiakKey 'Nothing)
+randomObjectKey = do
+  bucket <- randomBucketName
+  key <- randomKeyName
+  pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
+
+randomObjectKeyIn :: ByteString -> IO (RiakKey 'Nothing)
+randomObjectKeyIn bucket = do
+  key <- randomKeyName
+  pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
 
 shouldBe :: (Eq a, HasCallStack, Show a) => a -> a -> IO ()
 shouldBe = (@?=)

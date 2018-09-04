@@ -35,20 +35,20 @@ newSTMRiakCache = do
     { riakCacheLookup = do
         \loc -> do
           vclock <- atomically (STMMap.lookup (SomeRiakKey loc) cache)
-          debug $
-            "[riak] cache lookup: " ++ show vclock ++ " <= " ++
-            show loc
+          -- debug $
+          --   "[riak] cache lookup: " ++ show vclock ++ " <= " ++
+          --   show loc
           pure vclock
 
     , riakCacheInsert =
         \loc vclock -> do
-          debug $
-            "[riak] cache insert: " ++ show loc ++ " => " ++
-            show vclock
+          -- debug $
+          --   "[riak] cache insert: " ++ show loc ++ " => " ++
+          --   show vclock
           atomically (STMMap.insert vclock (SomeRiakKey loc) cache)
 
     , riakCacheDelete =
         \loc -> do
-          debug $ "[riak] cache delete: " ++ show loc
+          -- debug $ "[riak] cache delete: " ++ show loc
           atomically (STMMap.delete (SomeRiakKey loc) cache)
     }
