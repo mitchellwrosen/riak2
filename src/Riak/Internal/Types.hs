@@ -35,7 +35,7 @@ data ObjectReturn
   | ObjectReturnBody
 
 
--- | A bucket type and bucket.
+-- | A bucket type and bucket, tagged with the data type it contains.
 data RiakBucket (ty :: Maybe RiakCrdtTy)
   = RiakBucket !(RiakBucketType ty) !ByteString
   deriving stock (Eq)
@@ -56,6 +56,8 @@ instance Show (RiakBucket ty) where
       Text.unpack
       (decodeUtf8' bucket)
 
+-- | (De)construct a bucket in the the @default@ bucket type. Its usage is
+-- discouraged.
 pattern DefaultRiakBucket :: ByteString -> RiakBucket 'Nothing
 pattern DefaultRiakBucket name =
   RiakBucket DefaultRiakBucketType name
@@ -106,6 +108,7 @@ instance Show (RiakBucketType ty) where
   show =
     Text.unpack . decodeUtf8 . unRiakBucketType
 
+-- | (De)construct the @default@ bucket type. Its usage is discouraged.
 pattern DefaultRiakBucketType :: RiakBucketType 'Nothing
 pattern DefaultRiakBucketType =
   RiakBucketType "default"
@@ -147,7 +150,7 @@ newtype RiakIndexName
   deriving (Eq, Show)
 
 
--- | A bucket type, bucket, and key.
+-- | A bucket type, bucket, and key, tagged with the data type it contains.
 data RiakKey (ty :: Maybe RiakCrdtTy)
   = RiakKey !(RiakBucket ty) !ByteString
   deriving stock (Eq)
