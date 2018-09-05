@@ -32,7 +32,6 @@ import Data.Type.Bool             as X (If)
 import Data.Void                  as X
 import Data.Word                  as X
 import GHC.Exts                   as X (IsString)
-import List.Transformer           as X (ListT)
 import Prelude                    as X hiding (head, id, return, (.))
 import Text.Read                  as X (readMaybe)
 import UnliftIO.Exception         as X (Exception, SomeException, bracket,

@@ -55,6 +55,7 @@ module Riak.Internal
   , setRiakBucketPropsPB
   , setRiakBucketTypePropsPB
   , streamRiakBucketsPB
+  , streamRiakBuckets2PB
   , streamRiakKeysPB
   , UpdateRiakCrdtParams(..)
   , updateRiakCrdtPB
@@ -230,7 +231,10 @@ module Riak.Internal
   , TsRow(..)
   ) where
 
+import Control.Foldl (FoldM)
 import Lens.Labels (view)
+
+import qualified Control.Foldl as Foldl
 
 import Proto.Riak
 import Riak.Internal.Cache
@@ -361,18 +365,18 @@ resetRiakBucketPropsPB =
 riakIndexPB
   :: RiakConnection -- ^
   -> RpbIndexReq -- ^
-  -> (ListT (ExceptT RiakError IO) RpbIndexResp -> IO r) -- ^
-  -> IO r
-riakIndexPB conn =
-  riakStream conn (view #done)
+  -> FoldM IO RpbIndexResp r -- ^
+  -> IO (Either RiakError r)
+riakIndexPB conn request =
+  Foldl.impurely (riakStream conn (view #done) request)
 
 riakMapReducePB
   :: RiakConnection -- ^
   -> RpbMapRedReq -- ^
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r) -- ^
-  -> IO r
-riakMapReducePB conn =
-  riakStream conn (view #done)
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
+riakMapReducePB conn request =
+  Foldl.impurely (riakStream conn (view #done) request)
 
 riakSearchPB
   :: RiakConnection -- ^
@@ -398,18 +402,26 @@ setRiakBucketTypePropsPB =
 streamRiakBucketsPB
   :: RiakConnection -- ^
   -> RpbListBucketsReq -- ^
-  -> (ListT (ExceptT RiakError IO) RpbListBucketsResp -> IO r) -- ^
-  -> IO r
-streamRiakBucketsPB conn =
-  riakStream conn (view #done)
+  -> FoldM IO RpbListBucketsResp r -- ^
+  -> IO (Either RiakError r)
+streamRiakBucketsPB conn request =
+  Foldl.impurely (riakStream conn (view #done) request)
+
+streamRiakBuckets2PB
+  :: RiakConnection -- ^
+  -> RpbListBucketsReq -- ^
+  -> FoldM IO RpbListBucketsResp r -- ^
+  -> IO (Either RiakError r)
+streamRiakBuckets2PB conn request =
+  Foldl.impurely (riakStream conn (view #done) request)
 
 streamRiakKeysPB
   :: RiakConnection -- ^
   -> RpbListKeysReq -- ^
-  -> (ListT (ExceptT RiakError IO) RpbListKeysResp -> IO r) -- ^
-  -> IO r
-streamRiakKeysPB conn =
-  riakStream conn (view #done)
+  -> FoldM IO RpbListKeysResp r -- ^
+  -> IO (Either RiakError r)
+streamRiakKeysPB conn request =
+  Foldl.impurely (riakStream conn (view #done) request)
 
 updateRiakCrdtPB
   :: RiakConnection -- ^

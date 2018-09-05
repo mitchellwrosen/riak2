@@ -4,7 +4,6 @@
 import Control.Concurrent
 import Control.Exception
 import Control.Monad
-import Control.Monad.Trans.Except
 import Data.ByteString    (ByteString)
 import Data.Foldable
 import Data.Maybe         (isJust)
@@ -16,9 +15,9 @@ import Test.Tasty
 import Test.Tasty.HUnit
 import Text.Printf        (printf)
 
+import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
-import qualified List.Transformer      as ListT
 
 import           Riak
 import qualified Riak.Lenses as L
@@ -145,8 +144,8 @@ tests h =
         riakExactQuery h
           (RiakBucket (RiakBucketType "objects") b)
           (RiakExactQueryInt ixname i)
-          ((>>= either throwIO pure) . runExceptT . ListT.fold (\c _ -> c+1) 0 id)
-          `shouldReturn` length (filter (== i) ns)
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right (length (filter (== i) ns))
 
   , testCase "range int query" $ do
       let ixname = RiakIndexName "foo"
@@ -164,11 +163,8 @@ tests h =
         riakRangeQuery h
           (RiakBucket (RiakBucketType "objects") b)
           (RiakRangeQueryInt ixname i (i+1))
-          ((>>= either throwIO pure) . runExceptT . ListT.fold (\c _ -> c+1) 0 id)
-          `shouldReturn` length (filter (\j -> j == i || j == i+1) ns)
-
-  -- , testCase "exact int query" $ do
-  --     putRiakObject
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right (length (filter (\j -> j == i || j == i+1) ns))
 
   -- , testCase "storing Text has correct content type, charset, and content encoding" $ do
   --     bucket <- randomBucketName

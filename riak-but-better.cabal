@@ -23,13 +23,14 @@ library
     , containers ^>= 0.5.11 || ^>= 0.6.0
     , data-default-class ^>= 0.1.2
     , dlist ^>= 0.8.0
+    , foldl ^>= 1.4.4
     , ghc-prim ^>= 0.5.2
     , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
     , lens-labels ^>= 0.2.0
-    , list-transformer ^>= 1.0.4
     , network ^>= 2.7.0
     , primitive ^>= 0.6.4
+    , profunctors ^>= 5.3
     , proto-lens ^>= 0.3.1
     , proto-lens-protoc == 0.3.1.0
     , stm ^>= 2.4.5
@@ -85,14 +86,13 @@ executable riakc
       base
     , base64-bytestring
     , bytestring
+    , foldl
     , lens-family
-    , list-transformer
     , optparse-applicative
     , network
     , riak-but-better
     , utf8-string
     , text
-    , transformers
     , unordered-containers
   buildable:
     True
@@ -109,15 +109,14 @@ test-suite tests
   build-depends:
       base
     , bytestring
+    , foldl
     , lens-family
-    , list-transformer
     , process
     , random
     , riak-but-better
     , tasty
     , tasty-hunit
     , text
-    , transformers
   default-language:
     Haskell2010
   ghc-options:

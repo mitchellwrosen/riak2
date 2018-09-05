@@ -2,21 +2,19 @@
              OverloadedStrings, RankNTypes, ScopedTypeVariables,
              TypeApplications #-}
 
-import Control.Monad              (join, when, (<=<))
-import Control.Monad.IO.Class
-import Control.Monad.Trans.Except
-import Data.ByteString            (ByteString)
-import Data.Foldable              (asum, for_, toList, traverse_)
+import Control.Monad       (join, when, (<=<))
+import Data.ByteString     (ByteString)
+import Data.Foldable       (asum, for_, toList, traverse_)
 import Data.Int
-import Data.Text                  (Text)
+import Data.Text           (Text)
 import Data.Word
 import Lens.Family2
-import List.Transformer           (runListT)
-import Network.Socket             (HostName, PortNumber)
+import Network.Socket      (HostName, PortNumber)
 import Options.Applicative
-import Prelude                    hiding (head, return)
-import Text.Read                  (readMaybe)
+import Prelude             hiding (head, return)
+import Text.Read           (readMaybe)
 
+import qualified Control.Foldl          as Foldl
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
 import qualified Data.ByteString.UTF8   as Utf8
@@ -319,8 +317,7 @@ do2i bucket index key1 key2 host port = do
               Just n  -> RiakExactQueryInt index n
               Nothing -> RiakExactQueryBin index (Utf8.fromString key1)
         in
-          riakExactQuery h bucket query
-            (\resp -> (runExceptT . runListT) (resp >>= liftIO . print))
+          riakExactQuery h bucket query (Foldl.mapM_ print)
 
       Just key2' ->
         case (readMaybe key1, readMaybe key2') of
@@ -329,10 +326,7 @@ do2i bucket index key1 key2 host port = do
               h
               bucket
               (RiakRangeQueryInt index n m)
-              (\resp ->
-                (runExceptT . runListT)
-                (resp >>=
-                  liftIO . (\(x, y) -> putStrLn (show x ++ " " ++ show y))))
+              (Foldl.mapM_ ((\(x, y) -> putStrLn (show x ++ " " ++ show y))))
 
           _ ->
             riakRangeQueryTerms
@@ -342,10 +336,7 @@ do2i bucket index key1 key2 host port = do
                 index
                 (Utf8.fromString key1)
                 (Utf8.fromString key2'))
-              (\resp ->
-                (runExceptT . runListT)
-                (resp >>=
-                  liftIO . (\(x, y) -> putStrLn (show x ++ " " ++ show y))))
+              (Foldl.mapM_ (\(x, y) -> putStrLn (show x ++ " " ++ show y)))
 
 doDeleteObject :: RiakKey ty -> HostName -> PortNumber -> IO ()
 doDeleteObject loc host port = do
@@ -554,8 +545,8 @@ doStreamBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
 doStreamBuckets type' host port = do
   h <- createRiakHandle host port
   result :: Either RiakError () <-
-    streamRiakBuckets h type' $ \buckets ->
-      (runExceptT . runListT) (buckets >>= liftIO . print)
+    streamRiakBuckets h type' (Foldl.mapM_ print)
+      -- (runExceptT . runListT) (buckets >>= liftIO . print)
   either print (const (pure ())) result
 
 doStreamKeys
@@ -565,10 +556,8 @@ doStreamKeys
   -> IO ()
 doStreamKeys bucket host port = do
   h <- createRiakHandle host port
-  result :: Either RiakError () <-
-    streamRiakKeys h bucket $ \keys ->
-      (runExceptT . runListT) (keys >>= liftIO . print)
-  either print (const (pure ())) result
+  streamRiakKeys h bucket (Foldl.mapM_ print) >>=
+    either print (const (pure ()))
 
 doUpdateCounter
   :: RiakKey ('Just 'RiakCounterTy)

@@ -146,19 +146,23 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
     \BlockedIndefinitelyOnMVar -> atomically (readTMVar exVar) >>= throwIO
 
 riakStream
-  :: forall a b r.
+  :: forall a b r x.
      (Request a, Response b)
   => RiakConnection -- ^
   -> (b -> Bool) -- ^ Done?
   -> a -- ^
-  -> (ListT (ExceptT RiakError IO) b -> IO r)
-  -> IO r
-riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request k = do
+  -> (x -> b -> IO x) -- ^ Step
+  -> IO x -- ^ Initial
+  -> (x -> IO r) -- ^ Extract
+  -> IO (Either RiakError r)
+riakStream
+    conn@(RiakConnection _ sem recvQueue _ exVar) done request step initial0
+    extract = do
   -- debug "[riak] send"
   -- debug ("[riak] send: " ++ show request)
 
   responseQueue :: TQueue (Either RiakError b) <-
-    liftIO newTQueueIO
+    newTQueueIO
 
   -- Streaming responses are special; when one is active, no other requests can
   -- be serviced on this socket by riak. I learned this the hard way by
@@ -166,7 +170,7 @@ riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request k = do
   --
   -- So, hold a lock on the socket for the entirety of the request-response
   -- exchange, not just during sending the request.
-  liftIO . withMVar sem $ \() -> do
+  withMVar sem $ \() -> do
     riakSend conn request
 
     -- TODO don't bother going to/from the recv thread here, just recv manually
@@ -189,16 +193,21 @@ riakStream conn@(RiakConnection _ sem recvQueue _ exVar) done request k = do
 
     atomically (writeTQueue recvQueue consumer)
 
-    k $ fix $ \loop -> do
-      response :: b <-
-        (lift . ExceptT)
-          (atomically (readTQueue responseQueue)
-            `catch` \BlockedIndefinitelyOnSTM ->
-              (atomically (readTMVar exVar) >>= throwIO))
+    flip fix initial0 $ \loop initial -> do
+      response :: Either RiakError b <-
+        atomically (readTQueue responseQueue)
+          `catch` \BlockedIndefinitelyOnSTM ->
+            (atomically (readTMVar exVar) >>= throwIO)
 
-      if done response
-        then pure response
-        else pure response <|> loop
+      case response of
+        Left ex ->
+          pure (Left ex)
+
+        Right v | done v ->
+          Right <$> (initial >>= \x -> step x v >>= extract)
+
+        Right v ->
+          loop (initial >>= \x -> step x v)
 
 socketStream :: Socket -> Q.ByteString IO ()
 socketStream socket =

@@ -63,9 +63,7 @@ module Riak
   , resetRiakBucketProps
     -- * Full key traversals
   , streamRiakBuckets
-  , listRiakBuckets
   , streamRiakKeys
-  , listRiakKeys
     -- * MapReduce
     -- $mapreduce
   , riakMapReduceBucket
@@ -152,17 +150,19 @@ module Riak
     -- $documentation
   ) where
 
+import Control.Foldl         (FoldM)
 import Data.Default.Class    (def)
+import Data.Profunctor       (lmap)
 import Data.Time             (NominalDiffTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Lens.Labels
 import Network.Socket        (HostName, PortNumber)
 
-import qualified Data.ByteString         as ByteString
-import qualified Data.ByteString.Char8   as Latin1
-import qualified Data.HashSet            as HashSet
-import qualified Data.List.NonEmpty      as List1
-import qualified List.Transformer        as ListT
+import qualified Control.Foldl         as Foldl
+import qualified Data.ByteString       as ByteString
+import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.HashSet          as HashSet
+import qualified Data.List.NonEmpty    as List1
 
 import           Proto.Riak              hiding (SetOp)
 import qualified Proto.Riak              as Proto
@@ -1271,17 +1271,17 @@ resetRiakBucketProps (RiakHandle manager _) req = liftIO $
 --
 -- TODO streamRiakBuckets param timeout
 streamRiakBuckets
-  :: RiakHandle -- ^ Riak handle
+  :: forall r ty.
+     RiakHandle -- ^ Riak handle
   -> RiakBucketType ty -- ^ Bucket type
-  -> (ListT (ExceptT RiakError IO) (RiakBucket ty) -> IO r)
-  -> IO r
-streamRiakBuckets (RiakHandle manager _) type' k =
+  -> FoldM IO (RiakBucket ty) r
+  -> IO (Either RiakError r)
+streamRiakBuckets (RiakHandle manager _) type' fold =
   withRiakConnection manager $ \conn -> do
-    streamRiakBucketsPB conn request $ \responses -> k $ do
-      response :: RpbListBucketsResp <-
-        responses
-      ListT.select (map (RiakBucket type') (response ^. #buckets))
-
+    streamRiakBuckets2PB conn request
+      (fold
+        & Foldl.handlesM Foldl.folded
+        & lmap (map (RiakBucket type') . (^. #buckets)))
  where
   request :: RpbListBucketsReq
   request =
@@ -1292,18 +1292,6 @@ streamRiakBuckets (RiakHandle manager _) type' k =
       , _RpbListBucketsReq'type' = Just (unRiakBucketType type')
       }
 
--- | List all of the buckets in a bucket type. Provided for convenience when
--- bringing all buckets into memory is okay.
---
--- /Note/: This is an extremely expensive operation, and should not be used on a
--- production cluster.
-listRiakBuckets
-  :: RiakHandle -- ^ Riak handle
-  -> RiakBucketType ty -- ^ Bucket type
-  -> IO (Either RiakError [RiakBucket ty])
-listRiakBuckets h bucket =
-  streamRiakBuckets h bucket
-    (runExceptT . ListT.fold (\x a -> x . (a:)) id ($ []))
 
 --------------------------------------------------------------------------------
 -- List keys
@@ -1318,14 +1306,14 @@ listRiakBuckets h bucket =
 streamRiakKeys
   :: RiakHandle -- ^ Riak handle
   -> RiakBucket ty -- ^ Bucket type and bucket
-  -> (ListT (ExceptT RiakError IO) (RiakKey ty) -> IO r)
-  -> IO r
-streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) k =
+  -> FoldM IO (RiakKey ty) r -- ^
+  -> IO (Either RiakError r)
+streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
   withRiakConnection manager $ \conn -> do
-    streamRiakKeysPB conn request $ \responses -> k $ do
-      response :: RpbListKeysResp <-
-        responses
-      ListT.select (map (RiakKey namespace) (response ^. #keys))
+    streamRiakKeysPB conn request
+      (fold
+        & Foldl.handlesM Foldl.folded
+        & lmap (map (RiakKey namespace) . (^. #keys)))
 
  where
   request :: RpbListKeysReq
@@ -1336,19 +1324,6 @@ streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) k =
       , _RpbListKeysReq'timeout        = Nothing
       , _RpbListKeysReq'type'          = Just (unRiakBucketType type')
       }
-
--- | List all of the keys in a bucket. Provided for convenience when bringing
--- all keys into memory is okay.
---
--- /Note/: This is an extremely expensive operation, and should not be used on a
--- production cluster.
-listRiakKeys
-  :: RiakHandle -- ^ Riak handle
-  -> RiakBucket ty -- ^ Bucket type and bucket
-  -> IO (Either RiakError [RiakKey ty])
-listRiakKeys h bucket =
-  streamRiakKeys h bucket
-    (runExceptT . ListT.fold (\x a -> x . (a:)) id ($ []))
 
 
 --------------------------------------------------------------------------------
@@ -1367,8 +1342,8 @@ riakMapReduceBucket
   :: RiakHandle -- ^ Riak handle
   -> RiakBucket 'Nothing -- ^ Bucket type and bucket
   -> [RiakMapReducePhase] -- ^ MapReduce phases
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
-  -> IO r
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
 riakMapReduceBucket h bucket =
   _riakMapReduce h (RiakMapReduceInputsBucket bucket)
 
@@ -1376,8 +1351,8 @@ riakMapReduceKeys
   :: RiakHandle -- ^ Riak handle
   -> [RiakKey 'Nothing] -- ^ Bucket types, buckets, and keys
   -> [RiakMapReducePhase] -- ^ MapReduce phases
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
-  -> IO r
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
 riakMapReduceKeys h keys =
   _riakMapReduce h (RiakMapReduceInputsKeys keys)
 
@@ -1386,8 +1361,8 @@ riakMapReduceFunction
   -> Text -- ^ Erlang module.
   -> Text -- ^ Erlang function.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
-  -> IO r
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
 riakMapReduceFunction h m f =
   _riakMapReduce h (RiakMapReduceInputsFunction m f)
 
@@ -1396,8 +1371,8 @@ riakMapReduceExactQuery
   -> RiakBucket 'Nothing -- ^ Bucket type and bucket.
   -> RiakExactQuery -- ^ Exact query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
-  -> IO r
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
 riakMapReduceExactQuery h bucket query =
   _riakMapReduce h (RiakMapReduceInputsExactQuery bucket query)
 
@@ -1406,8 +1381,8 @@ riakMapReduceRangeQuery
   -> RiakBucket 'Nothing -- ^ Bucket type and bucket.
   -> RiakRangeQuery a -- ^ Range query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
-  -> IO r
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
 riakMapReduceRangeQuery h bucket query =
   _riakMapReduce h (RiakMapReduceInputsRangeQuery bucket query)
 
@@ -1415,8 +1390,8 @@ _riakMapReduce
   :: RiakHandle -- ^ Riak handle
   -> RiakMapReduceInputs -- ^ MapReduce inputs
   -> [RiakMapReducePhase] -- ^ MapReduce phases
-  -> (ListT (ExceptT RiakError IO) RpbMapRedResp -> IO r)
-  -> IO r
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (Either RiakError r)
 _riakMapReduce (RiakHandle manager _) inputs query k =
   withRiakConnection manager $ \conn ->
     riakMapReducePB conn (riakMapReduceRequest inputs query) k
@@ -1440,15 +1415,15 @@ riakExactQuery
   :: RiakHandle -- ^
   -> RiakBucket 'Nothing -- ^
   -> RiakExactQuery -- ^
-  -> (ListT (ExceptT RiakError IO) (RiakKey 'Nothing) -> IO r) -- ^
-  -> IO r
+  -> FoldM IO (RiakKey 'Nothing) r -- ^
+  -> IO (Either RiakError r)
 riakExactQuery
-    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    riakIndexPB conn request $ \responses -> k $ do
-      response :: RpbIndexResp <-
-        responses
-      ListT.select (map (RiakKey namespace ) (response ^. #keys))
+    riakIndexPB conn request
+      (fold
+        & Foldl.handlesM Foldl.folded
+        & lmap (map (RiakKey namespace) . (^. #keys)))
  where
   request :: RpbIndexReq
   request =
@@ -1497,15 +1472,15 @@ riakRangeQuery
   :: RiakHandle -- ^
   -> RiakBucket 'Nothing -- ^
   -> RiakRangeQuery a -- ^
-  -> (ListT (ExceptT RiakError IO) (RiakKey 'Nothing) -> IO r) -- ^
-  -> IO r
+  -> FoldM IO (RiakKey 'Nothing) r -- ^
+  -> IO (Either RiakError r)
 riakRangeQuery
-    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    riakIndexPB conn request $ \responses -> k $ do
-      response :: RpbIndexResp <-
-        responses
-      ListT.select (map (RiakKey namespace) (response ^. #keys))
+    riakIndexPB conn request
+      (fold
+        & Foldl.handlesM Foldl.folded
+        & lmap (map (RiakKey namespace) . (^. #keys)))
  where
   request :: RpbIndexReq
   request =
@@ -1560,15 +1535,15 @@ riakRangeQueryTerms
      RiakHandle -- ^
   -> RiakBucket 'Nothing -- ^
   -> RiakRangeQuery a -- ^
-  -> (ListT (ExceptT RiakError IO) (RiakKey 'Nothing, a) -> IO r) -- ^
-  -> IO r
+  -> FoldM IO (RiakKey 'Nothing, a) r -- ^
+  -> IO (Either RiakError r)
 riakRangeQueryTerms
-    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query k =
+    (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    riakIndexPB conn request $ \responses -> k $ do
-      response :: RpbIndexResp <-
-        responses
-      ListT.select (map parse (response ^. #results))
+    riakIndexPB conn request
+      (fold
+        & Foldl.handlesM Foldl.folded
+        & lmap (map parse . (^. #results)))
  where
   request :: RpbIndexReq
   request =
