@@ -105,18 +105,17 @@ module Riak
   , ContentType(..)
   , GetRiakCrdtParams
   , GetRiakObjectParams
-  , IsRiakContent(..)
   , IsRiakMap(..)
+  , IsRiakObject(..)
   , IsRiakRegister(..)
   , IsRiakSet
-  , JsonRiakContent(..)
+  , JsonRiakObject(..)
   , Modified(..)
   , PutRiakObjectParams
   , RiakBucket(..)
   , pattern DefaultRiakBucket
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
-  , RiakContent(..)
   , RiakCrdtError(..)
   , RiakCrdtTy(..)
   , RiakError(..)
@@ -131,6 +130,7 @@ module Riak
   , RiakMapReduceInputs(..)
   , RiakMapReducePhase(..)
   , RiakMetadata(..)
+  , RiakObject(..)
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
@@ -230,11 +230,11 @@ createRiakHandle host port = do
 -- @
 getRiakObject
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError [RiakContent a])
+  -> m (Either RiakError [RiakObject a])
 getRiakObject
     h@(RiakHandle manager _)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -246,7 +246,7 @@ getRiakObject
       (withRiakConnection manager
         (\conn -> getRiakObjectPB conn request))
 
-  contents :: [RiakContent a] <- lift $
+  contents :: [RiakObject a] <- lift $
     traverse
       (parseContent' loc)
       (filter notTombstone (response ^. #content))
@@ -288,7 +288,7 @@ getRiakObjectHead
     => RiakHandle -- ^ Riak handle
     -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
     -> GetRiakObjectParams -- ^ Optional parameters
-    -> m (Either RiakError [RiakContent ()])
+    -> m (Either RiakError [RiakObject ()])
 getRiakObjectHead
     h@(RiakHandle manager _)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -300,7 +300,7 @@ getRiakObjectHead
       (withRiakConnection manager
         (\conn -> getRiakObjectPB conn request))
 
-  contents :: [RiakContent ()] <- lift $
+  contents :: [RiakObject ()] <- lift $
     traverse
       (parseContentHead loc)
       (filter notTombstone (response ^. #content))
@@ -340,11 +340,11 @@ getRiakObjectHead
 -- 'putRiakObject'.
 getRiakObjectIfModified
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (Modified [RiakContent a]))
+  -> m (Either RiakError (Modified [RiakObject a]))
 getRiakObjectIfModified
     h@(RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -384,7 +384,7 @@ getRiakObjectIfModified
       pure Unmodified
 
     else do
-      contents :: [RiakContent a] <- lift $
+      contents :: [RiakObject a] <- lift $
         traverse
           (parseContent' loc)
           (filter notTombstone (response ^. #content))
@@ -405,7 +405,7 @@ getRiakObjectIfModifiedHead
   => RiakHandle -- ^ Riak handle
   -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (Modified [RiakContent ()]))
+  -> m (Either RiakError (Modified [RiakObject ()]))
 getRiakObjectIfModifiedHead
     h@(RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -445,7 +445,7 @@ getRiakObjectIfModifiedHead
       pure Unmodified
 
     else do
-      contents :: [RiakContent ()] <- lift $
+      contents :: [RiakObject ()] <- lift $
         traverse
           (parseContentHead loc)
           (filter notTombstone (response ^. #content))
@@ -465,13 +465,13 @@ getRiakObjectIfModifiedHead
 
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy _ 'ObjectReturnNone = RiakKey 'Nothing
-  ObjectReturnTy _ 'ObjectReturnHead = NonEmpty (RiakContent ())
-  ObjectReturnTy a 'ObjectReturnBody = NonEmpty (RiakContent a)
+  ObjectReturnTy _ 'ObjectReturnHead = NonEmpty (RiakObject ())
+  ObjectReturnTy a 'ObjectReturnBody = NonEmpty (RiakObject a)
 
 -- | Put an object.
 putRiakObject
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
@@ -486,12 +486,12 @@ putRiakObject
 -- | Put an object and return its metadata.
 putRiakObjectHead
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (NonEmpty (RiakContent ())))
+  -> m (Either RiakError (NonEmpty (RiakObject ())))
 putRiakObjectHead
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   (_putRiakObject handle bucket (Just key) content a b c d e
@@ -500,12 +500,12 @@ putRiakObjectHead
 -- | Put an object and return it.
 putRiakObjectBody
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (NonEmpty (RiakContent a)))
+  -> m (Either RiakError (NonEmpty (RiakObject a)))
 putRiakObjectBody
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   _putRiakObject handle bucket (Just key) content a b c d e
@@ -514,7 +514,7 @@ putRiakObjectBody
 -- | Put a new object and return its randomly-generated key.
 putNewRiakObject
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakBucket 'Nothing -- ^ Bucket type and bucket
   -> a -- ^ Object
@@ -528,12 +528,12 @@ putNewRiakObject
 -- | Put an new object and return its metadata.
 putNewRiakObjectHead
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakBucket 'Nothing -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (RiakContent ()))
+  -> m (Either RiakError (RiakObject ()))
 putNewRiakObjectHead
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head
@@ -543,12 +543,12 @@ putNewRiakObjectHead
 -- | Put an new object and return it.
 putNewRiakObjectBody
   :: forall a m.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
   -> RiakBucket 'Nothing -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (RiakContent a))
+  -> m (Either RiakError (RiakObject a))
 putNewRiakObjectBody
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
@@ -557,7 +557,7 @@ putNewRiakObjectBody
 
 _putRiakObject
   :: forall a m return.
-     (IsRiakContent a, MonadIO m)
+     (IsRiakObject a, MonadIO m)
   => RiakHandle
   -> RiakBucket 'Nothing
   -> Maybe ByteString
@@ -593,9 +593,9 @@ _putRiakObject
         , _RpbPutReq'content        =
             RpbContent
               { _RpbContent'_unknownFields  = []
-              , _RpbContent'charset         = coerce (riakCharset value)
-              , _RpbContent'contentEncoding = coerce (riakContentEncoding value)
-              , _RpbContent'contentType     = Just (unContentType (riakContentType value))
+              , _RpbContent'charset         = coerce (riakObjectCharset value)
+              , _RpbContent'contentEncoding = coerce (riakObjectContentEncoding value)
+              , _RpbContent'contentType     = Just (unContentType (riakObjectContentType value))
               , _RpbContent'deleted         = Nothing
               , _RpbContent'indexes         = map indexToRpbPair (coerce indexes)
               , _RpbContent'lastMod         = Nothing
@@ -603,7 +603,7 @@ _putRiakObject
               , _RpbContent'links           = []
               , _RpbContent'ttl             = Nothing
               , _RpbContent'usermeta        = map rpbPair (coerce metadata)
-              , _RpbContent'value           = encodeRiakContent value
+              , _RpbContent'value           = encodeRiakObject value
               , _RpbContent'vtag            = Nothing
               }
         , _RpbPutReq'dw             = coerce dw
@@ -1833,7 +1833,7 @@ cacheVclock (RiakHandle _ cache) loc =
   liftIO . maybe (riakCacheDelete cache loc) (riakCacheInsert cache loc)
 
 
-contentIsDataType :: RiakContent a -> Bool
+contentIsDataType :: RiakObject a -> Bool
 contentIsDataType =
   maybe False (`elem` crdtContentTypes) . (^. #contentType)
 
@@ -1856,12 +1856,12 @@ notTombstone content =
 
 parseContent
   :: forall a head.
-     IsRiakContent a
+     IsRiakObject a
   => Proxy# a
   -> RiakKey 'Nothing
   -> SBool head
   -> RpbContent
-  -> IO (RiakContent (If head () a))
+  -> IO (RiakObject (If head () a))
 parseContent _ loc head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
@@ -1875,7 +1875,7 @@ parseContent _ loc head
         either
           throwIO
           pure
-          (decodeRiakContent
+          (decodeRiakObject
             (coerce content_type)
             (coerce charset)
             (coerce content_encoding)
@@ -1889,7 +1889,7 @@ parseContent _ loc head
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
-  pure $ RiakContent
+  pure $ RiakObject
     loc
     theValue
     (coerce content_type)
@@ -1906,17 +1906,17 @@ parseContent _ loc head
 
 parseContent'
   :: forall a.
-     IsRiakContent a
+     IsRiakObject a
   => RiakKey 'Nothing
   -> RpbContent
-  -> IO (RiakContent a)
+  -> IO (RiakObject a)
 parseContent' =
-  _parseContent decodeRiakContent
+  _parseContent decodeRiakObject
 
 parseContentHead
   :: RiakKey 'Nothing
   -> RpbContent
-  -> IO (RiakContent ())
+  -> IO (RiakObject ())
 parseContentHead =
   _parseContent (\_ _ _ _ -> Right ())
 
@@ -1931,7 +1931,7 @@ _parseContent
      )
   -> RiakKey 'Nothing
   -> RpbContent
-  -> IO (RiakContent a)
+  -> IO (RiakObject a)
 _parseContent parse loc
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
@@ -1952,7 +1952,7 @@ _parseContent parse loc
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
-  pure $ RiakContent
+  pure $ RiakObject
     loc
     theValue
     (coerce content_type)

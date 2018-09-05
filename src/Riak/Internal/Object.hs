@@ -4,13 +4,13 @@
              OverloadedStrings, PatternSynonyms, TypeFamilies,
              UndecidableInstances #-}
 
-module Riak.Internal.Content
+module Riak.Internal.Object
   ( Charset(..)
-  , RiakContent(..)
+  , RiakObject(..)
   , ContentEncoding(..)
   , ContentType(..)
-  , IsRiakContent(..)
-  , JsonRiakContent(..)
+  , IsRiakObject(..)
+  , JsonRiakObject(..)
   ) where
 
 import Data.Aeson             (FromJSON, ToJSON)
@@ -26,8 +26,8 @@ import qualified Data.Text.Encoding as Text
 import Riak.Internal.Prelude
 import Riak.Internal.Types
 
-data RiakContent a
-  = RiakContent
+data RiakObject a
+  = RiakObject
       !(RiakKey 'Nothing)
       a                       -- Value
       (Maybe ContentType)     -- Content type
@@ -42,26 +42,26 @@ data RiakContent a
   deriving (Eq, Functor, Show)
 
 instance {-# OVERLAPPABLE #-}
-    ( HasLens' f (RiakContent s) x a
+    ( HasLens' f (RiakObject s) x a
     , s ~ t
     , a ~ b
-    ) => HasLens f (RiakContent s) (RiakContent t) x a b where
+    ) => HasLens f (RiakObject s) (RiakObject t) x a b where
   lensOf = lensOf'
 
-instance Functor f => HasLens' f (RiakContent a)                 "key"             (RiakKey 'Nothing)        where lensOf' _ = lens (\(RiakContent x _ _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent _ b c d e f g h i j k) x -> RiakContent x b c d e f g h i j k)
-instance Functor f => HasLens  f (RiakContent a) (RiakContent b) "value"           a                       b where lensOf  _ = lens (\(RiakContent _ x _ _ _ _ _ _ _ _ _) -> x) (\(RiakContent a _ c d e f g h i j k) x -> RiakContent a x c d e f g h i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "contentType"     (Maybe ContentType)       where lensOf' _ = lens (\(RiakContent _ _ x _ _ _ _ _ _ _ _) -> x) (\(RiakContent a b _ d e f g h i j k) x -> RiakContent a b x d e f g h i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "charset"         (Maybe Charset)           where lensOf' _ = lens (\(RiakContent _ _ _ x _ _ _ _ _ _ _) -> x) (\(RiakContent a b c _ e f g h i j k) x -> RiakContent a b c x e f g h i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "contentEncoding" (Maybe ContentEncoding)   where lensOf' _ = lens (\(RiakContent _ _ _ _ x _ _ _ _ _ _) -> x) (\(RiakContent a b c d _ f g h i j k) x -> RiakContent a b c d x f g h i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "vtag"            (Maybe RiakVtag)          where lensOf' _ = lens (\(RiakContent _ _ _ _ _ x _ _ _ _ _) -> x) (\(RiakContent a b c d e _ g h i j k) x -> RiakContent a b c d e x g h i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "lastMod"         (Maybe UTCTime)           where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ x _ _ _ _) -> x) (\(RiakContent a b c d e f _ h i j k) x -> RiakContent a b c d e f x h i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "usermeta"        RiakMetadata              where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ x _ _ _) -> x) (\(RiakContent a b c d e f g _ i j k) x -> RiakContent a b c d e f g x i j k)
-instance Functor f => HasLens' f (RiakContent a)                 "indexes"         [RiakIndex]               where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ x _ _) -> x) (\(RiakContent a b c d e f g h _ j k) x -> RiakContent a b c d e f g h x j k)
-instance Functor f => HasLens' f (RiakContent a)                 "deleted"         Bool                      where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ _ x _) -> x) (\(RiakContent a b c d e f g h i _ k) x -> RiakContent a b c d e f g h i x k)
-instance Functor f => HasLens' f (RiakContent a)                 "ttl"             TTL                       where lensOf' _ = lens (\(RiakContent _ _ _ _ _ _ _ _ _ _ x) -> x) (\(RiakContent a b c d e f g h i j _) x -> RiakContent a b c d e f g h i j x)
+instance Functor f => HasLens' f (RiakObject a)                "key"             (RiakKey 'Nothing)        where lensOf' _ = lens (\(RiakObject x _ _ _ _ _ _ _ _ _ _) -> x) (\(RiakObject _ b c d e f g h i j k) x -> RiakObject x b c d e f g h i j k)
+instance Functor f => HasLens  f (RiakObject a) (RiakObject b) "value"           a                       b where lensOf  _ = lens (\(RiakObject _ x _ _ _ _ _ _ _ _ _) -> x) (\(RiakObject a _ c d e f g h i j k) x -> RiakObject a x c d e f g h i j k)
+instance Functor f => HasLens' f (RiakObject a)                "contentType"     (Maybe ContentType)       where lensOf' _ = lens (\(RiakObject _ _ x _ _ _ _ _ _ _ _) -> x) (\(RiakObject a b _ d e f g h i j k) x -> RiakObject a b x d e f g h i j k)
+instance Functor f => HasLens' f (RiakObject a)                "charset"         (Maybe Charset)           where lensOf' _ = lens (\(RiakObject _ _ _ x _ _ _ _ _ _ _) -> x) (\(RiakObject a b c _ e f g h i j k) x -> RiakObject a b c x e f g h i j k)
+instance Functor f => HasLens' f (RiakObject a)                "contentEncoding" (Maybe ContentEncoding)   where lensOf' _ = lens (\(RiakObject _ _ _ _ x _ _ _ _ _ _) -> x) (\(RiakObject a b c d _ f g h i j k) x -> RiakObject a b c d x f g h i j k)
+instance Functor f => HasLens' f (RiakObject a)                "vtag"            (Maybe RiakVtag)          where lensOf' _ = lens (\(RiakObject _ _ _ _ _ x _ _ _ _ _) -> x) (\(RiakObject a b c d e _ g h i j k) x -> RiakObject a b c d e x g h i j k)
+instance Functor f => HasLens' f (RiakObject a)                "lastMod"         (Maybe UTCTime)           where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ x _ _ _ _) -> x) (\(RiakObject a b c d e f _ h i j k) x -> RiakObject a b c d e f x h i j k)
+instance Functor f => HasLens' f (RiakObject a)                "usermeta"        RiakMetadata              where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ x _ _ _) -> x) (\(RiakObject a b c d e f g _ i j k) x -> RiakObject a b c d e f g x i j k)
+instance Functor f => HasLens' f (RiakObject a)                "indexes"         [RiakIndex]               where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ _ x _ _) -> x) (\(RiakObject a b c d e f g h _ j k) x -> RiakObject a b c d e f g h x j k)
+instance Functor f => HasLens' f (RiakObject a)                "deleted"         Bool                      where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ _ _ x _) -> x) (\(RiakObject a b c d e f g h i _ k) x -> RiakObject a b c d e f g h i x k)
+instance Functor f => HasLens' f (RiakObject a)                "ttl"             TTL                       where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ _ _ _ x) -> x) (\(RiakObject a b c d e f g h i j _) x -> RiakObject a b c d e f g h i j x)
 
 
--- | 'IsRiakContent' classifies types that are stored in Riak objects. Every
+-- | 'IsRiakObject' classifies types that are stored in Riak objects. Every
 -- object must have a content type, and may optionally have a character set and
 -- encoding.
 --
@@ -88,86 +88,86 @@ instance Functor f => HasLens' f (RiakContent a)                 "ttl"          
 -- regardless of its type, as it ignores the content type, charset, and
 -- encoding.
 --
--- JSON data can be stored using a 'Aeson.Value' or the 'JsonRiakContent'
+-- JSON data can be stored using a 'Aeson.Value' or the 'JsonRiakObject'
 -- newtype wrapper, which can be used in a @deriving via@ clause as e.g.
 --
 -- @
 -- data MyType = MyType ...
---   deriving 'IsRiakContent' via 'JsonRiakContent'
+--   deriving 'IsRiakObject' via 'JsonRiakObject'
 -- @
 --
--- When writing your own 'IsRiakContent' instances, use any content type,
+-- When writing your own 'IsRiakObject' instances, use any content type,
 -- charset, and content encoding you wish. None of them are actually required by
 -- Riak, they are for you to help make sense of your own data.
-class IsRiakContent a where
-  -- | The content type.
-  riakContentType :: a -> ContentType
+class IsRiakObject a where
+  -- | The object's content type.
+  riakObjectContentType :: a -> ContentType
 
-  -- | The character set of the content. Defaults to 'Nothing'.
-  riakCharset :: a -> Maybe Charset
-  riakCharset _ =
+  -- | The object's character set. Defaults to 'Nothing'.
+  riakObjectCharset :: a -> Maybe Charset
+  riakObjectCharset _ =
     Nothing
 
-  -- | The encoding of the content. Defaults to 'Nothing'.
-  riakContentEncoding :: a -> Maybe ContentEncoding
-  riakContentEncoding _ =
+  -- | The object's encoding. Defaults to 'Nothing'.
+  riakObjectContentEncoding :: a -> Maybe ContentEncoding
+  riakObjectContentEncoding _ =
     Nothing
 
   -- | Encode a Riak object.
-  encodeRiakContent :: a -> ByteString
+  encodeRiakObject :: a -> ByteString
 
   -- | Decode a Riak object, given its content type, charset, encoding, and
   -- encoded value.
-  decodeRiakContent
+  decodeRiakObject
     :: Maybe ContentType
     -> Maybe Charset
     -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException a
 
-instance IsRiakContent ByteString where
-  riakContentType :: ByteString -> ContentType
-  riakContentType _ =
+instance IsRiakObject ByteString where
+  riakObjectContentType :: ByteString -> ContentType
+  riakObjectContentType _ =
     ContentType "application/octet-stream"
 
-  encodeRiakContent :: ByteString -> ByteString
-  encodeRiakContent =
+  encodeRiakObject :: ByteString -> ByteString
+  encodeRiakObject =
     id
 
-  decodeRiakContent
+  decodeRiakObject
     :: Maybe ContentType
     -> Maybe Charset
     -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException ByteString
-  decodeRiakContent _ _ _ =
+  decodeRiakObject _ _ _ =
     Right
 
-instance IsRiakContent Text where
-  riakContentType :: Text -> ContentType
-  riakContentType _ =
+instance IsRiakObject Text where
+  riakObjectContentType :: Text -> ContentType
+  riakObjectContentType _ =
     ContentType "text/plain"
 
-  riakCharset :: Text -> Maybe Charset
-  riakCharset _ =
+  riakObjectCharset :: Text -> Maybe Charset
+  riakObjectCharset _ =
     Just (Charset "utf-8")
 
-  riakContentEncoding :: Text -> Maybe ContentEncoding
-  riakContentEncoding _ =
+  riakObjectContentEncoding :: Text -> Maybe ContentEncoding
+  riakObjectContentEncoding _ =
     Just (ContentEncoding "utf-8")
 
-  encodeRiakContent :: Text -> ByteString
-  encodeRiakContent =
+  encodeRiakObject :: Text -> ByteString
+  encodeRiakObject =
     Text.encodeUtf8
 
   -- TODO text parse errors
-  decodeRiakContent
+  decodeRiakObject
     :: Maybe ContentType
     -> Maybe Charset
     -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException Text
-  decodeRiakContent type' charset encoding =
+  decodeRiakObject type' charset encoding =
     case type' of
       Just (ContentType "text/plain") ->
         decode <=< decompress
@@ -206,22 +206,22 @@ instance IsRiakContent Text where
         x ->
           error (show x)
 
-instance IsRiakContent Aeson.Value where
-  riakContentType :: Aeson.Value -> ContentType
-  riakContentType _ =
+instance IsRiakObject Aeson.Value where
+  riakObjectContentType :: Aeson.Value -> ContentType
+  riakObjectContentType _ =
     ContentType "application/json"
 
-  encodeRiakContent :: Aeson.Value -> ByteString
-  encodeRiakContent =
+  encodeRiakObject :: Aeson.Value -> ByteString
+  encodeRiakObject =
     LazyByteString.toStrict . Aeson.encode
 
-  decodeRiakContent
+  decodeRiakObject
     :: Maybe ContentType
     -> Maybe Charset
     -> Maybe ContentEncoding
     -> ByteString
     -> Either SomeException Aeson.Value
-  decodeRiakContent type' _ _ bytes =
+  decodeRiakObject type' _ _ bytes =
     case type' of
       Just (ContentType "application/json") ->
         case Aeson.eitherDecodeStrict' bytes of
@@ -235,26 +235,26 @@ instance IsRiakContent Aeson.Value where
         error (show x)
 
 
-newtype JsonRiakContent a
-  = JsonRiakContent { unJsonRiakContent :: a }
+newtype JsonRiakObject a
+  = JsonRiakObject { unJsonRiakObject :: a }
   deriving (Eq, Show)
 
-instance (FromJSON a, ToJSON a) => IsRiakContent (JsonRiakContent a) where
-  riakContentType :: JsonRiakContent a -> ContentType
-  riakContentType _ =
+instance (FromJSON a, ToJSON a) => IsRiakObject (JsonRiakObject a) where
+  riakObjectContentType :: JsonRiakObject a -> ContentType
+  riakObjectContentType _ =
     ContentType "application/json"
 
-  encodeRiakContent :: JsonRiakContent a -> ByteString
-  encodeRiakContent =
-    LazyByteString.toStrict . Aeson.encode . unJsonRiakContent
+  encodeRiakObject :: JsonRiakObject a -> ByteString
+  encodeRiakObject =
+    LazyByteString.toStrict . Aeson.encode . unJsonRiakObject
 
-  decodeRiakContent
+  decodeRiakObject
     :: Maybe ContentType
     -> Maybe Charset
     -> Maybe ContentEncoding
     -> ByteString
-    -> Either SomeException (JsonRiakContent a)
-  decodeRiakContent type' _ _ bytes =
+    -> Either SomeException (JsonRiakObject a)
+  decodeRiakObject type' _ _ bytes =
     case type' of
       Just (ContentType "application/json") ->
         case Aeson.eitherDecodeStrict' bytes of
@@ -262,7 +262,7 @@ instance (FromJSON a, ToJSON a) => IsRiakContent (JsonRiakContent a) where
             error err
 
           Right value ->
-            Right (JsonRiakContent value)
+            Right (JsonRiakObject value)
 
       x ->
         error (show x)

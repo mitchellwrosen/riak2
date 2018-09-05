@@ -409,7 +409,7 @@ doGetMap loc host port = do
     getRiakMap h loc def
 
 doGetObject
-  :: IsRiakContent a
+  :: IsRiakObject a
   => (Int -> a -> IO ())
   -> RiakKey 'Nothing
   -> Bool
@@ -424,7 +424,7 @@ doGetObject f loc head params host port = do
     else go (getRiakObject h loc params) f
  where
   go
-    :: IO (Either RiakError [RiakContent a])
+    :: IO (Either RiakError [RiakObject a])
     -> (Int -> a -> IO ())
     -> IO ()
   go get g = do
@@ -440,7 +440,7 @@ doGetObject f loc head params host port = do
 
       Right contents -> do
         for_ (zip [(0::Int)..] contents) $ \(i, content) ->
-          printContent (g i) (Just i) content
+          printObject (g i) (Just i) content
 
 doGetSchema :: SolrSchemaName -> HostName -> PortNumber -> IO ()
 doGetSchema schema host port = do
@@ -504,13 +504,13 @@ doPutObject loc content ixs dw n pw return no_sloppy_quorum timeout w host port 
         (putRiakObjectHead h)
         (\contents ->
           (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
-            printContent (\_ -> pure ()) (Just i) content'))
+            printObject (\_ -> pure ()) (Just i) content'))
     'b' ->
       go
         (putRiakObjectBody h)
         (\contents ->
           (for_ (zip [(0::Int)..] (toList contents)) $ \(i, content') ->
-            printContent
+            printObject
               (\s -> Text.putStrLn ("value[" <> Text.pack (show i) <> "] = " <> s))
               (Just i)
               content'))
@@ -621,29 +621,29 @@ printBucketProps props = do
   p s f =
     for_ (f props) (\x -> putStrLn (s ++ " = " ++ x))
 
-printContent :: (a -> IO ()) -> Maybe Int -> RiakContent a -> IO ()
-printContent f mi content = do
-  tag "key" (show (content ^. L.key))
+printObject :: (a -> IO ()) -> Maybe Int -> RiakObject a -> IO ()
+printObject f mi object = do
+  tag "key" (show (object ^. L.key))
 
-  f (content ^. L.value)
+  f (object ^. L.value)
 
-  for_ (content ^. L.contentType) (tag "content_type" . showContentType)
-  for_ (content ^. L.charset) (tag "charset" . showCharset)
-  for_ (content ^. L.contentEncoding) (tag "contentEncoding" . showContentEncoding)
-  for_ (content ^. L.lastMod) (tag "last_mod" . show)
+  for_ (object ^. L.contentType) (tag "content_type" . showContentType)
+  for_ (object ^. L.charset) (tag "charset" . showCharset)
+  for_ (object ^. L.contentEncoding) (tag "contentEncoding" . showContentEncoding)
+  for_ (object ^. L.lastMod) (tag "last_mod" . show)
 
-  case unRiakMetadata (content ^. L.usermeta) of
+  case unRiakMetadata (object ^. L.usermeta) of
     [] -> pure ()
     xs -> tag "metadata" (show xs)
 
-  case content ^. L.indexes of
+  case object ^. L.indexes of
     [] -> pure ()
     xs -> tag "indexes" (show xs)
 
-  when (content ^. L.deleted)
-    (tag "deleted" (show (content ^. L.deleted)))
+  when (object ^. L.deleted)
+    (tag "deleted" (show (object ^. L.deleted)))
 
-  for_ (unTTL (content ^. L.ttl)) (tag "ttl" . show)
+  for_ (unTTL (object ^. L.ttl)) (tag "ttl" . show)
  where
   tag :: String -> String -> IO ()
   tag k v =

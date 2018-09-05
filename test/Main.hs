@@ -45,7 +45,7 @@ tests h =
       key <- randomObjectKey
       let val = "foo"
       curlPutText  key val
-      Right [RiakContent key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
+      Right [RiakObject key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
         getRiakObject h key def
       key' `shouldBe` key
       val' `shouldBe` val
@@ -63,7 +63,7 @@ tests h =
       key <- randomObjectKey
       let val = "foo"
       curlPutByteString key val
-      Right [RiakContent key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
+      Right [RiakObject key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
         getRiakObject h key def
       key' `shouldBe` key
       val' `shouldBe` val
@@ -103,7 +103,7 @@ tests h =
   , testCase "get object head" $ do
       key <- randomObjectKey
       curlPutByteString key "foo"
-      Right [RiakContent key' () ctype charset encoding vtag ts meta ixs deleted ttl] <-
+      Right [RiakObject key' () ctype charset encoding vtag ts meta ixs deleted ttl] <-
         getRiakObjectHead h key def
       key' `shouldBe` key
       ctype `shouldBe` Just (ContentType "application/octet-stream")

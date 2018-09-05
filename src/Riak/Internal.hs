@@ -88,8 +88,8 @@ module Riak.Internal
   , Filter(..)
   , FL(..)
   , IncludeContext(..)
-  , IsRiakContent(..)
-  , JsonRiakContent(..)
+  , IsRiakObject(..)
+  , JsonRiakObject(..)
   , Modified(..)
   , N(..)
   , NotfoundOk(..)
@@ -104,13 +104,13 @@ module Riak.Internal
   , pattern DefaultRiakBucket
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
-  , RiakContent(..)
   , RiakError(..)
   , RiakExactQuery(..)
   , RiakIndex(..)
   , RiakIndexName(..)
   , RiakKey(..)
   , RiakMetadata(..)
+  , RiakObject(..)
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
@@ -235,11 +235,11 @@ import Lens.Labels (view)
 import Proto.Riak
 import Riak.Internal.Cache
 import Riak.Internal.Connection
-import Riak.Internal.Content
 import Riak.Internal.Crdts
 import Riak.Internal.Manager
 import Riak.Internal.MapReduce
 import Riak.Internal.Message
+import Riak.Internal.Object
 import Riak.Internal.Params
 import Riak.Internal.Prelude
 import Riak.Internal.Request

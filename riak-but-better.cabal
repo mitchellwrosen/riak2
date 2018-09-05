@@ -66,12 +66,12 @@ library
     Proto.Riak_Fields
     Riak.Internal.Cache
     Riak.Internal.Connection
-    Riak.Internal.Content
     Riak.Internal.Crdts
     Riak.Internal.Debug
     Riak.Internal.Manager
     Riak.Internal.MapReduce
     Riak.Internal.Message
+    Riak.Internal.Object
     Riak.Internal.Panic
     Riak.Internal.Params
     Riak.Internal.Prelude
