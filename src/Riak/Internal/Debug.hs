@@ -4,7 +4,7 @@ module Riak.Internal.Debug
   ( debug
   ) where
 
--- import System.IO
+import System.IO
 import System.IO.Unsafe
 
 import Riak.Internal.Prelude

@@ -46,7 +46,6 @@ module Riak.Internal
   , riakMapReducePhaseMapIdentity
   , riakMapReducePhaseMapObjectValue
   , riakMapReducePhaseReduceCount
-  , riakMapReducePhaseReduceIdentity
   , riakMapReducePhaseReduceSetUnion
   , riakMapReducePhaseReduceSort
   , riakMapReducePhaseReduceSum

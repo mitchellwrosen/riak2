@@ -19,6 +19,7 @@ import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
 
+import Erlang
 import           Riak
 import qualified Riak.Lenses as L
 
@@ -166,6 +167,65 @@ tests h =
           (Foldl.generalize Foldl.length)
           `shouldReturn` Right (length (filter (\j -> j == i || j == i+1) ns))
 
+  , testCase "get empty counter returns 0" $ do
+      key <- randomCounterKey
+      getRiakCounter h key def `shouldReturn` Right 0
+
+  , testCase "update/get counter" $ do
+      key <- randomCounterKey
+      updates <- randomRIO (1, 10)
+      incrs <- replicateM updates (randomRIO (1, 10))
+      for_ incrs $ \i -> updateRiakCounter h key i def `shouldReturn` Right 0
+      getRiakCounter h key def `shouldReturn` Right (sum incrs)
+
+  , testCase "update counter, return body" $ do
+      let i = 10
+      key <- randomCounterKey
+      updateRiakCounter h key i (def & #return_body True) `shouldReturn` Right i
+
+  , testCase "new counter" $ do
+      let i = 10
+      bucket <- randomCounterBucket
+      Right key <- updateNewRiakCounter h bucket i def
+      getRiakCounter h key def `shouldReturn` Right i
+
+  , testCase "get counter in object bucket returns Left" $ do
+      key <- randomObjectKey
+      getRiakCounter h (unsafeCastKey key) def `shouldReturn`
+        Left (RiakError "`undefined` is not a supported type")
+
+  , testCase "update counter in object bucket returns Left" $ do
+      key <- randomObjectKey
+      updateRiakCounter h (unsafeCastKey key) 1 def `shouldReturn`
+        Left (RiakError "Bucket datatype `undefined` is not a supported type")
+
+  , testCase "get counter in non-counter bucket type throws error" $ do
+      key <- randomSetKey
+      try (getRiakCounter h (unsafeCastKey key) def) `shouldReturn`
+        Left (RiakCrdtError key "expected counter but found set")
+
+  , testCase "update counter in non-counter bucket returns Left" $ do
+      key <- randomSetKey
+      updateRiakCounter h (unsafeCastKey key) 1 def `shouldReturn`
+        Left (RiakError "Operation type is `counter` but  bucket type is `set`.")
+  ]
+
+  -- , testCase "mapreduce identity over all keys in an empty bucket" $ do
+  --     bucket <- randomObjectBucket
+  --     Right _ <- putNewRiakObject h bucket ("foo" :: Text) def
+  --     let phases = [riakMapReducePhaseReduceSort] -- riakMapReducePhaseMapIdentity, riakMapReducePhaseMapObjectValue]
+  --     res <- riakMapReduceBucket h bucket phases (Foldl.generalize Foldl.list)
+  --     case res of
+  --       Left err -> print err
+  --       Right xs ->
+  --         for_ xs $ \x ->
+  --           for_ (_RpbMapRedResp'response x) $ \bytes ->
+  --             print (decodeErlTerm bytes)
+  --     -- print $ decodeErlTerm (_ resp)
+
+
+
+
   -- , testCase "storing Text has correct content type, charset, and content encoding" $ do
   --     bucket <- randomBucketName
   --     key <- randomKeyName
@@ -173,7 +233,6 @@ tests h =
   --     putRiakObject h loc ("foo" :: Text) def `shouldReturn` Right ()
   --     Right [x] <- getRiakObject @Text h loc def
   --     (x ^. L.contentType) `shouldBe` ContentType "text/plain"
-  ]
 
 curl :: String -> IO ()
 curl = callCommand . ("curl -s " ++)
@@ -223,6 +282,33 @@ randomObjectKeyIn :: ByteString -> IO (RiakKey 'Nothing)
 randomObjectKeyIn bucket = do
   key <- randomKeyName
   pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
+
+randomObjectBucket :: IO (RiakBucket 'Nothing)
+randomObjectBucket = do
+  bucket <- randomBucketName
+  pure (RiakBucket (RiakBucketType "objects") bucket)
+
+randomCounterBucket :: IO (RiakBucket ('Just 'RiakCounterTy))
+randomCounterBucket = do
+  bucket <- randomBucketName
+  pure (RiakBucket (RiakBucketType "counters") bucket)
+
+randomCounterKey :: IO (RiakKey ('Just 'RiakCounterTy))
+randomCounterKey = do
+  bucket <- randomBucketName
+  key <- randomKeyName
+  pure (RiakKey (RiakBucket (RiakBucketType "counters") bucket) key)
+
+randomSetKey :: IO (RiakKey ('Just ('RiakSetTy a)))
+randomSetKey = do
+  bucket <- randomBucketName
+  key <- randomKeyName
+  pure (RiakKey (RiakBucket (RiakBucketType "sets") bucket) key)
+
+unsafeCastKey :: RiakKey a -> RiakKey b
+unsafeCastKey (RiakKey (RiakBucket (RiakBucketType t) b) k) =
+  RiakKey (RiakBucket (RiakBucketType t) b) k
+
 
 shouldBe :: (Eq a, HasCallStack, Show a) => a -> a -> IO ()
 shouldBe = (@?=)

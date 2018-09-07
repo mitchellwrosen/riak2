@@ -59,9 +59,16 @@ class IsRiakCrdt (ty :: RiakCrdtTy) where
 data RiakCrdtError where
   RiakCrdtError :: RiakKey ty -> Text -> RiakCrdtError
 
-deriving instance Show RiakCrdtError
+instance Eq RiakCrdtError where
+  RiakCrdtError l1 m1 == RiakCrdtError l2 m2 =
+    t1 == t2 && b1 == b2 && k1 == k2 && m1 == m2
+   where
+    RiakKey (RiakBucket (RiakBucketType t1) b1) k1 = l1
+    RiakKey (RiakBucket (RiakBucketType t2) b2) k2 = l2
 
 instance Exception RiakCrdtError
+
+deriving instance Show RiakCrdtError
 
 
 dataTypeToText :: DtFetchResp'DataType -> Text

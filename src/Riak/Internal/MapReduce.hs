@@ -7,7 +7,6 @@ module Riak.Internal.MapReduce
   , riakMapReducePhaseMapIdentity
   , riakMapReducePhaseMapObjectValue
   , riakMapReducePhaseReduceCount
-  , riakMapReducePhaseReduceIdentity
   , riakMapReducePhaseReduceSetUnion
   , riakMapReducePhaseReduceSort
   , riakMapReducePhaseReduceSum
@@ -72,11 +71,6 @@ riakMapReducePhaseMapObjectValue =
 riakMapReducePhaseReduceCount :: RiakMapReducePhase
 riakMapReducePhaseReduceCount =
   RiakMapReducePhaseReduce "riak_kv_mapreduce" "reduce_count_inputs"
-
--- | Reduce inputs to themselves.
-riakMapReducePhaseReduceIdentity :: RiakMapReducePhase
-riakMapReducePhaseReduceIdentity =
-  RiakMapReducePhaseReduce "riak_kv_mapreduce" "reduce_identity"
 
 -- | Reduce inputs to their union.
 riakMapReducePhaseReduceSetUnion :: RiakMapReducePhase

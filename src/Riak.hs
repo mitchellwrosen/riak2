@@ -74,7 +74,6 @@ module Riak
   , riakMapReducePhaseMapIdentity
   , riakMapReducePhaseMapObjectValue
   , riakMapReducePhaseReduceCount
-  , riakMapReducePhaseReduceIdentity
   , riakMapReducePhaseReduceSetUnion
   , riakMapReducePhaseReduceSort
   , riakMapReducePhaseReduceSum
@@ -136,6 +135,7 @@ module Riak
   , RiakSearchParams
   , RiakSetOp
   , RiakVtag(..)
+  , RpbMapRedResp(..)
   , SolrIndexName(..)
   , pattern DontIndex
   , SolrSchemaName(..)
@@ -741,6 +741,8 @@ deleteRiakObject
 -- Get counter
 --------------------------------------------------------------------------------
 
+-- TODO: make updates throw RiakCrdtError as well
+
 -- | Get a counter.
 --
 -- Throws:
@@ -752,8 +754,8 @@ getRiakCounter
   -> RiakKey ('Just 'RiakCounterTy) -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError Int64)
-getRiakCounter h loc (GetRiakObjectParams a b c d e f g) =
-  getCrdt h loc (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
+getRiakCounter h key (GetRiakObjectParams a b c d e f g) =
+  getCrdt h key (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
 
 
 --------------------------------------------------------------------------------
@@ -761,10 +763,6 @@ getRiakCounter h loc (GetRiakObjectParams a b c d e f g) =
 --------------------------------------------------------------------------------
 
 -- | Update a counter and its updated value if @return_body@ is set, else 0.
---
--- Throws:
---
--- * 'RiakCrdtError' if the given 'RiakKey' does not contain counters.
 updateRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
@@ -777,10 +775,6 @@ updateRiakCounter h (RiakKey bucket key) incr params =
 
 
 -- | Update a new counter and return its randomly-generated key.
---
--- Throws:
---
--- * 'RiakCrdtError' if the given 'RiakKey' does not contain counters.
 updateNewRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
@@ -813,7 +807,6 @@ _updateRiakCounter h bucket key incr params =
       , _DtOp'mapOp          = Nothing
       , _DtOp'setOp          = Nothing
       }
-
 
 
 --------------------------------------------------------------------------------
@@ -919,9 +912,6 @@ getRiakSet =
 
 -- | Update a set and return its updated value if @return_body@ is set, else
 -- the empty set.
---
--- Throws a 'RiakCrdtError' if the given 'RiakKey' does not contain
--- sets.
 updateRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle
@@ -933,9 +923,6 @@ updateRiakSet h (RiakKey bucket key) op params =
   (fmap.fmap) snd (_updateSet h bucket (Just key) op params)
 
 -- | Update a new set and return its randomly-generated key.
---
--- Throws a 'RiakCrdtError' if the given 'RiakKey' does not contain
--- counters.
 updateNewRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle
