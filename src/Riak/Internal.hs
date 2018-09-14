@@ -2,7 +2,7 @@ module Riak.Internal
   ( -- * Handle
     RiakHandle(..)
     -- * Connection manager
-  , RiakManager(..)
+  , RiakManager
   , createRiakManager
   , withRiakConnection
     -- * Connection
