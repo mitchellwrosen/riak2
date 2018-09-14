@@ -2,8 +2,6 @@
 --
 -- <http://erlang.org/doc/apps/erts/erl_ext_dist.html>
 
-{-# LANGUAGE LambdaCase #-}
-
 module Erlang
   ( ErlTerm(..)
   , buildErlTerm
@@ -22,6 +20,7 @@ import Data.Text          (Text)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import Data.Vector        (Vector)
 import Data.Word
+import Prelude
 
 import qualified Data.Attoparsec.ByteString as Atto
 import qualified Data.ByteString            as ByteString

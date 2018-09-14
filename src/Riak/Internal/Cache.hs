@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude, RankNTypes, ScopedTypeVariables #-}
-
 module Riak.Internal.Cache
   ( RiakCache(..)
   , newSTMRiakCache

@@ -1,8 +1,3 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DerivingStrategies,
-             ExistentialQuantification, GADTs, GeneralizedNewtypeDeriving,
-             InstanceSigs, KindSignatures, NoImplicitPrelude,
-             OverloadedStrings, PatternSynonyms, StandaloneDeriving #-}
-
 -- | Sin-bin of misc. types.
 
 -- TODO $bucket index, only supports equality queries

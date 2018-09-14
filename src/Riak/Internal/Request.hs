@@ -1,6 +1,3 @@
-{-# LANGUAGE DefaultSignatures, NoImplicitPrelude, ScopedTypeVariables,
-             TypeApplications #-}
-
 module Riak.Internal.Request
   ( Request(..)
   , requestToMessage

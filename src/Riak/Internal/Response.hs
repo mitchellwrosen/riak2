@@ -1,6 +1,3 @@
-{-# LANGUAGE DefaultSignatures, NoImplicitPrelude, OverloadedStrings,
-             ScopedTypeVariables, TypeApplications #-}
-
 module Riak.Internal.Response
   ( Response(..)
   , parseResponse

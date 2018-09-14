@@ -1,7 +1,3 @@
-{-# LANGUAGE DeriveAnyClass, DerivingStrategies, ExistentialQuantification,
-             FlexibleInstances, InstanceSigs, NoImplicitPrelude,
-             TypeFamilies #-}
-
 module Riak.Internal.Panic
   ( Panic
   , panic

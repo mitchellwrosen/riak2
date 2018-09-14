@@ -1,8 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveFunctor, DerivingStrategies, FlexibleContexts,
-             FlexibleInstances, GeneralizedNewtypeDeriving, InstanceSigs,
-             LambdaCase, MagicHash, MultiParamTypeClasses, NoImplicitPrelude,
-             OverloadedStrings, PatternSynonyms, TypeFamilies,
-             UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Riak.Internal.Object
   ( Charset(..)
@@ -19,9 +15,9 @@ import Data.Time
 import Lens.Family2.Unchecked (lens)
 import Lens.Labels
 
-import qualified Data.Aeson as Aeson
+import qualified Data.Aeson           as Aeson
 import qualified Data.ByteString.Lazy as LazyByteString
-import qualified Data.Text.Encoding as Text
+import qualified Data.Text.Encoding   as Text
 
 import Riak.Internal.Prelude
 import Riak.Internal.Types
@@ -62,8 +58,8 @@ instance Functor f => HasLens' f (RiakObject a)                "ttl"            
 
 
 -- | 'IsRiakObject' classifies types that are stored in Riak objects. Every
--- object must have a content type, and may optionally have a character set and
--- encoding.
+-- object /should/ have a content type, /may/ have a character set and /may/
+-- have an encoding.
 --
 -- For convenience, instances are provided by this library, to store binary,
 -- textual, and JSON data.
@@ -101,7 +97,7 @@ instance Functor f => HasLens' f (RiakObject a)                "ttl"            
 -- Riak, they are for you to help make sense of your own data.
 class IsRiakObject a where
   -- | The object's content type.
-  riakObjectContentType :: a -> ContentType
+  riakObjectContentType :: a -> Maybe ContentType
 
   -- | The object's character set. Defaults to 'Nothing'.
   riakObjectCharset :: a -> Maybe Charset
@@ -116,37 +112,53 @@ class IsRiakObject a where
   -- | Encode a Riak object.
   encodeRiakObject :: a -> ByteString
 
-  -- | Decode a Riak object, given its content type, charset, encoding, and
-  -- encoded value.
+  -- | Decode a Riak object.
   decodeRiakObject
-    :: Maybe ContentType
-    -> Maybe Charset
-    -> Maybe ContentEncoding
-    -> ByteString
+    :: RiakObject ByteString
     -> Either SomeException a
 
+instance IsRiakObject a => IsRiakObject (RiakObject a) where
+  riakObjectContentType :: RiakObject a -> Maybe ContentType
+  riakObjectContentType object =
+    object ^. #contentType
+
+  riakObjectCharset :: RiakObject a -> Maybe Charset
+  riakObjectCharset object =
+    object ^. #charset
+
+  riakObjectContentEncoding :: RiakObject a -> Maybe ContentEncoding
+  riakObjectContentEncoding object =
+    object ^. #contentEncoding
+
+  encodeRiakObject :: RiakObject a -> ByteString
+  encodeRiakObject object =
+    encodeRiakObject (object ^. #value)
+
+  decodeRiakObject
+    :: RiakObject ByteString
+    -> Either SomeException (RiakObject a)
+  decodeRiakObject object =
+    (<$ object) <$> decodeRiakObject object
+
 instance IsRiakObject ByteString where
-  riakObjectContentType :: ByteString -> ContentType
+  riakObjectContentType :: ByteString -> Maybe ContentType
   riakObjectContentType _ =
-    ContentType "application/octet-stream"
+    Just (ContentType "application/octet-stream")
 
   encodeRiakObject :: ByteString -> ByteString
   encodeRiakObject =
     id
 
   decodeRiakObject
-    :: Maybe ContentType
-    -> Maybe Charset
-    -> Maybe ContentEncoding
-    -> ByteString
+    :: RiakObject ByteString
     -> Either SomeException ByteString
-  decodeRiakObject _ _ _ =
-    Right
+  decodeRiakObject object =
+    Right (object ^. #value)
 
 instance IsRiakObject Text where
-  riakObjectContentType :: Text -> ContentType
+  riakObjectContentType :: Text -> Maybe ContentType
   riakObjectContentType _ =
-    ContentType "text/plain"
+    Just (ContentType "text/plain")
 
   riakObjectCharset :: Text -> Maybe Charset
   riakObjectCharset _ =
@@ -162,15 +174,12 @@ instance IsRiakObject Text where
 
   -- TODO text parse errors
   decodeRiakObject
-    :: Maybe ContentType
-    -> Maybe Charset
-    -> Maybe ContentEncoding
-    -> ByteString
+    :: RiakObject ByteString
     -> Either SomeException Text
-  decodeRiakObject type' charset encoding =
-    case type' of
+  decodeRiakObject object =
+    case object ^. #contentType of
       Just (ContentType "text/plain") ->
-        decode <=< decompress
+        (decode <=< decompress) (object ^. #value)
 
       _ ->
         undefined
@@ -178,7 +187,7 @@ instance IsRiakObject Text where
    where
     decompress :: ByteString -> Either SomeException ByteString
     decompress =
-      case encoding of
+      case object ^. #contentEncoding of
         Nothing ->
           pure
 
@@ -193,7 +202,7 @@ instance IsRiakObject Text where
 
     decode :: ByteString -> Either SomeException Text
     decode =
-      case charset of
+      case object ^. #charset of
         Nothing ->
           first toException . Text.decodeUtf8'
 
@@ -207,24 +216,21 @@ instance IsRiakObject Text where
           error (show x)
 
 instance IsRiakObject Aeson.Value where
-  riakObjectContentType :: Aeson.Value -> ContentType
+  riakObjectContentType :: Aeson.Value -> Maybe ContentType
   riakObjectContentType _ =
-    ContentType "application/json"
+    Just (ContentType "application/json")
 
   encodeRiakObject :: Aeson.Value -> ByteString
   encodeRiakObject =
     LazyByteString.toStrict . Aeson.encode
 
   decodeRiakObject
-    :: Maybe ContentType
-    -> Maybe Charset
-    -> Maybe ContentEncoding
-    -> ByteString
+    :: RiakObject ByteString
     -> Either SomeException Aeson.Value
-  decodeRiakObject type' _ _ bytes =
-    case type' of
+  decodeRiakObject object =
+    case object ^. #contentType of
       Just (ContentType "application/json") ->
-        case Aeson.eitherDecodeStrict' bytes of
+        case Aeson.eitherDecodeStrict' (object ^. #value) of
           Left err ->
             error err
 
@@ -240,24 +246,21 @@ newtype JsonRiakObject a
   deriving (Eq, Show)
 
 instance (FromJSON a, ToJSON a) => IsRiakObject (JsonRiakObject a) where
-  riakObjectContentType :: JsonRiakObject a -> ContentType
+  riakObjectContentType :: JsonRiakObject a -> Maybe ContentType
   riakObjectContentType _ =
-    ContentType "application/json"
+    Just (ContentType "application/json")
 
   encodeRiakObject :: JsonRiakObject a -> ByteString
   encodeRiakObject =
     LazyByteString.toStrict . Aeson.encode . unJsonRiakObject
 
   decodeRiakObject
-    :: Maybe ContentType
-    -> Maybe Charset
-    -> Maybe ContentEncoding
-    -> ByteString
+    :: RiakObject ByteString
     -> Either SomeException (JsonRiakObject a)
-  decodeRiakObject type' _ _ bytes =
-    case type' of
+  decodeRiakObject object =
+    case object ^. #contentType of
       Just (ContentType "application/json") ->
-        case Aeson.eitherDecodeStrict' bytes of
+        case Aeson.eitherDecodeStrict' (object ^. #value) of
           Left err ->
             error err
 

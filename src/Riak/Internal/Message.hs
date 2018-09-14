@@ -1,6 +1,3 @@
-{-# LANGUAGE DerivingStrategies, GeneralizedNewtypeDeriving,
-             NoImplicitPrelude #-}
-
 module Riak.Internal.Message
   ( Message(..)
   , encodeMessage

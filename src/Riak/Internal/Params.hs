@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds, FlexibleInstances, MultiParamTypeClasses,
-             NoImplicitPrelude, TypeFamilies #-}
-
 module Riak.Internal.Params where
 
 import Data.Default.Class

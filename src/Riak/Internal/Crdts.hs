@@ -1,9 +1,4 @@
-{-# LANGUAGE DataKinds, DeriveAnyClass, DeriveFunctor, DerivingStrategies,
-             FlexibleInstances, GADTs, GeneralizedNewtypeDeriving,
-             InstanceSigs, KindSignatures, LambdaCase, MagicHash,
-             NoImplicitPrelude, OverloadedLabels, OverloadedStrings,
-             ScopedTypeVariables, StandaloneDeriving, TypeFamilies,
-             UndecidableInstances #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Riak.Internal.Crdts
   ( RiakCrdtError(..)

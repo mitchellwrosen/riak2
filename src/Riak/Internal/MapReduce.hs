@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds, GADTs, LambdaCase, NoImplicitPrelude,
-             OverloadedStrings #-}
-
 module Riak.Internal.MapReduce
   ( RiakMapReduceInputs(..)
   , RiakMapReducePhase(..)

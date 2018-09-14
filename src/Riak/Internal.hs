@@ -1,5 +1,3 @@
-{-# LANGUAGE NoImplicitPrelude, OverloadedLabels, PatternSynonyms #-}
-
 module Riak.Internal
   ( -- * Handle
     RiakHandle(..)

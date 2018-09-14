@@ -1,6 +1,3 @@
-{-# LANGUAGE DeriveAnyClass, DerivingStrategies, LambdaCase, NoImplicitPrelude,
-             OverloadedStrings, ScopedTypeVariables #-}
-
 module Riak.Internal.Connection
   ( RiakConnection(..)
   , riakConnect

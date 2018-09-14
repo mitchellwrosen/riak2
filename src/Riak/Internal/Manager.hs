@@ -15,9 +15,6 @@
 --
 -- * Currently, inactive sockets are never closed. TODO close inactive sockets.
 
-
-{-# LANGUAGE LambdaCase, NoImplicitPrelude, ScopedTypeVariables #-}
-
 module Riak.Internal.Manager
   ( RiakManager(..)
   , createRiakManager

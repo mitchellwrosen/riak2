@@ -1,9 +1,4 @@
-{-# LANGUAGE DataKinds, DerivingStrategies, FlexibleContexts, FlexibleInstances,
-             LambdaCase, MagicHash, NoImplicitPrelude, OverloadedLabels,
-             OverloadedStrings, PatternSynonyms, RankNTypes,
-             ScopedTypeVariables, StandaloneDeriving, TupleSections,
-             TypeApplications, TypeFamilies, TypeOperators,
-             UndecidableInstances, ViewPatterns #-}
+{-# LANGUAGE UndecidableInstances #-}
 
 module Riak
   ( -- * Handle
@@ -177,7 +172,6 @@ import           Riak.Internal.Types     (ObjectReturn(..),
 
 
 -- TODO _ variants that don't decode replies
--- TODO rename "content" to "object"
 
 --------------------------------------------------------------------------------
 -- Handle
@@ -595,7 +589,7 @@ _putRiakObject
               { _RpbContent'_unknownFields  = []
               , _RpbContent'charset         = coerce (riakObjectCharset value)
               , _RpbContent'contentEncoding = coerce (riakObjectContentEncoding value)
-              , _RpbContent'contentType     = Just (unContentType (riakObjectContentType value))
+              , _RpbContent'contentType     = coerce (riakObjectContentType value)
               , _RpbContent'deleted         = Nothing
               , _RpbContent'indexes         = map indexToRpbPair (coerce indexes)
               , _RpbContent'lastMod         = Nothing
@@ -1828,21 +1822,6 @@ parseContent _ loc head
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
 
-  theValue :: If head () a <-
-    case head of
-      STrue ->
-        pure ()
-
-      SFalse ->
-        either
-          throwIO
-          pure
-          (decodeRiakObject
-            (coerce content_type)
-            (coerce charset)
-            (coerce content_encoding)
-            value)
-
   let
     theLastMod :: Maybe NominalDiffTime
     theLastMod = do
@@ -1851,18 +1830,31 @@ parseContent _ loc head
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
-  pure $ RiakObject
-    loc
-    theValue
-    (coerce content_type)
-    (coerce charset)
-    (coerce content_encoding)
-    (coerce vtag)
-    (posixSecondsToUTCTime <$> theLastMod)
-    (RiakMetadata (map unRpbPair usermeta))
-    (map rpbPairToIndex indexes)
-    (fromMaybe False deleted)
-    (TTL ttl)
+  let
+    rawObject :: RiakObject ByteString
+    rawObject =
+      RiakObject
+        loc
+        value
+        (coerce content_type)
+        (coerce charset)
+        (coerce content_encoding)
+        (coerce vtag)
+        (posixSecondsToUTCTime <$> theLastMod)
+        (RiakMetadata (map unRpbPair usermeta))
+        (map rpbPairToIndex indexes)
+        (fromMaybe False deleted)
+        (TTL ttl)
+
+  theValue :: If head () a <-
+    case head of
+      STrue ->
+        pure ()
+
+      SFalse ->
+        either throwIO pure (decodeRiakObject rawObject)
+
+  pure (theValue <$ rawObject)
 
 -- TODO replace parseContent with parseContent', parseContentHead
 
@@ -1880,31 +1872,18 @@ parseContentHead
   -> RpbContent
   -> IO (RiakObject ())
 parseContentHead =
-  _parseContent (\_ _ _ _ -> Right ())
+  _parseContent (\_ -> Right ())
 
 
 _parseContent
   :: forall a.
-     (  Maybe ContentType
-     -> Maybe Charset
-     -> Maybe ContentEncoding
-     -> ByteString
-     -> Either SomeException a
-     )
+     (RiakObject ByteString -> Either SomeException a)
   -> RiakKey 'Nothing
   -> RpbContent
   -> IO (RiakObject a)
 _parseContent parse loc
     (RpbContent value content_type charset content_encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
-
-  theValue :: a <-
-    either throwIO pure
-      (parse
-        (coerce content_type)
-        (coerce charset)
-        (coerce content_encoding)
-        value)
 
   let
     theLastMod :: Maybe NominalDiffTime
@@ -1914,18 +1893,26 @@ _parseContent parse loc
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
-  pure $ RiakObject
-    loc
-    theValue
-    (coerce content_type)
-    (coerce charset)
-    (coerce content_encoding)
-    (coerce vtag)
-    (posixSecondsToUTCTime <$> theLastMod)
-    (RiakMetadata (map unRpbPair usermeta))
-    (map rpbPairToIndex indexes)
-    (fromMaybe False deleted)
-    (TTL ttl)
+  let
+    rawObject :: RiakObject ByteString
+    rawObject =
+      RiakObject
+        loc
+        value
+        (coerce content_type)
+        (coerce charset)
+        (coerce content_encoding)
+        (coerce vtag)
+        (posixSecondsToUTCTime <$> theLastMod)
+        (RiakMetadata (map unRpbPair usermeta))
+        (map rpbPairToIndex indexes)
+        (fromMaybe False deleted)
+        (TTL ttl)
+
+  theValue :: a <-
+    either throwIO pure (parse rawObject)
+
+  pure (theValue <$ rawObject)
 
 
 indexToRpbPair :: RiakIndex -> RpbPair

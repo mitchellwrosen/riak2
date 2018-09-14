@@ -1,6 +1,3 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, MagicHash, NoImplicitPrelude,
-             TypeApplications #-}
-
 module Riak.Lenses
   ( adds
   , allowMult
