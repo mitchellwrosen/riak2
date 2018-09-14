@@ -172,6 +172,7 @@ import           Riak.Internal.Utils     (bs2int, int2bs)
 
 
 -- TODO _ variants that don't decode replies
+-- TODO put raw RiakObject
 
 --------------------------------------------------------------------------------
 -- Handle
@@ -786,7 +787,7 @@ updateRiakCounter h (RiakKey bucket key) incr params =
 updateNewRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket ('Just 'RiakCounterTy) -- ^
+  -> RiakBucket ('Just 'RiakCounterTy) -- ^ Bucket type and bucket
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (RiakKey ('Just 'RiakCounterTy)))
@@ -1411,10 +1412,10 @@ _riakMapReduce (RiakHandle manager _) inputs query k =
 
 -- | Perform an exact query on a secondary index.
 riakExactQuery
-  :: RiakHandle -- ^
-  -> RiakBucket 'Nothing -- ^
-  -> RiakExactQuery -- ^
-  -> FoldM IO (RiakKey 'Nothing) r -- ^
+  :: RiakHandle -- ^ Riak handle
+  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakExactQuery -- ^ Exact query
+  -> FoldM IO (RiakKey 'Nothing) r -- ^ Key fold
   -> IO (Either RiakError r)
 riakExactQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
@@ -1464,10 +1465,10 @@ riakExactQuery
 
 -- | Perform a range query on a secondary index.
 riakRangeQuery
-  :: RiakHandle -- ^
-  -> RiakBucket 'Nothing -- ^
-  -> RiakRangeQuery a -- ^
-  -> FoldM IO (RiakKey 'Nothing) r -- ^
+  :: RiakHandle -- ^ Riak handle
+  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakRangeQuery a -- ^ Range query
+  -> FoldM IO (RiakKey 'Nothing) r -- ^ Key fold
   -> IO (Either RiakError r)
 riakRangeQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
@@ -1523,10 +1524,10 @@ riakRangeQuery
 -- along with the keys.
 riakRangeQueryTerms
   :: forall a r.
-     RiakHandle -- ^
-  -> RiakBucket 'Nothing -- ^
-  -> RiakRangeQuery a -- ^
-  -> FoldM IO (RiakKey 'Nothing, a) r -- ^
+     RiakHandle -- ^ Riak handle
+  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakRangeQuery a -- ^ Range query
+  -> FoldM IO (RiakKey 'Nothing, a) r -- ^ Key+value fold
   -> IO (Either RiakError r)
 riakRangeQueryTerms
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
@@ -1825,8 +1826,21 @@ parseContent
   -> RpbContent
   -> IO (RiakObject (If head () a))
 parseContent _ loc head
-    (RpbContent value content_type charset content_encoding vtag _ last_mod
+    (RpbContent bytes content_type charset encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
+
+  theValue :: If head () a <-
+    case head of
+      STrue ->
+        pure ()
+
+      SFalse ->
+        either throwIO pure
+          (decodeRiakObject
+            (coerce content_type)
+            (coerce charset)
+            (coerce encoding)
+            bytes)
 
   let
     theLastMod :: Maybe NominalDiffTime
@@ -1836,31 +1850,18 @@ parseContent _ loc head
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
-  let
-    rawObject :: RiakObject ByteString
-    rawObject =
-      RiakObject
-        loc
-        value
-        (coerce content_type)
-        (coerce charset)
-        (coerce content_encoding)
-        (coerce vtag)
-        (posixSecondsToUTCTime <$> theLastMod)
-        (RiakMetadata (map unRpbPair usermeta))
-        (map rpbPairToIndex indexes)
-        (fromMaybe False deleted)
-        (TTL ttl)
-
-  theValue :: If head () a <-
-    case head of
-      STrue ->
-        pure ()
-
-      SFalse ->
-        either throwIO pure (decodeRiakObject rawObject)
-
-  pure (theValue <$ rawObject)
+  pure $ RiakObject
+    loc
+    theValue
+    (coerce content_type)
+    (coerce charset)
+    (coerce encoding)
+    (coerce vtag)
+    (posixSecondsToUTCTime <$> theLastMod)
+    (RiakMetadata (map unRpbPair usermeta))
+    (map rpbPairToIndex indexes)
+    (fromMaybe False deleted)
+    (TTL ttl)
 
 -- TODO replace parseContent with parseContent', parseContentHead
 
@@ -1878,18 +1879,31 @@ parseContentHead
   -> RpbContent
   -> IO (RiakObject ())
 parseContentHead =
-  _parseContent (\_ -> Right ())
+  _parseContent (\_ _ _ _ -> Right ())
 
 
 _parseContent
   :: forall a.
-     (RiakObject ByteString -> Either SomeException a)
+     (  Maybe ContentType
+     -> Maybe Charset
+     -> Maybe ContentEncoding
+     -> ByteString
+     -> Either SomeException a
+     )
   -> RiakKey 'Nothing
   -> RpbContent
   -> IO (RiakObject a)
 _parseContent parse loc
-    (RpbContent value content_type charset content_encoding vtag _ last_mod
+    (RpbContent bytes content_type charset encoding vtag _ last_mod
                 last_mod_usecs usermeta indexes deleted ttl _) = do
+
+  theValue :: a <-
+    either throwIO pure
+      (parse
+        (coerce content_type)
+        (coerce charset)
+        (coerce encoding)
+        bytes)
 
   let
     theLastMod :: Maybe NominalDiffTime
@@ -1899,26 +1913,18 @@ _parseContent parse loc
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
-  let
-    rawObject :: RiakObject ByteString
-    rawObject =
-      RiakObject
-        loc
-        value
-        (coerce content_type)
-        (coerce charset)
-        (coerce content_encoding)
-        (coerce vtag)
-        (posixSecondsToUTCTime <$> theLastMod)
-        (RiakMetadata (map unRpbPair usermeta))
-        (map rpbPairToIndex indexes)
-        (fromMaybe False deleted)
-        (TTL ttl)
-
-  theValue :: a <-
-    either throwIO pure (parse rawObject)
-
-  pure (theValue <$ rawObject)
+  pure $ RiakObject
+    loc
+    theValue
+    (coerce content_type)
+    (coerce charset)
+    (coerce encoding)
+    (coerce vtag)
+    (posixSecondsToUTCTime <$> theLastMod)
+    (RiakMetadata (map unRpbPair usermeta))
+    (map rpbPairToIndex indexes)
+    (fromMaybe False deleted)
+    (TTL ttl)
 
 
 indexToRpbPair :: RiakIndex -> RpbPair

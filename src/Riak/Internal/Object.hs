@@ -112,33 +112,14 @@ class IsRiakObject a where
   -- | Encode a Riak object.
   encodeRiakObject :: a -> ByteString
 
-  -- | Decode a Riak object.
+  -- | Decode a Riak object, given its content type, charset, encoding, and
+  -- encoded value.
   decodeRiakObject
-    :: RiakObject ByteString
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
     -> Either SomeException a
-
-instance IsRiakObject a => IsRiakObject (RiakObject a) where
-  riakObjectContentType :: RiakObject a -> Maybe ContentType
-  riakObjectContentType object =
-    object ^. #contentType
-
-  riakObjectCharset :: RiakObject a -> Maybe Charset
-  riakObjectCharset object =
-    object ^. #charset
-
-  riakObjectContentEncoding :: RiakObject a -> Maybe ContentEncoding
-  riakObjectContentEncoding object =
-    object ^. #contentEncoding
-
-  encodeRiakObject :: RiakObject a -> ByteString
-  encodeRiakObject object =
-    encodeRiakObject (object ^. #value)
-
-  decodeRiakObject
-    :: RiakObject ByteString
-    -> Either SomeException (RiakObject a)
-  decodeRiakObject object =
-    (<$ object) <$> decodeRiakObject object
 
 instance IsRiakObject ByteString where
   riakObjectContentType :: ByteString -> Maybe ContentType
@@ -150,10 +131,13 @@ instance IsRiakObject ByteString where
     id
 
   decodeRiakObject
-    :: RiakObject ByteString
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
     -> Either SomeException ByteString
-  decodeRiakObject object =
-    Right (object ^. #value)
+  decodeRiakObject _ _ _ bytes =
+    Right bytes
 
 instance IsRiakObject Text where
   riakObjectContentType :: Text -> Maybe ContentType
@@ -174,12 +158,15 @@ instance IsRiakObject Text where
 
   -- TODO text parse errors
   decodeRiakObject
-    :: RiakObject ByteString
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
     -> Either SomeException Text
-  decodeRiakObject object =
-    case object ^. #contentType of
+  decodeRiakObject content_type charset encoding bytes =
+    case content_type of
       Just (ContentType "text/plain") ->
-        (decode <=< decompress) (object ^. #value)
+        (decode <=< decompress) bytes
 
       _ ->
         undefined
@@ -187,7 +174,7 @@ instance IsRiakObject Text where
    where
     decompress :: ByteString -> Either SomeException ByteString
     decompress =
-      case object ^. #contentEncoding of
+      case encoding of
         Nothing ->
           pure
 
@@ -202,7 +189,7 @@ instance IsRiakObject Text where
 
     decode :: ByteString -> Either SomeException Text
     decode =
-      case object ^. #charset of
+      case charset of
         Nothing ->
           first toException . Text.decodeUtf8'
 
@@ -225,12 +212,15 @@ instance IsRiakObject Aeson.Value where
     LazyByteString.toStrict . Aeson.encode
 
   decodeRiakObject
-    :: RiakObject ByteString
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
     -> Either SomeException Aeson.Value
-  decodeRiakObject object =
-    case object ^. #contentType of
+  decodeRiakObject content_type _ _ bytes =
+    case content_type of
       Just (ContentType "application/json") ->
-        case Aeson.eitherDecodeStrict' (object ^. #value) of
+        case Aeson.eitherDecodeStrict' bytes of
           Left err ->
             error err
 
@@ -255,12 +245,15 @@ instance (FromJSON a, ToJSON a) => IsRiakObject (JsonRiakObject a) where
     LazyByteString.toStrict . Aeson.encode . unJsonRiakObject
 
   decodeRiakObject
-    :: RiakObject ByteString
+    :: Maybe ContentType
+    -> Maybe Charset
+    -> Maybe ContentEncoding
+    -> ByteString
     -> Either SomeException (JsonRiakObject a)
-  decodeRiakObject object =
-    case object ^. #contentType of
+  decodeRiakObject content_type _ _ bytes =
+    case content_type of
       Just (ContentType "application/json") ->
-        case Aeson.eitherDecodeStrict' (object ^. #value) of
+        case Aeson.eitherDecodeStrict' bytes of
           Left err ->
             error err
 
