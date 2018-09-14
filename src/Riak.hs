@@ -155,7 +155,6 @@ import Network.Socket        (HostName, PortNumber)
 
 import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString       as ByteString
-import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.HashSet          as HashSet
 import qualified Data.List.NonEmpty    as List1
 
@@ -169,6 +168,7 @@ import           Riak.Internal.Panic
 import           Riak.Internal.Prelude
 import           Riak.Internal.Types     (ObjectReturn(..),
                                           ParamObjectReturn(..), SBool(..))
+import           Riak.Internal.Utils     (bs2int, int2bs)
 
 
 -- TODO _ variants that don't decode replies
@@ -1440,12 +1440,8 @@ riakExactQuery
   key :: ByteString
   key =
     case query of
-      RiakExactQueryBin _ val ->
-        val
-
-      -- TODO better int -> bytestring
-      RiakExactQueryInt _ n ->
-        Latin1.pack (show n)
+      RiakExactQueryBin _ n -> n
+      RiakExactQueryInt _ n -> int2bs n
 
 
 -- | Perform a range query on a secondary index.
@@ -1496,18 +1492,14 @@ riakRangeQuery
   rmin :: ByteString
   rmin =
     case query of
-      RiakRangeQueryBin _ n _ ->
-        n
-      RiakRangeQueryInt _ n _ ->
-        Latin1.pack (show n)
+      RiakRangeQueryBin _ n _ -> n
+      RiakRangeQueryInt _ n _ -> int2bs n
 
   rmax :: ByteString
   rmax =
     case query of
-      RiakRangeQueryBin _ _ n ->
-        n
-      RiakRangeQueryInt _ _ n ->
-        Latin1.pack (show n)
+      RiakRangeQueryBin _ _ n -> n
+      RiakRangeQueryInt _ _ n -> int2bs n
 
 -- | Perform a range query on a secondary index, and return the indexed terms
 -- along with the keys.
@@ -1559,18 +1551,14 @@ riakRangeQueryTerms
   rmin :: ByteString
   rmin =
     case query of
-      RiakRangeQueryBin _ n _ ->
-        n
-      RiakRangeQueryInt _ n _ ->
-        Latin1.pack (show n)
+      RiakRangeQueryBin _ n _ -> n
+      RiakRangeQueryInt _ n _ -> int2bs n
 
   rmax :: ByteString
   rmax =
     case query of
-      RiakRangeQueryBin _ _ n ->
-        n
-      RiakRangeQueryInt _ _ n ->
-        Latin1.pack (show n)
+      RiakRangeQueryBin _ _ n -> n
+      RiakRangeQueryInt _ _ n -> int2bs n
 
   parse :: RpbPair -> (RiakKey 'Nothing, a)
   parse = \case
@@ -1583,7 +1571,7 @@ riakRangeQueryTerms
   parse1 =
     case query of
       RiakRangeQueryBin _ _ _ -> id
-      RiakRangeQueryInt _ _ _ -> read . Latin1.unpack
+      RiakRangeQueryInt _ _ _ -> bs2int
 
 
 
@@ -1920,7 +1908,7 @@ indexToRpbPair = \case
   RiakIndexInt k v ->
     RpbPair
       (unRiakIndexName k <> "_int")
-      (Just (Latin1.pack (show v))) -- TODO more efficient show
+      (Just (int2bs v))
       []
 
   RiakIndexBin k v ->
@@ -1935,14 +1923,14 @@ rpbPairToIndex = \case
   RpbPair (ByteString.stripSuffix "_bin" -> Just k) (Just v) _ ->
     RiakIndexBin (RiakIndexName k) v
 
-  RpbPair
-      (ByteString.stripSuffix "_int" -> Just k)
-      (Just (readMaybe . Latin1.unpack -> Just v)) _ ->
-    RiakIndexInt (RiakIndexName k) v -- TODO better read
+  RpbPair (ByteString.stripSuffix "_int" -> Just k) (Just v) _ ->
+    RiakIndexInt (RiakIndexName k) (bs2int v)
 
-  -- TODO what to do if index value is empty...?
-  _ ->
-    undefined
+  RpbPair k v _ ->
+    impurePanic "rpbPairToIndex"
+      ( ("key",   k)
+      , ("value", v)
+      )
 
 translateNotfound :: Either RiakError a -> Either RiakError (Maybe a)
 translateNotfound = \case

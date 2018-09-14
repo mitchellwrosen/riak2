@@ -19,7 +19,7 @@ import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
 
-import Erlang
+import           Erlang
 import           Riak
 import qualified Riak.Lenses as L
 
@@ -131,7 +131,7 @@ tests h =
 
   , testCase "exact int query" $ do
       let ixname = RiakIndexName "foo"
-      ns <- replicateM 100 (randomRIO (1, 5))
+      ns <- replicateM 100 (randomRIO (-2, 2))
       b <- randomBucketName
       for_ ns $ \n -> do
         key <- randomObjectKeyIn b
@@ -141,7 +141,7 @@ tests h =
           (def & #indexes [RiakIndexInt ixname n])
             `shouldReturn` Right ()
 
-      for_ [1..5] $ \i -> do
+      for_ [(-2)..2] $ \i -> do
         riakExactQuery h
           (RiakBucket (RiakBucketType "objects") b)
           (RiakExactQueryInt ixname i)
@@ -210,29 +210,6 @@ tests h =
         Left (RiakError "Operation type is `counter` but  bucket type is `set`.")
   ]
 
-  -- , testCase "mapreduce identity over all keys in an empty bucket" $ do
-  --     bucket <- randomObjectBucket
-  --     Right _ <- putNewRiakObject h bucket ("foo" :: Text) def
-  --     let phases = [riakMapReducePhaseReduceSort] -- riakMapReducePhaseMapIdentity, riakMapReducePhaseMapObjectValue]
-  --     res <- riakMapReduceBucket h bucket phases (Foldl.generalize Foldl.list)
-  --     case res of
-  --       Left err -> print err
-  --       Right xs ->
-  --         for_ xs $ \x ->
-  --           for_ (_RpbMapRedResp'response x) $ \bytes ->
-  --             print (decodeErlTerm bytes)
-  --     -- print $ decodeErlTerm (_ resp)
-
-
-
-
-  -- , testCase "storing Text has correct content type, charset, and content encoding" $ do
-  --     bucket <- randomBucketName
-  --     key <- randomKeyName
-  --     let loc = defaultLocation bucket key
-  --     putRiakObject h loc ("foo" :: Text) def `shouldReturn` Right ()
-  --     Right [x] <- getRiakObject @Text h loc def
-  --     (x ^. L.contentType) `shouldBe` ContentType "text/plain"
 
 curl :: String -> IO ()
 curl = callCommand . ("curl -s " ++)

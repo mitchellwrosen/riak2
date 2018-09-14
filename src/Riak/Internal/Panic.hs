@@ -1,6 +1,7 @@
 module Riak.Internal.Panic
   ( Panic
   , panic
+  , impurePanic
   ) where
 
 import qualified Data.Text as Text
@@ -27,3 +28,7 @@ instance {-# OVERLAPPABLE #-} (a1 ~ Text, Show b1, a2 ~ Text, Show b2)          
 panic :: (MonadIO m, Panicked a) => Text -> a -> m void
 panic s x =
   throwIO (Panic s x)
+
+impurePanic :: Panicked a => Text -> a -> void
+impurePanic s x =
+  impureThrow (Panic s x)
