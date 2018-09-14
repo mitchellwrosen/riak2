@@ -17,10 +17,12 @@ import Text.Printf        (printf)
 
 import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.Set              as Set
 import qualified Data.Text             as Text
 
 import           Erlang
 import           Riak
+import           Riak.Internal
 import qualified Riak.Lenses as L
 
 main :: IO ()
@@ -208,6 +210,33 @@ tests h =
       key <- randomSetKey
       updateRiakCounter h (unsafeCastKey key) 1 def `shouldReturn`
         Left (RiakError "Operation type is `counter` but  bucket type is `set`.")
+
+  , testCase "new set" $ do
+      bucket <- randomSetBucket
+      let op = riakSetAddOp ("foo" :: ByteString)
+      Right key <- updateNewRiakSet h bucket op def
+      getRiakSet h key def `shouldReturn` Right (Set.fromList ["foo"])
+
+  , testCase "set add-remove" $ do
+      bucket <- randomSetBucket
+      let val = "foo" :: ByteString
+      Right key <- updateNewRiakSet h bucket (riakSetAddOp val) def
+      updateRiakSet h key (riakSetRemoveOp val) def `shouldReturn` Right mempty
+
+  , testCase "updating a new set with return_body caches its context" $ do
+      bucket <- randomSetBucket
+      let op = riakSetAddOp ("foo" :: ByteString)
+      Right key <- updateNewRiakSet h bucket op (def & #return_body True)
+      riakCacheLookup (riakHandleCache h) key `shouldReturnSatisfy` isJust
+
+  , testCase "reading a CRDT as an object does not overwrite its cached context" $ do
+      bucket <- randomSetBucket
+      let op = riakSetAddOp ("foo" :: ByteString)
+      Right key <- updateNewRiakSet h bucket op (def & #return_body True)
+      Just context1 <- riakCacheLookup (riakHandleCache h) key
+      Right [_] <- getRiakObjectHead h (unsafeCastKey key) def
+      Just context2 <- riakCacheLookup (riakHandleCache h) key
+      context1 `shouldBe` context2
   ]
 
 
@@ -233,6 +262,9 @@ curlPutText (RiakKey (RiakBucket (RiakBucketType type') bucket) key) val =
       (Latin1.unpack bucket)
       (Latin1.unpack key)
       (Text.unpack val)
+
+riakHandleCache :: RiakHandle -> RiakCache
+riakHandleCache (RiakHandle _ cache) = cache
 
 randomBucketName :: IO ByteString
 randomBucketName = Latin1.pack <$> randomBucketNameString
@@ -267,20 +299,19 @@ randomObjectBucket = do
 
 randomCounterBucket :: IO (RiakBucket ('Just 'RiakCounterTy))
 randomCounterBucket = do
-  bucket <- randomBucketName
-  pure (RiakBucket (RiakBucketType "counters") bucket)
+  RiakBucket (RiakBucketType "counters") <$> randomBucketName
 
 randomCounterKey :: IO (RiakKey ('Just 'RiakCounterTy))
-randomCounterKey = do
-  bucket <- randomBucketName
-  key <- randomKeyName
-  pure (RiakKey (RiakBucket (RiakBucketType "counters") bucket) key)
+randomCounterKey =
+  RiakKey <$> randomCounterBucket <*> randomKeyName
+
+randomSetBucket :: IO (RiakBucket ('Just ('RiakSetTy a)))
+randomSetBucket = do
+  RiakBucket (RiakBucketType "sets") <$> randomBucketName
 
 randomSetKey :: IO (RiakKey ('Just ('RiakSetTy a)))
-randomSetKey = do
-  bucket <- randomBucketName
-  key <- randomKeyName
-  pure (RiakKey (RiakBucket (RiakBucketType "sets") bucket) key)
+randomSetKey =
+  RiakKey <$> randomSetBucket <*> randomKeyName
 
 unsafeCastKey :: RiakKey a -> RiakKey b
 unsafeCastKey (RiakKey (RiakBucket (RiakBucketType t) b) k) =
@@ -293,5 +324,8 @@ shouldBe = (@?=)
 shouldReturn :: (Eq a, HasCallStack, Show a) => IO a -> a -> IO ()
 shouldReturn m x = m >>= (@?= x)
 
-shouldSatisfy :: (Eq a, HasCallStack, Show a) => a -> (a -> Bool) -> IO ()
+shouldReturnSatisfy :: (HasCallStack, Show a) => IO a -> (a -> Bool) -> IO ()
+shouldReturnSatisfy m p = (`shouldSatisfy` p) =<< m
+
+shouldSatisfy :: (HasCallStack, Show a) => a -> (a -> Bool) -> IO ()
 shouldSatisfy x f = assertBool "" (f x)

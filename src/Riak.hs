@@ -177,18 +177,32 @@ import           Riak.Internal.Utils     (bs2int, int2bs)
 -- Handle
 --------------------------------------------------------------------------------
 
+-- | Create a handle to Riak with the following default settings, which may be
+-- overridden by using various functionality exposed in the "Riak.Internal"
+-- module.
+--
+-- * Object and data type causal contexts are cached using an in-memory
+--   map from @stm-containers@.
+--
+-- * A maximum of two OS sockets per capability are opened.
+--
+-- * Inactive sockets are closed after approximately 30 seconds.
+--
 -- TODO createRiakHandle close connections after
 createRiakHandle
   :: MonadIO m
   => HostName -- ^ Host
   -> PortNumber -- ^ Port
   -> m RiakHandle
-createRiakHandle host port = do
+createRiakHandle host port = liftIO $ do
   cache :: RiakCache <-
-    liftIO newSTMRiakCache
+    newSTMRiakCache
+
+  sockets :: Int <-
+    (* 2) <$> getNumCapabilities
 
   manager :: RiakManager <-
-    liftIO (createRiakManager host port)
+    createRiakManager host port sockets 30
 
   pure (RiakHandle manager cache)
 
@@ -920,8 +934,8 @@ updateRiakSet h (RiakKey bucket key) op params =
 updateNewRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket ('Just ('RiakSetTy a)) -- ^
-  -> RiakSetOp a -- ^
+  -> RiakBucket ('Just ('RiakSetTy a)) -- ^ Bucket type and bucket
+  -> RiakSetOp a -- ^ Set operation
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (RiakKey ('Just ('RiakSetTy a))))
 updateNewRiakSet h bucket op params =
@@ -991,15 +1005,19 @@ _updateSet
                 Just context' ->
                   pure (Just context')
 
-  (loc, value) <-
+  (loc, response) <-
     ExceptT (updateCrdt h namespace key context op params)
 
-  case parseDtUpdateResp loc value of
+  case parseDtUpdateResp loc response of
     Left err ->
       throwIO err
 
-    Right value' ->
-      pure (loc, value')
+    Right value -> do
+      -- If the context was fetched, cache it
+      for_ (response ^. #maybe'context) $ \vclock ->
+        cacheVclock h loc (Just (RiakVclock vclock))
+
+      pure (loc, value)
 
  where
   op :: DtOp

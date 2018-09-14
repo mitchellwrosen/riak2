@@ -40,6 +40,7 @@ library
     , streaming-bytestring ^>= 0.1.6
     , text ^>= 1.2.3
     , time
+    , timer-wheel ^>= 0.1.0
     , transformers ^>= 0.5.5
     , unliftio ^>= 0.2.7
     , unliftio-core ^>= 0.1.1
@@ -139,6 +140,7 @@ test-suite tests
   build-depends:
       base
     , bytestring
+    , containers
     , foldl
     , lens-family
     , process

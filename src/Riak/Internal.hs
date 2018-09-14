@@ -254,7 +254,7 @@ import Riak.Internal.Types
 
 -- | A thread-safe handle to Riak.
 --
--- TODO: RiakHandle improvement: cluster
+-- TODO: RiakHandle optional cache
 data RiakHandle
   = RiakHandle !RiakManager !RiakCache
 

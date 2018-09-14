@@ -217,6 +217,7 @@ data RiakRangeQuery :: Type -> Type where
 
 newtype RiakVclock
   = RiakVclock { unRiakVclock :: ByteString }
+  deriving (Eq)
 
 instance Show RiakVclock where
   show :: RiakVclock -> String

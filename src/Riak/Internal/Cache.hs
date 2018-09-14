@@ -13,8 +13,6 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types
 
 -- TODO cache ttl
--- TODO expose cache interface in .Internal
--- TODO don't accidentally cache data types' vclocks
 
 data RiakCache
   = RiakCache
@@ -31,22 +29,22 @@ newSTMRiakCache = do
 
   pure RiakCache
     { riakCacheLookup = do
-        \loc -> do
-          vclock <- atomically (STMMap.lookup (SomeRiakKey loc) cache)
-          -- debug $
-          --   "[riak] cache lookup: " ++ show vclock ++ " <= " ++
-          --   show loc
+        \key -> do
+          vclock <- atomically (STMMap.lookup (SomeRiakKey key) cache)
+          debug $
+            "[riak] cache lookup: " ++ show vclock ++ " <= " ++
+            show key
           pure vclock
 
     , riakCacheInsert =
-        \loc vclock -> do
-          -- debug $
-          --   "[riak] cache insert: " ++ show loc ++ " => " ++
-          --   show vclock
-          atomically (STMMap.insert vclock (SomeRiakKey loc) cache)
+        \key vclock -> do
+          debug $
+            "[riak] cache insert: " ++ show key ++ " => " ++
+            show vclock
+          atomically (STMMap.insert vclock (SomeRiakKey key) cache)
 
     , riakCacheDelete =
-        \loc -> do
-          -- debug $ "[riak] cache delete: " ++ show loc
-          atomically (STMMap.delete (SomeRiakKey loc) cache)
+        \key -> do
+          debug $ "[riak] cache delete: " ++ show key
+          atomically (STMMap.delete (SomeRiakKey key) cache)
     }
