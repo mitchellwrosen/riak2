@@ -189,7 +189,8 @@ import           Riak.Internal.Utils     (bs2int, int2bs)
 --
 -- * Inactive sockets are closed after approximately 30 seconds.
 --
--- TODO createRiakHandle close connections after
+-- When the handle is garbage collected, all outstanding sockets (if any)
+-- are closed.
 createRiakHandle
   :: MonadIO m
   => HostName -- ^ Host

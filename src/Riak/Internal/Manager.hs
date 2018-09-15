@@ -88,6 +88,17 @@ createRiakManager host port n inactive = do
   lock :: MVar () <-
     newMVar ()
 
+  -- Attach a finalizer to the lock (since we have it lying around) that closes
+  -- all of the open connections.
+  (void . mkWeakMVar lock) $
+    for_ [0..n-1] $ \i ->
+      readMutVar (indexUnliftedArray conns' i) >>= \case
+        NotConnected ->
+          pure ()
+
+        Connected conn _ ->
+          void (tryAny (riakDisconnect conn))
+
   -- TODO configurable wheel spokes?
   wheel :: TimerWheel <-
     TimerWheel.new 1024 (max 1 (inactive / 4))
