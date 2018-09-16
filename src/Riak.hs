@@ -775,7 +775,7 @@ getRiakCounter
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError Int64)
+  -> m (Either RiakError (Maybe Int64))
 getRiakCounter h key (GetRiakObjectParams a b c d e f g) =
   getCrdt (proxy# @_ @'RiakCounterTy) h key
     (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
@@ -847,7 +847,7 @@ getRiakGrowOnlySet
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RiakError (Set ByteString))
+  -> m (Either RiakError (Maybe (Set ByteString)))
 getRiakGrowOnlySet =
   getCrdt (proxy# @_ @'RiakGrowOnlySetTy)
 
@@ -871,7 +871,7 @@ getRiakHyperLogLog
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RiakError Word64)
+  -> m (Either RiakError (Maybe Word64))
 getRiakHyperLogLog =
   getCrdt (proxy# @_ @'RiakHyperLogLogTy)
 
@@ -898,7 +898,7 @@ getRiakMap
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RiakError a)
+  -> m (Either RiakError (Maybe a))
 getRiakMap =
   getCrdt (proxy# @_ @('RiakMapTy a))
 
@@ -926,7 +926,7 @@ getRiakSet
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RiakError (Set a))
+  -> m (Either RiakError (Maybe (Set a)))
 getRiakSet =
   getCrdt (proxy# @_ @('RiakSetTy a))
 
@@ -1060,7 +1060,7 @@ getCrdt
   -> RiakHandle
   -> RiakKey
   -> GetRiakCrdtParams
-  -> m (Either RiakError (CrdtVal ty))
+  -> m (Either RiakError (Maybe (CrdtVal ty)))
 getCrdt
     p h@(RiakHandle manager _) loc@(RiakKey (RiakBucket type' bucket) key)
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n

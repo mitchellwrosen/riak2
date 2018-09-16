@@ -169,16 +169,16 @@ tests h =
           (Foldl.generalize Foldl.length)
           `shouldReturn` Right (length (filter (\j -> j == i || j == i+1) ns))
 
-  , testCase "get empty counter returns 0" $ do
+  , testCase "get empty counter returns Nothing" $ do
       key <- randomCounterKey
-      getRiakCounter h key def `shouldReturn` Right 0
+      getRiakCounter h key def `shouldReturn` Right Nothing
 
   , testCase "update/get counter" $ do
       key <- randomCounterKey
       updates <- randomRIO (1, 10)
       incrs <- replicateM updates (randomRIO (1, 10))
       for_ incrs $ \i -> updateRiakCounter h key i def `shouldReturn` Right 0
-      getRiakCounter h key def `shouldReturn` Right (sum incrs)
+      getRiakCounter h key def `shouldReturn` Right (Just (sum incrs))
 
   , testCase "update counter, return body" $ do
       let i = 10
@@ -189,7 +189,7 @@ tests h =
       let i = 10
       bucket <- randomCounterBucket
       Right key <- updateNewRiakCounter h bucket i def
-      getRiakCounter h key def `shouldReturn` Right i
+      getRiakCounter h key def `shouldReturn` Right (Just i)
 
   , testCase "get counter in object bucket returns Left" $ do
       key <- randomObjectKey
@@ -215,7 +215,7 @@ tests h =
       bucket <- randomSetBucket
       let op = riakSetAddOp ("foo" :: ByteString)
       Right key <- updateNewRiakSet h bucket op def
-      getRiakSet @ByteString h key def `shouldReturn` Right (Set.fromList ["foo"])
+      getRiakSet @ByteString h key def `shouldReturn` Right (Just (Set.fromList ["foo"]))
 
   , testCase "set add-remove" $ do
       bucket <- randomSetBucket

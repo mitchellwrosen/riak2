@@ -42,7 +42,7 @@ class IsRiakCrdt (ty :: RiakTy) where
     :: Proxy# ty
     -> RiakKey
     -> DtFetchResp
-    -> Either SomeException (CrdtVal ty)
+    -> Either SomeException (Maybe (CrdtVal ty))
 
   parseDtUpdateResp
     :: Proxy# ty
@@ -80,15 +80,17 @@ instance IsRiakCrdt 'RiakCounterTy where
     :: Proxy# 'RiakCounterTy
     -> RiakKey
     -> DtFetchResp
-    -> Either SomeException Int64
+    -> Either SomeException (Maybe Int64)
   parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'COUNTER ->
-        Right (resp ^. #value . #counterValue)
+        Right (view #counterValue <$> resp ^. #maybe'value)
 
       x ->
         (Left . toException . RiakCrdtError key)
           ("expected counter but found " <> dataTypeToText x)
+
+  -- TODO split into update, update-and-get
 
   parseDtUpdateResp
     :: Proxy# 'RiakCounterTy
@@ -110,11 +112,11 @@ instance IsRiakCrdt 'RiakGrowOnlySetTy where
     :: Proxy# 'RiakGrowOnlySetTy
     -> RiakKey
     -> DtFetchResp
-    -> Either SomeException (Set ByteString)
+    -> Either SomeException (Maybe (Set ByteString))
   parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'GSET ->
-        Right (Set.fromList (resp ^. #value . #gsetValue))
+        Right (Set.fromList . view #gsetValue <$> resp ^. #maybe'value)
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -140,11 +142,11 @@ instance IsRiakCrdt 'RiakHyperLogLogTy where
     :: Proxy# 'RiakHyperLogLogTy
     -> RiakKey
     -> DtFetchResp
-    -> Either SomeException Word64
+    -> Either SomeException (Maybe Word64)
   parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'HLL ->
-        Right (resp ^. #value . #hllValue)
+        Right (view #hllValue <$> resp ^. #maybe'value)
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -170,14 +172,19 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
     :: Proxy# ('RiakMapTy a)
     -> RiakKey
     -> DtFetchResp
-    -> Either SomeException a
+    -> Either SomeException (Maybe a)
   parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'MAP ->
-        first toException
-          (runFieldParser
-            decodeRiakMap
-            (parseMapEntries (resp ^. #value . #mapValue)))
+        case resp ^. #maybe'value of
+          Nothing ->
+            Right Nothing
+
+          Just value ->
+            bimap toException Just
+              (runFieldParser
+                decodeRiakMap
+                (parseMapEntries (value ^. #mapValue)))
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -417,11 +424,17 @@ instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
     :: Proxy# ('RiakSetTy a)
     -> RiakKey
     -> DtFetchResp
-    -> Either SomeException (Set a)
+    -> Either SomeException (Maybe (Set a))
   parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'SET ->
-        Set.fromList <$> for (resp ^. #value . #setValue) decodeRiakRegister
+        case resp ^. #maybe'value of
+          Nothing ->
+            Right Nothing
+
+          Just value ->
+            Just . Set.fromList <$>
+              for (value ^. #setValue) decodeRiakRegister
 
       x ->
         (Left . toException . RiakCrdtError key)
