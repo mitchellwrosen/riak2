@@ -16,21 +16,21 @@ import Riak.Internal.Types
 
 data RiakCache
   = RiakCache
-  { riakCacheLookup :: forall ty. RiakKey ty -> IO (Maybe RiakVclock)
-  , riakCacheInsert :: forall ty. RiakKey ty -> RiakVclock -> IO ()
-  , riakCacheDelete :: forall ty. RiakKey ty -> IO ()
+  { riakCacheLookup :: RiakKey -> IO (Maybe RiakVclock)
+  , riakCacheInsert :: RiakKey -> RiakVclock -> IO ()
+  , riakCacheDelete :: RiakKey -> IO ()
   }
 
 -- | Create a 'RiakCache' backed by an STM map.
 newSTMRiakCache :: IO RiakCache
 newSTMRiakCache = do
-  cache :: STM.Map SomeRiakKey RiakVclock <-
+  cache :: STM.Map RiakKey RiakVclock <-
     STMMap.newIO
 
   pure RiakCache
     { riakCacheLookup = do
         \key -> do
-          vclock <- atomically (STMMap.lookup (SomeRiakKey key) cache)
+          vclock <- atomically (STMMap.lookup key cache)
           debug $
             "[riak] cache lookup: " ++ show vclock ++ " <= " ++
             show key
@@ -41,10 +41,10 @@ newSTMRiakCache = do
           debug $
             "[riak] cache insert: " ++ show key ++ " => " ++
             show vclock
-          atomically (STMMap.insert vclock (SomeRiakKey key) cache)
+          atomically (STMMap.insert vclock key cache)
 
     , riakCacheDelete =
         \key -> do
           debug $ "[riak] cache delete: " ++ show key
-          atomically (STMMap.delete (SomeRiakKey key) cache)
+          atomically (STMMap.delete key cache)
     }

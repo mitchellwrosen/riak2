@@ -57,7 +57,6 @@ module Riak.Internal
   , UpdateRiakCrdtParams(..)
   , updateRiakCrdtPB
     -- * Data types
-  , RiakCrdtTy(..)
   , RiakCrdtError(..)
     -- ** Map
   , IsRiakMap(..)

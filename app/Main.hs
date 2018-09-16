@@ -298,7 +298,7 @@ updateCounterParser =
 --------------------------------------------------------------------------------
 
 do2i
-  :: RiakBucket 'Nothing
+  :: RiakBucket
   -> RiakIndexName
   -> [Char]
   -> Maybe [Char]
@@ -338,14 +338,14 @@ do2i bucket index key1 key2 host port = do
                 (Utf8.fromString key2'))
               (Foldl.mapM_ (\(x, y) -> putStrLn (show x ++ " " ++ show y)))
 
-doDeleteObject :: RiakKey ty -> HostName -> PortNumber -> IO ()
-doDeleteObject loc host port = do
+doDeleteObject :: RiakKey -> HostName -> PortNumber -> IO ()
+doDeleteObject key host port = do
   h <- createRiakHandle host port
   either print (\() -> pure ()) =<<
-    deleteRiakObject h loc
+    deleteRiakObject h key
 
 doGetBinaryObject
-  :: RiakKey 'Nothing
+  :: RiakKey
   -> Bool
   -> GetRiakObjectParams
   -> HostName
@@ -358,7 +358,7 @@ doGetBinaryObject =
         ("value[" <> Latin1.pack (show i) <> "] = " <> Base64.encode s))
 
 doGetBucketProps
-  :: RiakBucketType ty
+  :: RiakBucketType
   -> Maybe ByteString
   -> HostName
   -> PortNumber
@@ -372,14 +372,14 @@ doGetBucketProps type' bucket host port = do
       bucket
 
 doGetCounter
-  :: RiakKey ('Just 'RiakCounterTy)
+  :: RiakKey
   -> HostName
   -> PortNumber
   -> IO ()
-doGetCounter loc host port = do
+doGetCounter key host port = do
   h <- createRiakHandle host port
   either print print =<<
-    getRiakCounter h loc def
+    getRiakCounter h key def
 
 doGetIndex :: Maybe RiakIndexName -> HostName -> PortNumber -> IO ()
 doGetIndex index host port = do
@@ -390,29 +390,29 @@ doGetIndex index host port = do
     index
 
 doGetMap
-  :: RiakKey ('Just ('RiakMapTy RiakMapEntries))
+  :: RiakKey
   -> HostName
   -> PortNumber
   -> IO ()
-doGetMap loc host port = do
+doGetMap key host port = do
   h <- createRiakHandle host port
   either print print =<<
-    getRiakMap h loc def
+    getRiakMap @RiakMapEntries h key def
 
 doGetObject
   :: IsRiakObject a
   => (Int -> a -> IO ())
-  -> RiakKey 'Nothing
+  -> RiakKey
   -> Bool
   -> GetRiakObjectParams
   -> HostName
   -> PortNumber
   -> IO ()
-doGetObject f loc head params host port = do
+doGetObject f key head params host port = do
   h <- createRiakHandle host port
   if head
-    then go (getRiakObjectHead h loc params) (\_ _ -> pure ())
-    else go (getRiakObject h loc params) f
+    then go (getRiakObjectHead h key params) (\_ _ -> pure ())
+    else go (getRiakObject h key params) f
  where
   go
     :: IO (Either RiakError [RiakObject a])
@@ -440,13 +440,13 @@ doGetSchema schema host port = do
     getRiakSchema h schema
 
 doGetSet
-  :: RiakKey ('Just ('RiakSetTy Text))
+  :: RiakKey
   -> HostName
   -> PortNumber
   -> IO ()
-doGetSet loc host port = do
+doGetSet key host port = do
   h <- createRiakHandle host port
-  getRiakSet h loc def >>= \case
+  getRiakSet @Text h key def >>= \case
     Left err -> print err
     Right vals -> for_ vals print -- TODO encoding?
 
@@ -457,7 +457,7 @@ doGetServerInfo host port = do
     getRiakServerInfo h
 
 doGetTextObject
-  :: RiakKey 'Nothing
+  :: RiakKey
   -> Bool
   -> GetRiakObjectParams
   -> HostName
@@ -474,7 +474,7 @@ doPing host port = do
     pingRiak h
 
 doPutObject
-  :: RiakKey 'Nothing
+  :: RiakKey
   -> Text
   -> [RiakIndex]
   -> Maybe RiakQuorum
@@ -487,7 +487,7 @@ doPutObject
   -> HostName
   -> PortNumber
   -> IO ()
-doPutObject loc content ixs dw n pw return no_sloppy_quorum timeout w host port = do
+doPutObject key content ixs dw n pw return no_sloppy_quorum timeout w host port = do
   h <- createRiakHandle host port
   case return of
     'a' ->
@@ -511,13 +511,13 @@ doPutObject loc content ixs dw n pw return no_sloppy_quorum timeout w host port 
     _   -> undefined
  where
   go
-    :: (RiakKey 'Nothing -> Text -> PutRiakObjectParams -> IO (Either RiakError a))
+    :: (RiakKey -> Text -> PutRiakObjectParams -> IO (Either RiakError a))
     -> (a -> IO ())
     -> IO ()
   go put f = do
     eresponse <-
       put
-        loc
+        key
         content
         (def
           & maybe id #dw dw
@@ -531,7 +531,7 @@ doPutObject loc content ixs dw n pw return no_sloppy_quorum timeout w host port 
     either print f eresponse
 
 doStream
-  :: RiakBucketType ty
+  :: RiakBucketType
   -> Maybe ByteString
   -> HostName
   -> PortNumber
@@ -541,7 +541,7 @@ doStream type' =
     (doStreamBuckets type')
     (doStreamKeys . RiakBucket type')
 
-doStreamBuckets :: RiakBucketType ty -> HostName -> PortNumber -> IO ()
+doStreamBuckets :: RiakBucketType -> HostName -> PortNumber -> IO ()
 doStreamBuckets type' host port = do
   h <- createRiakHandle host port
   result :: Either RiakError () <-
@@ -550,7 +550,7 @@ doStreamBuckets type' host port = do
   either print (const (pure ())) result
 
 doStreamKeys
-  :: RiakBucket ty
+  :: RiakBucket
   -> HostName
   -> PortNumber
   -> IO ()
@@ -560,15 +560,15 @@ doStreamKeys bucket host port = do
     either print (const (pure ()))
 
 doUpdateCounter
-  :: RiakKey ('Just 'RiakCounterTy)
+  :: RiakKey
   -> Int64
   -> HostName
   -> PortNumber
   -> IO ()
-doUpdateCounter loc incr host port = do
+doUpdateCounter key incr host port = do
   h <- createRiakHandle host port
   either print print =<<
-    updateRiakCounter h loc incr def
+    updateRiakCounter h key incr def
 
 --------------------------------------------------------------------------------
 -- Misc. helpers
@@ -683,7 +683,7 @@ bucketArgument =
       , metavar "BUCKET"
       ])
 
-bucketTypeArgument :: Parser (RiakBucketType ty)
+bucketTypeArgument :: Parser RiakBucketType
 bucketTypeArgument =
   (fmap RiakBucketType . strArgument)
     (mconcat
@@ -691,7 +691,7 @@ bucketTypeArgument =
       , metavar "TYPE"
       ])
 
-locationArgument :: Parser (RiakKey ty)
+locationArgument :: Parser RiakKey
 locationArgument =
   (\type' bucket -> RiakKey (RiakBucket type' bucket))
     <$> bucketTypeArgument
@@ -740,7 +740,7 @@ dwOption :: Parser (Maybe RiakQuorum)
 dwOption =
   quorumOption "dw" "DW value"
 
-namespaceArgument :: Parser (RiakBucket ty)
+namespaceArgument :: Parser RiakBucket
 namespaceArgument =
   RiakBucket
     <$> bucketTypeArgument

@@ -34,16 +34,19 @@ import Riak.Internal.Types
 
 -- TODO CRDTs: Set -> HashSet
 
-class IsRiakCrdt (ty :: RiakCrdtTy) where
-  type CrdtVal    ty :: *
+-- Internal type class. Not exported.
+class IsRiakCrdt (ty :: RiakTy) where
+  type CrdtVal ty :: *
 
   parseDtFetchResp
-    :: RiakKey ('Just ty)
+    :: Proxy# ty
+    -> RiakKey
     -> DtFetchResp
     -> Either SomeException (CrdtVal ty)
 
   parseDtUpdateResp
-    :: RiakKey ('Just ty)
+    :: Proxy# ty
+    -> RiakKey
     -> DtUpdateResp
     -> Either SomeException (CrdtVal ty)
 
@@ -51,19 +54,10 @@ class IsRiakCrdt (ty :: RiakCrdtTy) where
 -- | A 'RiakCrdtError' is thrown when a data type operation is performed on
 -- an incompatible bucket type (for example, attempting to fetch a counter from
 -- a bucket type that contains sets).
-data RiakCrdtError where
-  RiakCrdtError :: RiakKey ty -> Text -> RiakCrdtError
-
-instance Eq RiakCrdtError where
-  RiakCrdtError l1 m1 == RiakCrdtError l2 m2 =
-    t1 == t2 && b1 == b2 && k1 == k2 && m1 == m2
-   where
-    RiakKey (RiakBucket (RiakBucketType t1) b1) k1 = l1
-    RiakKey (RiakBucket (RiakBucketType t2) b2) k2 = l2
-
-instance Exception RiakCrdtError
-
-deriving instance Show RiakCrdtError
+data RiakCrdtError
+  = RiakCrdtError !RiakKey !Text
+  deriving stock (Eq, Show)
+  deriving anyclass (Exception)
 
 
 dataTypeToText :: DtFetchResp'DataType -> Text
@@ -83,23 +77,25 @@ instance IsRiakCrdt 'RiakCounterTy where
   type CrdtVal 'RiakCounterTy = Int64
 
   parseDtFetchResp
-    :: RiakKey ('Just 'RiakCounterTy)
+    :: Proxy# 'RiakCounterTy
+    -> RiakKey
     -> DtFetchResp
     -> Either SomeException Int64
-  parseDtFetchResp loc resp =
+  parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'COUNTER ->
         Right (resp ^. #value . #counterValue)
 
       x ->
-        (Left . toException . RiakCrdtError loc)
+        (Left . toException . RiakCrdtError key)
           ("expected counter but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakKey ('Just 'RiakCounterTy)
+    :: Proxy# 'RiakCounterTy
+    -> RiakKey
     -> DtUpdateResp
     -> Either SomeException Int64
-  parseDtUpdateResp _ resp =
+  parseDtUpdateResp _ _ resp =
     Right (resp ^. #counterValue)
 
 
@@ -111,23 +107,25 @@ instance IsRiakCrdt 'RiakGrowOnlySetTy where
   type CrdtVal 'RiakGrowOnlySetTy = Set ByteString
 
   parseDtFetchResp
-    :: RiakKey ('Just 'RiakGrowOnlySetTy)
+    :: Proxy# 'RiakGrowOnlySetTy
+    -> RiakKey
     -> DtFetchResp
     -> Either SomeException (Set ByteString)
-  parseDtFetchResp loc resp =
+  parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'GSET ->
         Right (Set.fromList (resp ^. #value . #gsetValue))
 
       x ->
-        (Left . toException . RiakCrdtError loc)
+        (Left . toException . RiakCrdtError key)
           ("expected gset but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakKey ('Just 'RiakGrowOnlySetTy)
+    :: Proxy# 'RiakGrowOnlySetTy
+    -> RiakKey
     -> DtUpdateResp
     -> Either SomeException (Set ByteString)
-  parseDtUpdateResp _ resp =
+  parseDtUpdateResp _ _ resp =
     Right (Set.fromList (resp ^. #gsetValue))
 
 
@@ -139,23 +137,25 @@ instance IsRiakCrdt 'RiakHyperLogLogTy where
   type CrdtVal 'RiakHyperLogLogTy = Word64
 
   parseDtFetchResp
-    :: RiakKey ('Just 'RiakHyperLogLogTy)
+    :: Proxy# 'RiakHyperLogLogTy
+    -> RiakKey
     -> DtFetchResp
     -> Either SomeException Word64
-  parseDtFetchResp loc resp =
+  parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'HLL ->
         Right (resp ^. #value . #hllValue)
 
       x ->
-        (Left . toException . RiakCrdtError loc)
+        (Left . toException . RiakCrdtError key)
           ("expected hll but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakKey ('Just 'RiakHyperLogLogTy)
+    :: Proxy# 'RiakHyperLogLogTy
+    -> RiakKey
     -> DtUpdateResp
     -> Either SomeException Word64
-  parseDtUpdateResp _ resp =
+  parseDtUpdateResp _ _ resp =
     Right (resp ^. #hllValue)
 
 
@@ -167,10 +167,11 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
   type CrdtVal ('RiakMapTy a) = a
 
   parseDtFetchResp
-    :: RiakKey ('Just ('RiakMapTy a))
+    :: Proxy# ('RiakMapTy a)
+    -> RiakKey
     -> DtFetchResp
     -> Either SomeException a
-  parseDtFetchResp loc resp =
+  parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'MAP ->
         first toException
@@ -179,14 +180,15 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
             (parseMapEntries (resp ^. #value . #mapValue)))
 
       x ->
-        (Left . toException . RiakCrdtError loc)
+        (Left . toException . RiakCrdtError key)
           ("expected map but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakKey ('Just ('RiakMapTy a))
+    :: Proxy# ('RiakMapTy a)
+    -> RiakKey
     -> DtUpdateResp
     -> Either SomeException a
-  parseDtUpdateResp _ resp =
+  parseDtUpdateResp _ _ resp =
     first toException
       (runFieldParser
         decodeRiakMap
@@ -405,30 +407,32 @@ instance IsRiakRegister Text where
 -- sets only contain arrays of bytes, like Riak registers, so this type class is
 -- satisfied for all types that are instances of both 'IsRiakRegister' and
 -- 'Ord'.
-class (IsRiakRegister a, Ord a) => IsRiakSet a
-instance (IsRiakRegister a, Ord a) => IsRiakSet a
+type IsRiakSet a =
+  (IsRiakRegister a, Ord a)
 
 instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
   type CrdtVal ('RiakSetTy a) = Set a
 
   parseDtFetchResp
-    :: RiakKey ('Just ('RiakSetTy a))
+    :: Proxy# ('RiakSetTy a)
+    -> RiakKey
     -> DtFetchResp
     -> Either SomeException (Set a)
-  parseDtFetchResp loc resp =
+  parseDtFetchResp _ key resp =
     case resp ^. #type' of
       DtFetchResp'SET ->
         Set.fromList <$> for (resp ^. #value . #setValue) decodeRiakRegister
 
       x ->
-        (Left . toException . RiakCrdtError loc)
+        (Left . toException . RiakCrdtError key)
           ("expected set but found " <> dataTypeToText x)
 
   parseDtUpdateResp
-    :: RiakKey ('Just ('RiakSetTy a))
+    :: Proxy# ('RiakSetTy a)
+    -> RiakKey
     -> DtUpdateResp
     -> Either SomeException (Set a)
-  parseDtUpdateResp _ resp =
+  parseDtUpdateResp _ _ resp =
     Set.fromList <$> for (resp ^. #setValue) decodeRiakRegister
 
 

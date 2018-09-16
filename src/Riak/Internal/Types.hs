@@ -6,7 +6,6 @@
 module Riak.Internal.Types where
 
 import Data.Default.Class
-import Data.Hashable      (hashWithSalt)
 import Data.Text.Encoding (decodeUtf8, decodeUtf8')
 import Lens.Labels
 
@@ -30,19 +29,16 @@ data ObjectReturn
   | ObjectReturnBody
 
 
--- | A bucket type and bucket, tagged with the data type it contains.
-data RiakBucket (ty :: Maybe RiakCrdtTy)
-  = RiakBucket !(RiakBucketType ty) !ByteString
-  deriving stock (Eq)
-
-instance Hashable (RiakBucket ty) where
-  hashWithSalt salt (RiakBucket type' bucket) =
-    salt `hashWithSalt` type' `hashWithSalt` bucket
+-- | A bucket type and bucket.
+data RiakBucket
+  = RiakBucket !RiakBucketType !ByteString
+  deriving stock (Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
-instance Show (RiakBucket ty) where
-  show :: RiakBucket ty -> String
+instance Show RiakBucket where
+  show :: RiakBucket -> String
   show (RiakBucket type' bucket) =
     show type'
     ++ " " ++
@@ -53,7 +49,7 @@ instance Show (RiakBucket ty) where
 
 -- | (De)construct a bucket in the the @default@ bucket type. Its usage is
 -- discouraged.
-pattern DefaultRiakBucket :: ByteString -> RiakBucket 'Nothing
+pattern DefaultRiakBucket :: ByteString -> RiakBucket
 pattern DefaultRiakBucket name =
   RiakBucket DefaultRiakBucketType name
 
@@ -90,26 +86,26 @@ data RiakBucketProps
       !(Maybe Word32)                     -- hll_precision
       !(Maybe Word32)                     -- ttl
 
--- | A bucket type, tagged with the data type it contains.
+-- | A bucket type.
 --
 -- /Note/: Must be UTF-8 encoded.
-newtype RiakBucketType (ty :: Maybe RiakCrdtTy)
+newtype RiakBucketType
   = RiakBucketType { unRiakBucketType :: ByteString }
   deriving stock (Eq)
   deriving newtype (Hashable)
 
-instance Show (RiakBucketType ty) where
-  show :: RiakBucketType ty -> String
+instance Show RiakBucketType where
+  show :: RiakBucketType -> String
   show =
     Text.unpack . decodeUtf8 . unRiakBucketType
 
 -- | (De)construct the @default@ bucket type. Its usage is discouraged.
-pattern DefaultRiakBucketType :: RiakBucketType 'Nothing
+pattern DefaultRiakBucketType :: RiakBucketType
 pattern DefaultRiakBucketType =
   RiakBucketType "default"
 
 
-data RiakCrdtTy
+data RiakTy
   = RiakCounterTy
   | RiakGrowOnlySetTy -- TODO better GrowOnlySetTy
   | RiakHyperLogLogTy
@@ -145,19 +141,16 @@ newtype RiakIndexName
   deriving (Eq, Show)
 
 
--- | A bucket type, bucket, and key, tagged with the data type it contains.
-data RiakKey (ty :: Maybe RiakCrdtTy)
-  = RiakKey !(RiakBucket ty) !ByteString
-  deriving stock (Eq)
-
-instance Hashable (RiakKey ty) where
-  hashWithSalt salt (RiakKey bucket key) =
-    salt `hashWithSalt` bucket `hashWithSalt` key
+-- | A bucket type, bucket, and key
+data RiakKey
+  = RiakKey !RiakBucket !ByteString
+  deriving stock (Eq, Generic)
+  deriving anyclass (Hashable)
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.
-instance Show (RiakKey ty) where
-  show :: RiakKey ty -> String
+instance Show RiakKey where
+  show :: RiakKey -> String
   show (RiakKey bucket key) =
     show bucket
     ++ " " ++
@@ -174,11 +167,10 @@ newtype RiakMetadata
 
 
 -- TODO make RiakMapParseError a sub-exception of RiakParseError
-data RiakParseError where
-  RiakParseError :: !(RiakKey ty) -> !Text -> RiakParseError
-  deriving anyclass Exception
-
-deriving instance Show RiakParseError
+data RiakParseError
+  = RiakParseError !RiakKey !Text
+  deriving stock (Show)
+  deriving anyclass (Exception)
 
 
 -- | How many vnodes must respond before an operation is considered successful.
@@ -255,21 +247,6 @@ pattern DefaultSolrSchemaName =
 data SBool :: Bool -> Type where
   STrue  :: SBool 'True
   SFalse :: SBool 'False
-
-
-data SomeRiakKey where
-  SomeRiakKey :: RiakKey ty -> SomeRiakKey
-
-instance Eq SomeRiakKey where
-  SomeRiakKey (RiakKey n1 k1) == SomeRiakKey (RiakKey n2 k2) =
-    t1 == t2 && b1 == b2 && k1 == k2
-   where
-    RiakBucket (RiakBucketType t1) b1 = n1
-    RiakBucket (RiakBucketType t2) b2 = n2
-
-instance Hashable SomeRiakKey where
-  hashWithSalt salt (SomeRiakKey loc) =
-    hashWithSalt salt loc
 
 
 newtype TTL

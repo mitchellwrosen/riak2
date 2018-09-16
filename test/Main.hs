@@ -193,29 +193,29 @@ tests h =
 
   , testCase "get counter in object bucket returns Left" $ do
       key <- randomObjectKey
-      getRiakCounter h (unsafeCastKey key) def `shouldReturn`
+      getRiakCounter h key def `shouldReturn`
         Left (RiakError "`undefined` is not a supported type")
 
   , testCase "update counter in object bucket returns Left" $ do
       key <- randomObjectKey
-      updateRiakCounter h (unsafeCastKey key) 1 def `shouldReturn`
+      updateRiakCounter h key 1 def `shouldReturn`
         Left (RiakError "Bucket datatype `undefined` is not a supported type")
 
   , testCase "get counter in non-counter bucket type throws error" $ do
       key <- randomSetKey
-      try (getRiakCounter h (unsafeCastKey key) def) `shouldReturn`
+      try (getRiakCounter h key def) `shouldReturn`
         Left (RiakCrdtError key "expected counter but found set")
 
   , testCase "update counter in non-counter bucket returns Left" $ do
       key <- randomSetKey
-      updateRiakCounter h (unsafeCastKey key) 1 def `shouldReturn`
+      updateRiakCounter h key 1 def `shouldReturn`
         Left (RiakError "Operation type is `counter` but  bucket type is `set`.")
 
   , testCase "new set" $ do
       bucket <- randomSetBucket
       let op = riakSetAddOp ("foo" :: ByteString)
       Right key <- updateNewRiakSet h bucket op def
-      getRiakSet h key def `shouldReturn` Right (Set.fromList ["foo"])
+      getRiakSet @ByteString h key def `shouldReturn` Right (Set.fromList ["foo"])
 
   , testCase "set add-remove" $ do
       bucket <- randomSetBucket
@@ -234,7 +234,7 @@ tests h =
       let op = riakSetAddOp ("foo" :: ByteString)
       Right key <- updateNewRiakSet h bucket op (def & #return_body True)
       Just context1 <- riakCacheLookup (riakHandleCache h) key
-      Right [_] <- getRiakObjectHead h (unsafeCastKey key) def
+      Right [_] <- getRiakObjectHead h key def
       Just context2 <- riakCacheLookup (riakHandleCache h) key
       context1 `shouldBe` context2
   ]
@@ -243,7 +243,7 @@ tests h =
 curl :: String -> IO ()
 curl = callCommand . ("curl -s " ++)
 
-curlPutByteString :: RiakKey 'Nothing -> ByteString -> IO ()
+curlPutByteString :: RiakKey -> ByteString -> IO ()
 curlPutByteString (RiakKey (RiakBucket (RiakBucketType type') bucket) key) val =
   curl $
     printf
@@ -253,7 +253,7 @@ curlPutByteString (RiakKey (RiakBucket (RiakBucketType type') bucket) key) val =
       (Latin1.unpack key)
       (Latin1.unpack val)
 
-curlPutText :: RiakKey 'Nothing -> Text -> IO ()
+curlPutText :: RiakKey -> Text -> IO ()
 curlPutText (RiakKey (RiakBucket (RiakBucketType type') bucket) key) val =
   curl $
     printf
@@ -281,41 +281,37 @@ randomKeyNameString = randomBucketNameString
 randomText :: IO Text
 randomText = Text.pack <$> replicateM 32 (randomRIO ('a', 'z'))
 
-randomObjectKey :: IO (RiakKey 'Nothing)
+randomObjectKey :: IO RiakKey
 randomObjectKey = do
   bucket <- randomBucketName
   key <- randomKeyName
   pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
 
-randomObjectKeyIn :: ByteString -> IO (RiakKey 'Nothing)
+randomObjectKeyIn :: ByteString -> IO RiakKey
 randomObjectKeyIn bucket = do
   key <- randomKeyName
   pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
 
-randomObjectBucket :: IO (RiakBucket 'Nothing)
+randomObjectBucket :: IO RiakBucket
 randomObjectBucket = do
   bucket <- randomBucketName
   pure (RiakBucket (RiakBucketType "objects") bucket)
 
-randomCounterBucket :: IO (RiakBucket ('Just 'RiakCounterTy))
+randomCounterBucket :: IO RiakBucket
 randomCounterBucket = do
   RiakBucket (RiakBucketType "counters") <$> randomBucketName
 
-randomCounterKey :: IO (RiakKey ('Just 'RiakCounterTy))
+randomCounterKey :: IO RiakKey
 randomCounterKey =
   RiakKey <$> randomCounterBucket <*> randomKeyName
 
-randomSetBucket :: IO (RiakBucket ('Just ('RiakSetTy a)))
+randomSetBucket :: IO RiakBucket
 randomSetBucket = do
   RiakBucket (RiakBucketType "sets") <$> randomBucketName
 
-randomSetKey :: IO (RiakKey ('Just ('RiakSetTy a)))
+randomSetKey :: IO RiakKey
 randomSetKey =
   RiakKey <$> randomSetBucket <*> randomKeyName
-
-unsafeCastKey :: RiakKey a -> RiakKey b
-unsafeCastKey (RiakKey (RiakBucket (RiakBucketType t) b) k) =
-  RiakKey (RiakBucket (RiakBucketType t) b) k
 
 
 shouldBe :: (Eq a, HasCallStack, Show a) => a -> a -> IO ()

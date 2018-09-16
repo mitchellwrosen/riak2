@@ -109,7 +109,6 @@ module Riak
   , RiakBucketType(..)
   , pattern DefaultRiakBucketType
   , RiakCrdtError(..)
-  , RiakCrdtTy(..)
   , RiakError(..)
   , RiakExactQuery(..)
   , RiakHandle
@@ -153,10 +152,10 @@ import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 import Lens.Labels
 import Network.Socket        (HostName, PortNumber)
 
-import qualified Control.Foldl         as Foldl
-import qualified Data.ByteString       as ByteString
-import qualified Data.HashSet          as HashSet
-import qualified Data.List.NonEmpty    as List1
+import qualified Control.Foldl      as Foldl
+import qualified Data.ByteString    as ByteString
+import qualified Data.HashSet       as HashSet
+import qualified Data.List.NonEmpty as List1
 
 import           Proto.Riak              hiding (SetOp)
 import qualified Proto.Riak              as Proto
@@ -167,30 +166,32 @@ import           Riak.Internal.MapReduce (riakMapReduceRequest)
 import           Riak.Internal.Panic
 import           Riak.Internal.Prelude
 import           Riak.Internal.Types     (ObjectReturn(..),
-                                          ParamObjectReturn(..), SBool(..))
+                                          ParamObjectReturn(..), RiakTy(..),
+                                          SBool(..))
 import           Riak.Internal.Utils     (bs2int, int2bs)
 
 
 -- TODO _ variants that don't decode replies
+
 -- TODO put raw RiakObject
+
+-- TODO since annotations
 
 --------------------------------------------------------------------------------
 -- Handle
 --------------------------------------------------------------------------------
 
--- | Create a handle to Riak with the following default settings, which may be
--- overridden by using various functionality exposed in the "Riak.Internal"
--- module.
+-- | Create a handle to Riak. When the handle is garbage collected, all outstanding sockets (if any) are closed.
+--
+-- The following default settings are used, which can be overridden by using
+-- functionality exposed in the "Riak.Internal" module:
 --
 -- * Object and data type causal contexts are cached using an in-memory
 --   map from @stm-containers@.
 --
--- * A maximum of two OS sockets per capability are opened.
+-- * A maximum of two sockets per capability are opened.
 --
--- * Inactive sockets are closed after approximately 30 seconds.
---
--- When the handle is garbage collected, all outstanding sockets (if any)
--- are closed.
+-- * Inactive sockets are closed after 30 seconds.
 createRiakHandle
   :: MonadIO m
   => HostName -- ^ Host
@@ -223,6 +224,8 @@ createRiakHandle host port = liftIO $ do
 -- Get a 'Text' object at bucket type @"t"@, bucket @"b"@, key @"k"@. Note that
 -- the type application @\@Text@ is only necessary when type inference fails.
 --
+-- TODO fix this example
+--
 -- @
 -- do
 --   result <-
@@ -239,10 +242,10 @@ createRiakHandle host port = liftIO $ do
 --       {- The object does exist -}
 -- @
 getRiakObject
-  :: forall a m.
+  :: ∀ a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError [RiakObject a])
 getRiakObject
@@ -296,7 +299,7 @@ getRiakObjectHead
     :: forall m.
        MonadIO m
     => RiakHandle -- ^ Riak handle
-    -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+    -> RiakKey -- ^ Bucket type, bucket, and key
     -> GetRiakObjectParams -- ^ Optional parameters
     -> m (Either RiakError [RiakObject ()])
 getRiakObjectHead
@@ -352,7 +355,7 @@ getRiakObjectIfModified
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (Modified [RiakObject a]))
 getRiakObjectIfModified
@@ -409,11 +412,14 @@ getRiakObjectIfModified
       pure (Modified contents)
 
 -- | Get an object's metadata if it has been modified since the last get.
+--
+-- If multiple siblings are returned, you should perform a 'getRiakObject',
+-- resolve them, then perform a 'putRiakObject'.
 getRiakObjectIfModifiedHead
   :: forall m.
      MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (Modified [RiakObject ()]))
 getRiakObjectIfModifiedHead
@@ -474,7 +480,7 @@ getRiakObjectIfModifiedHead
 --------------------------------------------------------------------------------
 
 type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
-  ObjectReturnTy _ 'ObjectReturnNone = RiakKey 'Nothing
+  ObjectReturnTy _ 'ObjectReturnNone = RiakKey
   ObjectReturnTy _ 'ObjectReturnHead = NonEmpty (RiakObject ())
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (RiakObject a)
 
@@ -483,7 +489,7 @@ putRiakObject
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError ())
@@ -494,11 +500,14 @@ putRiakObject
       ParamObjectReturnNone f g h)
 
 -- | Put an object and return its metadata.
+--
+-- If multiple siblings are returned, you should perform a 'getRiakObject',
+-- resolve them, then perform a 'putRiakObject'.
 putRiakObjectHead
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (NonEmpty (RiakObject ())))
@@ -512,7 +521,7 @@ putRiakObjectBody
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey 'Nothing -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (NonEmpty (RiakObject a)))
@@ -522,14 +531,17 @@ putRiakObjectBody
     ParamObjectReturnBody f g h
 
 -- | Put a new object and return its randomly-generated key.
+--
+-- If multiple siblings are returned, you should resolve them, then perform a
+-- 'putRiakObject'.
 putNewRiakObject
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RiakError (RiakKey 'Nothing))
+  -> m (Either RiakError RiakKey)
 putNewRiakObject
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   _putRiakObject handle bucket Nothing content a b c d e
@@ -540,7 +552,7 @@ putNewRiakObjectHead
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (RiakObject ()))
@@ -555,7 +567,7 @@ putNewRiakObjectBody
   :: forall a m.
      (IsRiakObject a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError (RiakObject a))
@@ -569,7 +581,7 @@ _putRiakObject
   :: forall a m return.
      (IsRiakObject a, MonadIO m)
   => RiakHandle
-  -> RiakBucket 'Nothing
+  -> RiakBucket
   -> Maybe ByteString
   -> a
   -> DW
@@ -662,7 +674,7 @@ _putRiakObject
       key
 
   let
-    loc :: RiakKey 'Nothing
+    loc :: RiakKey
     loc =
       RiakKey namespace theKey
 
@@ -714,7 +726,7 @@ _putRiakObject
 deleteRiakObject
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ty -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> m (Either RiakError ())
 deleteRiakObject
     (RiakHandle manager cache)
@@ -761,11 +773,12 @@ deleteRiakObject
 getRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just 'RiakCounterTy) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
   -> m (Either RiakError Int64)
 getRiakCounter h key (GetRiakObjectParams a b c d e f g) =
-  getCrdt h key (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
+  getCrdt (proxy# @_ @'RiakCounterTy) h key
+    (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
 
 
 --------------------------------------------------------------------------------
@@ -776,7 +789,7 @@ getRiakCounter h key (GetRiakObjectParams a b c d e f g) =
 updateRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just 'RiakCounterTy) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError Int64)
@@ -788,21 +801,21 @@ updateRiakCounter h (RiakKey bucket key) incr params =
 updateNewRiakCounter
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket ('Just 'RiakCounterTy) -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RiakError (RiakKey ('Just 'RiakCounterTy)))
+  -> m (Either RiakError RiakKey)
 updateNewRiakCounter h bucket incr params =
   (fmap.fmap) fst (_updateRiakCounter h bucket Nothing incr params)
 
 _updateRiakCounter
   :: MonadIO m
   => RiakHandle
-  -> RiakBucket ('Just 'RiakCounterTy)
+  -> RiakBucket
   -> Maybe ByteString
   -> Int64
   -> UpdateRiakCrdtParams
-  -> m (Either RiakError (RiakKey ('Just 'RiakCounterTy), Int64))
+  -> m (Either RiakError (RiakKey, Int64))
 _updateRiakCounter h bucket key incr params =
   (fmap.fmap.fmap) (view #counterValue)
     (updateCrdt h bucket key Nothing op params)
@@ -832,11 +845,11 @@ _updateRiakCounter h bucket key incr params =
 getRiakGrowOnlySet
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just 'RiakGrowOnlySetTy) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (Set ByteString))
 getRiakGrowOnlySet =
-  getCrdt
+  getCrdt (proxy# @_ @'RiakGrowOnlySetTy)
 
 
 --------------------------------------------------------------------------------
@@ -856,11 +869,11 @@ getRiakGrowOnlySet =
 getRiakHyperLogLog
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just 'RiakHyperLogLogTy) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError Word64)
 getRiakHyperLogLog =
-  getCrdt
+  getCrdt (proxy# @_ @'RiakHyperLogLogTy)
 
 
 --------------------------------------------------------------------------------
@@ -880,13 +893,14 @@ getRiakHyperLogLog =
 --
 -- * 'RiakMapParseError' if decoding fails.
 getRiakMap
-  :: (IsRiakMap a, MonadIO m)
+  :: forall a m.
+     (IsRiakMap a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just ('RiakMapTy a)) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError a)
 getRiakMap =
-  getCrdt
+  getCrdt (proxy# @_ @('RiakMapTy a))
 
 
 -------------------------------------------------------------------------------
@@ -907,13 +921,14 @@ getRiakMap =
 -- * 'SomeException' if decoding fails. The exception thrown is provided by the
 --   implementation of 'decodeRiakRegister'.
 getRiakSet
-  :: (IsRiakSet a, MonadIO m)
+  :: forall a m.
+     (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just ('RiakSetTy a)) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (Set a))
 getRiakSet =
-  getCrdt
+  getCrdt (proxy# @_ @('RiakSetTy a))
 
 
 -------------------------------------------------------------------------------
@@ -925,7 +940,7 @@ getRiakSet =
 updateRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakKey ('Just ('RiakSetTy a)) -- ^ Bucket type, bucket, and key
+  -> RiakKey -- ^ Bucket type, bucket, and key
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
   -> m (Either RiakError (Set a))
@@ -936,10 +951,10 @@ updateRiakSet h (RiakKey bucket key) op params =
 updateNewRiakSet
   :: (IsRiakSet a, MonadIO m)
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket ('Just ('RiakSetTy a)) -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> RiakSetOp a -- ^ Set operation
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RiakError (RiakKey ('Just ('RiakSetTy a))))
+  -> m (Either RiakError RiakKey)
 updateNewRiakSet h bucket op params =
   (fmap.fmap) fst (_updateSet h bucket Nothing op params)
 
@@ -948,11 +963,11 @@ _updateSet
   :: forall a m.
      (IsRiakSet a, MonadIO m)
   => RiakHandle
-  -> RiakBucket ('Just ('RiakSetTy a))
+  -> RiakBucket
   -> Maybe ByteString
   -> RiakSetOp a
   -> UpdateRiakCrdtParams
-  -> m (Either RiakError (RiakKey ('Just ('RiakSetTy a)), Set a))
+  -> m (Either RiakError (RiakKey, (Set a)))
 _updateSet
     h@(RiakHandle _ cache) namespace key (unSetOp -> (adds, removes))
     params = liftIO . runExceptT $ do
@@ -984,7 +999,7 @@ _updateSet
 
       Just key' ->
         let
-          loc :: RiakKey ('Just ('RiakSetTy a))
+          loc :: RiakKey
           loc =
             RiakKey namespace key'
         in do
@@ -1000,7 +1015,7 @@ _updateSet
               case context of
                 -- (3b)
                 Nothing -> do
-                  _ <- ExceptT (getRiakSet h loc def)
+                  _ <- ExceptT (getRiakSet @a h loc def)
                   lift (riakCacheLookup cache loc)
 
                 -- (3a)
@@ -1010,7 +1025,7 @@ _updateSet
   (loc, response) <-
     ExceptT (updateCrdt h namespace key context op params)
 
-  case parseDtUpdateResp loc response of
+  case parseDtUpdateResp (proxy# @_ @('RiakSetTy a)) loc response of
     Left err ->
       throwIO err
 
@@ -1041,12 +1056,13 @@ _updateSet
 getCrdt
   :: forall m ty.
      (IsRiakCrdt ty, MonadIO m)
-  => RiakHandle
-  -> RiakKey ('Just ty)
+  => Proxy# ty
+  -> RiakHandle
+  -> RiakKey
   -> GetRiakCrdtParams
   -> m (Either RiakError (CrdtVal ty))
 getCrdt
-    h@(RiakHandle manager _) loc@(RiakKey (RiakBucket type' bucket) key)
+    p h@(RiakHandle manager _) loc@(RiakKey (RiakBucket type' bucket) key)
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
 
@@ -1055,7 +1071,7 @@ getCrdt
       (withRiakConnection manager
         (\conn -> getRiakCrdtPB conn request))
 
-  case parseDtFetchResp loc response of
+  case parseDtFetchResp p loc response of
     Left err ->
       throwIO err
 
@@ -1101,12 +1117,12 @@ getCrdt
 updateCrdt
   :: MonadIO m
   => RiakHandle
-  -> RiakBucket ('Just ty)
+  -> RiakBucket
   -> Maybe ByteString
   -> Maybe RiakVclock
   -> DtOp
   -> UpdateRiakCrdtParams
-  -> m (Either RiakError (RiakKey ('Just ty), DtUpdateResp))
+  -> m (Either RiakError (RiakKey, DtUpdateResp))
 updateCrdt
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) key context op
     (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
@@ -1160,7 +1176,7 @@ updateCrdt
 getRiakBucketTypeProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakBucketType ty -- ^ Bucket type
+  -> RiakBucketType -- ^ Bucket type
   -> m (Either RiakError RpbBucketProps)
 getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO . runExceptT $ do
   response :: RpbGetBucketResp <-
@@ -1186,7 +1202,7 @@ getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO . runExceptT $ do
 setRiakBucketTypeProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakBucketType ty -- ^ Bucket type
+  -> RiakBucketType -- ^ Bucket type
   -> RpbBucketProps -- ^
   -> m (Either RiakError ())
 setRiakBucketTypeProps (RiakHandle manager _) type' props =
@@ -1211,7 +1227,7 @@ setRiakBucketTypeProps (RiakHandle manager _) type' props =
 getRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> RiakBucket ty -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> m (Either RiakError RpbBucketProps)
 getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO . runExceptT $ do
   response :: RpbGetBucketResp <-
@@ -1272,10 +1288,10 @@ resetRiakBucketProps (RiakHandle manager _) req = liftIO $
 --
 -- TODO streamRiakBuckets param timeout
 streamRiakBuckets
-  :: forall r ty.
+  :: forall r.
      RiakHandle -- ^ Riak handle
-  -> RiakBucketType ty -- ^ Bucket type
-  -> FoldM IO (RiakBucket ty) r
+  -> RiakBucketType -- ^ Bucket type
+  -> FoldM IO RiakBucket r
   -> IO (Either RiakError r)
 streamRiakBuckets (RiakHandle manager _) type' fold =
   withRiakConnection manager $ \conn -> do
@@ -1306,8 +1322,8 @@ streamRiakBuckets (RiakHandle manager _) type' fold =
 -- TODO streamRiakKeys param timeout
 streamRiakKeys
   :: RiakHandle -- ^ Riak handle
-  -> RiakBucket ty -- ^ Bucket type and bucket
-  -> FoldM IO (RiakKey ty) r -- ^
+  -> RiakBucket -- ^ Bucket type and bucket
+  -> FoldM IO RiakKey r -- ^ Key fold
   -> IO (Either RiakError r)
 streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
   withRiakConnection manager $ \conn -> do
@@ -1341,7 +1357,7 @@ streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
 
 riakMapReduceBucket
   :: RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
   -> IO (Either RiakError r)
@@ -1350,7 +1366,7 @@ riakMapReduceBucket h bucket =
 
 riakMapReduceKeys
   :: RiakHandle -- ^ Riak handle
-  -> [RiakKey 'Nothing] -- ^ Bucket types, buckets, and keys
+  -> [RiakKey] -- ^ Bucket types, buckets, and keys
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
   -> IO (Either RiakError r)
@@ -1369,7 +1385,7 @@ riakMapReduceFunction h m f =
 
 riakMapReduceExactQuery
   :: RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket.
+  -> RiakBucket -- ^ Bucket type and bucket.
   -> RiakExactQuery -- ^ Exact query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
@@ -1379,7 +1395,7 @@ riakMapReduceExactQuery h bucket query =
 
 riakMapReduceRangeQuery
   :: RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket.
+  -> RiakBucket -- ^ Bucket type and bucket.
   -> RiakRangeQuery a -- ^ Range query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
@@ -1414,9 +1430,9 @@ _riakMapReduce (RiakHandle manager _) inputs query k =
 -- | Perform an exact query on a secondary index.
 riakExactQuery
   :: RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> RiakExactQuery -- ^ Exact query
-  -> FoldM IO (RiakKey 'Nothing) r -- ^ Key fold
+  -> FoldM IO RiakKey r -- ^ Key fold
   -> IO (Either RiakError r)
 riakExactQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
@@ -1467,9 +1483,9 @@ riakExactQuery
 -- | Perform a range query on a secondary index.
 riakRangeQuery
   :: RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> RiakRangeQuery a -- ^ Range query
-  -> FoldM IO (RiakKey 'Nothing) r -- ^ Key fold
+  -> FoldM IO RiakKey r -- ^ Key fold
   -> IO (Either RiakError r)
 riakRangeQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
@@ -1526,9 +1542,9 @@ riakRangeQuery
 riakRangeQueryTerms
   :: forall a r.
      RiakHandle -- ^ Riak handle
-  -> RiakBucket 'Nothing -- ^ Bucket type and bucket
+  -> RiakBucket -- ^ Bucket type and bucket
   -> RiakRangeQuery a -- ^ Range query
-  -> FoldM IO (RiakKey 'Nothing, a) r -- ^ Key+value fold
+  -> FoldM IO (RiakKey, a) r -- ^ Key+value fold
   -> IO (Either RiakError r)
 riakRangeQueryTerms
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
@@ -1580,7 +1596,7 @@ riakRangeQueryTerms
       RiakRangeQueryBin _ _ n -> n
       RiakRangeQueryInt _ _ n -> int2bs n
 
-  parse :: RpbPair -> (RiakKey 'Nothing, a)
+  parse :: RpbPair -> (RiakKey, a)
   parse = \case
     RpbPair val (Just key) _ ->
       (RiakKey namespace key, parse1 val)
@@ -1790,7 +1806,7 @@ getRiakServerInfo (RiakHandle manager _) = liftIO $
 cacheVclock
   :: MonadIO m
   => RiakHandle
-  -> RiakKey ty
+  -> RiakKey
   -> Maybe RiakVclock
   -> m ()
 cacheVclock (RiakHandle _ cache) loc =
@@ -1822,7 +1838,7 @@ parseContent
   :: forall a head.
      IsRiakObject a
   => Proxy# a
-  -> RiakKey 'Nothing
+  -> RiakKey
   -> SBool head
   -> RpbContent
   -> IO (RiakObject (If head () a))
@@ -1869,14 +1885,14 @@ parseContent _ loc head
 parseContent'
   :: forall a.
      IsRiakObject a
-  => RiakKey 'Nothing
+  => RiakKey
   -> RpbContent
   -> IO (RiakObject a)
 parseContent' =
   _parseContent decodeRiakObject
 
 parseContentHead
-  :: RiakKey 'Nothing
+  :: RiakKey
   -> RpbContent
   -> IO (RiakObject ())
 parseContentHead =
@@ -1891,7 +1907,7 @@ _parseContent
      -> ByteString
      -> Either SomeException a
      )
-  -> RiakKey 'Nothing
+  -> RiakKey
   -> RpbContent
   -> IO (RiakObject a)
 _parseContent parse loc
@@ -1980,36 +1996,7 @@ unSetOp (RiakSetOp (adds, removes)) =
 
 -- $documentation
 --
--- = Bucket types
---
--- 'RiakBucketType's carry a type-level tag that indicates what kind of data is
--- stored within:
---
--- +----------------------------+-----------------+
--- | @Nothing@                  | Opaque objects. |
--- +----------------------------+-----------------+
--- | @Just 'RiakCounterTy'@     | Counters.       |
--- +----------------------------+-----------------+
--- | @Just 'RiakGrowOnlySetTy'@ | Grow-only sets. |
--- +----------------------------+-----------------+
--- | @Just 'RiakHyperLogLogTy'@ | HyperLogLogs.   |
--- +----------------------------+-----------------+
--- | @Just 'RiakMapTy'@         | Maps.           |
--- +----------------------------+-----------------+
--- | @Just 'RiakSetTy'@         | Sets.           |
--- +----------------------------+-----------------+
---
--- You should know ahead of time what kind of data corresponds to each bucket
--- type, and may define these bucket types as top-level definitions.
---
--- For example,
---
--- @
--- countersBucketType :: 'RiakBucketType' ''CounterTy'
--- countersBucketType = 'RiakBucketType' "counters"
--- @
---
--- = Content
+-- = Objects
 --
 -- TODO write this
 --

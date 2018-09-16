@@ -17,5 +17,5 @@ _lock =
 -- TODO: add cabal flag to control debugging
 debug :: MonadIO m => String -> m ()
 debug _msg =
-  liftIO (withMVar _lock (\_ -> hPutStrLn stderr _msg))
-  -- pure ()
+  -- liftIO (withMVar _lock (\_ -> hPutStrLn stderr _msg))
+  pure ()

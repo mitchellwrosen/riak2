@@ -22,11 +22,11 @@ import Erlang
 
 data RiakMapReduceInputs where
   RiakMapReduceInputsBucket
-    :: !(RiakBucket 'Nothing)
+    :: !RiakBucket
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsKeys
-    :: ![RiakKey 'Nothing]
+    :: ![RiakKey]
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsFunction
@@ -35,12 +35,12 @@ data RiakMapReduceInputs where
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsExactQuery
-    :: !(RiakBucket 'Nothing)
+    :: !RiakBucket
     -> !RiakExactQuery
     -> RiakMapReduceInputs
 
   RiakMapReduceInputsRangeQuery
-    :: !(RiakBucket 'Nothing)
+    :: !RiakBucket
     -> !(RiakRangeQuery a)
     -> RiakMapReduceInputs
 
@@ -129,7 +129,7 @@ riakMapReduceInputsTerm = \case
   -- [{{{T,B},K},_KeyData}]
   RiakMapReduceInputsKeys keys ->
     let
-      toTerm :: RiakKey 'Nothing -> ErlTerm
+      toTerm :: RiakKey -> ErlTerm
       toTerm (RiakKey (RiakBucket (RiakBucketType type') bucket) key) =
         erlTuple2
           (erlTuple2

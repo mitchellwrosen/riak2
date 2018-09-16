@@ -225,10 +225,12 @@ newline: native
 #
 # No language extensions are enabled by default.
 language_extensions:
+  - ConstraintKinds
   - DataKinds
   - DefaultSignatures
   - DeriveAnyClass
   - DeriveFunctor
+  - DeriveGeneric
   - DerivingStrategies
   - ExistentialQuantification
   - FlexibleContexts
@@ -251,4 +253,5 @@ language_extensions:
   - TypeApplications
   - TypeFamilies
   - TypeOperators
+  - UnicodeSyntax
   - ViewPatterns
