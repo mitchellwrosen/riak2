@@ -105,14 +105,6 @@ pattern DefaultRiakBucketType =
   RiakBucketType "default"
 
 
-data RiakTy
-  = RiakCounterTy
-  | RiakGrowOnlySetTy -- TODO better GrowOnlySetTy
-  | RiakHyperLogLogTy
-  | forall a. RiakMapTy a
-  | forall a. RiakSetTy a
-
-
 -- | Riak returned some error.
 --
 -- http://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/#error-response
@@ -166,13 +158,6 @@ newtype RiakMetadata
   deriving (Eq, Show)
 
 
--- TODO make RiakMapParseError a sub-exception of RiakParseError
-data RiakParseError
-  = RiakParseError !RiakKey !Text
-  deriving stock (Show)
-  deriving anyclass (Exception)
-
-
 -- | How many vnodes must respond before an operation is considered successful.
 -- May be a number @<= N@, 'RiakQuorumQuorum', or 'RiakQuorumAll'.
 newtype RiakQuorum
@@ -205,6 +190,14 @@ data RiakRangeQuery :: Type -> Type where
     -> !Int64
     -> !Int64
     -> RiakRangeQuery Int64
+
+
+data RiakTy
+  = RiakCounterTy
+  | RiakGrowOnlySetTy -- TODO better GrowOnlySetTy
+  | RiakHyperLogLogTy
+  | forall a. RiakMapTy a
+  | forall a. RiakSetTy a
 
 
 newtype RiakVclock

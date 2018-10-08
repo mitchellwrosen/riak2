@@ -61,7 +61,7 @@ instance Functor f => HasLens' f (RiakObject a)                "ttl"            
 -- object /should/ have a content type, /may/ have a character set and /may/
 -- have an encoding.
 --
--- For convenience, instances are provided by this library, to store binary,
+-- For convenience, instances are provided by this library to store binary,
 -- textual, and JSON data.
 --
 -- +-----------------------------+----------------------------+------------------------------+------------------------------+
@@ -264,17 +264,20 @@ instance (FromJSON a, ToJSON a) => IsRiakObject (JsonRiakObject a) where
         error (show x)
 
 
+-- | Riak object charset.
 newtype Charset
   = Charset { unCharset :: ByteString }
   deriving (Eq, Show)
 
 
--- TODO ContentEncodingGzip
+-- | Riak object content encoding.
 newtype ContentEncoding
   = ContentEncoding { unContentEncoding :: ByteString }
   deriving (Eq, Show)
+-- TODO ContentEncodingGzip
 
 
+-- | Riak object content type.
 newtype ContentType
   = ContentType { unContentType :: ByteString }
   deriving stock (Eq, Show)

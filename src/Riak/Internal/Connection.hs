@@ -1,8 +1,11 @@
+{-# LANGUAGE AllowAmbiguousTypes #-}
+
 module Riak.Internal.Connection
   ( RiakConnection(..)
   , riakConnect
   , riakDisconnect
   , riakExchange
+  , riakExchange_
   , riakStream
   ) where
 
@@ -113,7 +116,25 @@ riakExchange
   => RiakConnection
   -> a
   -> IO (Either RiakError b)
-riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
+riakExchange conn request = do
+  join . fmap sequenceA . parseResponse =<< riakExchange__ conn request
+
+riakExchange_
+  :: forall b a.
+     (Request a, Response b)
+  => RiakConnection
+  -> a
+  -> IO (Either RiakError ())
+riakExchange_ conn request = do
+  fmap (() <$) . parseResponse @b =<< riakExchange__ conn request
+
+riakExchange__
+  :: forall a.
+     Request a
+  => RiakConnection
+  -> a
+  -> IO Message
+riakExchange__ conn@(RiakConnection _ sem recvQueue _ exVar) request = do
   -- debug "[riak] send"
   debug ("[riak] send: " ++ show request)
 
@@ -130,16 +151,7 @@ riakExchange conn@(RiakConnection _ sem recvQueue _ exVar) request = do
 
     atomically (writeTQueue recvQueue consumer)
 
-  let
-    recv :: IO (Either RiakError b)
-    recv = do
-      result :: Either RiakError b <-
-        parseResponse =<< takeMVar resultVar
-      -- debug "[riak] recv"
-      debug ("[riak] recv: " ++ either show show result)
-      pure result
-
-  recv `catch`
+  takeMVar resultVar `catch`
     \BlockedIndefinitelyOnMVar -> atomically (readTMVar exVar) >>= throwIO
 
 riakStream
@@ -179,7 +191,7 @@ riakStream
       consumer =
         Streaming.wrap $ \message -> do
           response :: Either RiakError b <-
-            lift (parseResponse message)
+            lift ((join . fmap sequenceA . parseResponse) message)
           -- debug "[riak] recv"
           -- debug ("[riak] recv: " ++ either show show response)
 

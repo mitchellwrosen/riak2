@@ -95,15 +95,12 @@ module Riak
   , Charset(..)
   , ContentEncoding(..)
   , ContentType(..)
-  , GetRiakCrdtParams
-  , GetRiakObjectParams
   , IsRiakMap(..)
   , IsRiakObject(..)
   , IsRiakRegister(..)
   , IsRiakSet
   , JsonRiakObject(..)
   , Modified(..)
-  , PutRiakObjectParams
   , RiakBucket(..)
   , pattern DefaultRiakBucket
   , RiakBucketType(..)
@@ -126,7 +123,6 @@ module Riak
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
   , RiakRangeQuery(..)
-  , RiakSearchParams
   , RiakSetOp
   , RiakVtag(..)
   , RpbMapRedResp(..)
@@ -135,6 +131,11 @@ module Riak
   , SolrSchemaName(..)
   , pattern DefaultSolrSchemaName
   , TTL(..)
+    -- * Optional parameters
+  , GetRiakCrdtParams
+  , GetRiakObjectParams
+  , PutRiakObjectParams
+  , RiakSearchParams
   , UpdateRiakCrdtParams
     -- * Re-exports
   , def
@@ -181,7 +182,8 @@ import           Riak.Internal.Utils     (bs2int, int2bs)
 -- Handle
 --------------------------------------------------------------------------------
 
--- | Create a handle to Riak. When the handle is garbage collected, all outstanding sockets (if any) are closed.
+-- | Create a handle to Riak. When the handle is garbage collected, all
+-- outstanding sockets (if any) are closed.
 --
 -- The following default settings are used, which can be overridden by using
 -- functionality exposed in the "Riak.Internal" module:
@@ -221,26 +223,28 @@ createRiakHandle host port = liftIO $ do
 --
 -- === __Examples__
 --
--- Get a 'Text' object at bucket type @"t"@, bucket @"b"@, key @"k"@. Note that
--- the type application @\@Text@ is only necessary when type inference fails.
+-- * Get a 'Text' object at bucket type @"t"@, bucket @"b"@, key @"k"@.
 --
--- TODO fix this example
+--     @
+--     do
+--       let
+--         t = 'RiakBucketType' "t"
+--         b = 'RiakBucket' t "b"
+--         k = 'RiakKey' b "k"
 --
--- @
--- do
---   result <-
---     'getRiakObject' @'Text' h ('RiakKey' "t" "b" "k") 'def'
+--       result :: 'Text' <-
+--         'getRiakObject' h k 'def'
 --
---   case result of
---     'Left' err ->
---       {- Some Riak error -}
+--       case result of
+--         'Left' err ->
+--           {- Some Riak error -}
 --
---     'Right' 'Nothing' ->
---       {- The object does not exist -}
+--         'Right' 'Nothing' ->
+--           {- The object does not exist -}
 --
---     'Right' object ->
---       {- The object does exist -}
--- @
+--         'Right' object ->
+--           {- The object does exist -}
+--     @
 getRiakObject
   :: ∀ a m.
      (IsRiakObject a, MonadIO m)
@@ -1291,7 +1295,7 @@ streamRiakBuckets
   :: forall r.
      RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
-  -> FoldM IO RiakBucket r
+  -> FoldM IO RiakBucket r -- ^ Bucket fold
   -> IO (Either RiakError r)
 streamRiakBuckets (RiakHandle manager _) type' fold =
   withRiakConnection manager $ \conn -> do

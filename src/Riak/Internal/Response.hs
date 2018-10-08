@@ -89,10 +89,10 @@ instance Response RpbSetBucketTypeResp where
   responseCode = 32
   responseDecode _ = pure RpbSetBucketTypeResp
 
-parseResponse :: forall a. Response a => Message -> IO (Either RiakError a)
+parseResponse :: forall a. Response a => Message -> IO (Either RiakError (IO a))
 parseResponse (Message actual bytes)
   | actual == expected =
-      Right <$> decodeResponse actual bytes
+      pure (Right (decodeResponse actual bytes))
 
   | actual == 0 =
       Left . toRiakError <$> decodeResponse actual bytes
@@ -111,7 +111,6 @@ parseResponse (Message actual bytes)
   toRiakError :: RpbErrorResp -> RiakError
   toRiakError (RpbErrorResp msg _code _) =
     RiakError (decodeUtf8 msg)
-
 
 decodeResponse :: Response a => Word8 -> ByteString -> IO a
 decodeResponse code bytes =

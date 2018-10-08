@@ -35,6 +35,7 @@ module Riak.Internal
   , putRiakIndexPB
   , PutRiakObjectParams(..)
   , putRiakObjectPB
+  , putRiakObjectPB_
   , putRiakSchemaPB
   , resetRiakBucketPropsPB
   , riakIndexPB
@@ -343,6 +344,13 @@ putRiakObjectPB
   -> IO (Either RiakError RpbPutResp)
 putRiakObjectPB =
   riakExchange
+
+putRiakObjectPB_
+  :: RiakConnection -- ^
+  -> RpbPutReq -- ^
+  -> IO (Either RiakError ())
+putRiakObjectPB_ =
+  riakExchange_ @RpbPutResp
 
 putRiakSchemaPB
   :: RiakConnection -- ^
