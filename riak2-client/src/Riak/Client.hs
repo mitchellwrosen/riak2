@@ -71,7 +71,7 @@ socketStream ::
 socketStream socket =
   fix $ \loop -> do
     bytes :: ByteString <-
-      liftIO (Socket.recv socket 4096)
+      liftIO (Socket.recv socket 16384)
 
     unless (ByteString.null bytes) $ do
       Q.chunk bytes
