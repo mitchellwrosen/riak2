@@ -16,14 +16,17 @@ library
     , data-default-class ^>= 0.1.2
     , dlist ^>= 0.8.0
     , foldl ^>= 1.4.4
+    , generic-lens ^>= 1.1.0
     , ghc-prim ^>= 0.5.2
     , hashable ^>= 1.2.7
+    , lens ^>= 4.17
     , lens-family ^>= 1.2.2
     , lens-labels ^>= 0.3.0
     , network ^>= 2.7.0
     , primitive ^>= 0.6.4
     , profunctors ^>= 5.3
     , proto-lens ^>= 0.4.0
+    , riak2-client
     , riak2-proto
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
@@ -78,7 +81,6 @@ library
     Erlang
     Riak
     Riak.Internal
-    Riak.Lenses
 
   ghc-options:
     -Weverything
@@ -102,13 +104,13 @@ library
     Riak.Internal.Debug
     Riak.Internal.Manager
     Riak.Internal.MapReduce
-    Riak.Internal.Message
+    -- Riak.Internal.Message
     Riak.Internal.Object
     Riak.Internal.Panic
     Riak.Internal.Params
     Riak.Internal.Prelude
-    Riak.Internal.Request
-    Riak.Internal.Response
+    -- Riak.Internal.Request
+    -- Riak.Internal.Response
     Riak.Internal.Types
     Riak.Internal.Utils
 

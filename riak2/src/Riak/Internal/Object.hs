@@ -12,8 +12,6 @@ module Riak.Internal.Object
 import Data.Aeson             (FromJSON, ToJSON)
 import Data.Bifunctor         (first)
 import Data.Time
-import Lens.Family2.Unchecked (lens)
-import Lens.Labels
 
 import qualified Data.Aeson           as Aeson
 import qualified Data.ByteString.Lazy as LazyByteString

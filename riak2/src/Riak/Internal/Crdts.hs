@@ -20,16 +20,18 @@ module Riak.Internal.Crdts
   , riakSetRemoveOp
   ) where
 
+import Riak.Internal.Prelude
+import Riak.Internal.Types
+import Riak.Proto
+
 import Data.Bifunctor     (first)
 import Data.DList         (DList)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set            as Set
+import qualified Lens.Labels         as L
 
-import Proto.Riak
-import Riak.Internal.Prelude
-import Riak.Internal.Types
 
 -- TODO CRDTs: Set -> HashSet
 
@@ -81,9 +83,9 @@ instance IsRiakCrdt 'RiakCounterTy where
     -> DtFetchResp
     -> Either SomeException (Maybe Int64)
   parseDtFetchResp _ key resp =
-    case resp ^. #type' of
+    case resp L.^. #type' of
       DtFetchResp'COUNTER ->
-        Right (view #counterValue <$> resp ^. #maybe'value)
+        Right (L.view #counterValue <$> resp L.^. #maybe'value)
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -97,7 +99,7 @@ instance IsRiakCrdt 'RiakCounterTy where
     -> DtUpdateResp
     -> Either SomeException Int64
   parseDtUpdateResp _ _ resp =
-    Right (resp ^. #counterValue)
+    Right (resp L.^. #counterValue)
 
 
 --------------------------------------------------------------------------------
@@ -113,9 +115,9 @@ instance IsRiakCrdt 'RiakGrowOnlySetTy where
     -> DtFetchResp
     -> Either SomeException (Maybe (Set ByteString))
   parseDtFetchResp _ key resp =
-    case resp ^. #type' of
+    case resp L.^. #type' of
       DtFetchResp'GSET ->
-        Right (Set.fromList . view #gsetValue <$> resp ^. #maybe'value)
+        Right (Set.fromList . L.view #gsetValue <$> resp L.^. #maybe'value)
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -127,7 +129,7 @@ instance IsRiakCrdt 'RiakGrowOnlySetTy where
     -> DtUpdateResp
     -> Either SomeException (Set ByteString)
   parseDtUpdateResp _ _ resp =
-    Right (Set.fromList (resp ^. #gsetValue))
+    Right (Set.fromList (resp L.^. #gsetValue))
 
 
 --------------------------------------------------------------------------------
@@ -143,9 +145,9 @@ instance IsRiakCrdt 'RiakHyperLogLogTy where
     -> DtFetchResp
     -> Either SomeException (Maybe Word64)
   parseDtFetchResp _ key resp =
-    case resp ^. #type' of
+    case resp L.^. #type' of
       DtFetchResp'HLL ->
-        Right (view #hllValue <$> resp ^. #maybe'value)
+        Right (L.view #hllValue <$> resp L.^. #maybe'value)
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -157,7 +159,7 @@ instance IsRiakCrdt 'RiakHyperLogLogTy where
     -> DtUpdateResp
     -> Either SomeException Word64
   parseDtUpdateResp _ _ resp =
-    Right (resp ^. #hllValue)
+    Right (resp L.^. #hllValue)
 
 
 --------------------------------------------------------------------------------
@@ -173,9 +175,9 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
     -> DtFetchResp
     -> Either SomeException (Maybe a)
   parseDtFetchResp _ key resp =
-    case resp ^. #type' of
+    case resp L.^. #type' of
       DtFetchResp'MAP ->
-        case resp ^. #maybe'value of
+        case resp L.^. #maybe'value of
           Nothing ->
             Right Nothing
 
@@ -183,7 +185,7 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
             bimap toException Just
               (runFieldParser
                 decodeRiakMap
-                (parseMapEntries (value ^. #mapValue)))
+                (parseMapEntries (value L.^. #mapValue)))
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -198,19 +200,19 @@ instance IsRiakMap a => IsRiakCrdt ('RiakMapTy a) where
     first toException
       (runFieldParser
         decodeRiakMap
-        (parseMapEntries (resp ^. #mapValue)))
+        (parseMapEntries (resp L.^. #mapValue)))
 
 parseMapEntries :: [MapEntry] -> RiakMapEntries
 parseMapEntries =
   foldMap $ \entry ->
     let
       k =
-        entry ^. #field . #name
+        entry L.^. #field . #name
     in
-      case entry ^. #field . #type' of
+      case entry L.^. #field . #type' of
         MapField'COUNTER ->
           RiakMapEntries
-            (HashMap.singleton k (entry ^. #counterValue))
+            (HashMap.singleton k (entry L.^. #counterValue))
             mempty
             mempty
             mempty
@@ -219,7 +221,7 @@ parseMapEntries =
         MapField'FLAG ->
           RiakMapEntries
             mempty
-            (HashMap.singleton k (entry ^. #flagValue))
+            (HashMap.singleton k (entry L.^. #flagValue))
             mempty
             mempty
             mempty
@@ -228,7 +230,7 @@ parseMapEntries =
           RiakMapEntries
             mempty
             mempty
-            (HashMap.singleton k (parseMapEntries (entry ^. #mapValue)))
+            (HashMap.singleton k (parseMapEntries (entry L.^. #mapValue)))
             mempty
             mempty
 
@@ -237,7 +239,7 @@ parseMapEntries =
             mempty
             mempty
             mempty
-            (HashMap.singleton k (entry ^. #registerValue))
+            (HashMap.singleton k (entry L.^. #registerValue))
             mempty
 
         MapField'SET ->
@@ -246,7 +248,7 @@ parseMapEntries =
             mempty
             mempty
             mempty
-            (HashMap.singleton k (Set.fromList (entry ^. #setValue)))
+            (HashMap.singleton k (Set.fromList (entry L.^. #setValue)))
 
 
 data RiakMapEntries
@@ -425,15 +427,15 @@ instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
     -> DtFetchResp
     -> Either SomeException (Maybe (Set a))
   parseDtFetchResp _ key resp =
-    case resp ^. #type' of
+    case resp L.^. #type' of
       DtFetchResp'SET ->
-        case resp ^. #maybe'value of
+        case resp L.^. #maybe'value of
           Nothing ->
             Right Nothing
 
           Just value ->
             Just . Set.fromList <$>
-              for (value ^. #setValue) decodeRiakRegister
+              for (value L.^. #setValue) decodeRiakRegister
 
       x ->
         (Left . toException . RiakCrdtError key)
@@ -445,7 +447,7 @@ instance IsRiakSet a => IsRiakCrdt ('RiakSetTy a) where
     -> DtUpdateResp
     -> Either SomeException (Set a)
   parseDtUpdateResp _ _ resp =
-    Set.fromList <$> for (resp ^. #setValue) decodeRiakRegister
+    Set.fromList <$> for (resp L.^. #setValue) decodeRiakRegister
 
 
 newtype RiakSetOp a

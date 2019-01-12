@@ -13,8 +13,8 @@ import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
 import qualified Data.Text              as Text
 
-import Proto.Riak
 import Riak.Internal.Prelude
+import Riak.Proto
 
 
 data Modified a
@@ -169,10 +169,10 @@ instance Default RiakQuorum where
   def = RiakQuorumDefault
 
 instance Show RiakQuorum where
-  show RiakQuorumAll = "all"
+  show RiakQuorumAll     = "all"
   show RiakQuorumDefault = "default"
-  show RiakQuorumQuorum = "quorum"
-  show (RiakQuorum n) = show n
+  show RiakQuorumQuorum  = "quorum"
+  show (RiakQuorum n)    = show n
 
 -- | All vnodes must respond.
 pattern RiakQuorumAll :: RiakQuorum

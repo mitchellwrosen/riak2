@@ -6,6 +6,7 @@ import Control.Applicative        as X
 import Control.Category           as X
 import Control.Concurrent         as X
 import Control.Concurrent.STM     as X
+import Control.Lens               as X ((^.))
 import Control.Monad              as X hiding (return)
 import Control.Monad.IO.Unlift    as X
 import Control.Monad.Trans.Class  as X
@@ -34,8 +35,7 @@ import Data.Void                  as X
 import Data.Word                  as X
 import GHC.Exts                   as X (IsString)
 import GHC.Generics               as X (Generic)
-import GHC.Prim                   as X (Proxy#)
-import Lens.Labels                as X (view, (.~), (^.))
+import GHC.Prim                   as X (Proxy#, proxy#)
 import Prelude                    as X hiding (head, id, return, (.))
 import Text.Read                  as X (readMaybe)
 import UnliftIO.Exception         as X (Exception, SomeException, bracket,

@@ -10,14 +10,15 @@ module Riak.Internal.MapReduce
   , riakMapReduceRequest
   ) where
 
-import qualified Data.ByteString.Char8 as Latin1
-import qualified Data.Vector           as Vector
-
-import Proto.Riak            (RpbMapRedReq)
-import Riak.Internal.Prelude
-import Riak.Internal.Types
 
 import Erlang
+import Riak.Internal.Prelude
+import Riak.Internal.Types
+import Riak.Proto            (RpbMapRedReq)
+
+import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.Vector           as Vector
+import qualified Lens.Labels           as L
 
 
 data RiakMapReduceInputs where
@@ -93,8 +94,8 @@ riakMapReduceRequest
   -> RpbMapRedReq
 riakMapReduceRequest inputs phases =
   defMessage
-    & #contentType .~ "application/x-erlang-binary"
-    & #request .~ buildErlTerm term
+    & #contentType L..~ "application/x-erlang-binary"
+    & #request L..~ buildErlTerm term
  where
   -- [{inputs, Inputs}, {query, Query}, {timeout, Timeout}]
   -- timeout is optional

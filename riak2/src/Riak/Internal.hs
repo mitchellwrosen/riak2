@@ -11,11 +11,11 @@ module Riak.Internal
   , riakDisconnect
   , riakExchange
   , riakStream
-  , Message(..)
-  , Request(..)
-  , requestToMessage
-  , Response(..)
-  , parseResponse
+  -- , Message(..)
+  -- , Request(..)
+  -- , requestToMessage
+  -- , Response(..)
+  -- , parseResponse
     -- * Cache
   , RiakCache(..)
   , newSTMRiakCache
@@ -229,23 +229,20 @@ module Riak.Internal
   ) where
 
 import Control.Foldl (FoldM)
-import Lens.Labels (view)
+import Lens.Labels   (view)
 
 import qualified Control.Foldl as Foldl
 
-import Proto.Riak
 import Riak.Internal.Cache
 import Riak.Internal.Connection
 import Riak.Internal.Crdts
 import Riak.Internal.Manager
 import Riak.Internal.MapReduce
-import Riak.Internal.Message
 import Riak.Internal.Object
 import Riak.Internal.Params
 import Riak.Internal.Prelude
-import Riak.Internal.Request
-import Riak.Internal.Response
 import Riak.Internal.Types
+import Riak.Proto
 
 
 --------------------------------------------------------------------------------
@@ -266,103 +263,103 @@ data RiakHandle
 deleteRiakIndexPB
   :: RiakConnection
   -> RpbYokozunaIndexDeleteReq -- ^
-  -> IO (Either RiakError RpbDelResp)
+  -> IO (Either RpbErrorResp RpbDelResp)
 deleteRiakIndexPB =
   riakExchange
 
 deleteRiakObjectPB
   :: RiakConnection -- ^
   -> RpbDelReq -- ^
-  -> IO (Either RiakError RpbDelResp)
+  -> IO (Either RpbErrorResp RpbDelResp)
 deleteRiakObjectPB =
   riakExchange
 
 getRiakBucketPropsPB
   :: RiakConnection -- ^
   -> RpbGetBucketReq -- ^
-  -> IO (Either RiakError RpbGetBucketResp)
+  -> IO (Either RpbErrorResp RpbGetBucketResp)
 getRiakBucketPropsPB =
   riakExchange
 
 getRiakBucketTypePropsPB
   :: RiakConnection -- ^
   -> RpbGetBucketTypeReq -- ^
-  -> IO (Either RiakError RpbGetBucketResp)
+  -> IO (Either RpbErrorResp RpbGetBucketResp)
 getRiakBucketTypePropsPB =
   riakExchange
 
 getRiakCrdtPB
   :: RiakConnection -- ^
   -> DtFetchReq -- ^
-  -> IO (Either RiakError DtFetchResp)
+  -> IO (Either RpbErrorResp DtFetchResp)
 getRiakCrdtPB
   = riakExchange
 
 getRiakIndexPB
   :: RiakConnection -- ^
   -> RpbYokozunaIndexGetReq -- ^
-  -> IO (Either RiakError RpbYokozunaIndexGetResp)
+  -> IO (Either RpbErrorResp RpbYokozunaIndexGetResp)
 getRiakIndexPB =
   riakExchange
 
 getRiakObjectPB
   :: RiakConnection -- ^
   -> RpbGetReq -- ^
-  -> IO (Either RiakError RpbGetResp)
+  -> IO (Either RpbErrorResp RpbGetResp)
 getRiakObjectPB =
   riakExchange
 
 getRiakSchemaPB
   :: RiakConnection -- ^
   -> RpbYokozunaSchemaGetReq -- ^
-  -> IO (Either RiakError RpbYokozunaSchemaGetResp)
+  -> IO (Either RpbErrorResp RpbYokozunaSchemaGetResp)
 getRiakSchemaPB =
   riakExchange
 
 getRiakServerInfoPB
   :: RiakConnection -- ^
-  -> IO (Either RiakError RpbGetServerInfoResp)
+  -> IO (Either RpbErrorResp RpbGetServerInfoResp)
 getRiakServerInfoPB conn =
   riakExchange conn RpbGetServerInfoReq
 
 pingRiakPB
   :: RiakConnection -- ^
-  -> IO (Either RiakError RpbPingResp)
+  -> IO (Either RpbErrorResp RpbPingResp)
 pingRiakPB conn =
   riakExchange conn RpbPingReq
 
 putRiakIndexPB
   :: RiakConnection -- ^
   -> RpbYokozunaIndexPutReq -- ^
-  -> IO (Either RiakError RpbEmptyPutResp)
+  -> IO (Either RpbErrorResp RpbEmptyPutResp)
 putRiakIndexPB =
   riakExchange
 
 putRiakObjectPB
   :: RiakConnection -- ^
   -> RpbPutReq -- ^
-  -> IO (Either RiakError RpbPutResp)
+  -> IO (Either RpbErrorResp RpbPutResp)
 putRiakObjectPB =
   riakExchange
 
 putRiakObjectPB_
   :: RiakConnection -- ^
   -> RpbPutReq -- ^
-  -> IO (Either RiakError ())
+  -> IO (Either RpbErrorResp ())
 putRiakObjectPB_ =
   riakExchange_ @RpbPutResp
 
 putRiakSchemaPB
   :: RiakConnection -- ^
   -> RpbYokozunaSchemaPutReq -- ^
-  -> IO (Either RiakError RpbEmptyPutResp)
+  -> IO (Either RpbErrorResp RpbEmptyPutResp)
 putRiakSchemaPB =
   riakExchange
 
 resetRiakBucketPropsPB
   :: RiakConnection -- ^
   -> RpbResetBucketReq -- ^
-  -> IO (Either RiakError RpbResetBucketResp)
+  -> IO (Either RpbErrorResp RpbResetBucketResp)
 resetRiakBucketPropsPB =
   riakExchange
 
@@ -370,7 +367,7 @@ riakIndexPB
   :: RiakConnection -- ^
   -> RpbIndexReq -- ^
   -> FoldM IO RpbIndexResp r -- ^
-  -> IO (Either RiakError r)
+  -> IO (Either RpbErrorResp r)
 riakIndexPB conn request =
   Foldl.impurely (riakStream conn (view #done) request)
 
@@ -378,28 +375,28 @@ riakMapReducePB
   :: RiakConnection -- ^
   -> RpbMapRedReq -- ^
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RiakError r)
+  -> IO (Either RpbErrorResp r)
 riakMapReducePB conn request =
   Foldl.impurely (riakStream conn (view #done) request)
 
 riakSearchPB
   :: RiakConnection -- ^
   -> RpbSearchQueryReq -- ^
-  -> IO (Either RiakError RpbSearchQueryResp)
+  -> IO (Either RpbErrorResp RpbSearchQueryResp)
 riakSearchPB =
   riakExchange
 
 setRiakBucketPropsPB
   :: RiakConnection -- ^
   -> RpbSetBucketReq -- ^
-  -> IO (Either RiakError RpbSetBucketResp)
+  -> IO (Either RpbErrorResp RpbSetBucketResp)
 setRiakBucketPropsPB =
   riakExchange
 
 setRiakBucketTypePropsPB
   :: RiakConnection -- ^
   -> RpbSetBucketTypeReq -- ^
-  -> IO (Either RiakError RpbSetBucketTypeResp)
+  -> IO (Either RpbErrorResp RpbSetBucketTypeResp)
 setRiakBucketTypePropsPB =
   riakExchange
 
@@ -407,7 +404,7 @@ streamRiakBucketsPB
   :: RiakConnection -- ^
   -> RpbListBucketsReq -- ^
   -> FoldM IO RpbListBucketsResp r -- ^
-  -> IO (Either RiakError r)
+  -> IO (Either RpbErrorResp r)
 streamRiakBucketsPB conn request =
   Foldl.impurely (riakStream conn (view #done) request)
 
@@ -415,7 +412,7 @@ streamRiakBuckets2PB
   :: RiakConnection -- ^
   -> RpbListBucketsReq -- ^
   -> FoldM IO RpbListBucketsResp r -- ^
-  -> IO (Either RiakError r)
+  -> IO (Either RpbErrorResp r)
 streamRiakBuckets2PB conn request =
   Foldl.impurely (riakStream conn (view #done) request)
 
@@ -423,13 +420,13 @@ streamRiakKeysPB
   :: RiakConnection -- ^
   -> RpbListKeysReq -- ^
   -> FoldM IO RpbListKeysResp r -- ^
-  -> IO (Either RiakError r)
+  -> IO (Either RpbErrorResp r)
 streamRiakKeysPB conn request =
   Foldl.impurely (riakStream conn (view #done) request)
 
 updateRiakCrdtPB
   :: RiakConnection -- ^
   -> DtUpdateReq -- ^
-  -> IO (Either RiakError DtUpdateResp)
+  -> IO (Either RpbErrorResp DtUpdateResp)
 updateRiakCrdtPB =
   riakExchange

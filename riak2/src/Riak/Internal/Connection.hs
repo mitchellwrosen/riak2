@@ -9,6 +9,19 @@ module Riak.Internal.Connection
   , riakStream
   ) where
 
+import Riak.Internal.Debug
+import Riak.Internal.Panic
+import Riak.Internal.Prelude
+import Riak.Internal.Types
+import Riak.Message          (Message)
+import Riak.Proto            (RpbErrorResp)
+import Riak.Request          (Request)
+import Riak.Response         (Response)
+
+import qualified Riak.Message  as Message
+import qualified Riak.Request  as Request
+import qualified Riak.Response as Response
+
 import Control.Exception (BlockedIndefinitelyOnMVar(..),
                           BlockedIndefinitelyOnSTM(..))
 import Network.Socket    (AddrInfo(..), HostName, PortNumber, Socket,
@@ -24,13 +37,6 @@ import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 import qualified Streaming                      as Streaming
 import qualified Streaming.Prelude              as Streaming
 
-import Riak.Internal.Debug
-import Riak.Internal.Message
-import Riak.Internal.Panic
-import Riak.Internal.Prelude
-import Riak.Internal.Request
-import Riak.Internal.Response
-import Riak.Internal.Types
 
 -- | A thread-safe connection to Riak.
 data RiakConnection
@@ -105,7 +111,7 @@ riakDisconnect (RiakConnection socket _ _ recvTid _) = do
 
 riakSend :: Request a => RiakConnection -> a -> IO ()
 riakSend (RiakConnection socket _ _ _ exVar) request =
-  Socket.sendAll socket (encodeMessage (requestToMessage request))
+  Socket.sendAll socket (Message.encode (Request.toMessage request))
     `catch` \e -> do
       void (atomically (tryPutTMVar exVar e))
       throwIO e
@@ -115,18 +121,18 @@ riakExchange
      (Request a, Response b)
   => RiakConnection
   -> a
-  -> IO (Either RiakError b)
+  -> IO (Either RpbErrorResp b)
 riakExchange conn request = do
-  join . fmap sequenceA . parseResponse =<< riakExchange__ conn request
+  join . fmap sequenceA . Response.parse =<< riakExchange__ conn request
 
 riakExchange_
   :: forall b a.
      (Request a, Response b)
   => RiakConnection
   -> a
-  -> IO (Either RiakError ())
+  -> IO (Either RpbErrorResp ())
 riakExchange_ conn request = do
-  fmap (() <$) . parseResponse @b =<< riakExchange__ conn request
+  fmap (() <$) . Response.parse @b =<< riakExchange__ conn request
 
 riakExchange__
   :: forall a.
@@ -163,14 +169,14 @@ riakStream
   -> (x -> b -> IO x) -- ^ Step
   -> IO x -- ^ Initial
   -> (x -> IO r) -- ^ Extract
-  -> IO (Either RiakError r)
+  -> IO (Either RpbErrorResp r)
 riakStream
     conn@(RiakConnection _ sem recvQueue _ exVar) done request step initial0
     extract = do
   -- debug "[riak] send"
   -- debug ("[riak] send: " ++ show request)
 
-  responseQueue :: TQueue (Either RiakError b) <-
+  responseQueue :: TQueue (Either RpbErrorResp b) <-
     newTQueueIO
 
   -- Streaming responses are special; when one is active, no other requests can
@@ -190,8 +196,8 @@ riakStream
       consumer :: Stream ((->) Message) IO ()
       consumer =
         Streaming.wrap $ \message -> do
-          response :: Either RiakError b <-
-            lift ((join . fmap sequenceA . parseResponse) message)
+          response :: Either RpbErrorResp b <-
+            lift ((join . fmap sequenceA . Response.parse) message)
           -- debug "[riak] recv"
           -- debug ("[riak] recv: " ++ either show show response)
 
@@ -203,7 +209,7 @@ riakStream
     atomically (writeTQueue recvQueue consumer)
 
     flip fix initial0 $ \loop initial -> do
-      response :: Either RiakError b <-
+      response :: Either RpbErrorResp b <-
         atomically (readTQueue responseQueue)
           `catch` \BlockedIndefinitelyOnSTM ->
             (atomically (readTMVar exVar) >>= throwIO)
@@ -229,7 +235,7 @@ socketStream socket =
 
 messageStream :: Q.ByteString IO a -> Stream (Of Message) IO a
 messageStream bytes0 =
-  lift (parseByteStream messageParser bytes0) >>= \case
+  lift (parseByteStream Message.parser bytes0) >>= \case
     EndOfInput x ->
       pure x
 

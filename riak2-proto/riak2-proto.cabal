@@ -19,11 +19,37 @@ library
     Proto.Riak_Fields
 
   build-depends:
-      proto-lens-runtime ^>= 0.4.0
+      attoparsec ^>= 0.13.2
+    , base
+    , bytestring
+    , proto-lens ^>= 0.4.0
+    , proto-lens-runtime ^>= 0.4.0
+
+  default-extensions:
+    DefaultSignatures
+    DeriveAnyClass
+    DerivingStrategies
+    GeneralizedNewtypeDeriving
+    OverloadedLabels
+    ScopedTypeVariables
+    TypeApplications
 
   default-language:
     Haskell2010
 
   exposed-modules:
+    Riak.Message
+    Riak.Proto
+    Riak.Proto.Lens
+    Riak.Request
+    Riak.Response
+
+  ghc-options:
+    -Wall
+
+  hs-source-dirs:
+    src
+
+  other-modules:
     Proto.Riak
     Proto.Riak_Fields

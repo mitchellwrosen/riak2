@@ -1,3 +1,4 @@
 packages:
-  riak2,
-  riak2-proto
+    riak2
+  , riak2-client
+  , riak2-proto
