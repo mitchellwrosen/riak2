@@ -6,11 +6,19 @@ build-type: Simple
 
 library
   build-depends:
-      base
+      attoparsec ^>= 0.13.2
+    , base
+    , bytestring ^>= 0.10.8
     , network ^>= 2.7.0
     , riak2-proto
+    , streaming
+    , streaming-bytestring ^>= 0.1.6
+    , transformers ^>= 0.5.5
 
   default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    LambdaCase
     ScopedTypeVariables
 
   default-language:
@@ -21,6 +29,7 @@ library
 
   ghc-options:
     -Wall
+    -fno-warn-name-shadowing
 
   hs-source-dirs:
     src

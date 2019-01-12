@@ -31,7 +31,6 @@ library
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
     , streaming
-    , streaming-bytestring ^>= 0.1.6
     , text ^>= 1.2.3
     , time
     , timer-wheel ^>= 0.1.0

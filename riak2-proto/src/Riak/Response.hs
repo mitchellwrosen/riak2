@@ -3,8 +3,6 @@ module Riak.Response
   , parse
   ) where
 
--- import Data.Text.Encoding (decodeUtf8)
-
 import Riak.Message (Code(..), Message(..))
 import Riak.Proto
 
@@ -111,8 +109,3 @@ parse message@(Message actual bytes)
     expected :: Word8
     expected =
       coerce (Riak.Response.code @a)
-
-    -- -- Code as of 2.2.3 is currently always 0, so just just toss it
-    -- toRiakError :: RpbErrorResp -> RiakError
-    -- toRiakError resp =
-    --   RiakError (decodeUtf8 (resp ^. #errmsg))

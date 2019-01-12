@@ -1,7 +1,8 @@
 module Riak.Message
   ( Message(..)
   , encode
-  , parser
+  , parse
+  , parser -- TODO don't export parser
   , Code(..)
   ) where
 
@@ -34,6 +35,10 @@ encode (Message code bytes) =
     (Builder.int32BE (fromIntegral (ByteString.length bytes + 1))
       <> Builder.word8 code
       <> Builder.byteString bytes)
+
+parse :: ByteString -> Atto.IResult ByteString Message
+parse =
+  Atto.parse parser
 
 parser :: Atto.Parser Message
 parser = do

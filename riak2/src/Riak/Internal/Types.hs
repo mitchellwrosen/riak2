@@ -112,6 +112,10 @@ data RiakError
   = RiakError !Text
   deriving stock (Eq, Show)
   deriving anyclass (Exception)
+-- -- Code as of 2.2.3 is currently always 0, so just just toss it
+-- toRiakError :: RpbErrorResp -> RiakError
+-- toRiakError resp =
+--   RiakError (decodeUtf8 (resp ^. #errmsg))
 
 
 -- | An exact query on a secondary index.
