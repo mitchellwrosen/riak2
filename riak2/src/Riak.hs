@@ -125,7 +125,7 @@ module Riak
   , RiakRangeQuery(..)
   , RiakSetOp
   , RiakVtag(..)
-  , RpbMapRedResp(..)
+  , RpbMapRedResp
   , SolrIndexName(..)
   , pattern DontIndex
   , SolrSchemaName(..)
@@ -158,18 +158,16 @@ import qualified Data.ByteString    as ByteString
 import qualified Data.HashSet       as HashSet
 import qualified Data.List.NonEmpty as List1
 
-import           Proto.Riak              hiding (SetOp)
-import qualified Proto.Riak              as Proto
-import           Riak.Internal
-import           Riak.Internal.Cache     (newSTMRiakCache)
-import           Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
-import           Riak.Internal.MapReduce (riakMapReduceRequest)
-import           Riak.Internal.Panic
-import           Riak.Internal.Prelude
-import           Riak.Internal.Types     (ObjectReturn(..),
-                                          ParamObjectReturn(..), RiakTy(..),
-                                          SBool(..))
-import           Riak.Internal.Utils     (bs2int, int2bs)
+import Proto.Riak              hiding (SetOp)
+import Riak.Internal
+import Riak.Internal.Cache     (newSTMRiakCache)
+import Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
+import Riak.Internal.MapReduce (riakMapReduceRequest)
+import Riak.Internal.Panic
+import Riak.Internal.Prelude
+import Riak.Internal.Types     (ObjectReturn(..), ParamObjectReturn(..),
+                                RiakTy(..), SBool(..))
+import Riak.Internal.Utils     (bs2int, int2bs)
 
 
 -- TODO _ variants that don't decode replies
@@ -280,22 +278,20 @@ getRiakObject
  where
   request :: RpbGetReq
   request =
-    RpbGetReq
-      { _RpbGetReq'_unknownFields = []
-      , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
-      , _RpbGetReq'bucket         = bucket
-      , _RpbGetReq'deletedvclock  = Just True
-      , _RpbGetReq'head           = Nothing
-      , _RpbGetReq'ifModified     = Nothing
-      , _RpbGetReq'key            = key
-      , _RpbGetReq'nVal           = coerce n
-      , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
-      , _RpbGetReq'pr             = coerce pr
-      , _RpbGetReq'r              = coerce r
-      , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-      , _RpbGetReq'timeout        = unTimeout timeout
-      , _RpbGetReq'type'          = Just type'
-      }
+    defMessage
+      & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
+      & #bucket .~ bucket
+      & #deletedvclock .~ True
+      & #maybe'head .~ Nothing
+      & #maybe'ifModified .~ Nothing
+      & #key .~ key
+      & #maybe'nVal .~ coerce n
+      & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
+      & #maybe'pr .~ coerce pr
+      & #maybe'r .~ coerce r
+      & #maybe'sloppyQuorum .~ unSloppyQuorum sloppy_quorum
+      & #maybe'timeout .~ unTimeout timeout
+      & #type' .~ type'
 
 
 -- | Get an object's metadata.
@@ -334,22 +330,20 @@ getRiakObjectHead
  where
   request :: RpbGetReq
   request =
-    RpbGetReq
-      { _RpbGetReq'_unknownFields = []
-      , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
-      , _RpbGetReq'bucket         = bucket
-      , _RpbGetReq'deletedvclock  = Just True
-      , _RpbGetReq'head           = Just True
-      , _RpbGetReq'ifModified     = Nothing
-      , _RpbGetReq'key            = key
-      , _RpbGetReq'nVal           = coerce n
-      , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
-      , _RpbGetReq'pr             = coerce pr
-      , _RpbGetReq'r              = coerce r
-      , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-      , _RpbGetReq'timeout        = unTimeout timeout
-      , _RpbGetReq'type'          = Just type'
-      }
+    defMessage
+      & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
+      & #bucket .~ bucket
+      & #deletedvclock .~ True
+      & #head .~ True
+      & #maybe'ifModified .~ Nothing
+      & #key .~ key
+      & #maybe'nVal .~ coerce n
+      & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
+      & #maybe'pr .~ coerce pr
+      & #maybe'r .~ coerce r
+      & #maybe'sloppyQuorum .~ unSloppyQuorum sloppy_quorum
+      & #maybe'timeout .~ unTimeout timeout
+      & #type' .~ type'
 
 -- | Get an object if it has been modified since the last get.
 --
@@ -374,22 +368,20 @@ getRiakObjectIfModified
   let
     request :: RpbGetReq
     request =
-      RpbGetReq
-        { _RpbGetReq'_unknownFields = []
-        , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
-        , _RpbGetReq'bucket         = bucket
-        , _RpbGetReq'deletedvclock  = Just True
-        , _RpbGetReq'head           = Nothing
-        , _RpbGetReq'ifModified     = coerce vclock
-        , _RpbGetReq'key            = key
-        , _RpbGetReq'nVal           = coerce n
-        , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
-        , _RpbGetReq'pr             = coerce pr
-        , _RpbGetReq'r              = coerce r
-        , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-        , _RpbGetReq'timeout        = unTimeout timeout
-        , _RpbGetReq'type'          = Just type'
-        }
+      defMessage
+        & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
+        & #bucket .~ bucket
+        & #deletedvclock .~ True
+        & #maybe'head .~ Nothing
+        & #maybe'ifModified .~ coerce vclock
+        & #key .~ key
+        & #maybe'nVal .~ coerce n
+        & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
+        & #maybe'pr .~ coerce pr
+        & #maybe'r .~ coerce r
+        & #maybe'sloppyQuorum .~ unSloppyQuorum sloppy_quorum
+        & #maybe'timeout .~ unTimeout timeout
+        & #type' .~ type'
 
   response :: RpbGetResp <-
     ExceptT
@@ -438,22 +430,20 @@ getRiakObjectIfModifiedHead
   let
     request :: RpbGetReq
     request =
-      RpbGetReq
-        { _RpbGetReq'_unknownFields = []
-        , _RpbGetReq'basicQuorum    = unBasicQuorum basic_quorum
-        , _RpbGetReq'bucket         = bucket
-        , _RpbGetReq'deletedvclock  = Just True
-        , _RpbGetReq'head           = Nothing
-        , _RpbGetReq'ifModified     = coerce vclock
-        , _RpbGetReq'key            = key
-        , _RpbGetReq'nVal           = coerce n
-        , _RpbGetReq'notfoundOk     = unNotfoundOk notfound_ok
-        , _RpbGetReq'pr             = coerce pr
-        , _RpbGetReq'r              = coerce r
-        , _RpbGetReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-        , _RpbGetReq'timeout        = unTimeout timeout
-        , _RpbGetReq'type'          = Just type'
-        }
+      defMessage
+        & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
+        & #bucket .~ bucket
+        & #deletedvclock .~ True
+        & #maybe'head .~ Nothing
+        & #maybe'ifModified .~ coerce vclock
+        & #key .~ key
+        & #maybe'nVal .~ coerce n
+        & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
+        & #maybe'pr .~ coerce pr
+        & #maybe'r .~ coerce r
+        & #maybe'sloppyQuorum .~ unSloppyQuorum sloppy_quorum
+        & #maybe'timeout .~ unTimeout timeout
+        & #type' .~ type'
 
   response :: RpbGetResp <-
     ExceptT
@@ -612,48 +602,44 @@ _putRiakObject
   let
     request :: RpbPutReq
     request =
-      RpbPutReq
-        { _RpbPutReq'_unknownFields = []
-        , _RpbPutReq'asis           = Nothing
-        , _RpbPutReq'bucket         = bucket
-        , _RpbPutReq'content        =
-            RpbContent
-              { _RpbContent'_unknownFields  = []
-              , _RpbContent'charset         = coerce (riakObjectCharset value)
-              , _RpbContent'contentEncoding = coerce (riakObjectContentEncoding value)
-              , _RpbContent'contentType     = coerce (riakObjectContentType value)
-              , _RpbContent'deleted         = Nothing
-              , _RpbContent'indexes         = map indexToRpbPair (coerce indexes)
-              , _RpbContent'lastMod         = Nothing
-              , _RpbContent'lastModUsecs    = Nothing
-              , _RpbContent'links           = []
-              , _RpbContent'ttl             = Nothing
-              , _RpbContent'usermeta        = map rpbPair (coerce metadata)
-              , _RpbContent'value           = encodeRiakObject value
-              , _RpbContent'vtag            = Nothing
-              }
-        , _RpbPutReq'dw             = coerce dw
-        , _RpbPutReq'ifNoneMatch    = Nothing
-        , _RpbPutReq'ifNotModified  = Nothing
-        , _RpbPutReq'key            = coerce key
-        , _RpbPutReq'nVal           = unN n
-        , _RpbPutReq'pw             = coerce pw
-        , _RpbPutReq'returnBody     =
-            case return of
+      defMessage
+        & #maybe'asis .~ Nothing
+        & #bucket .~ bucket
+        & #content .~
+            (defMessage
+              & #maybe'charset .~ coerce (riakObjectCharset value)
+              & #maybe'contentEncoding .~ coerce (riakObjectContentEncoding value)
+              & #maybe'contentType .~ coerce (riakObjectContentType value)
+              & #maybe'deleted .~ Nothing
+              & #indexes .~ map indexToRpbPair (coerce indexes)
+              & #maybe'lastMod .~ Nothing
+              & #maybe'lastModUsecs .~ Nothing
+              & #links .~ []
+              & #maybe'ttl .~ Nothing
+              & #usermeta .~ map rpbPair (coerce metadata)
+              & #value .~ encodeRiakObject value
+              & #maybe'vtag .~ Nothing)
+        & #maybe'dw .~ coerce dw
+        & #maybe'ifNoneMatch .~ Nothing
+        & #maybe'ifNotModified .~ Nothing
+        & #maybe'key .~ coerce key
+        & #maybe'nVal .~ unN n
+        & #maybe'pw .~ coerce pw
+        & #maybe'returnBody .~
+            (case return of
               ParamObjectReturnNone -> Nothing
               ParamObjectReturnHead -> Nothing
-              ParamObjectReturnBody -> Just True
-        , _RpbPutReq'returnHead     =
-            case return of
+              ParamObjectReturnBody -> Just True)
+        & #maybe'returnHead .~
+            (case return of
               ParamObjectReturnNone -> Nothing
               ParamObjectReturnHead -> Just True
-              ParamObjectReturnBody -> Nothing
-        , _RpbPutReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-        , _RpbPutReq'timeout        = unTimeout timeout
-        , _RpbPutReq'type'          = Just (unRiakBucketType type')
-        , _RpbPutReq'vclock         = coerce vclock
-        , _RpbPutReq'w              = coerce w
-        }
+              ParamObjectReturnBody -> Nothing)
+        & #maybe'sloppyQuorum .~ unSloppyQuorum sloppy_quorum
+        & #maybe'timeout .~ unTimeout timeout
+        & #type' .~ unRiakBucketType type'
+        & #maybe'vclock .~ coerce vclock
+        & #maybe'w .~ coerce w
 
   response :: RpbPutResp <-
     ExceptT
@@ -742,22 +728,20 @@ deleteRiakObject
   let
     request :: RpbDelReq
     request =
-      RpbDelReq
-        { _RpbDelReq'_unknownFields = []
-        , _RpbDelReq'bucket         = bucket
-        , _RpbDelReq'dw             = Nothing
-        , _RpbDelReq'key            = key
-        , _RpbDelReq'nVal           = Nothing
-        , _RpbDelReq'pr             = Nothing
-        , _RpbDelReq'pw             = Nothing
-        , _RpbDelReq'r              = Nothing
-        , _RpbDelReq'rw             = Nothing
-        , _RpbDelReq'sloppyQuorum   = Nothing
-        , _RpbDelReq'timeout        = Nothing
-        , _RpbDelReq'type'          = Just type'
-        , _RpbDelReq'vclock         = coerce vclock
-        , _RpbDelReq'w              = Nothing
-        }
+      defMessage
+        & #bucket .~ bucket
+        & #maybe'dw .~ Nothing
+        & #key .~ key
+        & #maybe'nVal .~ Nothing
+        & #maybe'pr .~ Nothing
+        & #maybe'pw .~ Nothing
+        & #maybe'r .~ Nothing
+        & #maybe'rw .~ Nothing
+        & #maybe'sloppyQuorum .~ Nothing
+        & #maybe'timeout .~ Nothing
+        & #type' .~ type'
+        & #maybe'vclock .~ coerce vclock
+        & #maybe'w .~ Nothing
 
   fmap (() <$)
     (withRiakConnection manager (\conn -> deleteRiakObjectPB conn request))
@@ -826,14 +810,12 @@ _updateRiakCounter h bucket key incr params =
  where
   op :: DtOp
   op =
-    DtOp
-      { _DtOp'_unknownFields = []
-      , _DtOp'counterOp      = Just (CounterOp (Just incr) [])
-      , _DtOp'gsetOp         = Nothing
-      , _DtOp'hllOp          = Nothing
-      , _DtOp'mapOp          = Nothing
-      , _DtOp'setOp          = Nothing
-      }
+    defMessage
+      & #counterOp .~ (defMessage & #increment .~ incr)
+      & #maybe'gsetOp .~ Nothing
+      & #maybe'hllOp .~ Nothing
+      & #maybe'mapOp .~ Nothing
+      & #maybe'setOp .~ Nothing
 
 
 --------------------------------------------------------------------------------
@@ -1043,14 +1025,15 @@ _updateSet
  where
   op :: DtOp
   op =
-    DtOp
-      { _DtOp'_unknownFields = []
-      , _DtOp'counterOp      = Nothing
-      , _DtOp'gsetOp         = Nothing
-      , _DtOp'hllOp          = Nothing
-      , _DtOp'mapOp          = Nothing
-      , _DtOp'setOp          = Just (Proto.SetOp adds removes [])
-      }
+    defMessage
+      & #maybe'counterOp .~ Nothing
+      & #maybe'gsetOp .~ Nothing
+      & #maybe'hllOp .~ Nothing
+      & #maybe'mapOp .~ Nothing
+      & #setOp .~
+          (defMessage
+            & #adds .~ adds
+            & #removes .~ removes)
 
 
 --------------------------------------------------------------------------------
@@ -1098,20 +1081,18 @@ getCrdt
  where
   request :: DtFetchReq
   request =
-    DtFetchReq
-      { _DtFetchReq'_unknownFields = []
-      , _DtFetchReq'basicQuorum    = unBasicQuorum basic_quorum
-      , _DtFetchReq'bucket         = bucket
-      , _DtFetchReq'includeContext = include_context
-      , _DtFetchReq'key            = key
-      , _DtFetchReq'nVal           = coerce n
-      , _DtFetchReq'notfoundOk     = unNotfoundOk notfound_ok
-      , _DtFetchReq'pr             = coerce pr
-      , _DtFetchReq'r              = coerce r
-      , _DtFetchReq'sloppyQuorum   = coerce sloppy_quorum
-      , _DtFetchReq'timeout        = coerce timeout
-      , _DtFetchReq'type'          = unRiakBucketType type'
-      }
+    defMessage
+      & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
+      & #bucket .~ bucket
+      & #maybe'includeContext .~ include_context
+      & #key .~ key
+      & #maybe'nVal .~ coerce n
+      & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
+      & #maybe'pr .~ coerce pr
+      & #maybe'r .~ coerce r
+      & #maybe'sloppyQuorum .~ coerce sloppy_quorum
+      & #maybe'timeout .~ coerce timeout
+      & #type' .~ unRiakBucketType type'
 
 
 -------------------------------------------------------------------------------
@@ -1154,22 +1135,20 @@ updateCrdt
  where
   request :: DtUpdateReq
   request =
-    DtUpdateReq
-      { _DtUpdateReq'_unknownFields = []
-      , _DtUpdateReq'bucket         = bucket
-      , _DtUpdateReq'context        = coerce context
-      , _DtUpdateReq'dw             = coerce dw
-      , _DtUpdateReq'includeContext = Nothing
-      , _DtUpdateReq'key            = coerce key
-      , _DtUpdateReq'nVal           = coerce n
-      , _DtUpdateReq'op             = op
-      , _DtUpdateReq'pw             = coerce pw
-      , _DtUpdateReq'returnBody     = unReturnBody return_body
-      , _DtUpdateReq'sloppyQuorum   = unSloppyQuorum sloppy_quorum
-      , _DtUpdateReq'timeout        = unTimeout timeout
-      , _DtUpdateReq'type'          = unRiakBucketType type'
-      , _DtUpdateReq'w              = coerce w
-      }
+    defMessage
+      & #bucket .~ bucket
+      & #maybe'context .~ coerce context
+      & #maybe'dw .~ coerce dw
+      & #maybe'includeContext .~ Nothing
+      & #maybe'key .~ coerce key
+      & #maybe'nVal .~ coerce n
+      & #op .~ op
+      & #maybe'pw .~ coerce pw
+      & #maybe'returnBody .~ unReturnBody return_body
+      & #maybe'sloppyQuorum .~ unSloppyQuorum sloppy_quorum
+      & #maybe'timeout .~ unTimeout timeout
+      & #type' .~ unRiakBucketType type'
+      & #maybe'w .~ coerce w
 
 
 --------------------------------------------------------------------------------
@@ -1192,10 +1171,8 @@ getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO . runExceptT $ do
  where
   request :: RpbGetBucketTypeReq
   request =
-    RpbGetBucketTypeReq
-      { _RpbGetBucketTypeReq'_unknownFields = []
-      , _RpbGetBucketTypeReq'type'          = unRiakBucketType type'
-      }
+    defMessage
+      & #type' .~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1216,11 +1193,9 @@ setRiakBucketTypeProps (RiakHandle manager _) type' props =
  where
   request :: RpbSetBucketTypeReq
   request =
-    RpbSetBucketTypeReq
-      { _RpbSetBucketTypeReq'_unknownFields = []
-      , _RpbSetBucketTypeReq'props          = props
-      , _RpbSetBucketTypeReq'type'          = unRiakBucketType type'
-      }
+    defMessage
+      & #props .~ props
+      & #type' .~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1243,11 +1218,9 @@ getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO . r
  where
   request :: RpbGetBucketReq
   request =
-    RpbGetBucketReq
-      { _RpbGetBucketReq'_unknownFields = []
-      , _RpbGetBucketReq'bucket         = bucket
-      , _RpbGetBucketReq'type'          = Just (unRiakBucketType type')
-      }
+    defMessage
+      & #bucket .~ bucket
+      & #type' .~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1306,12 +1279,10 @@ streamRiakBuckets (RiakHandle manager _) type' fold =
  where
   request :: RpbListBucketsReq
   request =
-    RpbListBucketsReq
-      { _RpbListBucketsReq'_unknownFields = []
-      , _RpbListBucketsReq'stream = Just True
-      , _RpbListBucketsReq'timeout = Nothing
-      , _RpbListBucketsReq'type' = Just (unRiakBucketType type')
-      }
+    defMessage
+      & #stream .~ True
+      & #maybe'timeout .~ Nothing
+      & #type' .~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1339,12 +1310,10 @@ streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
  where
   request :: RpbListKeysReq
   request =
-    RpbListKeysReq
-      { _RpbListKeysReq'_unknownFields = []
-      , _RpbListKeysReq'bucket         = bucket
-      , _RpbListKeysReq'timeout        = Nothing
-      , _RpbListKeysReq'type'          = Just (unRiakBucketType type')
-      }
+    defMessage
+      & #bucket .~ bucket
+      & #maybe'timeout .~ Nothing
+      & #type' .~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1448,25 +1417,23 @@ riakExactQuery
  where
   request :: RpbIndexReq
   request =
-    RpbIndexReq
-      { _RpbIndexReq'_unknownFields = []
-      , _RpbIndexReq'bucket         = bucket
-      , _RpbIndexReq'continuation   = Nothing
-      , _RpbIndexReq'coverContext   = Nothing
-      , _RpbIndexReq'index          = unRiakIndexName index
-      , _RpbIndexReq'key            = Just key
-      , _RpbIndexReq'maxResults     = Nothing
-      , _RpbIndexReq'paginationSort = Nothing
-      , _RpbIndexReq'qtype          = RpbIndexReq'eq
-      , _RpbIndexReq'rangeMax       = Nothing
-      , _RpbIndexReq'rangeMin       = Nothing
-      , _RpbIndexReq'returnBody     = Nothing
-      , _RpbIndexReq'returnTerms    = Nothing
-      , _RpbIndexReq'stream         = Just True
-      , _RpbIndexReq'termRegex      = Nothing
-      , _RpbIndexReq'timeout        = Nothing
-      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
-      }
+    defMessage
+      & #bucket .~ bucket
+      & #maybe'continuation .~ Nothing
+      & #maybe'coverContext .~ Nothing
+      & #index .~ unRiakIndexName index
+      & #key .~ key
+      & #maybe'maxResults .~ Nothing
+      & #maybe'paginationSort .~ Nothing
+      & #qtype .~ RpbIndexReq'eq
+      & #maybe'rangeMax .~ Nothing
+      & #maybe'rangeMin .~ Nothing
+      & #maybe'returnBody .~ Nothing
+      & #maybe'returnTerms .~ Nothing
+      & #stream .~ True
+      & #maybe'termRegex .~ Nothing
+      & #maybe'timeout .~ Nothing
+      & #type' .~ unRiakBucketType type'
 
   index :: RiakIndexName
   index =
@@ -1501,25 +1468,23 @@ riakRangeQuery
  where
   request :: RpbIndexReq
   request =
-    RpbIndexReq
-      { _RpbIndexReq'_unknownFields = []
-      , _RpbIndexReq'bucket         = bucket
-      , _RpbIndexReq'continuation   = Nothing
-      , _RpbIndexReq'coverContext   = Nothing
-      , _RpbIndexReq'index          = unRiakIndexName index
-      , _RpbIndexReq'key            = Nothing
-      , _RpbIndexReq'maxResults     = Nothing
-      , _RpbIndexReq'paginationSort = Nothing
-      , _RpbIndexReq'qtype          = RpbIndexReq'range
-      , _RpbIndexReq'rangeMax       = Just rmax
-      , _RpbIndexReq'rangeMin       = Just rmin
-      , _RpbIndexReq'returnBody     = Nothing
-      , _RpbIndexReq'returnTerms    = Nothing
-      , _RpbIndexReq'stream         = Just True
-      , _RpbIndexReq'termRegex      = Nothing
-      , _RpbIndexReq'timeout        = Nothing
-      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
-      }
+    defMessage
+      & #bucket .~ bucket
+      & #maybe'continuation .~ Nothing
+      & #maybe'coverContext .~ Nothing
+      & #index .~ unRiakIndexName index
+      & #maybe'key .~ Nothing
+      & #maybe'maxResults .~ Nothing
+      & #maybe'paginationSort .~ Nothing
+      & #qtype .~ RpbIndexReq'range
+      & #rangeMax .~ rmax
+      & #rangeMin .~ rmin
+      & #maybe'returnBody .~ Nothing
+      & #maybe'returnTerms .~ Nothing
+      & #stream .~ True
+      & #maybe'termRegex .~ Nothing
+      & #maybe'timeout .~ Nothing
+      & #type' .~ unRiakBucketType type'
 
   index :: RiakIndexName
   index =
@@ -1560,25 +1525,23 @@ riakRangeQueryTerms
  where
   request :: RpbIndexReq
   request =
-    RpbIndexReq
-      { _RpbIndexReq'_unknownFields = []
-      , _RpbIndexReq'bucket         = bucket
-      , _RpbIndexReq'continuation   = Nothing
-      , _RpbIndexReq'coverContext   = Nothing
-      , _RpbIndexReq'index          = unRiakIndexName index
-      , _RpbIndexReq'key            = Nothing
-      , _RpbIndexReq'maxResults     = Nothing
-      , _RpbIndexReq'paginationSort = Nothing
-      , _RpbIndexReq'qtype          = RpbIndexReq'range
-      , _RpbIndexReq'rangeMax       = Just rmax
-      , _RpbIndexReq'rangeMin       = Just rmin
-      , _RpbIndexReq'returnBody     = Nothing
-      , _RpbIndexReq'returnTerms    = Just True
-      , _RpbIndexReq'stream         = Just True
-      , _RpbIndexReq'termRegex      = Nothing
-      , _RpbIndexReq'timeout        = Nothing
-      , _RpbIndexReq'type'          = Just (unRiakBucketType type')
-      }
+    defMessage
+      & #bucket .~ bucket
+      & #maybe'continuation .~ Nothing
+      & #maybe'coverContext .~ Nothing
+      & #index .~ unRiakIndexName index
+      & #maybe'key .~ Nothing
+      & #maybe'maxResults .~ Nothing
+      & #maybe'paginationSort .~ Nothing
+      & #qtype .~ RpbIndexReq'range
+      & #rangeMax .~ rmax
+      & #rangeMin .~ rmin
+      & #maybe'returnBody .~ Nothing
+      & #returnTerms .~ True
+      & #stream .~ True
+      & #maybe'termRegex .~ Nothing
+      & #maybe'timeout .~ Nothing
+      & #type' .~ unRiakBucketType type'
 
   index :: RiakIndexName
   index =
@@ -1601,11 +1564,12 @@ riakRangeQueryTerms
       RiakRangeQueryInt _ _ n -> int2bs n
 
   parse :: RpbPair -> (RiakKey, a)
-  parse = \case
-    RpbPair val (Just key) _ ->
-      (RiakKey namespace key, parse1 val)
-    _ ->
-      undefined
+  parse =
+    unRpbPair >>> \case
+      (val, Just key) ->
+        (RiakKey namespace key, parse1 val)
+      _ ->
+        undefined
 
   parse1 :: ByteString -> a
   parse1 =
@@ -1634,19 +1598,17 @@ riakSearch (RiakHandle manager _)
  where
   request :: RpbSearchQueryReq
   request =
-    RpbSearchQueryReq
-      { _RpbSearchQueryReq'_unknownFields = []
-      , _RpbSearchQueryReq'df             = unDF df
-      , _RpbSearchQueryReq'filter         = unFilter filter'
-      , _RpbSearchQueryReq'fl             = unFL fl
-      , _RpbSearchQueryReq'index          = index
-      , _RpbSearchQueryReq'op             = unOp op
-      , _RpbSearchQueryReq'presort        = unPresort presort
-      , _RpbSearchQueryReq'q              = query
-      , _RpbSearchQueryReq'rows           = unRows rows
-      , _RpbSearchQueryReq'sort           = unSort sort
-      , _RpbSearchQueryReq'start          = unStart start
-      }
+    defMessage
+      & #maybe'df .~ unDF df
+      & #maybe'filter .~ unFilter filter'
+      & #fl .~ unFL fl
+      & #index .~ index
+      & #maybe'op .~ unOp op
+      & #maybe'presort .~ unPresort presort
+      & #q .~ query
+      & #maybe'rows .~ unRows rows
+      & #maybe'sort .~ unSort sort
+      & #maybe'start .~ unStart start
 
 
 getRiakSchema
@@ -1661,10 +1623,8 @@ getRiakSchema (RiakHandle manager _) schema = liftIO $
  where
   request :: RpbYokozunaSchemaGetReq
   request =
-    RpbYokozunaSchemaGetReq
-      { _RpbYokozunaSchemaGetReq'_unknownFields = []
-      , _RpbYokozunaSchemaGetReq'name           = unSolrSchemaName schema
-      }
+    defMessage
+      & #name .~ unSolrSchemaName schema
 
 
 putRiakSchema
@@ -1680,15 +1640,11 @@ putRiakSchema (RiakHandle manager _) name bytes = liftIO $
  where
   request :: RpbYokozunaSchemaPutReq
   request =
-    RpbYokozunaSchemaPutReq
-      { _RpbYokozunaSchemaPutReq'_unknownFields = []
-      , _RpbYokozunaSchemaPutReq'schema         =
-          RpbYokozunaSchema
-            { _RpbYokozunaSchema'_unknownFields = []
-            , _RpbYokozunaSchema'content        = Just bytes
-            , _RpbYokozunaSchema'name           = unSolrSchemaName name
-            }
-      }
+    defMessage
+      & #schema .~
+          (defMessage
+            & #content .~ bytes
+            & #name .~ unSolrSchemaName name)
 
 
 getRiakIndex
@@ -1701,19 +1657,20 @@ getRiakIndex (RiakHandle manager _) name = liftIO $ do
  where
   request :: RpbYokozunaIndexGetReq
   request =
-    RpbYokozunaIndexGetReq
-      { _RpbYokozunaIndexGetReq'_unknownFields = []
-      , _RpbYokozunaIndexGetReq'name           = Just (unRiakIndexName name)
-      }
+    defMessage
+      & #name .~ unRiakIndexName name
 
   action
     :: RiakConnection
     -> MaybeT (ExceptT RiakError IO) RpbYokozunaIndex
-  action conn =
-    MaybeT (ExceptT m) >>= \case
-      RpbYokozunaIndexGetResp [index] _ ->
+  action conn = do
+    response :: RpbYokozunaIndexGetResp <-
+      MaybeT (ExceptT m)
+    case response ^. #index of
+      [index] ->
         pure index
-      response ->
+
+      _ ->
         panic "0 or 2+ indexes"
           ( ( "request",  request  )
           , ( "response", response )
@@ -1729,19 +1686,17 @@ getRiakIndexes
   => RiakHandle -- ^ Riak handle
   -> m (Either RiakError [RpbYokozunaIndex])
 getRiakIndexes (RiakHandle manager _) = liftIO . runExceptT $ do
-  RpbYokozunaIndexGetResp indexes _ <-
+  response :: RpbYokozunaIndexGetResp <-
     ExceptT
       (withRiakConnection manager
         (\conn -> getRiakIndexPB conn request))
-  pure indexes
+  pure (response ^. #index)
 
  where
   request :: RpbYokozunaIndexGetReq
   request =
-    RpbYokozunaIndexGetReq
-      { _RpbYokozunaIndexGetReq'_unknownFields = []
-      , _RpbYokozunaIndexGetReq'name           = Nothing
-      }
+    defMessage
+      & #maybe'name .~ Nothing
 
 
 putRiakIndex
@@ -1757,17 +1712,13 @@ putRiakIndex (RiakHandle manager _) index schema = liftIO $
  where
   request :: RpbYokozunaIndexPutReq
   request =
-    RpbYokozunaIndexPutReq
-      { _RpbYokozunaIndexPutReq'_unknownFields  = []
-      , _RpbYokozunaIndexPutReq'index           =
-          RpbYokozunaIndex
-             { _RpbYokozunaIndex'_unknownFields = []
-             , _RpbYokozunaIndex'nVal           = Nothing -- TODO putRiakIndex n_val
-             , _RpbYokozunaIndex'name           = unRiakIndexName index
-             , _RpbYokozunaIndex'schema         = Just (unSolrSchemaName schema)
-             }
-      , _RpbYokozunaIndexPutReq'timeout         = Nothing -- TODO putRiakIndex timeout
-      }
+    defMessage
+      & #index .~
+          (defMessage
+            & #maybe'nVal .~ Nothing -- TODO putRiakIndex n_val
+            & #name .~ unRiakIndexName index
+            & #schema .~ unSolrSchemaName schema)
+      & #maybe'timeout .~ Nothing -- TODO putRiakIndex timeout
 
 
 deleteRiakIndex
@@ -1819,7 +1770,7 @@ cacheVclock (RiakHandle _ cache) loc =
 
 contentIsDataType :: RiakObject a -> Bool
 contentIsDataType =
-  maybe False (`elem` crdtContentTypes) . (^. #contentType)
+  maybe False (`elem` crdtContentTypes) . contentType
 
 crdtContentTypes :: HashSet ContentType
 crdtContentTypes =
@@ -1846,10 +1797,7 @@ parseContent
   -> SBool head
   -> RpbContent
   -> IO (RiakObject (If head () a))
-parseContent _ loc head
-    (RpbContent bytes content_type charset encoding vtag _ last_mod
-                last_mod_usecs usermeta indexes deleted ttl _) = do
-
+parseContent _ loc head content = do
   theValue :: If head () a <-
     case head of
       STrue ->
@@ -1858,31 +1806,31 @@ parseContent _ loc head
       SFalse ->
         either throwIO pure
           (decodeRiakObject
-            (coerce content_type)
-            (coerce charset)
-            (coerce encoding)
-            bytes)
+            (coerce (content ^. #maybe'contentType))
+            (coerce (content ^. #maybe'charset))
+            (coerce (content ^. #maybe'contentEncoding))
+            (content ^. #value))
 
   let
     theLastMod :: Maybe NominalDiffTime
     theLastMod = do
-      secs  <- last_mod
-      usecs <- last_mod_usecs <|> pure 0
+      secs  <- content ^. #maybe'lastMod
+      usecs <- (content ^. #maybe'lastModUsecs) <|> pure 0
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
   pure $ RiakObject
     loc
     theValue
-    (coerce content_type)
-    (coerce charset)
-    (coerce encoding)
-    (coerce vtag)
+    (coerce (content ^. #maybe'contentType))
+    (coerce (content ^. #maybe'charset))
+    (coerce (content ^. #maybe'contentEncoding))
+    (coerce (content ^. #maybe'vtag))
     (posixSecondsToUTCTime <$> theLastMod)
-    (RiakMetadata (map unRpbPair usermeta))
-    (map rpbPairToIndex indexes)
-    (fromMaybe False deleted)
-    (TTL ttl)
+    (RiakMetadata (map unRpbPair (content ^. #usermeta)))
+    (map rpbPairToIndex (content ^. #indexes))
+    (fromMaybe False (content ^. #maybe'deleted))
+    (TTL (content ^. #maybe'ttl))
 
 -- TODO replace parseContent with parseContent', parseContentHead
 
@@ -1914,68 +1862,60 @@ _parseContent
   -> RiakKey
   -> RpbContent
   -> IO (RiakObject a)
-_parseContent parse loc
-    (RpbContent bytes content_type charset encoding vtag _ last_mod
-                last_mod_usecs usermeta indexes deleted ttl _) = do
-
+_parseContent parse loc content = do
   theValue :: a <-
     either throwIO pure
       (parse
-        (coerce content_type)
-        (coerce charset)
-        (coerce encoding)
-        bytes)
+        (coerce (content ^. #maybe'contentType))
+        (coerce (content ^. #maybe'charset))
+        (coerce (content ^. #maybe'contentEncoding))
+        (content ^. #value))
 
   let
     theLastMod :: Maybe NominalDiffTime
     theLastMod = do
-      secs  <- last_mod
-      usecs <- last_mod_usecs <|> pure 0
+      secs  <- content ^. #maybe'lastMod
+      usecs <- (content ^. #maybe'lastModUsecs) <|> pure 0
       let usecs_d = realToFrac usecs / 1000000 :: Double
       pure (fromIntegral secs + realToFrac usecs_d)
 
   pure $ RiakObject
     loc
     theValue
-    (coerce content_type)
-    (coerce charset)
-    (coerce encoding)
-    (coerce vtag)
+    (coerce (content ^. #maybe'contentType))
+    (coerce (content ^. #maybe'charset))
+    (coerce (content ^. #maybe'contentEncoding))
+    (coerce (content ^. #maybe'vtag))
     (posixSecondsToUTCTime <$> theLastMod)
-    (RiakMetadata (map unRpbPair usermeta))
-    (map rpbPairToIndex indexes)
-    (fromMaybe False deleted)
-    (TTL ttl)
+    (RiakMetadata (map unRpbPair (content ^. #usermeta)))
+    (map rpbPairToIndex (content ^. #indexes))
+    (fromMaybe False (content ^. #maybe'deleted))
+    (TTL (content ^. #maybe'ttl))
 
 
 indexToRpbPair :: RiakIndex -> RpbPair
 indexToRpbPair = \case
   RiakIndexInt k v ->
-    RpbPair
-      (unRiakIndexName k <> "_int")
-      (Just (int2bs v))
-      []
+    rpbPair (unRiakIndexName k <> "_int", Just (int2bs v))
 
   RiakIndexBin k v ->
-    RpbPair
-      (unRiakIndexName k <> "_bin")
-      (Just v)
-      []
+    rpbPair (unRiakIndexName k <> "_bin", Just v)
 
 
 rpbPairToIndex :: RpbPair -> RiakIndex
-rpbPairToIndex = \case
-  RpbPair (ByteString.stripSuffix "_bin" -> Just k) (Just v) _ ->
-    RiakIndexBin (RiakIndexName k) v
+rpbPairToIndex =
+  unRpbPair >>> \case
+    (ByteString.stripSuffix "_bin" -> Just k, Just v) ->
+      RiakIndexBin (RiakIndexName k) v
 
-  RpbPair (ByteString.stripSuffix "_int" -> Just k) (Just v) _ ->
-    RiakIndexInt (RiakIndexName k) (bs2int v)
+    (ByteString.stripSuffix "_int" -> Just k, Just v) ->
+      RiakIndexInt (RiakIndexName k) (bs2int v)
 
-  RpbPair k v _ ->
-    impurePanic "rpbPairToIndex"
-      ( ("key",   k)
-      , ("value", v)
-      )
+    (k, v) ->
+      impurePanic "rpbPairToIndex"
+        ( ("key",   k)
+        , ("value", v)
+        )
 
 translateNotfound :: Either RiakError a -> Either RiakError (Maybe a)
 translateNotfound = \case
@@ -1985,12 +1925,14 @@ translateNotfound = \case
 
 rpbPair :: (ByteString, Maybe ByteString) -> RpbPair
 rpbPair (k, v) =
-  RpbPair k v []
+  defMessage
+    & #key .~ k
+    & #maybe'value .~ v
 
 
 unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)
-unRpbPair (RpbPair k v _) =
-  (k, v)
+unRpbPair pair =
+  (pair ^. #key, pair ^. #maybe'value)
 
 unSetOp :: IsRiakSet a => RiakSetOp a -> ([ByteString], [ByteString])
 unSetOp (RiakSetOp (adds, removes)) =

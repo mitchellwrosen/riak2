@@ -23,7 +23,6 @@ module Riak.Internal.Crdts
 import Data.Bifunctor     (first)
 import Data.DList         (DList)
 import Data.Text.Encoding (decodeUtf8', encodeUtf8)
-import Lens.Labels
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.Set            as Set
@@ -205,10 +204,10 @@ parseMapEntries :: [MapEntry] -> RiakMapEntries
 parseMapEntries =
   foldMap $ \entry ->
     let
-      MapField k ty _ =
-        entry ^. #field
+      k =
+        entry ^. #field . #name
     in
-      case ty of
+      case entry ^. #field . #type' of
         MapField'COUNTER ->
           RiakMapEntries
             (HashMap.singleton k (entry ^. #counterValue))

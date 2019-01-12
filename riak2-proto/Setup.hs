@@ -3,9 +3,11 @@ import Distribution.Simple
 
 main :: IO ()
 main =
-  defaultMainWithHooks
-    ((generatingSpecificProtos
-      "."
-      (\_ -> pure ["riak.proto"])
-      simpleUserHooks)
-    { sDistHook = sDistHook simpleUserHooks })
+  defaultMainWithHooks userHooks
+
+userHooks :: UserHooks
+userHooks =
+  generatingSpecificProtos
+    "."
+    (\_ -> pure ["riak.proto"])
+    simpleUserHooks

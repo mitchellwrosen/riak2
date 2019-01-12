@@ -7,7 +7,7 @@ module Riak.Internal.Types where
 
 import Data.Default.Class
 import Data.Text.Encoding (decodeUtf8, decodeUtf8')
-import Lens.Labels
+-- import Lens.Labels
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1

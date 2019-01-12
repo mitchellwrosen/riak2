@@ -24,37 +24,18 @@ import Riak.Internal.Types
 
 data RiakObject a
   = RiakObject
-      !RiakKey
-      a                       -- Value
-      (Maybe ContentType)     -- Content type
-      (Maybe Charset)         -- Charset
-      (Maybe ContentEncoding) -- Content encoding
-      (Maybe RiakVtag)        -- Vtag
-      (Maybe UTCTime)         -- Last modified
-      RiakMetadata            -- User metadata
-      [RiakIndex]             -- Secondary indexes
-      Bool                    -- Deleted
-      TTL                     -- TTL
-  deriving (Eq, Functor, Show)
-
-instance {-# OVERLAPPABLE #-}
-    ( HasLens' f (RiakObject s) x a
-    , s ~ t
-    , a ~ b
-    ) => HasLens f (RiakObject s) (RiakObject t) x a b where
-  lensOf = lensOf'
-
-instance Functor f => HasLens' f (RiakObject a)                "key"             RiakKey                   where lensOf' _ = lens (\(RiakObject x _ _ _ _ _ _ _ _ _ _) -> x) (\(RiakObject _ b c d e f g h i j k) x -> RiakObject x b c d e f g h i j k)
-instance Functor f => HasLens  f (RiakObject a) (RiakObject b) "value"           a                       b where lensOf  _ = lens (\(RiakObject _ x _ _ _ _ _ _ _ _ _) -> x) (\(RiakObject a _ c d e f g h i j k) x -> RiakObject a x c d e f g h i j k)
-instance Functor f => HasLens' f (RiakObject a)                "contentType"     (Maybe ContentType)       where lensOf' _ = lens (\(RiakObject _ _ x _ _ _ _ _ _ _ _) -> x) (\(RiakObject a b _ d e f g h i j k) x -> RiakObject a b x d e f g h i j k)
-instance Functor f => HasLens' f (RiakObject a)                "charset"         (Maybe Charset)           where lensOf' _ = lens (\(RiakObject _ _ _ x _ _ _ _ _ _ _) -> x) (\(RiakObject a b c _ e f g h i j k) x -> RiakObject a b c x e f g h i j k)
-instance Functor f => HasLens' f (RiakObject a)                "contentEncoding" (Maybe ContentEncoding)   where lensOf' _ = lens (\(RiakObject _ _ _ _ x _ _ _ _ _ _) -> x) (\(RiakObject a b c d _ f g h i j k) x -> RiakObject a b c d x f g h i j k)
-instance Functor f => HasLens' f (RiakObject a)                "vtag"            (Maybe RiakVtag)          where lensOf' _ = lens (\(RiakObject _ _ _ _ _ x _ _ _ _ _) -> x) (\(RiakObject a b c d e _ g h i j k) x -> RiakObject a b c d e x g h i j k)
-instance Functor f => HasLens' f (RiakObject a)                "lastMod"         (Maybe UTCTime)           where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ x _ _ _ _) -> x) (\(RiakObject a b c d e f _ h i j k) x -> RiakObject a b c d e f x h i j k)
-instance Functor f => HasLens' f (RiakObject a)                "usermeta"        RiakMetadata              where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ x _ _ _) -> x) (\(RiakObject a b c d e f g _ i j k) x -> RiakObject a b c d e f g x i j k)
-instance Functor f => HasLens' f (RiakObject a)                "indexes"         [RiakIndex]               where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ _ x _ _) -> x) (\(RiakObject a b c d e f g h _ j k) x -> RiakObject a b c d e f g h x j k)
-instance Functor f => HasLens' f (RiakObject a)                "deleted"         Bool                      where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ _ _ x _) -> x) (\(RiakObject a b c d e f g h i _ k) x -> RiakObject a b c d e f g h i x k)
-instance Functor f => HasLens' f (RiakObject a)                "ttl"             TTL                       where lensOf' _ = lens (\(RiakObject _ _ _ _ _ _ _ _ _ _ x) -> x) (\(RiakObject a b c d e f g h i j _) x -> RiakObject a b c d e f g h i j x)
+  { key :: !RiakKey
+  , value :: a
+  , contentType :: Maybe ContentType
+  , charset :: Maybe Charset
+  , contentEncoding :: Maybe ContentEncoding
+  , vtag :: Maybe RiakVtag
+  , lastModified :: Maybe UTCTime
+  , metadata :: RiakMetadata
+  , indexes :: [RiakIndex]
+  , deleted :: Bool
+  , ttl :: TTL
+  } deriving stock (Eq, Functor, Generic, Show)
 
 
 -- | 'IsRiakObject' classifies types that are stored in Riak objects. Every

@@ -19,11 +19,11 @@ library
     , ghc-prim ^>= 0.5.2
     , hashable ^>= 1.2.7
     , lens-family ^>= 1.2.2
-    , lens-labels ^>= 0.2.0
+    , lens-labels ^>= 0.3.0
     , network ^>= 2.7.0
     , primitive ^>= 0.6.4
     , profunctors ^>= 5.3
-    , proto-lens ^>= 0.3.1
+    , proto-lens ^>= 0.4.0
     , riak2-proto
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
@@ -87,6 +87,7 @@ library
     -fno-warn-missed-specialisations
     -fno-warn-missing-export-lists
     -fno-warn-missing-import-lists
+    -fno-warn-name-shadowing
     -fno-warn-safe
     -fno-warn-unsafe
 
