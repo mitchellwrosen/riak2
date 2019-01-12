@@ -1,19 +1,10 @@
 cabal-version: 2.2
 
-name: riak-but-better
+name: riak2
 version: 0.1.0
-build-type: Custom
-
-custom-setup
-  setup-depends:
-      base
-    , Cabal ^>= 2.2.0 || ^>= 2.4.0
-    , proto-lens-protoc == 0.3.1.0
+build-type: Simple
 
 library
-  autogen-modules:
-    Proto.Riak
-    Proto.Riak_Fields
   build-depends:
       aeson ^>= 1.4.0
     , attoparsec ^>= 0.13.2
@@ -33,7 +24,7 @@ library
     , primitive ^>= 0.6.4
     , profunctors ^>= 5.3
     , proto-lens ^>= 0.3.1
-    , proto-lens-protoc == 0.3.1.0
+    , riak2-proto
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
     , streaming
@@ -46,6 +37,7 @@ library
     , unliftio-core ^>= 0.1.1
     , unordered-containers ^>= 0.2.9
     , vector
+
   default-extensions:
       ConstraintKinds
     , DataKinds
@@ -77,14 +69,17 @@ library
     , TypeOperators
     , UnicodeSyntax
     , ViewPatterns
+
   default-language:
     Haskell2010
+
   exposed-modules:
     -- temporary
     Erlang
     Riak
     Riak.Internal
     Riak.Lenses
+
   ghc-options:
     -Weverything
     -fno-warn-all-missed-specialisations
@@ -94,11 +89,11 @@ library
     -fno-warn-missing-import-lists
     -fno-warn-safe
     -fno-warn-unsafe
+
   hs-source-dirs:
     src
+
   other-modules:
-    Proto.Riak
-    Proto.Riak_Fields
     Riak.Internal.Cache
     Riak.Internal.Connection
     Riak.Internal.Crdts
@@ -116,29 +111,29 @@ library
     Riak.Internal.Types
     Riak.Internal.Utils
 
-executable riakc
-  build-depends:
-      base
-    , base64-bytestring
-    , bytestring
-    , foldl
-    , lens-family
-    , optparse-applicative
-    , network
-    , riak-but-better
-    , utf8-string
-    , text
-    , unordered-containers
-  buildable:
-    True
-  default-language:
-    Haskell2010
-  ghc-options:
-    -Wall
-  hs-source-dirs:
-    app
-  main-is:
-    Main.hs
+-- executable riakc
+--   build-depends:
+--       base
+--     , base64-bytestring
+--     , bytestring
+--     , foldl
+--     , lens-family
+--     , microcli
+--     , network
+--     , riak-but-better
+--     , utf8-string
+--     , text
+--     , unordered-containers
+--   buildable:
+--     True
+--   default-language:
+--     Haskell2010
+--   ghc-options:
+--     -Wall
+--   hs-source-dirs:
+--     app
+--   main-is:
+--     Main.hs
 
 test-suite tests
   build-depends:
@@ -149,19 +144,24 @@ test-suite tests
     , lens-family
     , process
     , random
-    , riak-but-better
+    , riak2
     , tasty
     , tasty-hunit
     , text
+
   default-language:
     Haskell2010
+
   ghc-options:
     -threaded
     -with-rtsopts=-N4
     -Wall
+
   hs-source-dirs:
     test
+
   main-is:
     Main.hs
+
   type:
     exitcode-stdio-1.0

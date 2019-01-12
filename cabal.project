@@ -1,0 +1,11 @@
+packages:
+  riak2,
+  riak2-proto
+
+allow-newer:
+  lens-labels:base
+
+  proto-lens:base
+
+  proto-lens-protoc:base
+  proto-lens-protoc:Cabal

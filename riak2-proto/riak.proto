@@ -1,3 +1,5 @@
+syntax = "proto2";
+
 // Error response - may be generated for any Req
 message RpbErrorResp {
     required bytes errmsg = 1;

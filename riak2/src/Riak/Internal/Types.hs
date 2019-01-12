@@ -166,11 +166,20 @@ newtype RiakQuorum
   deriving newtype (Num)
 
 instance Default RiakQuorum where
-  def = 4294967291
+  def = RiakQuorumDefault
+
+instance Show RiakQuorum where
+  show RiakQuorumAll = "all"
+  show RiakQuorumDefault = "default"
+  show RiakQuorumQuorum = "quorum"
+  show (RiakQuorum n) = show n
 
 -- | All vnodes must respond.
 pattern RiakQuorumAll :: RiakQuorum
 pattern RiakQuorumAll = 4294967292
+
+pattern RiakQuorumDefault :: RiakQuorum
+pattern RiakQuorumDefault = 4294967291
 
 -- | A majority of the vnodes must respond.
 pattern RiakQuorumQuorum :: RiakQuorum
