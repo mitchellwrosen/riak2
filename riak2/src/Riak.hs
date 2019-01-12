@@ -282,8 +282,6 @@ getRiakObject
       & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
       & #bucket .~ bucket
       & #deletedvclock .~ True
-      & #maybe'head .~ Nothing
-      & #maybe'ifModified .~ Nothing
       & #key .~ key
       & #maybe'nVal .~ coerce n
       & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
@@ -335,7 +333,6 @@ getRiakObjectHead
       & #bucket .~ bucket
       & #deletedvclock .~ True
       & #head .~ True
-      & #maybe'ifModified .~ Nothing
       & #key .~ key
       & #maybe'nVal .~ coerce n
       & #maybe'notfoundOk .~ unNotfoundOk notfound_ok
@@ -372,7 +369,6 @@ getRiakObjectIfModified
         & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
         & #bucket .~ bucket
         & #deletedvclock .~ True
-        & #maybe'head .~ Nothing
         & #maybe'ifModified .~ coerce vclock
         & #key .~ key
         & #maybe'nVal .~ coerce n
@@ -434,7 +430,6 @@ getRiakObjectIfModifiedHead
         & #maybe'basicQuorum .~ unBasicQuorum basic_quorum
         & #bucket .~ bucket
         & #deletedvclock .~ True
-        & #maybe'head .~ Nothing
         & #maybe'ifModified .~ coerce vclock
         & #key .~ key
         & #maybe'nVal .~ coerce n
@@ -603,25 +598,17 @@ _putRiakObject
     request :: RpbPutReq
     request =
       defMessage
-        & #maybe'asis .~ Nothing
         & #bucket .~ bucket
         & #content .~
             (defMessage
               & #maybe'charset .~ coerce (riakObjectCharset value)
               & #maybe'contentEncoding .~ coerce (riakObjectContentEncoding value)
               & #maybe'contentType .~ coerce (riakObjectContentType value)
-              & #maybe'deleted .~ Nothing
               & #indexes .~ map indexToRpbPair (coerce indexes)
-              & #maybe'lastMod .~ Nothing
-              & #maybe'lastModUsecs .~ Nothing
               & #links .~ []
-              & #maybe'ttl .~ Nothing
               & #usermeta .~ map rpbPair (coerce metadata)
-              & #value .~ encodeRiakObject value
-              & #maybe'vtag .~ Nothing)
+              & #value .~ encodeRiakObject value)
         & #maybe'dw .~ coerce dw
-        & #maybe'ifNoneMatch .~ Nothing
-        & #maybe'ifNotModified .~ Nothing
         & #maybe'key .~ coerce key
         & #maybe'nVal .~ unN n
         & #maybe'pw .~ coerce pw
@@ -730,18 +717,9 @@ deleteRiakObject
     request =
       defMessage
         & #bucket .~ bucket
-        & #maybe'dw .~ Nothing
         & #key .~ key
-        & #maybe'nVal .~ Nothing
-        & #maybe'pr .~ Nothing
-        & #maybe'pw .~ Nothing
-        & #maybe'r .~ Nothing
-        & #maybe'rw .~ Nothing
-        & #maybe'sloppyQuorum .~ Nothing
-        & #maybe'timeout .~ Nothing
         & #type' .~ type'
         & #maybe'vclock .~ coerce vclock
-        & #maybe'w .~ Nothing
 
   fmap (() <$)
     (withRiakConnection manager (\conn -> deleteRiakObjectPB conn request))
@@ -812,10 +790,6 @@ _updateRiakCounter h bucket key incr params =
   op =
     defMessage
       & #counterOp .~ (defMessage & #increment .~ incr)
-      & #maybe'gsetOp .~ Nothing
-      & #maybe'hllOp .~ Nothing
-      & #maybe'mapOp .~ Nothing
-      & #maybe'setOp .~ Nothing
 
 
 --------------------------------------------------------------------------------
@@ -1026,10 +1000,6 @@ _updateSet
   op :: DtOp
   op =
     defMessage
-      & #maybe'counterOp .~ Nothing
-      & #maybe'gsetOp .~ Nothing
-      & #maybe'hllOp .~ Nothing
-      & #maybe'mapOp .~ Nothing
       & #setOp .~
           (defMessage
             & #adds .~ adds
@@ -1139,7 +1109,6 @@ updateCrdt
       & #bucket .~ bucket
       & #maybe'context .~ coerce context
       & #maybe'dw .~ coerce dw
-      & #maybe'includeContext .~ Nothing
       & #maybe'key .~ coerce key
       & #maybe'nVal .~ coerce n
       & #op .~ op
@@ -1281,7 +1250,6 @@ streamRiakBuckets (RiakHandle manager _) type' fold =
   request =
     defMessage
       & #stream .~ True
-      & #maybe'timeout .~ Nothing
       & #type' .~ unRiakBucketType type'
 
 
@@ -1312,7 +1280,6 @@ streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
   request =
     defMessage
       & #bucket .~ bucket
-      & #maybe'timeout .~ Nothing
       & #type' .~ unRiakBucketType type'
 
 
@@ -1419,20 +1386,10 @@ riakExactQuery
   request =
     defMessage
       & #bucket .~ bucket
-      & #maybe'continuation .~ Nothing
-      & #maybe'coverContext .~ Nothing
       & #index .~ unRiakIndexName index
       & #key .~ key
-      & #maybe'maxResults .~ Nothing
-      & #maybe'paginationSort .~ Nothing
       & #qtype .~ RpbIndexReq'eq
-      & #maybe'rangeMax .~ Nothing
-      & #maybe'rangeMin .~ Nothing
-      & #maybe'returnBody .~ Nothing
-      & #maybe'returnTerms .~ Nothing
       & #stream .~ True
-      & #maybe'termRegex .~ Nothing
-      & #maybe'timeout .~ Nothing
       & #type' .~ unRiakBucketType type'
 
   index :: RiakIndexName
@@ -1470,20 +1427,11 @@ riakRangeQuery
   request =
     defMessage
       & #bucket .~ bucket
-      & #maybe'continuation .~ Nothing
-      & #maybe'coverContext .~ Nothing
       & #index .~ unRiakIndexName index
-      & #maybe'key .~ Nothing
-      & #maybe'maxResults .~ Nothing
-      & #maybe'paginationSort .~ Nothing
       & #qtype .~ RpbIndexReq'range
       & #rangeMax .~ rmax
       & #rangeMin .~ rmin
-      & #maybe'returnBody .~ Nothing
-      & #maybe'returnTerms .~ Nothing
       & #stream .~ True
-      & #maybe'termRegex .~ Nothing
-      & #maybe'timeout .~ Nothing
       & #type' .~ unRiakBucketType type'
 
   index :: RiakIndexName
@@ -1527,20 +1475,12 @@ riakRangeQueryTerms
   request =
     defMessage
       & #bucket .~ bucket
-      & #maybe'continuation .~ Nothing
-      & #maybe'coverContext .~ Nothing
       & #index .~ unRiakIndexName index
-      & #maybe'key .~ Nothing
-      & #maybe'maxResults .~ Nothing
-      & #maybe'paginationSort .~ Nothing
       & #qtype .~ RpbIndexReq'range
       & #rangeMax .~ rmax
       & #rangeMin .~ rmin
-      & #maybe'returnBody .~ Nothing
       & #returnTerms .~ True
       & #stream .~ True
-      & #maybe'termRegex .~ Nothing
-      & #maybe'timeout .~ Nothing
       & #type' .~ unRiakBucketType type'
 
   index :: RiakIndexName
@@ -1689,14 +1629,8 @@ getRiakIndexes (RiakHandle manager _) = liftIO . runExceptT $ do
   response :: RpbYokozunaIndexGetResp <-
     ExceptT
       (withRiakConnection manager
-        (\conn -> getRiakIndexPB conn request))
+        (\conn -> getRiakIndexPB conn defMessage))
   pure (response ^. #index)
-
- where
-  request :: RpbYokozunaIndexGetReq
-  request =
-    defMessage
-      & #maybe'name .~ Nothing
 
 
 putRiakIndex
