@@ -32,7 +32,7 @@ import qualified Streaming.Prelude as Streaming
 -- | A thread-safe connection to Riak.
 data RiakConnection
   = RiakConnection
-      !Socket
+      !Client.Socket
       !(MVar ())
       !(TQueue (Stream ((->) Message) IO ()))
       !ThreadId
@@ -44,7 +44,7 @@ data EOF = EOF
 
 riakConnect :: HostName -> PortNumber -> IO RiakConnection
 riakConnect host port = do
-  socket :: Socket <-
+  socket :: Client.Socket <-
     Client.connect host port
 
   sem :: MVar () <-
@@ -89,7 +89,7 @@ riakConnect host port = do
 riakDisconnect :: RiakConnection -> IO ()
 riakDisconnect (RiakConnection socket _ _ recvTid _) = do
   killThread recvTid
-  Socket.close socket
+  Client.close socket
 
 riakSend :: Request a => RiakConnection -> a -> IO ()
 riakSend (RiakConnection socket _ _ _ exVar) request =

@@ -1,5 +1,7 @@
 module Riak.Client
-  ( connect
+  ( Socket
+  , connect
+  , close
   , send
   , messages
   ) where
@@ -10,14 +12,15 @@ import Riak.Request (Request)
 import qualified Riak.Message as Message
 import qualified Riak.Request as Request
 
+import Control.Concurrent.MVar
 import Control.Exception         (Exception, throwIO)
 import Control.Monad             (unless)
 import Control.Monad.IO.Class    (MonadIO(liftIO))
 import Control.Monad.Trans.Class (lift)
 import Data.ByteString           (ByteString)
 import Data.Function             (fix)
-import Network.Socket            (HostName, PortNumber, Socket,
-                                  SocketType(Stream))
+import Data.IORef
+import Network.Socket            (HostName, PortNumber)
 import Streaming                 (Of, Stream, hoist)
 
 import qualified Data.Attoparsec.ByteString     as Atto
@@ -29,16 +32,30 @@ import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 import qualified Streaming.Prelude              as Streaming
 
 
-connect :: HostName -> PortNumber -> IO Socket
-connect host port = do
+data SocketError
+  = EOF
+  | ParseFailure ![String] String
+  deriving stock (Show)
+  deriving anyclass (Exception)
+
+data Socket
+  = Socket
+  { socket    :: !Socket.Socket
+  , bufferRef :: !(IORef ByteString)
+  , sendlock  :: !(MVar ())
+  , recvlock  :: !(MVar ())
+  }
+
+connect :: MonadIO m => HostName -> PortNumber -> m Socket
+connect host port = liftIO $ do
   info : _ <-
     let
       hints =
-        Socket.defaultHints { Socket.addrSocketType = Stream }
+        Socket.defaultHints { Socket.addrSocketType = Socket.Stream }
     in
       Socket.getAddrInfo (Just hints) (Just host) (Just (show port))
 
-  socket :: Socket <-
+  socket :: Socket.Socket <-
     Socket.socket
       (Socket.addrFamily info)
       (Socket.addrSocketType info)
@@ -46,11 +63,56 @@ connect host port = do
 
   Socket.connect socket (Socket.addrAddress info)
 
-  pure socket
+  bufferRef <- newIORef ByteString.empty
+  sendlock <- newMVar ()
+  recvlock <- newMVar ()
 
-send :: Request a => Socket -> a -> IO ()
-send socket request =
-  Socket.sendAll socket (Message.encode (Request.toMessage request))
+  pure Socket
+    { socket = socket
+    , bufferRef = bufferRef
+    , sendlock = sendlock
+    , recvlock = recvlock
+    }
+
+close :: MonadIO m => Socket -> m ()
+close =
+  liftIO . Socket.close . socket
+
+send :: (MonadIO m, Request a) => Socket -> a -> m ()
+send (Socket { sendlock, socket }) request = liftIO $
+  withMVar sendlock $ \() ->
+    Socket.sendAll socket (Message.encode (Request.toMessage request))
+
+recv :: MonadIO m => Socket -> m Message
+recv (Socket { bufferRef, recvlock, socket }) =
+  liftIO (withMVar recvlock $ \() -> recv_ bufferRef socket)
+
+recv_ :: IORef ByteString -> Socket.Socket -> IO Message
+recv_ bufferRef socket = do
+  buffer <- readIORef bufferRef
+
+  loop
+    (if ByteString.null buffer
+      then Atto.Partial Message.parse
+      else Message.parse buffer)
+
+  where
+    loop :: Atto.IResult ByteString Message -> IO Message
+    loop = \case
+      Atto.Fail _unconsumed context reason ->
+        throwIO (ParseFailure context reason)
+
+      Atto.Partial k -> do
+        bytes <- Socket.recv socket 16384
+
+        loop
+          (if ByteString.null bytes
+            then k ByteString.empty
+            else Message.parse bytes)
+
+      Atto.Done unconsumed message -> do
+        writeIORef bufferRef unconsumed
+        pure message
 
 
 data MessageParseFailure
@@ -62,11 +124,11 @@ data MessageParseFailure
 
 messages :: MonadIO m => Socket -> Stream (Of Message) m ()
 messages =
-  hoist liftIO . messageStream . socketStream
+  hoist liftIO . messageStream . socketStream . socket
 
 socketStream ::
      MonadIO m
-  => Socket
+  => Socket.Socket
   -> Q.ByteString m ()
 socketStream socket =
   fix $ \loop -> do

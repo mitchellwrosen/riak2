@@ -36,6 +36,7 @@ language_extensions:
   - LambdaCase
   - MagicHash
   - MultiParamTypeClasses
+  - NamedFieldPuns
   - NoImplicitPrelude
   - OverloadedLabels
   - OverloadedStrings

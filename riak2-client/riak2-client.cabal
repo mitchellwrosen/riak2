@@ -19,6 +19,7 @@ library
     DeriveAnyClass
     DerivingStrategies
     LambdaCase
+    NamedFieldPuns
     ScopedTypeVariables
 
   default-language:
@@ -26,6 +27,8 @@ library
 
   exposed-modules:
     Riak.Client
+    Riak.Socket.Sequential
+    Riak.Socket.Concurrent
 
   ghc-options:
     -Wall
