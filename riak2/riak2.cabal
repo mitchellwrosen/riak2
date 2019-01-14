@@ -26,7 +26,6 @@ library
     , primitive ^>= 0.6.4
     , profunctors ^>= 5.3
     , proto-lens ^>= 0.4.0
-    , riak2-client
     , riak2-proto
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
@@ -96,21 +95,22 @@ library
     src
 
   other-modules:
+    Riak.Client
     Riak.Internal.Cache
     Riak.Internal.Crdts
     Riak.Internal.Exception
     Riak.Internal.Debug
     Riak.Internal.Manager
     Riak.Internal.MapReduce
-    -- Riak.Internal.Message
     Riak.Internal.Object
     Riak.Internal.Panic
     Riak.Internal.Params
     Riak.Internal.Prelude
-    -- Riak.Internal.Request
-    -- Riak.Internal.Response
     Riak.Internal.Types
     Riak.Internal.Utils
+
+  signatures:
+    Riak.Client.Signature
 
 -- executable riakc
 --   build-depends:
@@ -136,33 +136,33 @@ library
 --   main-is:
 --     Main.hs
 
-test-suite tests
-  build-depends:
-      base
-    , bytestring
-    , containers
-    , foldl
-    , lens-family
-    , process
-    , random
-    , riak2
-    , tasty
-    , tasty-hunit
-    , text
-
-  default-language:
-    Haskell2010
-
-  ghc-options:
-    -threaded
-    -with-rtsopts=-N4
-    -Wall
-
-  hs-source-dirs:
-    test
-
-  main-is:
-    Main.hs
-
-  type:
-    exitcode-stdio-1.0
+-- test-suite tests
+--   build-depends:
+--       base
+--     , bytestring
+--     , containers
+--     , foldl
+--     , lens-family
+--     , process
+--     , random
+--     , riak2
+--     , tasty
+--     , tasty-hunit
+--     , text
+--
+--   default-language:
+--     Haskell2010
+--
+--   ghc-options:
+--     -threaded
+--     -with-rtsopts=-N4
+--     -Wall
+--
+--   hs-source-dirs:
+--     test
+--
+--   main-is:
+--     Main.hs
+--
+--   type:
+--     exitcode-stdio-1.0

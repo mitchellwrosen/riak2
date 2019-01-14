@@ -1,4 +1,4 @@
-{-# LANGUAGE AllowAmbiguousTypes,UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes, UndecidableInstances #-}
 
 module Riak
   ( -- * Handle
@@ -145,6 +145,7 @@ module Riak
     -- $documentation
   ) where
 
+import Riak.Client             (Client, RecvResult(..))
 import Riak.Internal
 import Riak.Internal.Cache     (newSTMRiakCache)
 import Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
@@ -154,7 +155,6 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types     (ObjectReturn(..), ParamObjectReturn(..),
                                 RiakTy(..), SBool(..))
 import Riak.Internal.Utils     (bs2int, int2bs)
-import Riak.Socket.Concurrent  (RecvResult(..), Socket)
 
 import qualified Riak.Client     as Client
 import qualified Riak.Proto.Lens as L
@@ -1639,7 +1639,7 @@ getRiakIndex (RiakHandle manager _) name = liftIO $ do
         & #name L..~ unRiakIndexName name
 
     action
-      :: Socket
+      :: Client
       -> IO (RecvResult (Maybe RpbYokozunaIndex))
     action conn =
       (translateNotfound <$> Client.getIndex conn request) >>= \case

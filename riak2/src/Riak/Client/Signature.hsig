@@ -1,0 +1,25 @@
+signature Riak.Client.Signature where
+
+import Riak.Message (Message)
+
+import Prelude
+import Network.Socket (HostName, PortNumber)
+
+import qualified Data.ByteString.Lazy as Lazy (ByteString)
+
+data Client
+
+connect ::
+     HostName
+  -> PortNumber
+  -> IO Client
+
+disconnect ::
+     Client
+  -> IO ()
+
+exchange ::
+     Client
+  -> Lazy.ByteString
+  -> (IO (Maybe Message) -> IO r)
+  -> IO r
