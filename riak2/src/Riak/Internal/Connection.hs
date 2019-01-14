@@ -105,7 +105,8 @@ riakExchange
   -> a
   -> IO (Either RpbErrorResp b)
 riakExchange conn request = do
-  join . fmap sequenceA . Response.parse =<< riakExchange__ conn request
+  undefined
+  -- join . fmap sequenceA . Response.parse =<< riakExchange__ conn request
 
 riakExchange_
   :: forall b a.
@@ -114,7 +115,8 @@ riakExchange_
   -> a
   -> IO (Either RpbErrorResp ())
 riakExchange_ conn request = do
-  fmap (() <$) . Response.parse @b =<< riakExchange__ conn request
+  undefined
+  -- fmap (() <$) . Response.parse @b =<< riakExchange__ conn request
 
 riakExchange__
   :: forall a.
@@ -179,7 +181,8 @@ riakStream
       consumer =
         Streaming.wrap $ \message -> do
           response :: Either RpbErrorResp b <-
-            lift ((join . fmap sequenceA . Response.parse) message)
+            undefined
+            -- lift ((join . fmap sequenceA . Response.parse) message)
           -- debug "[riak] recv"
           -- debug ("[riak] recv: " ++ either show show response)
 

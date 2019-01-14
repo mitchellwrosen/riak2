@@ -2,7 +2,7 @@ steps:
   - simple_align:
       cases: true
       top_level_patterns: true
-      records: true
+      records: false
   - imports:
       align: group
       list_align: after_alias

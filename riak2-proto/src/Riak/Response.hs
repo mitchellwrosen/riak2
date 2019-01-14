@@ -1,6 +1,7 @@
 module Riak.Response
   ( Response(..)
   , parse
+  , ParseError(..)
   ) where
 
 import Riak.Message (Code(..), Message(..))
@@ -18,18 +19,9 @@ import qualified Data.ProtoLens as Proto
 class Show a => Response a where
   code :: Code a
 
-  decode :: MonadIO m => ByteString -> m a
-  default decode :: (Proto.Message a, MonadIO m) => ByteString -> m a
-  decode bytes =
-    case Proto.decodeMessage bytes of
-      Left message ->
-        liftIO $ throwIO ProtobufDecodeFailure
-          { message = message
-          , bytes = bytes
-          }
-
-      Right value ->
-        pure value
+  decode :: ByteString -> Either String a
+  default decode :: Proto.Message a => ByteString -> Either String a
+  decode = Proto.decodeMessage
 
 instance Response DtFetchResp              where code = 81
 instance Response DtUpdateResp             where code = 83
@@ -48,62 +40,59 @@ instance Response RpbYokozunaSchemaGetResp where code = 59
 
 instance Response RpbDelResp where
   code = 14
-  decode _ = pure RpbDelResp
+  decode _ = Right RpbDelResp
 
 instance Response RpbEmptyPutResp where
   code = 12
-  decode _ = pure RpbEmptyPutResp
+  decode _ = Right RpbEmptyPutResp
 
 instance Response RpbPingResp where
   code = 2
-  decode _ = pure RpbPingResp
+  decode _ = Right RpbPingResp
 
 instance Response RpbResetBucketResp where
   code = 30
-  decode _ = pure RpbResetBucketResp
+  decode _ = Right RpbResetBucketResp
 
 instance Response RpbSetBucketResp where
   code = 22
-  decode _ = pure RpbSetBucketResp
+  decode _ = Right RpbSetBucketResp
 
 instance Response RpbSetBucketTypeResp where
   code = 32
-  decode _ = pure RpbSetBucketTypeResp
+  decode _ = Right RpbSetBucketTypeResp
 
 
-data UnexpectedMessageCode
-  = UnexpectedMessageCode
-  { actual   :: !Message
-  , expected :: !Word8
-  } deriving stock (Show)
-    deriving anyclass (Exception)
+data ParseError
+  = UnexpectedMessageCode !Message !Word8
+  | ProtobufDecodeError !Message !String
+  deriving stock (Show)
 
-data ProtobufDecodeFailure
-  = ProtobufDecodeFailure
-  { message :: !String
-  , bytes   :: !ByteString
-  } deriving stock (Show)
-    deriving anyclass (Exception)
 
 parse ::
-     forall a m.
-     ( MonadIO m
-     , Response a
-     )
+     forall a.
+     Response a
   => Message
-  -> m (Either RpbErrorResp (m a))
+  -> Either ParseError (Either RpbErrorResp a)
 parse message@(Message actual bytes)
   | actual == expected =
-      pure (Right (decode bytes))
+      case decode bytes of
+        Left err ->
+          Left (ProtobufDecodeError message err)
+
+        Right response ->
+          Right (Right response)
 
   | actual == 0 =
-      Left <$> decode bytes
+      case decode bytes of
+        Left err ->
+          Left (ProtobufDecodeError message err)
+
+        Right response ->
+          Right (Left response)
 
   | otherwise =
-      liftIO $ throwIO UnexpectedMessageCode
-        { actual = message
-        , expected = expected
-        }
+      Left (UnexpectedMessageCode message expected)
 
   where
     expected :: Word8

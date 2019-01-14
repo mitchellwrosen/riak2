@@ -14,6 +14,7 @@ library
     , streaming
     , streaming-bytestring ^>= 0.1.6
     , transformers ^>= 0.5.5
+    , unliftio
 
   default-extensions:
     DeriveAnyClass

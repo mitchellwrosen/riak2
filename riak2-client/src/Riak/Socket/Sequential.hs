@@ -4,20 +4,22 @@ module Riak.Socket.Sequential
   , close
   , send
   , recv
-  , SocketError(..)
+  , RecvError(..)
   ) where
 
-import Riak.Message (Message)
-import Riak.Request (Request)
+import Riak.Message  (Message)
+import Riak.Proto    (RpbErrorResp)
+import Riak.Request  (Request)
+import Riak.Response (Response)
 
-import qualified Riak.Message as Message
-import qualified Riak.Request as Request
+import qualified Riak.Message  as Message
+import qualified Riak.Request  as Request
+import qualified Riak.Response as Response
 
-import Control.Exception      (Exception, throwIO)
-import Control.Monad.IO.Class (MonadIO(liftIO))
-import Data.ByteString        (ByteString)
+import Data.Bifunctor  (first)
+import Data.ByteString (ByteString)
 import Data.IORef
-import Network.Socket         (HostName, PortNumber)
+import Network.Socket  (HostName, PortNumber)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
@@ -26,22 +28,16 @@ import qualified Network.Socket.ByteString      as Socket (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
 
 
-data SocketError
-  = EOF
-  | ParseFailure ![String] String
-  deriving stock (Show)
-  deriving anyclass (Exception)
-
 -- | A non-thread-safe connection to Riak.
 data Socket
   = Socket
-  { socket    :: !Socket.Socket
+  { socket :: !Socket.Socket
   , bufferRef :: !(IORef ByteString)
   }
 
 -- | Connect to Riak.
-connect :: MonadIO m => HostName -> PortNumber -> m Socket
-connect host port = liftIO $ do
+connect :: HostName -> PortNumber -> IO Socket
+connect host port = do
   info : _ <-
     let
       hints =
@@ -65,18 +61,26 @@ connect host port = liftIO $ do
     }
 
 -- | Close the connection to Riak.
-close :: MonadIO m => Socket -> m ()
+close :: Socket -> IO ()
 close =
-  liftIO . Socket.close . socket
+  Socket.close . socket
 
 -- | Send a request to Riak.
-send :: (MonadIO m, Request a) => Socket -> a -> m ()
+send :: Request a => Socket -> a -> IO ()
 send (Socket { socket }) request =
-  liftIO (Socket.sendAll socket (Message.encode (Request.toMessage request)))
+  Socket.sendAll socket (Message.encode (Request.toMessage request))
+
+data RecvError
+  = EOF
+  | ParseError Response.ParseError
 
 -- | Receive a response from Riak.
-recv :: MonadIO m => Socket -> m Message
-recv (Socket { bufferRef, socket }) = liftIO $ do
+recv ::
+     forall a.
+     Response a
+  => Socket
+  -> IO (Either RecvError (Either RpbErrorResp a))
+recv (Socket { bufferRef, socket }) = do
   buffer <- readIORef bufferRef
 
   loop
@@ -85,10 +89,14 @@ recv (Socket { bufferRef, socket }) = liftIO $ do
       else Message.parse buffer)
 
   where
-    loop :: Atto.IResult ByteString Message -> IO Message
+    loop ::
+         Atto.IResult ByteString Message
+      -> IO (Either RecvError (Either RpbErrorResp a))
     loop = \case
-      Atto.Fail _unconsumed context reason ->
-        throwIO (ParseFailure context reason)
+      -- The message parser is just a 4-byte length followed by that many bytes,
+      -- so just assume that can only fail due to not enough bytes.
+      Atto.Fail _unconsumed _context _reason ->
+        pure (Left EOF)
 
       Atto.Partial k -> do
         bytes <- Socket.recv socket 16384
@@ -100,4 +108,5 @@ recv (Socket { bufferRef, socket }) = liftIO $ do
 
       Atto.Done unconsumed message -> do
         writeIORef bufferRef unconsumed
-        pure message
+
+        pure (first ParseError (Response.parse message))

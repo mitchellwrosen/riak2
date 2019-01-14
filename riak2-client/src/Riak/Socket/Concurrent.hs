@@ -2,69 +2,108 @@ module Riak.Socket.Concurrent
   ( Socket
   , connect
   , close
-  , send
-  , recv
+  , exchange
+  , RecvError(..)
   ) where
 
-import Riak.Message  (Message)
-import Riak.Proto    (RpbErrorResp)
-import Riak.Request  (Request)
-import Riak.Response (Response)
+import Riak.Proto             (RpbErrorResp)
+import Riak.Request           (Request)
+import Riak.Response          (Response)
+import Riak.Socket.Sequential (RecvError(..))
 
-import qualified Riak.Response          as Response
 import qualified Riak.Socket.Sequential as Sequential (Socket)
 import qualified Riak.Socket.Sequential as Socket.Sequential
 
 import Control.Concurrent.MVar
-import Control.Monad.IO.Class    (MonadIO(liftIO))
-import Network.Socket            (HostName, PortNumber)
+import Data.Coerce
+import Network.Socket          (HostName, PortNumber)
+import UnliftIO.Exception      (finally)
 
 
 -- | A thread-safe connection to Riak.
---
--- Sending an receiving may be performed concurrently via multiple threads, but
--- it is the user's responsibility to associate requests with their responses.
-data Socket
-  = Socket
-  { socket :: !Sequential.Socket
-  , sendlock :: !(MVar ())
-  , recvlock :: !(MVar ())
-  }
+newtype Socket
+  = Socket (ReqRep Sequential.Socket)
 
 -- | Connect to Riak.
-connect :: MonadIO m => HostName -> PortNumber -> m Socket
-connect host port = liftIO $
-  Socket
-    <$> Socket.Sequential.connect host port
-    <*> newMVar ()
-    <*> newMVar ()
+connect :: HostName -> PortNumber -> IO Socket
+connect host port =
+  coerce (newReqRep =<< Socket.Sequential.connect host port)
 
 -- | Close the connection to Riak.
-close :: MonadIO m => Socket -> m ()
+close :: Socket -> IO ()
 close =
-  Socket.Sequential.close . socket
-
--- | Send a request to Riak.
-send :: (MonadIO m, Request a) => Socket -> a -> m ()
-send (Socket { sendlock, socket }) request = liftIO $
-  withMVar sendlock $ \() ->
-    Socket.Sequential.send socket request
-
--- | Receive a response from Riak.
---
--- Returns an action that decodes the response received.
-recv :: (MonadIO m, Response a) => Socket -> m (Either RpbErrorResp (m a))
-recv (Socket { recvlock, socket }) = do
-  message :: Message <-
-    liftIO $ withMVar recvlock $ \() ->
-      Socket.Sequential.recv socket
-
-  Response.parse message
+  Socket.Sequential.close . resource . coerce
 
 exchange ::
-     (MonadIO m, Request a, Response b)
+     (Request a, Response b)
   => Socket
   -> a
-  -> m (Either RpbErrorResp (m b))
-exchange socket request =
-  undefined
+  -> IO (Either RecvError (Either RpbErrorResp b))
+exchange (Socket socket) request =
+  reqRep
+    socket
+    (\socket -> Socket.Sequential.send socket request)
+    Socket.Sequential.recv
+
+
+data ReqRep a
+  = ReqRep
+  { resource :: a
+  , sync :: !Synchronized
+  , relay :: !Relay
+  }
+
+newReqRep :: a -> IO (ReqRep a)
+newReqRep resource =
+  ReqRep
+    <$> pure resource
+    <*> newSynchronized
+    <*> newRelay
+
+reqRep ::
+     ReqRep a
+  -> (a -> IO ())
+  -> (a -> IO b)
+  -> IO b
+reqRep (ReqRep { resource, sync, relay }) send recv = do
+  baton <-
+    synchronized sync $ do
+      send resource
+      enterRelay relay
+
+  withBaton baton (recv resource)
+
+
+newtype Synchronized
+  = Synchronized (MVar ())
+
+newSynchronized :: IO Synchronized
+newSynchronized =
+  coerce (newMVar ())
+
+synchronized :: Synchronized -> IO a -> IO a
+synchronized (Synchronized var) =
+  withMVar var . const
+
+
+newtype Relay
+  = Relay (MVar (MVar ()))
+
+data Baton
+  = Baton (MVar ()) (MVar ())
+
+newRelay :: IO Relay
+newRelay =
+  coerce (newMVar =<< newMVar ())
+
+enterRelay :: Relay -> IO Baton
+enterRelay (Relay var) = do
+  after <- newEmptyMVar
+  before <- swapMVar var after
+  pure (Baton before after)
+
+-- TODO think about async exceptions a bit here
+withBaton :: Baton -> IO a -> IO a
+withBaton (Baton before after) action = do
+  takeMVar before
+  action `finally` putMVar after ()
