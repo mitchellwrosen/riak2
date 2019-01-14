@@ -4,22 +4,23 @@ module Riak.Socket.Sequential
   , close
   , send
   , recv
-  , RecvError(..)
+  , RecvResult(..)
+  , ParseError(..)
   ) where
 
 import Riak.Message  (Message)
 import Riak.Proto    (RpbErrorResp)
 import Riak.Request  (Request)
-import Riak.Response (Response)
+import Riak.Response (ParseError(..), Response)
 
 import qualified Riak.Message  as Message
 import qualified Riak.Request  as Request
 import qualified Riak.Response as Response
 
-import Data.Bifunctor  (first)
-import Data.ByteString (ByteString)
+import Control.Exception (throwIO)
+import Data.ByteString   (ByteString)
 import Data.IORef
-import Network.Socket  (HostName, PortNumber)
+import Network.Socket    (HostName, PortNumber)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
@@ -70,16 +71,19 @@ send :: Request a => Socket -> a -> IO ()
 send (Socket { socket }) request =
   Socket.sendAll socket (Message.encode (Request.toMessage request))
 
-data RecvError
-  = EOF
-  | ParseError Response.ParseError
+
+data RecvResult a
+  = RiakClosedConnection
+  | Failure RpbErrorResp
+  | Success a
+  deriving stock (Eq, Functor, Show)
 
 -- | Receive a response from Riak.
 recv ::
      forall a.
      Response a
   => Socket
-  -> IO (Either RecvError (Either RpbErrorResp a))
+  -> IO (RecvResult a)
 recv (Socket { bufferRef, socket }) = do
   buffer <- readIORef bufferRef
 
@@ -91,12 +95,12 @@ recv (Socket { bufferRef, socket }) = do
   where
     loop ::
          Atto.IResult ByteString Message
-      -> IO (Either RecvError (Either RpbErrorResp a))
+      -> IO (RecvResult a)
     loop = \case
       -- The message parser is just a 4-byte length followed by that many bytes,
       -- so just assume that can only fail due to not enough bytes.
       Atto.Fail _unconsumed _context _reason ->
-        pure (Left EOF)
+        pure RiakClosedConnection
 
       Atto.Partial k -> do
         bytes <- Socket.recv socket 16384
@@ -109,4 +113,12 @@ recv (Socket { bufferRef, socket }) = do
       Atto.Done unconsumed message -> do
         writeIORef bufferRef unconsumed
 
-        pure (first ParseError (Response.parse message))
+        case Response.parse message of
+          Left err ->
+            throwIO err
+
+          Right (Left err) ->
+            pure (Failure err)
+
+          Right (Right response) ->
+            pure (Success response)

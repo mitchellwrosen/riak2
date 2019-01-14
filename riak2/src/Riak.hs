@@ -1,4 +1,4 @@
-{-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE AllowAmbiguousTypes,UndecidableInstances #-}
 
 module Riak
   ( -- * Handle
@@ -154,8 +154,13 @@ import Riak.Internal.Prelude
 import Riak.Internal.Types     (ObjectReturn(..), ParamObjectReturn(..),
                                 RiakTy(..), SBool(..))
 import Riak.Internal.Utils     (bs2int, int2bs)
+import Riak.Socket.Concurrent  (RecvResult(..), Socket)
+
+import qualified Riak.Client     as Client
+import qualified Riak.Proto.Lens as L
 
 import Control.Foldl                (FoldM)
+import Control.Lens                 (view)
 import Data.Default.Class           (def)
 import Data.Generics.Product.Fields (field)
 import Data.Profunctor              (lmap)
@@ -249,47 +254,50 @@ getRiakObject
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp [RiakObject a])
+  -> m (RecvResult [RiakObject a])
 getRiakObject
     h@(RiakHandle manager _)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
-    = liftIO . runExceptT $ do
+    = liftIO $ do
 
-  response :: RpbGetResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakObjectPB conn request))
+  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  contents :: [RiakObject a] <- lift $
-    traverse
-      (parseContent' loc)
-      (filter notTombstone (response L.^. #content))
+    Failure err ->
+      pure (Failure err)
 
-  case contents of
-    c0 : _ | contentIsDataType c0 ->
-      pure ()
+    Success response -> do
+      contents :: [RiakObject a] <-
+        traverse
+          (parseContent' loc)
+          (filter notTombstone (response ^. L.content))
 
-    _ -> do
-      lift (cacheVclock h loc (coerce (response L.^. #maybe'vclock)))
+      case contents of
+        c0 : _ | contentIsDataType c0 ->
+          pure ()
 
-  pure contents
+        _ -> do
+          cacheVclock h loc (coerce (response ^. L.maybe'vclock))
 
- where
-  request :: RpbGetReq
-  request =
-    defMessage
-      & #maybe'basicQuorum L..~ unBasicQuorum basic_quorum
-      & #bucket L..~ bucket
-      & #deletedvclock L..~ True
-      & #key L..~ key
-      & #maybe'nVal L..~ coerce n
-      & #maybe'notfoundOk L..~ unNotfoundOk notfound_ok
-      & #maybe'pr L..~ coerce pr
-      & #maybe'r L..~ coerce r
-      & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
-      & #maybe'timeout L..~ unTimeout timeout
-      & #type' L..~ type'
+      pure (Success contents)
+
+  where
+    request :: RpbGetReq
+    request =
+      defMessage
+        & #maybe'basicQuorum L..~ unBasicQuorum basic_quorum
+        & #bucket L..~ bucket
+        & #deletedvclock L..~ True
+        & #key L..~ key
+        & #maybe'nVal L..~ coerce n
+        & #maybe'notfoundOk L..~ unNotfoundOk notfound_ok
+        & #maybe'pr L..~ coerce pr
+        & #maybe'r L..~ coerce r
+        & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
+        & #maybe'timeout L..~ unTimeout timeout
+        & #type' L..~ type'
 
 
 -- | Get an object's metadata.
@@ -299,48 +307,51 @@ getRiakObjectHead
     => RiakHandle -- ^ Riak handle
     -> RiakKey -- ^ Bucket type, bucket, and key
     -> GetRiakObjectParams -- ^ Optional parameters
-    -> m (Either RpbErrorResp [RiakObject ()])
+    -> m (RecvResult [RiakObject ()])
 getRiakObjectHead
     h@(RiakHandle manager _)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
-    = liftIO . runExceptT $ do
+    = liftIO $ do
 
-  response :: RpbGetResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakObjectPB conn request))
+  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  contents :: [RiakObject ()] <- lift $
-    traverse
-      (parseContentHead loc)
-      (filter notTombstone (response L.^. #content))
+    Failure err ->
+      pure (Failure err)
 
-  case contents of
-    c0 : _ | contentIsDataType c0 ->
-      pure ()
+    Success response -> do
+      contents :: [RiakObject ()] <-
+        traverse
+          (parseContentHead loc)
+          (filter notTombstone (response ^. L.content))
 
-    _ -> do
-      lift (cacheVclock h loc (coerce (response L.^. #maybe'vclock)))
+      case contents of
+        c0 : _ | contentIsDataType c0 ->
+          pure ()
 
-  pure contents
+        _ -> do
+          cacheVclock h loc (coerce (response ^. L.maybe'vclock))
 
- where
-  request :: RpbGetReq
-  request =
-    defMessage
-      & #maybe'basicQuorum L..~ unBasicQuorum basic_quorum
-      & #bucket L..~ bucket
-      & #deletedvclock L..~ True
-      & #head L..~ True
-      & #key L..~ key
-      & #maybe'nVal L..~ coerce n
-      & #maybe'notfoundOk L..~ unNotfoundOk notfound_ok
-      & #maybe'pr L..~ coerce pr
-      & #maybe'r L..~ coerce r
-      & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
-      & #maybe'timeout L..~ unTimeout timeout
-      & #type' L..~ type'
+      pure (Success contents)
+
+  where
+    request :: RpbGetReq
+    request =
+      defMessage
+        & #maybe'basicQuorum L..~ unBasicQuorum basic_quorum
+        & #bucket L..~ bucket
+        & #deletedvclock L..~ True
+        & #head L..~ True
+        & #key L..~ key
+        & #maybe'nVal L..~ coerce n
+        & #maybe'notfoundOk L..~ unNotfoundOk notfound_ok
+        & #maybe'pr L..~ coerce pr
+        & #maybe'r L..~ coerce r
+        & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
+        & #maybe'timeout L..~ unTimeout timeout
+        & #type' L..~ type'
 
 -- | Get an object if it has been modified since the last get.
 --
@@ -352,15 +363,15 @@ getRiakObjectIfModified
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Modified [RiakObject a]))
+  -> m (RecvResult (Modified [RiakObject a]))
 getRiakObjectIfModified
     h@(RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
-    = liftIO . runExceptT $ do
+    = liftIO $ do
 
   vclock :: Maybe RiakVclock <-
-    lift (riakCacheLookup cache loc)
+    riakCacheLookup cache loc
 
   let
     request :: RpbGetReq
@@ -379,29 +390,32 @@ getRiakObjectIfModified
         & #maybe'timeout L..~ unTimeout timeout
         & #type' L..~ type'
 
-  response :: RpbGetResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakObjectPB conn request))
+  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  if response L.^. #unchanged
-    then
-      pure Unmodified
+    Failure err ->
+      pure (Failure err)
 
-    else do
-      contents :: [RiakObject a] <- lift $
-        traverse
-          (parseContent' loc)
-          (filter notTombstone (response L.^. #content))
+    Success response ->
+      if response ^. L.unchanged
+        then
+          pure (Success Unmodified)
 
-      case contents of
-        c0 : _ | contentIsDataType c0 ->
-          pure ()
+        else do
+          contents :: [RiakObject a] <-
+            traverse
+              (parseContent' loc)
+              (filter notTombstone (response ^. L.content))
 
-        _ -> do
-          lift (cacheVclock h loc (coerce (response L.^. #maybe'vclock)))
+          case contents of
+            c0 : _ | contentIsDataType c0 ->
+              pure ()
 
-      pure (Modified contents)
+            _ -> do
+              cacheVclock h loc (coerce (response ^. L.maybe'vclock))
+
+          pure (Success (Modified contents))
 
 -- | Get an object's metadata if it has been modified since the last get.
 --
@@ -413,15 +427,15 @@ getRiakObjectIfModifiedHead
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Modified [RiakObject ()]))
+  -> m (RecvResult (Modified [RiakObject ()]))
 getRiakObjectIfModifiedHead
     h@(RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
-    = liftIO . runExceptT $ do
+    = liftIO $ do
 
   vclock :: Maybe RiakVclock <-
-    lift (riakCacheLookup cache loc)
+    riakCacheLookup cache loc
 
   let
     request :: RpbGetReq
@@ -440,29 +454,32 @@ getRiakObjectIfModifiedHead
         & #maybe'timeout L..~ unTimeout timeout
         & #type' L..~ type'
 
-  response :: RpbGetResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakObjectPB conn request))
+  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  if response L.^. #unchanged
-    then
-      pure Unmodified
+    Failure err ->
+      pure (Failure err)
 
-    else do
-      contents :: [RiakObject ()] <- lift $
-        traverse
-          (parseContentHead loc)
-          (filter notTombstone (response L.^. #content))
+    Success response ->
+      if response ^. L.unchanged
+        then
+          pure (Success Unmodified)
 
-      case contents of
-        c0 : _ | contentIsDataType c0 ->
-          pure ()
+        else do
+          contents :: [RiakObject ()] <-
+            traverse
+              (parseContentHead loc)
+              (filter notTombstone (response L.^. #content))
 
-        _ -> do
-          lift (cacheVclock h loc (coerce (response L.^. #maybe'vclock)))
+          case contents of
+            c0 : _ | contentIsDataType c0 ->
+              pure ()
 
-      pure (Modified contents)
+            _ -> do
+              cacheVclock h loc (coerce (response L.^. #maybe'vclock))
+
+          pure (Success (Modified contents))
 
 --------------------------------------------------------------------------------
 -- Put object
@@ -481,7 +498,7 @@ putRiakObject
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 putRiakObject
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   fmap (() <$)
@@ -499,7 +516,7 @@ putRiakObjectHead
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (NonEmpty (RiakObject ())))
+  -> m (RecvResult (NonEmpty (RiakObject ())))
 putRiakObjectHead
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   (_putRiakObject handle bucket (Just key) content a b c d e
@@ -513,7 +530,7 @@ putRiakObjectBody
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (NonEmpty (RiakObject a)))
+  -> m (RecvResult (NonEmpty (RiakObject a)))
 putRiakObjectBody
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   _putRiakObject handle bucket (Just key) content a b c d e
@@ -530,7 +547,7 @@ putNewRiakObject
   -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp RiakKey)
+  -> m (RecvResult RiakKey)
 putNewRiakObject
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   _putRiakObject handle bucket Nothing content a b c d e
@@ -544,7 +561,7 @@ putNewRiakObjectHead
   -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (RiakObject ()))
+  -> m (RecvResult (RiakObject ()))
 putNewRiakObjectHead
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head
@@ -559,7 +576,7 @@ putNewRiakObjectBody
   -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (RiakObject a))
+  -> m (RecvResult (RiakObject a))
 putNewRiakObjectBody
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
@@ -582,16 +599,16 @@ _putRiakObject
   -> SloppyQuorum
   -> Timeout
   -> W
-  -> m (Either RpbErrorResp (ObjectReturnTy a return))
+  -> m (RecvResult (ObjectReturnTy a return))
 _putRiakObject
     h@(RiakHandle manager cache) namespace@(RiakBucket type' bucket) key value
-    dw indexes metadata n pw return sloppy_quorum timeout w = liftIO . runExceptT $ do
+    dw indexes metadata n pw return sloppy_quorum timeout w = liftIO $ do
 
   -- Get the cached vclock of this object to pass in the put request.
   vclock :: Maybe RiakVclock <-
     maybe
       (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (lift . riakCacheLookup cache . RiakKey namespace)
+      (riakCacheLookup cache . RiakKey namespace)
       key
 
   let
@@ -628,71 +645,74 @@ _putRiakObject
         & #maybe'vclock L..~ coerce vclock
         & #maybe'w L..~ coerce w
 
-  response :: RpbPutResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> putRiakObjectPB conn request))
+  withRiakConnection manager (\conn -> Client.putObject conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  let
-    nonsense :: Text -> ExceptT RpbErrorResp IO void
-    nonsense s =
-      panic s
-        ( ( "request",  request  )
-        , ( "response", response )
-        )
+    Failure err ->
+      pure (Failure err)
 
-  theKey :: ByteString <-
-    maybe
-      (maybe
-        (nonsense "missing key")
-        pure
-        (response L.^. #maybe'key))
-      pure
-      key
+    Success response -> do
+      let
+        nonsense :: Text -> IO void
+        nonsense s =
+          panic s
+            ( ( "request",  request  )
+            , ( "response", response )
+            )
 
-  let
-    loc :: RiakKey
-    loc =
-      RiakKey namespace theKey
+      theKey :: ByteString <-
+        maybe
+          (maybe
+            (nonsense "missing key")
+            pure
+            (response ^. L.maybe'key))
+          pure
+          key
 
-  -- Cache the vclock if asked for it with return_head or return_body.
-  do
-    let
-      doCacheVclock :: ExceptT RpbErrorResp IO ()
-      doCacheVclock =
-        case response L.^. #maybe'vclock of
-          Nothing ->
-            nonsense "missing vclock"
+      let
+        loc :: RiakKey
+        loc =
+          RiakKey namespace theKey
 
-          Just theVclock ->
-            cacheVclock h loc (Just (coerce theVclock))
+      -- Cache the vclock if asked for it with return_head or return_body.
+      do
+        let
+          doCacheVclock :: IO ()
+          doCacheVclock =
+            case response ^. L.maybe'vclock of
+              Nothing ->
+                nonsense "missing vclock"
 
-    () <-
-      case return of
-        ParamObjectReturnNone -> pure ()
-        ParamObjectReturnHead -> doCacheVclock
-        ParamObjectReturnBody -> doCacheVclock
+              Just theVclock ->
+                cacheVclock h loc (Just (coerce theVclock))
 
-    pure ()
+        () <-
+          case return of
+            ParamObjectReturnNone -> pure ()
+            ParamObjectReturnHead -> doCacheVclock
+            ParamObjectReturnBody -> doCacheVclock
 
-  let
-    theValue :: IO (ObjectReturnTy a return)
-    theValue =
-      case return of
-        ParamObjectReturnNone ->
-          pure loc
+        pure ()
 
-        ParamObjectReturnHead ->
-          traverse
-            (parseContent @a proxy# loc STrue)
-            (List1.fromList (response L.^. #content))
+      let
+        theValue :: IO (ObjectReturnTy a return)
+        theValue =
+          case return of
+            ParamObjectReturnNone ->
+              pure loc
 
-        ParamObjectReturnBody ->
-          traverse
-            (parseContent @a proxy# loc SFalse)
-            (List1.fromList (response L.^. #content))
+            ParamObjectReturnHead ->
+              traverse
+                (parseContent @a proxy# loc STrue)
+                (List1.fromList (response L.^. #content))
 
-  lift theValue
+            ParamObjectReturnBody ->
+              traverse
+                (parseContent @a proxy# loc SFalse)
+                (List1.fromList (response L.^. #content))
+
+      Success <$> theValue
 
 
 --------------------------------------------------------------------------------
@@ -704,7 +724,7 @@ deleteRiakObject
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 deleteRiakObject
     (RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key) = liftIO $ do
@@ -722,7 +742,7 @@ deleteRiakObject
         & #maybe'vclock L..~ coerce vclock
 
   fmap (() <$)
-    (withRiakConnection manager (\conn -> deleteRiakObjectPB conn request))
+    (withRiakConnection manager (\conn -> Client.deleteObject conn request))
 
 
 --------------------------------------------------------------------------------
@@ -741,7 +761,7 @@ getRiakCounter
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Maybe Int64))
+  -> m (RecvResult (Maybe Int64))
 getRiakCounter h key (GetRiakObjectParams a b c d e f g) =
   getCrdt (proxy# @_ @'RiakCounterTy) h key
     (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
@@ -758,7 +778,7 @@ updateRiakCounter
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp Int64)
+  -> m (RecvResult Int64)
 updateRiakCounter h (RiakKey bucket key) incr params =
   (fmap.fmap) snd (_updateRiakCounter h bucket (Just key) incr params)
 
@@ -770,7 +790,7 @@ updateNewRiakCounter
   -> RiakBucket -- ^ Bucket type and bucket
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp RiakKey)
+  -> m (RecvResult RiakKey)
 updateNewRiakCounter h bucket incr params =
   (fmap.fmap) fst (_updateRiakCounter h bucket Nothing incr params)
 
@@ -781,15 +801,15 @@ _updateRiakCounter
   -> Maybe ByteString
   -> Int64
   -> UpdateRiakCrdtParams
-  -> m (Either RpbErrorResp (RiakKey, Int64))
+  -> m (RecvResult (RiakKey, Int64))
 _updateRiakCounter h bucket key incr params =
   (fmap.fmap.fmap) (L.view #counterValue)
     (updateCrdt h bucket key Nothing op params)
- where
-  op :: DtOp
-  op =
-    defMessage
-      & #counterOp L..~ (defMessage & #increment L..~ incr)
+  where
+    op :: DtOp
+    op =
+      defMessage
+        & #counterOp L..~ (defMessage & #increment L..~ incr)
 
 
 --------------------------------------------------------------------------------
@@ -807,7 +827,7 @@ getRiakGrowOnlySet
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Maybe (Set ByteString)))
+  -> m (RecvResult (Maybe (Set ByteString)))
 getRiakGrowOnlySet =
   getCrdt (proxy# @_ @'RiakGrowOnlySetTy)
 
@@ -831,7 +851,7 @@ getRiakHyperLogLog
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Maybe Word64))
+  -> m (RecvResult (Maybe Word64))
 getRiakHyperLogLog =
   getCrdt (proxy# @_ @'RiakHyperLogLogTy)
 
@@ -858,7 +878,7 @@ getRiakMap
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Maybe a))
+  -> m (RecvResult (Maybe a))
 getRiakMap =
   getCrdt (proxy# @_ @('RiakMapTy a))
 
@@ -886,7 +906,7 @@ getRiakSet
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Maybe (Set a)))
+  -> m (RecvResult (Maybe (Set a)))
 getRiakSet =
   getCrdt (proxy# @_ @('RiakSetTy a))
 
@@ -903,7 +923,7 @@ updateRiakSet
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp (Set a))
+  -> m (RecvResult (Set a))
 updateRiakSet h (RiakKey bucket key) op params =
   (fmap.fmap) snd (_updateSet h bucket (Just key) op params)
 
@@ -914,7 +934,7 @@ updateNewRiakSet
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakSetOp a -- ^ Set operation
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (Either RpbErrorResp RiakKey)
+  -> m (RecvResult RiakKey)
 updateNewRiakSet h bucket op params =
   (fmap.fmap) fst (_updateSet h bucket Nothing op params)
 
@@ -927,83 +947,99 @@ _updateSet
   -> Maybe ByteString
   -> RiakSetOp a
   -> UpdateRiakCrdtParams
-  -> m (Either RpbErrorResp (RiakKey, (Set a)))
-_updateSet
-    h@(RiakHandle _ cache) namespace key (unSetOp -> (adds, removes))
-    params = liftIO . runExceptT $ do
-
-  -- Be a good citizen and perhaps include the cached causal context with this
-  -- update request.
-  --
-  -- (1) If the set definitely doesn't already exist, no context is required.
-  --
-  -- (2) If the set might exist but we aren't attempting any removes, no
-  --     context is required.
-  --
-  -- (3) If the set might exist and we are attempting at least one remove, a
-  --     context is required (more like "recommended").
-  --
-  --     (a) If we have one cached, hooray.
-  --
-  --     (b) If we don't have one cached, perform a quick get first. Note that
-  --         we won't get a context if the set doesn't exist - this would mean
-  --         we are attempting to remove something from an empty set. That is
-  --         weird, so I'm okay with not passing in a context in this situation
-  --         (we don't have one to pass, anyway).
-
+  -> m (RecvResult (RiakKey, (Set a)))
+_updateSet h namespace key setOp params = liftIO $ do
   context :: Maybe RiakVclock <-
-    case key of
-      -- (1)
-      Nothing ->
-        pure Nothing
+    _updateSetGetContext @a h namespace key removes
 
-      Just key' ->
-        let
-          loc :: RiakKey
-          loc =
-            RiakKey namespace key'
-        in do
-          context :: Maybe RiakVclock <-
-            lift (riakCacheLookup cache loc)
+  updateCrdt h namespace key context op params >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-          if null removes
-            then
-              -- (2)
-              pure context
+    Failure err ->
+      pure (Failure err)
 
-            else
-              case context of
-                -- (3b)
-                Nothing -> do
-                  _ <- ExceptT (getRiakSet @a h loc def)
-                  lift (riakCacheLookup cache loc)
+    Success (loc, response) ->
+      case parseDtUpdateResp (proxy# @_ @('RiakSetTy a)) loc response of
+        Left err ->
+          throwIO err
 
-                -- (3a)
-                Just context' ->
-                  pure (Just context')
+        Right value -> do
+          -- If the context was fetched, cache it
+          for_ (response L.^. #maybe'context) $ \vclock ->
+            cacheVclock h loc (Just (RiakVclock vclock))
 
-  (loc, response) <-
-    ExceptT (updateCrdt h namespace key context op params)
+          pure (Success (loc, value))
 
-  case parseDtUpdateResp (proxy# @_ @('RiakSetTy a)) loc response of
-    Left err ->
-      throwIO err
+  where
+    op :: DtOp
+    op =
+      defMessage
+        & #setOp L..~
+            (defMessage
+              & #adds L..~ adds
+              & #removes L..~ removes)
 
-    Right value -> do
-      -- If the context was fetched, cache it
-      for_ (response L.^. #maybe'context) $ \vclock ->
-        cacheVclock h loc (Just (RiakVclock vclock))
+    (adds, removes) =
+      unSetOp setOp
 
-      pure (loc, value)
+-- Be a good citizen and perhaps include the cached causal context with this
+-- update request.
+--
+-- (1) If the set definitely doesn't already exist, no context is required.
+--
+-- (2) If the set might exist but we aren't attempting any removes, no
+--     context is required.
+--
+-- (3) If the set might exist and we are attempting at least one remove, a
+--     context is required (more like "recommended").
+--
+--     (a) If we have one cached, hooray.
+--
+--     (b) If we don't have one cached, perform a quick get first. Note that
+--         we won't get a context if the set doesn't exist - this would mean
+--         we are attempting to remove something from an empty set. That is
+--         weird, so I'm okay with not passing in a context in this situation
+--         (we don't have one to pass, anyway).
+_updateSetGetContext ::
+     forall a.
+     IsRiakSet a
+  => RiakHandle
+  -> RiakBucket
+  -> Maybe ByteString
+  -> [ByteString]
+  -> IO (Maybe RiakVclock)
+_updateSetGetContext h@(RiakHandle _ cache) namespace key removes = do
+  case key of
+    -- (1)
+    Nothing ->
+      pure Nothing
 
- where
-  op :: DtOp
-  op =
-    defMessage
-      & #setOp L..~
-          (defMessage
-            & #adds L..~ adds
-            & #removes L..~ removes)
+    Just key' ->
+      let
+        loc :: RiakKey
+        loc =
+          RiakKey namespace key'
+      in do
+        context :: Maybe RiakVclock <-
+          riakCacheLookup cache loc
+
+        if null removes
+          then
+            -- (2)
+            pure context
+
+          else
+            case context of
+              -- (3b)
+              Nothing -> do
+                _ <- getRiakSet @a h loc def
+                riakCacheLookup cache loc
+
+              -- (3a)
+              Just context' ->
+                pure (Just context')
+
 
 
 --------------------------------------------------------------------------------
@@ -1017,52 +1053,55 @@ getCrdt
   -> RiakHandle
   -> RiakKey
   -> GetRiakCrdtParams
-  -> m (Either RpbErrorResp (Maybe (CrdtVal ty)))
+  -> m (RecvResult (Maybe (CrdtVal ty)))
 getCrdt
     p h@(RiakHandle manager _) loc@(RiakKey (RiakBucket type' bucket) key)
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n
-      notfound_ok pr r sloppy_quorum timeout) = liftIO . runExceptT $ do
+      notfound_ok pr r sloppy_quorum timeout) = liftIO $ do
 
-  response :: DtFetchResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakCrdtPB conn request))
+  withRiakConnection manager (\conn -> Client.getCrdt conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  case parseDtFetchResp p loc response of
-    Left err ->
-      throwIO err
+    Failure err ->
+      pure (Failure err)
 
-    Right value -> do
-      -- Only counters don't have a causal context
-      let
-        shouldCache :: Bool
-        shouldCache =
-          response L.^. #type' /= DtFetchResp'COUNTER &&
-            include_context /= Just False
+    Success response ->
+      case parseDtFetchResp p loc response of
+        Left err ->
+          throwIO err
 
-      when shouldCache $
-        cacheVclock
-          h
-          loc
-          (coerce (response L.^. #maybe'context))
+        Right value -> do
+          -- Only counters don't have a causal context
+          let
+            shouldCache :: Bool
+            shouldCache =
+              response L.^. #type' /= DtFetchResp'COUNTER &&
+                include_context /= Just False
 
-      pure value
+          when shouldCache $
+            cacheVclock
+              h
+              loc
+              (coerce (response L.^. #maybe'context))
 
- where
-  request :: DtFetchReq
-  request =
-    defMessage
-      & #maybe'basicQuorum L..~ unBasicQuorum basic_quorum
-      & #bucket L..~ bucket
-      & #maybe'includeContext L..~ include_context
-      & #key L..~ key
-      & #maybe'nVal L..~ coerce n
-      & #maybe'notfoundOk L..~ unNotfoundOk notfound_ok
-      & #maybe'pr L..~ coerce pr
-      & #maybe'r L..~ coerce r
-      & #maybe'sloppyQuorum L..~ coerce sloppy_quorum
-      & #maybe'timeout L..~ coerce timeout
-      & #type' L..~ unRiakBucketType type'
+          pure (Success value)
+
+  where
+    request :: DtFetchReq
+    request =
+      defMessage
+        & #maybe'basicQuorum L..~ unBasicQuorum basic_quorum
+        & #bucket L..~ bucket
+        & #maybe'includeContext L..~ include_context
+        & #key L..~ key
+        & #maybe'nVal L..~ coerce n
+        & #maybe'notfoundOk L..~ unNotfoundOk notfound_ok
+        & #maybe'pr L..~ coerce pr
+        & #maybe'r L..~ coerce r
+        & #maybe'sloppyQuorum L..~ coerce sloppy_quorum
+        & #maybe'timeout L..~ coerce timeout
+        & #type' L..~ unRiakBucketType type'
 
 
 -------------------------------------------------------------------------------
@@ -1077,47 +1116,50 @@ updateCrdt
   -> Maybe RiakVclock
   -> DtOp
   -> UpdateRiakCrdtParams
-  -> m (Either RpbErrorResp (RiakKey, DtUpdateResp))
+  -> m (RecvResult (RiakKey, DtUpdateResp))
 updateCrdt
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) key context op
     (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
-    liftIO . runExceptT $ do
+    liftIO $ do
 
-  response :: DtUpdateResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> updateRiakCrdtPB conn request))
+  withRiakConnection manager (\conn -> Client.updateCrdt conn request) >>= \case
+    RiakClosedConnection ->
+      pure RiakClosedConnection
 
-  theKey :: ByteString <-
-    maybe
-      (maybe
-        (panic "missing key"
-          ( ( "request" , request  )
-          , ( "response", response )
-          ))
-        pure
-        (response L.^. #maybe'key))
-      pure
-      key
+    Failure err ->
+      pure (Failure err)
 
-  pure (RiakKey namespace theKey, response)
+    Success response -> do
+      theKey :: ByteString <-
+        maybe
+          (maybe
+            (panic "missing key"
+              ( ( "request" , request  )
+              , ( "response", response )
+              ))
+            pure
+            (response L.^. #maybe'key))
+          pure
+          key
 
- where
-  request :: DtUpdateReq
-  request =
-    defMessage
-      & #bucket L..~ bucket
-      & #maybe'context L..~ coerce context
-      & #maybe'dw L..~ coerce dw
-      & #maybe'key L..~ coerce key
-      & #maybe'nVal L..~ coerce n
-      & #op L..~ op
-      & #maybe'pw L..~ coerce pw
-      & #maybe'returnBody L..~ unReturnBody return_body
-      & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
-      & #maybe'timeout L..~ unTimeout timeout
-      & #type' L..~ unRiakBucketType type'
-      & #maybe'w L..~ coerce w
+      pure (Success (RiakKey namespace theKey, response))
+
+  where
+    request :: DtUpdateReq
+    request =
+      defMessage
+        & #bucket L..~ bucket
+        & #maybe'context L..~ coerce context
+        & #maybe'dw L..~ coerce dw
+        & #maybe'key L..~ coerce key
+        & #maybe'nVal L..~ coerce n
+        & #op L..~ op
+        & #maybe'pw L..~ coerce pw
+        & #maybe'returnBody L..~ unReturnBody return_body
+        & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
+        & #maybe'timeout L..~ unTimeout timeout
+        & #type' L..~ unRiakBucketType type'
+        & #maybe'w L..~ coerce w
 
 
 --------------------------------------------------------------------------------
@@ -1129,19 +1171,17 @@ getRiakBucketTypeProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
-  -> m (Either RpbErrorResp RpbBucketProps)
-getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO . runExceptT $ do
-  response :: RpbGetBucketResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakBucketTypePropsPB conn request))
-  pure (response L.^. #props)
+  -> m (RecvResult RpbBucketProps)
+getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO $ do
+  fmap (^. L.props) <$>
+    withRiakConnection manager
+      (\conn -> Client.getBucketTypeProps conn request)
 
- where
-  request :: RpbGetBucketTypeReq
-  request =
-    defMessage
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbGetBucketTypeReq
+    request =
+      defMessage
+        & #type' L..~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1154,17 +1194,17 @@ setRiakBucketTypeProps
   => RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
   -> RpbBucketProps -- ^
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 setRiakBucketTypeProps (RiakHandle manager _) type' props =
   liftIO (fmap (() <$)
     (withRiakConnection manager
-      (\conn -> (setRiakBucketTypePropsPB conn request))))
- where
-  request :: RpbSetBucketTypeReq
-  request =
-    defMessage
-      & #props L..~ props
-      & #type' L..~ unRiakBucketType type'
+      (\conn -> Client.setBucketTypeProps conn request)))
+  where
+    request :: RpbSetBucketTypeReq
+    request =
+      defMessage
+        & #props L..~ props
+        & #type' L..~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1176,20 +1216,18 @@ getRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakBucket -- ^ Bucket type and bucket
-  -> m (Either RpbErrorResp RpbBucketProps)
-getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO . runExceptT $ do
-  response :: RpbGetBucketResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakBucketPropsPB conn request))
-  pure (response L.^. #props)
+  -> m (RecvResult RpbBucketProps)
+getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO $ do
+  fmap (^. L.props) <$>
+    withRiakConnection manager
+      (\conn -> Client.getBucketProps conn request)
 
- where
-  request :: RpbGetBucketReq
-  request =
-    defMessage
-      & #bucket L..~ bucket
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbGetBucketReq
+    request =
+      defMessage
+        & #bucket L..~ bucket
+        & #type' L..~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1201,11 +1239,11 @@ setRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RpbSetBucketReq -- ^
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 setRiakBucketProps (RiakHandle manager _) req =
   liftIO (fmap (() <$)
     (withRiakConnection manager
-      (\conn -> setRiakBucketPropsPB conn req)))
+      (\conn -> Client.setBucketProps conn req)))
 
 
 --------------------------------------------------------------------------------
@@ -1216,11 +1254,11 @@ resetRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RpbResetBucketReq -- ^
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 resetRiakBucketProps (RiakHandle manager _) req = liftIO $
   fmap (() <$)
     (withRiakConnection manager
-      (\conn -> resetRiakBucketPropsPB conn req))
+      (\conn -> Client.resetBucketProps conn req))
 
 
 --------------------------------------------------------------------------------
@@ -1238,19 +1276,19 @@ streamRiakBuckets
      RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
   -> FoldM IO RiakBucket r -- ^ Bucket fold
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 streamRiakBuckets (RiakHandle manager _) type' fold =
   withRiakConnection manager $ \conn -> do
-    streamRiakBuckets2PB conn request
+    Client.streamBuckets conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakBucket type') . (L.^. #buckets)))
- where
-  request :: RpbListBucketsReq
-  request =
-    defMessage
-      & #stream L..~ True
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbListBucketsReq
+    request =
+      defMessage
+        & #stream L..~ True
+        & #type' L..~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1267,20 +1305,20 @@ streamRiakKeys
   :: RiakHandle -- ^ Riak handle
   -> RiakBucket -- ^ Bucket type and bucket
   -> FoldM IO RiakKey r -- ^ Key fold
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
   withRiakConnection manager $ \conn -> do
-    streamRiakKeysPB conn request
+    Client.streamKeys conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakKey namespace) . (L.^. #keys)))
 
- where
-  request :: RpbListKeysReq
-  request =
-    defMessage
-      & #bucket L..~ bucket
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbListKeysReq
+    request =
+      defMessage
+        & #bucket L..~ bucket
+        & #type' L..~ unRiakBucketType type'
 
 
 --------------------------------------------------------------------------------
@@ -1300,7 +1338,7 @@ riakMapReduceBucket
   -> RiakBucket -- ^ Bucket type and bucket
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakMapReduceBucket h bucket =
   _riakMapReduce h (RiakMapReduceInputsBucket bucket)
 
@@ -1309,7 +1347,7 @@ riakMapReduceKeys
   -> [RiakKey] -- ^ Bucket types, buckets, and keys
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakMapReduceKeys h keys =
   _riakMapReduce h (RiakMapReduceInputsKeys keys)
 
@@ -1319,7 +1357,7 @@ riakMapReduceFunction
   -> Text -- ^ Erlang function.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakMapReduceFunction h m f =
   _riakMapReduce h (RiakMapReduceInputsFunction m f)
 
@@ -1329,7 +1367,7 @@ riakMapReduceExactQuery
   -> RiakExactQuery -- ^ Exact query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakMapReduceExactQuery h bucket query =
   _riakMapReduce h (RiakMapReduceInputsExactQuery bucket query)
 
@@ -1339,7 +1377,7 @@ riakMapReduceRangeQuery
   -> RiakRangeQuery a -- ^ Range query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakMapReduceRangeQuery h bucket query =
   _riakMapReduce h (RiakMapReduceInputsRangeQuery bucket query)
 
@@ -1348,10 +1386,10 @@ _riakMapReduce
   -> RiakMapReduceInputs -- ^ MapReduce inputs
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 _riakMapReduce (RiakHandle manager _) inputs query k =
   withRiakConnection manager $ \conn ->
-    riakMapReducePB conn (riakMapReduceRequest inputs query) k
+    Client.mapReduce conn (riakMapReduceRequest inputs query) k
 
 --------------------------------------------------------------------------------
 -- Secondary indexes
@@ -1373,39 +1411,39 @@ riakExactQuery
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakExactQuery -- ^ Exact query
   -> FoldM IO RiakKey r -- ^ Key fold
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakExactQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    riakIndexPB conn request
+    Client.index conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakKey namespace) . (L.^. #keys)))
- where
-  request :: RpbIndexReq
-  request =
-    defMessage
-      & #bucket L..~ bucket
-      & #index L..~ unRiakIndexName index
-      & #key L..~ key
-      & #qtype L..~ RpbIndexReq'eq
-      & #stream L..~ True
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbIndexReq
+    request =
+      defMessage
+        & #bucket L..~ bucket
+        & #index L..~ unRiakIndexName index
+        & #key L..~ key
+        & #qtype L..~ RpbIndexReq'eq
+        & #stream L..~ True
+        & #type' L..~ unRiakBucketType type'
 
-  index :: RiakIndexName
-  index =
-    case query of
-      RiakExactQueryBin (RiakIndexName idx) _ ->
-        RiakIndexName (idx <> "_bin")
+    index :: RiakIndexName
+    index =
+      case query of
+        RiakExactQueryBin (RiakIndexName idx) _ ->
+          RiakIndexName (idx <> "_bin")
 
-      RiakExactQueryInt (RiakIndexName idx) _ ->
-        RiakIndexName (idx <> "_int")
+        RiakExactQueryInt (RiakIndexName idx) _ ->
+          RiakIndexName (idx <> "_int")
 
-  key :: ByteString
-  key =
-    case query of
-      RiakExactQueryBin _ n -> n
-      RiakExactQueryInt _ n -> int2bs n
+    key :: ByteString
+    key =
+      case query of
+        RiakExactQueryBin _ n -> n
+        RiakExactQueryInt _ n -> int2bs n
 
 
 -- | Perform a range query on a secondary index.
@@ -1414,45 +1452,45 @@ riakRangeQuery
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakRangeQuery a -- ^ Range query
   -> FoldM IO RiakKey r -- ^ Key fold
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakRangeQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    riakIndexPB conn request
+    Client.index conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakKey namespace) . (L.^. #keys)))
- where
-  request :: RpbIndexReq
-  request =
-    defMessage
-      & #bucket L..~ bucket
-      & #index L..~ unRiakIndexName index
-      & #qtype L..~ RpbIndexReq'range
-      & #rangeMax L..~ rmax
-      & #rangeMin L..~ rmin
-      & #stream L..~ True
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbIndexReq
+    request =
+      defMessage
+        & #bucket L..~ bucket
+        & #index L..~ unRiakIndexName index
+        & #qtype L..~ RpbIndexReq'range
+        & #rangeMax L..~ rmax
+        & #rangeMin L..~ rmin
+        & #stream L..~ True
+        & #type' L..~ unRiakBucketType type'
 
-  index :: RiakIndexName
-  index =
-    case query of
-      RiakRangeQueryBin (RiakIndexName idx) _ _ ->
-        RiakIndexName (idx <> "_bin")
-      RiakRangeQueryInt (RiakIndexName idx) _ _ ->
-        RiakIndexName (idx <> "_int")
+    index :: RiakIndexName
+    index =
+      case query of
+        RiakRangeQueryBin (RiakIndexName idx) _ _ ->
+          RiakIndexName (idx <> "_bin")
+        RiakRangeQueryInt (RiakIndexName idx) _ _ ->
+          RiakIndexName (idx <> "_int")
 
-  rmin :: ByteString
-  rmin =
-    case query of
-      RiakRangeQueryBin _ n _ -> n
-      RiakRangeQueryInt _ n _ -> int2bs n
+    rmin :: ByteString
+    rmin =
+      case query of
+        RiakRangeQueryBin _ n _ -> n
+        RiakRangeQueryInt _ n _ -> int2bs n
 
-  rmax :: ByteString
-  rmax =
-    case query of
-      RiakRangeQueryBin _ _ n -> n
-      RiakRangeQueryInt _ _ n -> int2bs n
+    rmax :: ByteString
+    rmax =
+      case query of
+        RiakRangeQueryBin _ _ n -> n
+        RiakRangeQueryInt _ _ n -> int2bs n
 
 -- | Perform a range query on a secondary index, and return the indexed terms
 -- along with the keys.
@@ -1462,60 +1500,60 @@ riakRangeQueryTerms
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakRangeQuery a -- ^ Range query
   -> FoldM IO (RiakKey, a) r -- ^ Key+value fold
-  -> IO (Either RpbErrorResp r)
+  -> IO (RecvResult r)
 riakRangeQueryTerms
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    riakIndexPB conn request
+    Client.index conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map parse . (L.^. #results)))
- where
-  request :: RpbIndexReq
-  request =
-    defMessage
-      & #bucket L..~ bucket
-      & #index L..~ unRiakIndexName index
-      & #qtype L..~ RpbIndexReq'range
-      & #rangeMax L..~ rmax
-      & #rangeMin L..~ rmin
-      & #returnTerms L..~ True
-      & #stream L..~ True
-      & #type' L..~ unRiakBucketType type'
+  where
+    request :: RpbIndexReq
+    request =
+      defMessage
+        & #bucket L..~ bucket
+        & #index L..~ unRiakIndexName index
+        & #qtype L..~ RpbIndexReq'range
+        & #rangeMax L..~ rmax
+        & #rangeMin L..~ rmin
+        & #returnTerms L..~ True
+        & #stream L..~ True
+        & #type' L..~ unRiakBucketType type'
 
-  index :: RiakIndexName
-  index =
-    case query of
-      RiakRangeQueryBin (RiakIndexName idx) _ _ ->
-        RiakIndexName (idx <> "_bin")
-      RiakRangeQueryInt (RiakIndexName idx) _ _ ->
-        RiakIndexName (idx <> "_int")
+    index :: RiakIndexName
+    index =
+      case query of
+        RiakRangeQueryBin (RiakIndexName idx) _ _ ->
+          RiakIndexName (idx <> "_bin")
+        RiakRangeQueryInt (RiakIndexName idx) _ _ ->
+          RiakIndexName (idx <> "_int")
 
-  rmin :: ByteString
-  rmin =
-    case query of
-      RiakRangeQueryBin _ n _ -> n
-      RiakRangeQueryInt _ n _ -> int2bs n
+    rmin :: ByteString
+    rmin =
+      case query of
+        RiakRangeQueryBin _ n _ -> n
+        RiakRangeQueryInt _ n _ -> int2bs n
 
-  rmax :: ByteString
-  rmax =
-    case query of
-      RiakRangeQueryBin _ _ n -> n
-      RiakRangeQueryInt _ _ n -> int2bs n
+    rmax :: ByteString
+    rmax =
+      case query of
+        RiakRangeQueryBin _ _ n -> n
+        RiakRangeQueryInt _ _ n -> int2bs n
 
-  parse :: RpbPair -> (RiakKey, a)
-  parse =
-    unRpbPair >>> \case
-      (val, Just key) ->
-        (RiakKey namespace key, parse1 val)
-      _ ->
-        undefined
+    parse :: RpbPair -> (RiakKey, a)
+    parse =
+      unRpbPair >>> \case
+        (val, Just key) ->
+          (RiakKey namespace key, parse1 val)
+        _ ->
+          undefined
 
-  parse1 :: ByteString -> a
-  parse1 =
-    case query of
-      RiakRangeQueryBin _ _ _ -> id
-      RiakRangeQueryInt _ _ _ -> bs2int
+    parse1 :: ByteString -> a
+    parse1 =
+      case query of
+        RiakRangeQueryBin _ _ _ -> id
+        RiakRangeQueryInt _ _ _ -> bs2int
 
 
 
@@ -1529,42 +1567,42 @@ riakSearch
   -> ByteString -- ^ Query
   -> ByteString -- ^ Index
   -> RiakSearchParams -- ^ Optional parameters
-  -> IO (Either RpbErrorResp RpbSearchQueryResp)
+  -> IO (RecvResult RpbSearchQueryResp)
 riakSearch (RiakHandle manager _)
     query index
     (RiakSearchParams df filter' fl op presort rows sort start) =
   withRiakConnection manager $ \conn ->
-    riakSearchPB conn request
- where
-  request :: RpbSearchQueryReq
-  request =
-    defMessage
-      & #maybe'df L..~ unDF df
-      & #maybe'filter L..~ unFilter filter'
-      & #fl L..~ unFL fl
-      & #index L..~ index
-      & #maybe'op L..~ unOp op
-      & #maybe'presort L..~ unPresort presort
-      & #q L..~ query
-      & #maybe'rows L..~ unRows rows
-      & #maybe'sort L..~ unSort sort
-      & #maybe'start L..~ unStart start
+    Client.search conn request
+  where
+    request :: RpbSearchQueryReq
+    request =
+      defMessage
+        & #maybe'df L..~ unDF df
+        & #maybe'filter L..~ unFilter filter'
+        & #fl L..~ unFL fl
+        & #index L..~ index
+        & #maybe'op L..~ unOp op
+        & #maybe'presort L..~ unPresort presort
+        & #q L..~ query
+        & #maybe'rows L..~ unRows rows
+        & #maybe'sort L..~ unSort sort
+        & #maybe'start L..~ unStart start
 
 
 getRiakSchema
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> SolrSchemaName -- ^ Schema name
-  -> m (Either RpbErrorResp (Maybe RpbYokozunaSchemaGetResp))
+  -> m (RecvResult (Maybe RpbYokozunaSchemaGetResp))
 getRiakSchema (RiakHandle manager _) schema = liftIO $
   withRiakConnection manager
     (\conn ->
-      translateNotfound <$> getRiakSchemaPB conn request)
- where
-  request :: RpbYokozunaSchemaGetReq
-  request =
-    defMessage
-      & #name L..~ unSolrSchemaName schema
+      translateNotfound <$> Client.getSchema conn request)
+  where
+    request :: RpbYokozunaSchemaGetReq
+    request =
+      defMessage
+        & #name L..~ unSolrSchemaName schema
 
 
 putRiakSchema
@@ -1572,65 +1610,67 @@ putRiakSchema
   => RiakHandle -- ^ Riak handle
   -> SolrSchemaName -- ^ Schema name
   -> ByteString -- ^ Schema contents
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 putRiakSchema (RiakHandle manager _) name bytes = liftIO $
   fmap (() <$)
     (withRiakConnection manager
-      (\conn -> putRiakSchemaPB conn request))
- where
-  request :: RpbYokozunaSchemaPutReq
-  request =
-    defMessage
-      & #schema L..~
-          (defMessage
-            & #content L..~ bytes
-            & #name L..~ unSolrSchemaName name)
+      (\conn -> Client.putSchema conn request))
+  where
+    request :: RpbYokozunaSchemaPutReq
+    request =
+      defMessage
+        & #schema L..~
+            (defMessage
+              & #content L..~ bytes
+              & #name L..~ unSolrSchemaName name)
 
 
 getRiakIndex
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakIndexName -- ^
-  -> m (Either RpbErrorResp (Maybe RpbYokozunaIndex))
+  -> m (RecvResult (Maybe RpbYokozunaIndex))
 getRiakIndex (RiakHandle manager _) name = liftIO $ do
-  withRiakConnection manager (runExceptT . runMaybeT . action)
- where
-  request :: RpbYokozunaIndexGetReq
-  request =
-    defMessage
-      & #name L..~ unRiakIndexName name
+  withRiakConnection manager action
+  where
+    request :: RpbYokozunaIndexGetReq
+    request =
+      defMessage
+        & #name L..~ unRiakIndexName name
 
-  action
-    :: RiakConnection
-    -> MaybeT (ExceptT RpbErrorResp IO) RpbYokozunaIndex
-  action conn = do
-    response :: RpbYokozunaIndexGetResp <-
-      MaybeT (ExceptT m)
-    case response L.^. #index of
-      [index] ->
-        pure index
+    action
+      :: Socket
+      -> IO (RecvResult (Maybe RpbYokozunaIndex))
+    action conn =
+      (translateNotfound <$> Client.getIndex conn request) >>= \case
+        RiakClosedConnection ->
+          pure (RiakClosedConnection)
 
-      _ ->
-        panic "0 or 2+ indexes"
-          ( ( "request",  request  )
-          , ( "response", response )
-          )
+        Failure err ->
+          pure (Failure err)
 
-   where
-    m :: IO (Either RpbErrorResp (Maybe RpbYokozunaIndexGetResp))
-    m =
-      translateNotfound <$> getRiakIndexPB conn request
+        Success Nothing ->
+          pure (Success Nothing)
+
+        Success (Just response) ->
+          case response ^. L.index of
+            [index] ->
+              pure (Success (Just index))
+
+            _ ->
+              panic "0 or 2+ indexes"
+                ( ( "request",  request  )
+                , ( "response", response )
+                )
 
 getRiakIndexes
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> m (Either RpbErrorResp [RpbYokozunaIndex])
-getRiakIndexes (RiakHandle manager _) = liftIO . runExceptT $ do
-  response :: RpbYokozunaIndexGetResp <-
-    ExceptT
-      (withRiakConnection manager
-        (\conn -> getRiakIndexPB conn defMessage))
-  pure (response L.^. #index)
+  -> m (RecvResult [RpbYokozunaIndex])
+getRiakIndexes (RiakHandle manager _) = liftIO $
+  fmap (^. L.index) <$>
+    (withRiakConnection manager
+      (\conn -> Client.getIndex conn defMessage))
 
 
 putRiakIndex
@@ -1638,31 +1678,31 @@ putRiakIndex
   => RiakHandle -- ^ Riak handle
   -> RiakIndexName -- ^
   -> SolrSchemaName -- ^
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 putRiakIndex (RiakHandle manager _) index schema = liftIO $
   fmap (() <$)
     (withRiakConnection manager
-      (\conn -> putRiakIndexPB conn request))
- where
-  request :: RpbYokozunaIndexPutReq
-  request =
-    defMessage
-      & #index L..~
-          (defMessage
-            & #maybe'nVal L..~ Nothing -- TODO putRiakIndex n_val
-            & #name L..~ unRiakIndexName index
-            & #schema L..~ unSolrSchemaName schema)
-      & #maybe'timeout L..~ Nothing -- TODO putRiakIndex timeout
+      (\conn -> Client.putIndex conn request))
+  where
+    request :: RpbYokozunaIndexPutReq
+    request =
+      defMessage
+        & #index L..~
+            (defMessage
+              & #maybe'nVal L..~ Nothing -- TODO putRiakIndex n_val
+              & #name L..~ unRiakIndexName index
+              & #schema L..~ unSolrSchemaName schema)
+        & #maybe'timeout L..~ Nothing -- TODO putRiakIndex timeout
 
 
 deleteRiakIndex
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RpbYokozunaIndexDeleteReq -- ^
-  -> m (Either RpbErrorResp RpbDelResp)
+  -> m (RecvResult RpbDelResp)
 deleteRiakIndex (RiakHandle manager _) req = liftIO $
   withRiakConnection manager
-    (\conn -> deleteRiakIndexPB conn req)
+    (\conn -> Client.deleteIndex conn req)
 
 
 --------------------------------------------------------------------------------
@@ -1672,18 +1712,17 @@ deleteRiakIndex (RiakHandle manager _) req = liftIO $
 pingRiak
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> m (Either RpbErrorResp ())
+  -> m (RecvResult ())
 pingRiak (RiakHandle manager _) = liftIO $
-  fmap (() <$) (withRiakConnection manager pingRiakPB)
+  fmap (() <$) (withRiakConnection manager Client.ping)
 
 
 getRiakServerInfo
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> m (Either RpbErrorResp RpbGetServerInfoResp)
+  -> m (RecvResult RpbGetServerInfoResp)
 getRiakServerInfo (RiakHandle manager _) = liftIO $
-  withRiakConnection manager
-    (\conn -> getRiakServerInfoPB conn)
+  withRiakConnection manager Client.getServerInfo
 
 
 --------------------------------------------------------------------------------
@@ -1851,11 +1890,19 @@ rpbPairToIndex =
         , ("value", v)
         )
 
-translateNotfound :: Either RpbErrorResp a -> Either RpbErrorResp (Maybe a)
+translateNotfound :: RecvResult a -> RecvResult (Maybe a)
 translateNotfound = \case
-  Left ((L.view #errmsg) -> "notfound") -> Right Nothing
-  Left x -> Left x
-  Right x -> Right (Just x)
+  RiakClosedConnection ->
+    RiakClosedConnection
+
+  Failure (view L.errmsg -> "notfound") ->
+    Success Nothing
+
+  Failure err ->
+    Failure err
+
+  Success result ->
+    Success (Just result)
 
 rpbPair :: (ByteString, Maybe ByteString) -> RpbPair
 rpbPair (k, v) =

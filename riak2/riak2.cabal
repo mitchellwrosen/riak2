@@ -97,7 +97,6 @@ library
 
   other-modules:
     Riak.Internal.Cache
-    Riak.Internal.Connection
     Riak.Internal.Crdts
     Riak.Internal.Exception
     Riak.Internal.Debug

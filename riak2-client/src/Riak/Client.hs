@@ -1,198 +1,197 @@
 module Riak.Client
-  ( Socket
-  , connect
-  , close
-  , send
-  , messages
+  ( deleteIndex
+  , deleteObject
+  , getBucketProps
+  , getBucketTypeProps
+  , getCrdt
+  , getIndex
+  , getObject
+  , getSchema
+  , getServerInfo
+  , index
+  , mapReduce
+  , ping
+  , putIndex
+  , putObject
+  , putSchema
+  , resetBucketProps
+  , search
+  , setBucketProps
+  , setBucketTypeProps
+  , streamBuckets
+  , streamKeys
+  , updateCrdt
   ) where
 
-import Riak.Message (Message)
-import Riak.Request (Request)
+import Riak.Proto
+import Riak.Proto.Lens        (done)
+import Riak.Socket.Concurrent (RecvResult(..), Socket)
 
-import qualified Riak.Message as Message
-import qualified Riak.Request as Request
+import qualified Riak.Socket.Concurrent as Socket
 
-import Control.Concurrent.MVar
-import Control.Exception         (Exception, throwIO)
-import Control.Monad             (unless)
-import Control.Monad.IO.Class    (MonadIO(liftIO))
-import Control.Monad.Trans.Class (lift)
-import Data.ByteString           (ByteString)
-import Data.Function             (fix)
-import Data.IORef
-import Network.Socket            (HostName, PortNumber)
-import Streaming                 (Of, Stream, hoist)
-
-import qualified Data.Attoparsec.ByteString     as Atto
-import qualified Data.ByteString                as ByteString
-import qualified Data.ByteString.Streaming      as Q
-import qualified Network.Socket                 as Socket hiding (recv)
-import qualified Network.Socket.ByteString      as Socket (recv)
-import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
-import qualified Streaming.Prelude              as Streaming
+import Control.Foldl (FoldM)
+import Control.Lens  (view)
 
 
-data SocketError
-  = EOF
-  | ParseFailure ![String] String
-  deriving stock (Show)
-  deriving anyclass (Exception)
+deleteIndex
+  :: Socket -- ^
+  -> RpbYokozunaIndexDeleteReq -- ^
+  -> IO (RecvResult RpbDelResp)
+deleteIndex =
+  Socket.exchange
 
-data Socket
-  = Socket
-  { socket    :: !Socket.Socket
-  , bufferRef :: !(IORef ByteString)
-  , sendlock  :: !(MVar ())
-  , recvlock  :: !(MVar ())
-  }
+deleteObject
+  :: Socket -- ^
+  -> RpbDelReq -- ^
+  -> IO (RecvResult RpbDelResp)
+deleteObject =
+  Socket.exchange
 
-connect :: MonadIO m => HostName -> PortNumber -> m Socket
-connect host port = liftIO $ do
-  info : _ <-
-    let
-      hints =
-        Socket.defaultHints { Socket.addrSocketType = Socket.Stream }
-    in
-      Socket.getAddrInfo (Just hints) (Just host) (Just (show port))
+getBucketProps
+  :: Socket -- ^
+  -> RpbGetBucketReq -- ^
+  -> IO (RecvResult RpbGetBucketResp)
+getBucketProps =
+  Socket.exchange
 
-  socket :: Socket.Socket <-
-    Socket.socket
-      (Socket.addrFamily info)
-      (Socket.addrSocketType info)
-      (Socket.addrProtocol info)
+getBucketTypeProps
+  :: Socket -- ^
+  -> RpbGetBucketTypeReq -- ^
+  -> IO (RecvResult RpbGetBucketResp)
+getBucketTypeProps =
+  Socket.exchange
 
-  Socket.connect socket (Socket.addrAddress info)
+getCrdt
+  :: Socket -- ^
+  -> DtFetchReq -- ^
+  -> IO (RecvResult DtFetchResp)
+getCrdt
+  = Socket.exchange
 
-  bufferRef <- newIORef ByteString.empty
-  sendlock <- newMVar ()
-  recvlock <- newMVar ()
+getIndex
+  :: Socket -- ^
+  -> RpbYokozunaIndexGetReq -- ^
+  -> IO (RecvResult RpbYokozunaIndexGetResp)
+getIndex =
+  Socket.exchange
 
-  pure Socket
-    { socket = socket
-    , bufferRef = bufferRef
-    , sendlock = sendlock
-    , recvlock = recvlock
-    }
+getObject
+  :: Socket -- ^
+  -> RpbGetReq -- ^
+  -> IO (RecvResult RpbGetResp)
+getObject =
+  Socket.exchange
 
-close :: MonadIO m => Socket -> m ()
-close =
-  liftIO . Socket.close . socket
+getSchema
+  :: Socket -- ^
+  -> RpbYokozunaSchemaGetReq -- ^
+  -> IO (RecvResult RpbYokozunaSchemaGetResp)
+getSchema =
+  Socket.exchange
 
-send :: (MonadIO m, Request a) => Socket -> a -> m ()
-send (Socket { sendlock, socket }) request = liftIO $
-  withMVar sendlock $ \() ->
-    Socket.sendAll socket (Message.encode (Request.toMessage request))
+getServerInfo
+  :: Socket -- ^
+  -> IO (RecvResult RpbGetServerInfoResp)
+getServerInfo conn =
+  Socket.exchange conn RpbGetServerInfoReq
 
-recv :: MonadIO m => Socket -> m Message
-recv (Socket { bufferRef, recvlock, socket }) =
-  liftIO (withMVar recvlock $ \() -> recv_ bufferRef socket)
+ping
+  :: Socket -- ^
+  -> IO (RecvResult RpbPingResp)
+ping conn = do
+  Socket.exchange conn RpbPingReq
 
-recv_ :: IORef ByteString -> Socket.Socket -> IO Message
-recv_ bufferRef socket = do
-  buffer <- readIORef bufferRef
+putIndex
+  :: Socket -- ^
+  -> RpbYokozunaIndexPutReq -- ^
+  -> IO (RecvResult RpbEmptyPutResp)
+putIndex =
+  Socket.exchange
 
-  loop
-    (if ByteString.null buffer
-      then Atto.Partial Message.parse
-      else Message.parse buffer)
+putObject
+  :: Socket -- ^
+  -> RpbPutReq -- ^
+  -> IO (RecvResult RpbPutResp)
+putObject =
+  Socket.exchange
 
-  where
-    loop :: Atto.IResult ByteString Message -> IO Message
-    loop = \case
-      Atto.Fail _unconsumed context reason ->
-        throwIO (ParseFailure context reason)
+-- putObject_
+--   :: Socket -- ^
+--   -> RpbPutReq -- ^
+--   -> IO (RecvResult ())
+-- putRiakObjectPB_ =
+--   Socket.exchange_ @RpbPutResp
 
-      Atto.Partial k -> do
-        bytes <- Socket.recv socket 16384
+putSchema
+  :: Socket -- ^
+  -> RpbYokozunaSchemaPutReq -- ^
+  -> IO (RecvResult RpbEmptyPutResp)
+putSchema =
+  Socket.exchange
 
-        loop
-          (if ByteString.null bytes
-            then k ByteString.empty
-            else Message.parse bytes)
+resetBucketProps
+  :: Socket -- ^
+  -> RpbResetBucketReq -- ^
+  -> IO (RecvResult RpbResetBucketResp)
+resetBucketProps =
+  Socket.exchange
 
-      Atto.Done unconsumed message -> do
-        writeIORef bufferRef unconsumed
-        pure message
+index
+  :: Socket -- ^
+  -> RpbIndexReq -- ^
+  -> FoldM IO RpbIndexResp r -- ^
+  -> IO (RecvResult r)
+index conn request =
+  Socket.stream conn request (view done)
 
+mapReduce
+  :: Socket -- ^
+  -> RpbMapRedReq -- ^
+  -> FoldM IO RpbMapRedResp r -- ^
+  -> IO (RecvResult r)
+mapReduce conn request =
+  Socket.stream conn request (view done)
 
-data MessageParseFailure
-  = MessageParseFailure
-  { context :: [String]
-  , reason  :: String
-  } deriving stock (Show)
-    deriving anyclass (Exception)
+search
+  :: Socket -- ^
+  -> RpbSearchQueryReq -- ^
+  -> IO (RecvResult RpbSearchQueryResp)
+search =
+  Socket.exchange
 
-messages :: MonadIO m => Socket -> Stream (Of Message) m ()
-messages =
-  hoist liftIO . messageStream . socketStream . socket
+setBucketProps
+  :: Socket -- ^
+  -> RpbSetBucketReq -- ^
+  -> IO (RecvResult RpbSetBucketResp)
+setBucketProps =
+  Socket.exchange
 
-socketStream ::
-     MonadIO m
-  => Socket.Socket
-  -> Q.ByteString m ()
-socketStream socket =
-  fix $ \loop -> do
-    bytes :: ByteString <-
-      liftIO (Socket.recv socket 16384)
+setBucketTypeProps
+  :: Socket -- ^
+  -> RpbSetBucketTypeReq -- ^
+  -> IO (RecvResult RpbSetBucketTypeResp)
+setBucketTypeProps =
+  Socket.exchange
 
-    unless (ByteString.null bytes) $ do
-      Q.chunk bytes
-      loop
+streamBuckets
+  :: Socket -- ^
+  -> RpbListBucketsReq -- ^
+  -> FoldM IO RpbListBucketsResp r -- ^
+  -> IO (RecvResult r)
+streamBuckets conn request =
+  Socket.stream conn request (view done)
 
-messageStream :: Q.ByteString IO a -> Stream (Of Message) IO a
-messageStream bytes0 =
-  lift (parseByteStream Message.parse bytes0) >>= \case
-    EndOfInput x ->
-      pure x
+streamKeys
+  :: Socket -- ^
+  -> RpbListKeysReq -- ^
+  -> FoldM IO RpbListKeysResp r -- ^
+  -> IO (RecvResult r)
+streamKeys conn request =
+  Socket.stream conn request (view done)
 
-    FailedParse _unconsumed context reason ->
-      liftIO $ throwIO MessageParseFailure
-        { context = context
-        , reason = reason
-        }
-
-    SuccessfulParse message bytes1 -> do
-      Streaming.yield message
-      messageStream bytes1
-
--- | Throwaway 'parseByteStream' result type.
-data ParseResult a r
-  = EndOfInput r
-  | FailedParse !ByteString  ![String] !String
-  | SuccessfulParse a (Q.ByteString IO r)
-
--- | Apply an attoparsec parser to a streaming bytestring. Return the parsed
--- value and the remaining stream.
-parseByteStream
-  :: forall a r.
-     (ByteString -> Atto.IResult ByteString a)
-  -> Q.ByteString IO r
-  -> IO (ParseResult a r)
-parseByteStream parse bytes0 =
-  Q.nextChunk bytes0 >>= \case
-    Left r ->
-      pure (EndOfInput r)
-
-    Right (chunk0, bytes1) ->
-      let
-        loop
-          :: Atto.Result a
-          -> Q.ByteString IO r
-          -> IO (ParseResult a r)
-        loop result bytes =
-          case result of
-            Atto.Fail unconsumed context reason ->
-              pure (FailedParse unconsumed context reason)
-
-            Atto.Partial k ->
-              Q.nextChunk bytes >>= \case
-                Left r ->
-                  pure (EndOfInput r)
-
-                Right (chunk, bytes') ->
-                  loop (k chunk) bytes'
-
-            Atto.Done leftover x ->
-              pure (SuccessfulParse x (Q.chunk leftover *> bytes))
-      in
-        loop (parse chunk0) bytes1
+updateCrdt
+  :: Socket -- ^
+  -> DtUpdateReq -- ^
+  -> IO (RecvResult DtUpdateResp)
+updateCrdt =
+  Socket.exchange

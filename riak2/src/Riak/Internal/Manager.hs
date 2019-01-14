@@ -2,8 +2,8 @@
 --
 -- Some details about the implementation:
 --
--- * Contains a static array of @Maybe RiakConnection@. This is the maximum
---   number of open sockets.
+-- * Contains a static array of @Maybe Socket@. This is the maximum number of
+--   open sockets.
 --
 -- * When a thread checks out a connection, its hashed thread id is used to
 --   select the connection. If the connection is not open yet, the thread takes
@@ -23,6 +23,12 @@ module Riak.Internal.Manager
   , withRiakConnection
   ) where
 
+import Riak.Internal.Debug
+import Riak.Internal.Prelude  hiding (IORef)
+import Riak.Socket.Concurrent (Socket)
+
+import qualified Riak.Socket.Concurrent as Socket
+
 import Data.Fixed                   (E6, Fixed)
 import Data.Hashable                (hash)
 import Data.Primitive.MutVar
@@ -33,10 +39,6 @@ import Network.Socket               (HostName, PortNumber)
 
 import qualified Data.TimerWheel as TimerWheel
 
-import Riak.Internal.Connection
-import Riak.Internal.Debug
-import Riak.Internal.Prelude    hiding (IORef)
-
 
 type IORef
   = MutVar RealWorld
@@ -45,7 +47,7 @@ type IORef
 data Entry
   = NotConnected
   | Connected
-      !RiakConnection -- Connection
+      !Socket -- Connection
       !(IORef (IO Bool)) -- Action to cancel the timer that closes the connection
 
 
@@ -97,7 +99,7 @@ createRiakManager host port n inactive = do
           pure ()
 
         Connected conn _ ->
-          void (tryAny (riakDisconnect conn))
+          void (tryAny (Socket.close conn))
 
   -- TODO configurable wheel spokes?
   wheel :: TimerWheel <-
@@ -106,7 +108,7 @@ createRiakManager host port n inactive = do
   pure (RiakManager host port conns' lock wheel inactive)
 
 
-withRiakConnection :: RiakManager -> (RiakConnection -> IO a) -> IO a
+withRiakConnection :: RiakManager -> (Socket -> IO a) -> IO a
 withRiakConnection (RiakManager host port conns lock wheel inactive) k = do
   which :: Int <-
     (`mod` sizeofUnliftedArray conns) . hash <$> myThreadId
@@ -129,7 +131,7 @@ acquireRiakConnection
   -> TimerWheel
   -> Fixed E6
   -> IORef Entry
-  -> IO RiakConnection
+  -> IO Socket
 acquireRiakConnection host port which lock wheel inactive connVar =
   readMutVar connVar >>= \case
     NotConnected ->
@@ -143,8 +145,8 @@ acquireRiakConnection host port which lock wheel inactive connVar =
             -- returning from this action. Otherwise, we might die from an async
             -- exception and leave the connection open.
             mask $ \unmask -> do
-              conn :: RiakConnection <-
-                unmask (riakConnect host port)
+              conn :: Socket <-
+                unmask (Socket.connect host port)
 
               cancelRef :: IORef (IO Bool) <-
                 newMutVar =<< registerClose conn
@@ -164,7 +166,7 @@ acquireRiakConnection host port which lock wheel inactive connVar =
   -- and return the connection. If canceling fails, that means the reaper thread
   -- snuck in underneath us and closed the connection; just re-acquire the
   -- connection.
-  reregisterClose :: RiakConnection -> IORef (IO Bool) -> IO RiakConnection
+  reregisterClose :: Socket -> IORef (IO Bool) -> IO Socket
   reregisterClose conn cancelRef = do
     canceled :: Bool <-
       join (readMutVar cancelRef)
@@ -177,7 +179,7 @@ acquireRiakConnection host port which lock wheel inactive connVar =
         acquireRiakConnection host port which lock wheel inactive connVar
 
   -- Register a timer that closes this connection when it fires.
-  registerClose :: RiakConnection -> IO (IO Bool)
+  registerClose :: Socket -> IO (IO Bool)
   registerClose conn = do
     TimerWheel.register
       inactive
@@ -187,15 +189,15 @@ acquireRiakConnection host port which lock wheel inactive connVar =
             show inactive ++ " seconds of inactivity"
 
         writeMutVar connVar NotConnected
-        void (tryAny (riakDisconnect conn)))
+        void (tryAny (Socket.close conn)))
       wheel
 
 releaseRiakConnection
   :: Int
   -> IORef Entry
-  -> RiakConnection
+  -> Socket
   -> IO ()
 releaseRiakConnection which connVar conn = do
   writeMutVar connVar NotConnected
-  riakDisconnect conn
+  Socket.close conn
   debug ("[riak] manager: exception on connection " ++ show which)

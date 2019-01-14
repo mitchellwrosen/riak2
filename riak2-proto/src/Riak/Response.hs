@@ -7,11 +7,10 @@ module Riak.Response
 import Riak.Message (Code(..), Message(..))
 import Riak.Proto
 
-import Control.Exception      (Exception, throwIO)
-import Control.Monad.IO.Class (MonadIO(liftIO))
-import Data.ByteString        (ByteString)
-import Data.Coerce            (coerce)
-import Data.Word              (Word8)
+import Control.Exception (Exception)
+import Data.ByteString   (ByteString)
+import Data.Coerce       (coerce)
+import Data.Word         (Word8)
 
 import qualified Data.ProtoLens as Proto
 
@@ -67,6 +66,7 @@ data ParseError
   = UnexpectedMessageCode !Message !Word8
   | ProtobufDecodeError !Message !String
   deriving stock (Show)
+  deriving anyclass (Exception)
 
 
 parse ::

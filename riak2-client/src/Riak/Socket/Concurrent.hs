@@ -4,19 +4,18 @@ module Riak.Socket.Concurrent
   , close
   , exchange
   , stream
-  , RecvError(..)
+  , RecvResult(..)
   ) where
 
-import Riak.Proto             (RpbErrorResp)
 import Riak.Request           (Request)
 import Riak.Response          (Response)
-import Riak.Socket.Sequential (RecvError(..))
+import Riak.Socket.Sequential (RecvResult(..))
 
 import qualified Riak.Socket.Sequential as Sequential (Socket)
 import qualified Riak.Socket.Sequential as Socket.Sequential
 
 import Control.Concurrent.MVar
-import Control.Foldl (FoldM(..))
+import Control.Foldl           (FoldM(..))
 import Data.Coerce
 import Network.Socket          (HostName, PortNumber)
 import UnliftIO.Exception      (finally)
@@ -47,7 +46,7 @@ exchange ::
      (Request a, Response b)
   => Socket
   -> a
-  -> IO (Either RecvError (Either RpbErrorResp b))
+  -> IO (RecvResult b)
 exchange (Socket { socket, sync, relay}) request = do
   baton <-
     synchronized sync $ do
@@ -62,7 +61,7 @@ stream ::
   -> a -- ^ Request
   -> (b -> Bool) -- ^ Done?
   -> FoldM IO b r -- ^ Fold responses
-  -> IO (Either RecvError (Either RpbErrorResp r))
+  -> IO (RecvResult r)
 stream (Socket { socket, sync, relay }) request done (FoldM step initial extract) = do
   baton <-
     synchronized sync $ do
@@ -73,19 +72,19 @@ stream (Socket { socket, sync, relay }) request done (FoldM step initial extract
     let
       loop value =
         Socket.Sequential.recv socket >>= \case
-          Left err ->
-            pure (Left err)
+          RiakClosedConnection ->
+            pure RiakClosedConnection
 
-          Right (Left err) ->
-            pure (Right (Left err))
+          Failure err ->
+            pure (Failure err)
 
-          Right (Right message) -> do
+          Success message -> do
             value' <-
               step value message
 
             if done message
               then
-                Right . Right <$> extract value'
+                Success <$> extract value'
               else
                 loop value'
 
