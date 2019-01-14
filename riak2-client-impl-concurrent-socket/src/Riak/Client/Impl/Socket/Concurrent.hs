@@ -3,6 +3,7 @@ module Riak.Client.Impl.Socket.Concurrent
   , connect
   , disconnect
   , exchange
+  , stream
   ) where
 
 import Riak.Message (Message)
@@ -14,8 +15,6 @@ import Control.Concurrent.MVar
 import Data.Coerce             (coerce)
 import Network.Socket          (HostName, PortNumber)
 import UnliftIO.Exception      (finally)
-
-import qualified Data.ByteString.Lazy as Lazy (ByteString)
 
 
 data Client
@@ -38,17 +37,32 @@ disconnect =
 
 exchange ::
      Client
-  -> Lazy.ByteString
-  -> (IO (Maybe Message) -> IO r)
-  -> IO r
-exchange client request callback = do
+  -> Message
+  -> IO (Maybe Message)
+exchange client request = do
   baton <-
     synchronized (sync client) $ do
       Client.Sequential.send (socket client) request
       enterRelay (relay client)
 
   withBaton baton
-    (callback (Client.Sequential.recv (socket client)))
+    (Client.Sequential.recv (socket client))
+
+stream ::
+     Client
+  -> Message
+  -> (IO (Maybe Message) -> IO r)
+  -> IO r
+stream client request callback =
+  -- Riak request handling state machine is odd. Streaming responses are
+  -- special; when one is active, no other requests can be serviced on this
+  -- socket. I learned this the hard way by reading Riak source code.
+  --
+  -- So, hold a lock for the entirety of the request-response exchange, not just
+  -- during sending the request.
+  synchronized (sync client) $ do
+    Client.Sequential.send (socket client) request
+    callback (Client.Sequential.recv (socket client))
 
 
 newtype Synchronized

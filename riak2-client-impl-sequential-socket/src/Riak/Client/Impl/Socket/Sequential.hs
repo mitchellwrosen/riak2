@@ -5,6 +5,7 @@ module Riak.Client.Impl.Socket.Sequential
   , send
   , recv
   , exchange
+  , stream
   ) where
 
 import Riak.Message (Message)
@@ -18,7 +19,6 @@ import Network.Socket          (HostName, PortNumber, Socket)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
-import qualified Data.ByteString.Lazy           as Lazy (ByteString)
 import qualified Network.Socket                 as Socket hiding (recv)
 import qualified Network.Socket.ByteString      as Socket (recv)
 import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
@@ -61,9 +61,9 @@ disconnect :: Client -> IO ()
 disconnect =
   Socket.close . socket
 
-send :: Client -> Lazy.ByteString -> IO ()
-send client =
-  Socket.sendAll (socket client)
+send :: Client -> Message -> IO ()
+send client message =
+  Socket.sendAll (socket client) (Message.encode message)
 
 recv :: Client -> IO (Maybe Message)
 recv client = do
@@ -98,10 +98,19 @@ recv client = do
 
 exchange ::
      Client
-  -> Lazy.ByteString
+  -> Message
+  -> IO (Maybe Message)
+exchange client request =
+  withMVar (lock client) $ \_ -> do
+    send client request
+    recv client
+
+stream ::
+     Client
+  -> Message
   -> (IO (Maybe Message) -> IO r)
   -> IO r
-exchange client request callback =
+stream client request callback =
   withMVar (lock client) $ \_ -> do
     send client request
     callback (recv client)

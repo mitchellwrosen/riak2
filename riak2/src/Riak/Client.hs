@@ -34,7 +34,6 @@ import Riak.Request          (Request)
 import Riak.Response         (Response)
 
 import qualified Riak.Client.Signature as Client
-import qualified Riak.Message          as Message
 import qualified Riak.Request          as Request
 import qualified Riak.Response         as Response
 
@@ -62,10 +61,8 @@ exchange ::
   -> a
   -> IO (RecvResult b)
 exchange client request =
-  Client.exchange
-    client
-    (Message.encode (Request.toMessage request))
-    (>>= toRecvResult)
+  Client.exchange client (Request.toMessage request) >>=
+    toRecvResult
 
 stream ::
      forall a b r.
@@ -76,9 +73,9 @@ stream ::
   -> FoldM IO b r -- ^ Fold responses
   -> IO (RecvResult r)
 stream client request done (FoldM step initial extract) =
-  Client.exchange
+  Client.stream
     client
-    (Message.encode (Request.toMessage request))
+    (Request.toMessage request)
     callback
 
   where

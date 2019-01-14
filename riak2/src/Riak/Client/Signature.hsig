@@ -5,8 +5,6 @@ import Riak.Message (Message)
 import Prelude
 import Network.Socket (HostName, PortNumber)
 
-import qualified Data.ByteString.Lazy as Lazy (ByteString)
-
 data Client
 
 connect ::
@@ -20,6 +18,11 @@ disconnect ::
 
 exchange ::
      Client
-  -> Lazy.ByteString
+  -> Message
+  -> IO (Maybe Message)
+
+stream ::
+     Client
+  -> Message
   -> (IO (Maybe Message) -> IO r)
   -> IO r
