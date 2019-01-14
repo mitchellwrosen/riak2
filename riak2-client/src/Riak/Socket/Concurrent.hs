@@ -3,6 +3,7 @@ module Riak.Socket.Concurrent
   , connect
   , close
   , exchange
+  , stream
   , RecvError(..)
   ) where
 
@@ -15,63 +16,80 @@ import qualified Riak.Socket.Sequential as Sequential (Socket)
 import qualified Riak.Socket.Sequential as Socket.Sequential
 
 import Control.Concurrent.MVar
+import Control.Foldl (FoldM(..))
 import Data.Coerce
 import Network.Socket          (HostName, PortNumber)
 import UnliftIO.Exception      (finally)
 
 
 -- | A thread-safe connection to Riak.
-newtype Socket
-  = Socket (ReqRep Sequential.Socket)
+data Socket
+  = Socket
+  { socket :: !Sequential.Socket
+  , sync :: !Synchronized
+  , relay :: !Relay
+  }
 
 -- | Connect to Riak.
 connect :: HostName -> PortNumber -> IO Socket
 connect host port =
-  coerce (newReqRep =<< Socket.Sequential.connect host port)
+  Socket
+    <$> Socket.Sequential.connect host port
+    <*> newSynchronized
+    <*> newRelay
 
 -- | Close the connection to Riak.
 close :: Socket -> IO ()
 close =
-  Socket.Sequential.close . resource . coerce
+  Socket.Sequential.close . socket
 
 exchange ::
      (Request a, Response b)
   => Socket
   -> a
   -> IO (Either RecvError (Either RpbErrorResp b))
-exchange (Socket socket) request =
-  reqRep
-    socket
-    (\socket -> Socket.Sequential.send socket request)
-    Socket.Sequential.recv
-
-
-data ReqRep a
-  = ReqRep
-  { resource :: a
-  , sync :: !Synchronized
-  , relay :: !Relay
-  }
-
-newReqRep :: a -> IO (ReqRep a)
-newReqRep resource =
-  ReqRep
-    <$> pure resource
-    <*> newSynchronized
-    <*> newRelay
-
-reqRep ::
-     ReqRep a
-  -> (a -> IO ())
-  -> (a -> IO b)
-  -> IO b
-reqRep (ReqRep { resource, sync, relay }) send recv = do
+exchange (Socket { socket, sync, relay}) request = do
   baton <-
     synchronized sync $ do
-      send resource
+      Socket.Sequential.send socket request
       enterRelay relay
 
-  withBaton baton (recv resource)
+  withBaton baton (Socket.Sequential.recv socket)
+
+stream ::
+     (Request a, Response b)
+  => Socket
+  -> a -- ^ Request
+  -> (b -> Bool) -- ^ Done?
+  -> FoldM IO b r -- ^ Fold responses
+  -> IO (Either RecvError (Either RpbErrorResp r))
+stream (Socket { socket, sync, relay }) request done (FoldM step initial extract) = do
+  baton <-
+    synchronized sync $ do
+      Socket.Sequential.send socket request
+      enterRelay relay
+
+  withBaton baton $ do
+    let
+      loop value =
+        Socket.Sequential.recv socket >>= \case
+          Left err ->
+            pure (Left err)
+
+          Right (Left err) ->
+            pure (Right (Left err))
+
+          Right (Right message) -> do
+            value' <-
+              step value message
+
+            if done message
+              then
+                Right . Right <$> extract value'
+              else
+                loop value'
+
+    loop =<< initial
 
 
 newtype Synchronized

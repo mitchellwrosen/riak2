@@ -9,6 +9,7 @@ library
       attoparsec ^>= 0.13.2
     , base
     , bytestring ^>= 0.10.8
+    , foldl
     , network ^>= 2.7.0
     , riak2-proto
     , streaming
