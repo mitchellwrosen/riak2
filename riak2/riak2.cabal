@@ -6,6 +6,21 @@ build-type: Simple
 
 library
   build-depends:
+      riak2-indef
+    -- , riak2-client-impl-concurrent-socket
+    , riak2-client-impl-sequential-socket
+
+  default-language:
+    Haskell2010
+
+  mixins:
+    --riak2-indef requires
+    --  (Riak.Client.Signature as Riak.Client.Impl.Socket.Concurrent)
+    riak2-indef requires
+      (Riak.Client.Signature as Riak.Client.Impl.Socket.Sequential)
+
+library riak2-indef
+  build-depends:
       aeson ^>= 1.4.0
     , attoparsec ^>= 0.13.2
     , base ^>= 4.11.1 || ^>= 4.12.0
