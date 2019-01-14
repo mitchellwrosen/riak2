@@ -2,4 +2,5 @@ packages:
     riak2
   , riak2-client-impl-concurrent-socket
   , riak2-client-impl-sequential-socket
+  , riak2-client-sig
   , riak2-proto

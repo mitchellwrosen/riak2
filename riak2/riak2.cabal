@@ -41,6 +41,7 @@ library riak2-indef
     , primitive ^>= 0.6.4
     , profunctors ^>= 5.3
     , proto-lens ^>= 0.4.0
+    , riak2-client-sig
     , riak2-proto
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
@@ -123,9 +124,6 @@ library riak2-indef
     Riak.Internal.Prelude
     Riak.Internal.Types
     Riak.Internal.Utils
-
-  signatures:
-    Riak.Client.Signature
 
 -- executable riakc
 --   build-depends:
