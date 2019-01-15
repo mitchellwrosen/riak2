@@ -3,14 +3,12 @@ signature Riak.Client.Signature where
 import Riak.Message (Message)
 
 import Prelude
-import Network.Socket (HostName, PortNumber)
 
 data Client
 
 connect ::
-     HostName
-  -> PortNumber
-  -> IO Client
+     Client
+  -> IO ()
 
 disconnect ::
      Client

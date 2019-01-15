@@ -6,8 +6,6 @@ module Riak.Request
 import Riak.Message (Message(..), Code(..))
 import Riak.Proto
 
-import qualified Riak.Message as Message
-
 import Data.ByteString (ByteString)
 import Data.Coerce (coerce)
 

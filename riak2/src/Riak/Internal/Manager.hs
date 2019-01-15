@@ -146,7 +146,7 @@ acquireRiakConnection host port which lock wheel inactive connVar =
             -- exception and leave the connection open.
             mask $ \unmask -> do
               conn :: Client <-
-                unmask (Client.connect host port)
+                undefined -- unmask (Client.connect host port)
 
               cancelRef :: IORef (IO Bool) <-
                 newMutVar =<< registerClose conn

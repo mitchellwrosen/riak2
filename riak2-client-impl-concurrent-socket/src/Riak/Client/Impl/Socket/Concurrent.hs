@@ -1,5 +1,7 @@
 module Riak.Client.Impl.Socket.Concurrent
   ( Client
+  , EventHandlers(..)
+  , new
   , connect
   , disconnect
   , exchange
@@ -8,12 +10,14 @@ module Riak.Client.Impl.Socket.Concurrent
 
 import Riak.Message (Message)
 
+import Riak.Client.Impl.Socket.Sequential (EventHandlers(..))
+
 import qualified Riak.Client.Impl.Socket.Sequential as Sequential (Client)
 import qualified Riak.Client.Impl.Socket.Sequential as Client.Sequential
 
 import Control.Concurrent.MVar
 import Data.Coerce             (coerce)
-import Network.Socket          (HostName, PortNumber)
+import Network.Socket          (HostName, PortNumber, SockAddr)
 import UnliftIO.Exception      (finally)
 
 
@@ -24,12 +28,20 @@ data Client
   , relay :: !Relay
   }
 
-connect :: HostName -> PortNumber -> IO Client
-connect host port =
+new ::
+     HostName
+  -> PortNumber
+  -> EventHandlers
+  -> IO Client
+new host port handlers =
   Client
-    <$> Client.Sequential.connect host port
+    <$> Client.Sequential.new host port handlers
     <*> newSynchronized
     <*> newRelay
+
+connect :: Client -> IO ()
+connect client =
+  Client.Sequential.connect (socket client)
 
 disconnect :: Client -> IO ()
 disconnect =
@@ -40,13 +52,13 @@ exchange ::
   -> Message
   -> IO (Maybe Message)
 exchange client request = do
-  baton <-
+  baton :: Baton <-
     synchronized (sync client) $ do
       Client.Sequential.send (socket client) request
       enterRelay (relay client)
 
   withBaton baton
-    (Client.Sequential.recv (socket client))
+    (Client.Sequential.receive (socket client))
 
 stream ::
      Client
@@ -62,7 +74,7 @@ stream client request callback =
   -- during sending the request.
   synchronized (sync client) $ do
     Client.Sequential.send (socket client) request
-    callback (Client.Sequential.recv (socket client))
+    callback (Client.Sequential.receive (socket client))
 
 
 newtype Synchronized

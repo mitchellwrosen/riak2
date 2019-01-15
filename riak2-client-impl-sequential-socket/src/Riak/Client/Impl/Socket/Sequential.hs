@@ -1,9 +1,11 @@
 module Riak.Client.Impl.Socket.Sequential
   ( Client
+  , EventHandlers(..)
+  , new
   , connect
   , disconnect
   , send
-  , recv
+  , receive
   , exchange
   , stream
   ) where
@@ -15,64 +17,90 @@ import qualified Riak.Message as Message
 import Control.Concurrent.MVar
 import Data.ByteString         (ByteString)
 import Data.IORef
-import Network.Socket          (HostName, PortNumber, Socket)
+import Network.Socket          (HostName, PortNumber, SockAddr, Socket)
 
 import qualified Data.Attoparsec.ByteString     as Atto
 import qualified Data.ByteString                as ByteString
-import qualified Network.Socket                 as Socket hiding (recv)
-import qualified Network.Socket.ByteString      as Socket (recv)
-import qualified Network.Socket.ByteString.Lazy as Socket (sendAll)
+import qualified Network.Socket                 as Network hiding (recv)
+import qualified Network.Socket.ByteString      as Network (recv)
+import qualified Network.Socket.ByteString.Lazy as Network (sendAll)
 
 
 data Client
   = Client
-  { socket :: !Socket
+  { sockaddr :: !SockAddr
+  , socket :: !Socket
   , bufferRef :: !(IORef ByteString)
   , lock :: !(MVar ())
+  , handlers :: !EventHandlers
   }
 
-connect :: HostName -> PortNumber -> IO Client
-connect host port = do
+data EventHandlers
+  = EventHandlers
+  { onConnect :: IO ()
+  , onDisconnect :: IO ()
+  , onSend :: Message -> IO ()
+  , onReceive :: Maybe Message -> IO ()
+  }
+
+new ::
+     HostName
+  -> PortNumber
+  -> EventHandlers
+  -> IO Client
+new host port handlers = do
   info : _ <-
     let
       hints =
-        Socket.defaultHints { Socket.addrSocketType = Socket.Stream }
+        Network.defaultHints { Network.addrSocketType = Network.Stream }
     in
-      Socket.getAddrInfo (Just hints) (Just host) (Just (show port))
+      Network.getAddrInfo (Just hints) (Just host) (Just (show port))
 
-  socket :: Socket.Socket <-
-    Socket.socket
-      (Socket.addrFamily info)
-      (Socket.addrSocketType info)
-      (Socket.addrProtocol info)
-
-  Socket.connect socket (Socket.addrAddress info)
+  socket :: Socket <-
+    Network.socket
+      (Network.addrFamily info)
+      (Network.addrSocketType info)
+      (Network.addrProtocol info)
 
   bufferRef <- newIORef ByteString.empty
   lock <- newMVar ()
 
   pure Client
-    { socket = socket
+    { sockaddr = Network.addrAddress info
+    , socket = socket
     , bufferRef = bufferRef
     , lock = lock
+    , handlers = handlers
     }
 
+connect :: Client -> IO ()
+connect client = do
+  onConnect (handlers client)
+  Network.connect (socket client) (sockaddr client)
+
 disconnect :: Client -> IO ()
-disconnect =
-  Socket.close . socket
+disconnect client = do
+  onDisconnect (handlers client)
+  Network.close (socket client)
+  writeIORef (bufferRef client) ByteString.empty
 
 send :: Client -> Message -> IO ()
-send client message =
-  Socket.sendAll (socket client) (Message.encode message)
+send client message = do
+  onSend (handlers client) message
+  Network.sendAll (socket client) (Message.encode message)
 
-recv :: Client -> IO (Maybe Message)
-recv client = do
+receive :: Client -> IO (Maybe Message)
+receive client = do
   buffer <- readIORef (bufferRef client)
 
-  loop
-    (if ByteString.null buffer
-      then Atto.Partial Message.parse
-      else Message.parse buffer)
+  result :: Maybe Message <-
+    loop
+      (if ByteString.null buffer
+        then Atto.Partial Message.parse
+        else Message.parse buffer)
+
+  onReceive (handlers client) result
+  pure result
 
   where
     loop ::
@@ -85,7 +113,7 @@ recv client = do
         pure Nothing
 
       Atto.Partial k -> do
-        bytes <- Socket.recv (socket client) 16384
+        bytes <- Network.recv (socket client) 16384
 
         loop
           (if ByteString.null bytes
@@ -103,7 +131,7 @@ exchange ::
 exchange client request =
   withMVar (lock client) $ \_ -> do
     send client request
-    recv client
+    receive client
 
 stream ::
      Client
@@ -113,4 +141,4 @@ stream ::
 stream client request callback =
   withMVar (lock client) $ \_ -> do
     send client request
-    callback (recv client)
+    callback (receive client)
