@@ -22,6 +22,13 @@ This package contains a `riak2-client-sig` implementation that improves the
 potential throughput of the sequential socket. Multiple threads are able to send
 requests to Riak concurrently.
 
+### `riak2-client-impl-managed-indef`
+
+This package contains a `riak2-client-sig` "modifier" implementation, i.e., it
+is both parameterized by and implements the Riak client signature. It upgrades a
+client by automatically reconnecting and retrying on failure (not currently
+configurable).
+
 ### `riak2`
 
 This package contains high-level Riak bindings. Requires `riak2-client-sig` to
