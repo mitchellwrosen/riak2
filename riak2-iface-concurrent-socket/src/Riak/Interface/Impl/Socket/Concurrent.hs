@@ -1,5 +1,5 @@
-module Riak.Client.Impl.Socket.Concurrent
-  ( Client
+module Riak.Interface.Impl.Socket.Concurrent
+  ( Interface
   , EventHandlers(..)
   , new
   , connect
@@ -10,10 +10,9 @@ module Riak.Client.Impl.Socket.Concurrent
 
 import Riak.Message (Message)
 
-import Riak.Client.Impl.Socket.Sequential (EventHandlers(..))
+import Riak.Interface.Impl.Socket (EventHandlers(..))
 
-import qualified Riak.Client.Impl.Socket.Sequential as Sequential (Client)
-import qualified Riak.Client.Impl.Socket.Sequential as Client.Sequential
+import qualified Riak.Interface.Impl.Socket as Inner
 
 import Control.Concurrent.MVar
 import Data.Coerce             (coerce)
@@ -21,9 +20,9 @@ import Network.Socket          (HostName, PortNumber, SockAddr)
 import UnliftIO.Exception      (finally)
 
 
-data Client
-  = Client
-  { socket :: !Sequential.Client
+data Interface
+  = Interface
+  { inner :: !Inner.Interface
   , sync :: !Synchronized
   , relay :: !Relay
   }
@@ -32,49 +31,49 @@ new ::
      HostName
   -> PortNumber
   -> EventHandlers
-  -> IO Client
+  -> IO Interface
 new host port handlers =
-  Client
-    <$> Client.Sequential.new host port handlers
+  Interface
+    <$> Inner.new host port handlers
     <*> newSynchronized
     <*> newRelay
 
-connect :: Client -> IO ()
-connect client =
-  Client.Sequential.connect (socket client)
+connect :: Interface -> IO ()
+connect iface =
+  Inner.connect (inner iface)
 
-disconnect :: Client -> IO ()
+disconnect :: Interface -> IO ()
 disconnect =
-  Client.Sequential.disconnect . socket
+  Inner.disconnect . inner
 
 exchange ::
-     Client
+     Interface
   -> Message
   -> IO (Maybe Message)
-exchange client request = do
+exchange iface request = do
   baton :: Baton <-
-    synchronized (sync client) $ do
-      Client.Sequential.send (socket client) request
-      enterRelay (relay client)
+    synchronized (sync iface) $ do
+      Inner.send (inner iface) request
+      enterRelay (relay iface)
 
   withBaton baton
-    (Client.Sequential.receive (socket client))
+    (Inner.receive (inner iface))
 
 stream ::
-     Client
+     Interface
   -> Message
   -> (IO (Maybe Message) -> IO r)
   -> IO r
-stream client request callback =
+stream iface request callback =
   -- Riak request handling state machine is odd. Streaming responses are
   -- special; when one is active, no other requests can be serviced on this
   -- socket. I learned this the hard way by reading Riak source code.
   --
   -- So, hold a lock for the entirety of the request-response exchange, not just
   -- during sending the request.
-  synchronized (sync client) $ do
-    Client.Sequential.send (socket client) request
-    callback (Client.Sequential.receive (socket client))
+  synchronized (sync iface) $ do
+    Inner.send (inner iface) request
+    callback (Inner.receive (inner iface))
 
 
 newtype Synchronized

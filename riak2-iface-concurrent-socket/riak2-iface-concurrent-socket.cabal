@@ -1,6 +1,6 @@
 cabal-version: 2.4
 
-name: riak2-client-impl-concurrent-socket
+name: riak2-iface-concurrent-socket
 version: 0.1.0
 build-type: Simple
 
@@ -9,7 +9,7 @@ library
       base
     , bytestring
     , network
-    , riak2-client-impl-sequential-socket
+    , riak2-iface-socket
     , riak2-proto
     , unliftio
 
@@ -20,7 +20,7 @@ library
     Haskell2010
 
   exposed-modules:
-    Riak.Client.Impl.Socket.Concurrent
+    Riak.Interface.Impl.Socket.Concurrent
 
   ghc-options:
     -Wall

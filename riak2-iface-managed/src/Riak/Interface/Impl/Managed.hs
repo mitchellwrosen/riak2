@@ -22,8 +22,8 @@
 -- Still TODO: some way of configuring when we want to reconnect, and when we
 -- want to give up on the connection permanently.
 
-module Riak.Client.Impl.Managed
-  ( Client
+module Riak.Interface.Impl.Managed
+  ( Interface
   , new
   , connect
   , disconnect
@@ -33,7 +33,7 @@ module Riak.Client.Impl.Managed
 
 import Riak.Message (Message)
 
-import qualified Riak.Client.Signature as Client
+import qualified Riak.Interface.Signature as Inner
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -42,9 +42,9 @@ import System.IO.Unsafe       (unsafeInterleaveIO)
 import UnliftIO.Exception
 
 
-data Client
-  = Client
-  { inner :: !Client.Client
+data Interface
+  = Interface
+  { inner :: !Inner.Interface
   , statusVar :: !(TVar Status)
   , backgroundThreadVar :: !(MVar ThreadId)
   }
@@ -55,35 +55,35 @@ data Status
   | Connected
 
 new ::
-     Client.Client
-  -> IO Client
+     Inner.Interface
+  -> IO Interface
 new inner =
-  Client
+  Interface
     <$> pure inner
     <*> newTVarIO Disconnected
     <*> newEmptyMVar
 
-connect :: Client -> IO ()
+connect :: Interface -> IO ()
 connect =
   spawnBackgroundThreadIfNotRunning
 
-spawnBackgroundThreadIfNotRunning :: Client -> IO ()
-spawnBackgroundThreadIfNotRunning client = do
+spawnBackgroundThreadIfNotRunning :: Interface -> IO ()
+spawnBackgroundThreadIfNotRunning iface = do
   -- TODO background thread lifetime/exception handling
   backgroundThread :: ThreadId <-
     unsafeInterleaveIO
       (forkIO
-        (runBackgroundThread (inner client) (statusVar client)))
+        (runBackgroundThread (inner iface) (statusVar iface)))
 
   success :: Bool <-
     tryPutMVar
-      (backgroundThreadVar client)
+      (backgroundThreadVar iface)
       backgroundThread
 
   when success (void (evaluate backgroundThread))
 
-runBackgroundThread :: Client.Client -> TVar Status -> IO ()
-runBackgroundThread client statusVar =
+runBackgroundThread :: Inner.Interface -> TVar Status -> IO ()
+runBackgroundThread iface statusVar =
   loop
 
   where
@@ -93,7 +93,7 @@ runBackgroundThread client statusVar =
         waitForConnecting
 
       when continue $ do
-        Client.disconnect client `catchAny` \_ -> pure ()
+        Inner.disconnect iface `catchAny` \_ -> pure ()
         reconnect
 
     waitForConnecting :: IO Bool
@@ -108,18 +108,18 @@ runBackgroundThread client statusVar =
     reconnect = do
       threadDelay 1000000
 
-      tryAny (Client.connect client) >>= \case
+      tryAny (Inner.connect iface) >>= \case
         Left _ ->
           reconnect
 
         Right () ->
           atomically (writeTVar statusVar Connected)
 
-disconnect :: Client -> IO ()
-disconnect client = do
+disconnect :: Interface -> IO ()
+disconnect iface = do
   mask_ $ do
-    atomically (writeTVar (statusVar client) Disconnected)
-    Client.disconnect (inner client)
+    atomically (writeTVar (statusVar iface) Disconnected)
+    Inner.disconnect (inner iface)
 
 waitForConnected :: TVar Status -> IO ()
 waitForConnected statusVar = do
@@ -130,20 +130,20 @@ waitForConnected statusVar = do
       Connected -> pure ()
 
 exchange ::
-     Client
+     Interface
   -> Message
   -> IO (Maybe Message)
-exchange client request =
+exchange iface request =
   loop
 
   where
     loop :: IO (Maybe Message)
     loop = do
-      waitForConnected (statusVar client)
+      waitForConnected (statusVar iface)
 
-      tryAny (Client.exchange (inner client) request) >>= \case
+      tryAny (Inner.exchange (inner iface) request) >>= \case
         Left _ -> do
-          atomically (writeTVar (statusVar client) Connecting)
+          atomically (writeTVar (statusVar iface) Connecting)
           loop
 
         Right response ->
@@ -151,21 +151,21 @@ exchange client request =
 
 stream ::
      forall r.
-     Client
+     Interface
   -> Message
   -> (IO (Maybe Message) -> IO r)
   -> IO r
-stream client request callback =
+stream iface request callback =
   loop
 
   where
     loop :: IO r
     loop = do
-      waitForConnected (statusVar client)
+      waitForConnected (statusVar iface)
 
-      tryAny (Client.stream (inner client) request callback) >>= \case
+      tryAny (Inner.stream (inner iface) request callback) >>= \case
         Left _ -> do
-          atomically (writeTVar (statusVar client) Connecting)
+          atomically (writeTVar (statusVar iface) Connecting)
           loop
 
         Right response ->

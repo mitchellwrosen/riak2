@@ -1,5 +1,5 @@
-module Riak.Client.Impl.Socket.Sequential
-  ( Client
+module Riak.Interface.Impl.Socket
+  ( Interface
   , EventHandlers(..)
   , new
   , connect
@@ -26,8 +26,8 @@ import qualified Network.Socket.ByteString      as Network (recv)
 import qualified Network.Socket.ByteString.Lazy as Network (sendAll)
 
 
-data Client
-  = Client
+data Interface
+  = Interface
   { sockaddr :: !SockAddr
   , socket :: !Socket
   , bufferRef :: !(IORef ByteString)
@@ -47,7 +47,7 @@ new ::
      HostName
   -> PortNumber
   -> EventHandlers
-  -> IO Client
+  -> IO Interface
 new host port handlers = do
   info : _ <-
     let
@@ -65,7 +65,7 @@ new host port handlers = do
   bufferRef <- newIORef ByteString.empty
   lock <- newMVar ()
 
-  pure Client
+  pure Interface
     { sockaddr = Network.addrAddress info
     , socket = socket
     , bufferRef = bufferRef
@@ -73,25 +73,25 @@ new host port handlers = do
     , handlers = handlers
     }
 
-connect :: Client -> IO ()
-connect client = do
-  onConnect (handlers client)
-  Network.connect (socket client) (sockaddr client)
+connect :: Interface -> IO ()
+connect iface = do
+  onConnect (handlers iface)
+  Network.connect (socket iface) (sockaddr iface)
 
-disconnect :: Client -> IO ()
-disconnect client = do
-  onDisconnect (handlers client)
-  Network.close (socket client)
-  writeIORef (bufferRef client) ByteString.empty
+disconnect :: Interface -> IO ()
+disconnect iface = do
+  onDisconnect (handlers iface)
+  Network.close (socket iface)
+  writeIORef (bufferRef iface) ByteString.empty
 
-send :: Client -> Message -> IO ()
-send client message = do
-  onSend (handlers client) message
-  Network.sendAll (socket client) (Message.encode message)
+send :: Interface -> Message -> IO ()
+send iface message = do
+  onSend (handlers iface) message
+  Network.sendAll (socket iface) (Message.encode message)
 
-receive :: Client -> IO (Maybe Message)
-receive client = do
-  buffer <- readIORef (bufferRef client)
+receive :: Interface -> IO (Maybe Message)
+receive iface = do
+  buffer <- readIORef (bufferRef iface)
 
   result :: Maybe Message <-
     loop
@@ -99,7 +99,7 @@ receive client = do
         then Atto.Partial Message.parse
         else Message.parse buffer)
 
-  onReceive (handlers client) result
+  onReceive (handlers iface) result
   pure result
 
   where
@@ -113,7 +113,7 @@ receive client = do
         pure Nothing
 
       Atto.Partial k -> do
-        bytes <- Network.recv (socket client) 16384
+        bytes <- Network.recv (socket iface) 16384
 
         loop
           (if ByteString.null bytes
@@ -121,24 +121,24 @@ receive client = do
             else Message.parse bytes)
 
       Atto.Done unconsumed message -> do
-        writeIORef (bufferRef client) unconsumed
+        writeIORef (bufferRef iface) unconsumed
         pure (Just message)
 
 exchange ::
-     Client
+     Interface
   -> Message
   -> IO (Maybe Message)
-exchange client request =
-  withMVar (lock client) $ \_ -> do
-    send client request
-    receive client
+exchange iface request =
+  withMVar (lock iface) $ \_ -> do
+    send iface request
+    receive iface
 
 stream ::
-     Client
+     Interface
   -> Message
   -> (IO (Maybe Message) -> IO r)
   -> IO r
-stream client request callback =
-  withMVar (lock client) $ \_ -> do
-    send client request
-    callback (receive client)
+stream iface request callback =
+  withMVar (lock iface) $ \_ -> do
+    send iface request
+    callback (receive iface)

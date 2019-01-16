@@ -1,16 +1,16 @@
 cabal-version: 2.4
 
-name: riak2-client-impl-sequential-socket
+name: riak2-iface-managed
 version: 0.1.0
 build-type: Simple
 
 library
   build-depends:
-      attoparsec
-    , base
-    , bytestring
-    , network
+      base
+    , riak2-iface
     , riak2-proto
+    , stm
+    , unliftio
 
   default-extensions:
     LambdaCase
@@ -20,7 +20,7 @@ library
     Haskell2010
 
   exposed-modules:
-    Riak.Client.Impl.Socket.Sequential
+    Riak.Interface.Impl.Managed
 
   ghc-options:
     -Wall

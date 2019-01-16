@@ -145,7 +145,7 @@ module Riak
     -- $documentation
   ) where
 
-import Riak.Client             (Client, RecvResult(..))
+import Riak.Interface          (Interface, RecvResult(..))
 import Riak.Internal
 import Riak.Internal.Cache     (newSTMRiakCache)
 import Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
@@ -156,7 +156,7 @@ import Riak.Internal.Types     (ObjectReturn(..), ParamObjectReturn(..),
                                 RiakTy(..), SBool(..))
 import Riak.Internal.Utils     (bs2int, int2bs)
 
-import qualified Riak.Client     as Client
+import qualified Riak.Interface     as Interface
 import qualified Riak.Proto.Lens as L
 
 import Control.Foldl                (FoldM)
@@ -261,7 +261,7 @@ getRiakObject
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
     = liftIO $ do
 
-  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.getObject conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -314,7 +314,7 @@ getRiakObjectHead
     (GetRiakObjectParams basic_quorum n notfound_ok pr r sloppy_quorum timeout)
     = liftIO $ do
 
-  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.getObject conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -390,7 +390,7 @@ getRiakObjectIfModified
         & #maybe'timeout L..~ unTimeout timeout
         & #type' L..~ type'
 
-  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.getObject conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -454,7 +454,7 @@ getRiakObjectIfModifiedHead
         & #maybe'timeout L..~ unTimeout timeout
         & #type' L..~ type'
 
-  withRiakConnection manager (\conn -> Client.getObject conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.getObject conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -645,7 +645,7 @@ _putRiakObject
         & #maybe'vclock L..~ coerce vclock
         & #maybe'w L..~ coerce w
 
-  withRiakConnection manager (\conn -> Client.putObject conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.putObject conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -742,7 +742,7 @@ deleteRiakObject
         & #maybe'vclock L..~ coerce vclock
 
   fmap (() <$)
-    (withRiakConnection manager (\conn -> Client.deleteObject conn request))
+    (withRiakConnection manager (\conn -> Interface.deleteObject conn request))
 
 
 --------------------------------------------------------------------------------
@@ -1059,7 +1059,7 @@ getCrdt
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n
       notfound_ok pr r sloppy_quorum timeout) = liftIO $ do
 
-  withRiakConnection manager (\conn -> Client.getCrdt conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.getCrdt conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -1122,7 +1122,7 @@ updateCrdt
     (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
     liftIO $ do
 
-  withRiakConnection manager (\conn -> Client.updateCrdt conn request) >>= \case
+  withRiakConnection manager (\conn -> Interface.updateCrdt conn request) >>= \case
     RiakClosedConnection ->
       pure RiakClosedConnection
 
@@ -1175,7 +1175,7 @@ getRiakBucketTypeProps
 getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO $ do
   fmap (^. L.props) <$>
     withRiakConnection manager
-      (\conn -> Client.getBucketTypeProps conn request)
+      (\conn -> Interface.getBucketTypeProps conn request)
 
   where
     request :: RpbGetBucketTypeReq
@@ -1198,7 +1198,7 @@ setRiakBucketTypeProps
 setRiakBucketTypeProps (RiakHandle manager _) type' props =
   liftIO (fmap (() <$)
     (withRiakConnection manager
-      (\conn -> Client.setBucketTypeProps conn request)))
+      (\conn -> Interface.setBucketTypeProps conn request)))
   where
     request :: RpbSetBucketTypeReq
     request =
@@ -1220,7 +1220,7 @@ getRiakBucketProps
 getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO $ do
   fmap (^. L.props) <$>
     withRiakConnection manager
-      (\conn -> Client.getBucketProps conn request)
+      (\conn -> Interface.getBucketProps conn request)
 
   where
     request :: RpbGetBucketReq
@@ -1243,7 +1243,7 @@ setRiakBucketProps
 setRiakBucketProps (RiakHandle manager _) req =
   liftIO (fmap (() <$)
     (withRiakConnection manager
-      (\conn -> Client.setBucketProps conn req)))
+      (\conn -> Interface.setBucketProps conn req)))
 
 
 --------------------------------------------------------------------------------
@@ -1258,7 +1258,7 @@ resetRiakBucketProps
 resetRiakBucketProps (RiakHandle manager _) req = liftIO $
   fmap (() <$)
     (withRiakConnection manager
-      (\conn -> Client.resetBucketProps conn req))
+      (\conn -> Interface.resetBucketProps conn req))
 
 
 --------------------------------------------------------------------------------
@@ -1279,7 +1279,7 @@ streamRiakBuckets
   -> IO (RecvResult r)
 streamRiakBuckets (RiakHandle manager _) type' fold =
   withRiakConnection manager $ \conn -> do
-    Client.streamBuckets conn request
+    Interface.streamBuckets conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakBucket type') . (L.^. #buckets)))
@@ -1308,7 +1308,7 @@ streamRiakKeys
   -> IO (RecvResult r)
 streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
   withRiakConnection manager $ \conn -> do
-    Client.streamKeys conn request
+    Interface.streamKeys conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakKey namespace) . (L.^. #keys)))
@@ -1389,7 +1389,7 @@ _riakMapReduce
   -> IO (RecvResult r)
 _riakMapReduce (RiakHandle manager _) inputs query k =
   withRiakConnection manager $ \conn ->
-    Client.mapReduce conn (riakMapReduceRequest inputs query) k
+    Interface.mapReduce conn (riakMapReduceRequest inputs query) k
 
 --------------------------------------------------------------------------------
 -- Secondary indexes
@@ -1415,7 +1415,7 @@ riakExactQuery
 riakExactQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    Client.index conn request
+    Interface.index conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakKey namespace) . (L.^. #keys)))
@@ -1456,7 +1456,7 @@ riakRangeQuery
 riakRangeQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    Client.index conn request
+    Interface.index conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map (RiakKey namespace) . (L.^. #keys)))
@@ -1504,7 +1504,7 @@ riakRangeQueryTerms
 riakRangeQueryTerms
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
-    Client.index conn request
+    Interface.index conn request
       (fold
         & Foldl.handlesM Foldl.folded
         & lmap (map parse . (L.^. #results)))
@@ -1572,7 +1572,7 @@ riakSearch (RiakHandle manager _)
     query index
     (RiakSearchParams df filter' fl op presort rows sort start) =
   withRiakConnection manager $ \conn ->
-    Client.search conn request
+    Interface.search conn request
   where
     request :: RpbSearchQueryReq
     request =
@@ -1597,7 +1597,7 @@ getRiakSchema
 getRiakSchema (RiakHandle manager _) schema = liftIO $
   withRiakConnection manager
     (\conn ->
-      translateNotfound <$> Client.getSchema conn request)
+      translateNotfound <$> Interface.getSchema conn request)
   where
     request :: RpbYokozunaSchemaGetReq
     request =
@@ -1614,7 +1614,7 @@ putRiakSchema
 putRiakSchema (RiakHandle manager _) name bytes = liftIO $
   fmap (() <$)
     (withRiakConnection manager
-      (\conn -> Client.putSchema conn request))
+      (\conn -> Interface.putSchema conn request))
   where
     request :: RpbYokozunaSchemaPutReq
     request =
@@ -1639,10 +1639,10 @@ getRiakIndex (RiakHandle manager _) name = liftIO $ do
         & #name L..~ unRiakIndexName name
 
     action
-      :: Client
+      :: Interface
       -> IO (RecvResult (Maybe RpbYokozunaIndex))
     action conn =
-      (translateNotfound <$> Client.getIndex conn request) >>= \case
+      (translateNotfound <$> Interface.getIndex conn request) >>= \case
         RiakClosedConnection ->
           pure (RiakClosedConnection)
 
@@ -1670,7 +1670,7 @@ getRiakIndexes
 getRiakIndexes (RiakHandle manager _) = liftIO $
   fmap (^. L.index) <$>
     (withRiakConnection manager
-      (\conn -> Client.getIndex conn defMessage))
+      (\conn -> Interface.getIndex conn defMessage))
 
 
 putRiakIndex
@@ -1682,7 +1682,7 @@ putRiakIndex
 putRiakIndex (RiakHandle manager _) index schema = liftIO $
   fmap (() <$)
     (withRiakConnection manager
-      (\conn -> Client.putIndex conn request))
+      (\conn -> Interface.putIndex conn request))
   where
     request :: RpbYokozunaIndexPutReq
     request =
@@ -1702,7 +1702,7 @@ deleteRiakIndex
   -> m (RecvResult RpbDelResp)
 deleteRiakIndex (RiakHandle manager _) req = liftIO $
   withRiakConnection manager
-    (\conn -> Client.deleteIndex conn req)
+    (\conn -> Interface.deleteIndex conn req)
 
 
 --------------------------------------------------------------------------------
@@ -1714,7 +1714,7 @@ pingRiak
   => RiakHandle -- ^ Riak handle
   -> m (RecvResult ())
 pingRiak (RiakHandle manager _) = liftIO $
-  fmap (() <$) (withRiakConnection manager Client.ping)
+  fmap (() <$) (withRiakConnection manager Interface.ping)
 
 
 getRiakServerInfo
@@ -1722,7 +1722,7 @@ getRiakServerInfo
   => RiakHandle -- ^ Riak handle
   -> m (RecvResult RpbGetServerInfoResp)
 getRiakServerInfo (RiakHandle manager _) = liftIO $
-  withRiakConnection manager Client.getServerInfo
+  withRiakConnection manager Interface.getServerInfo
 
 
 --------------------------------------------------------------------------------

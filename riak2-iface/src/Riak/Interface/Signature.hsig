@@ -1,26 +1,24 @@
-signature Riak.Client.Signature where
+signature Riak.Interface.Signature where
 
 import Riak.Message (Message)
 
-import Prelude
-
-data Client
+data Interface
 
 connect ::
-     Client
+     Interface
   -> IO ()
 
 disconnect ::
-     Client
+     Interface
   -> IO ()
 
 exchange ::
-     Client
+     Interface
   -> Message
   -> IO (Maybe Message)
 
 stream ::
-     Client
+     Interface
   -> Message
   -> (IO (Maybe Message) -> IO r)
   -> IO r

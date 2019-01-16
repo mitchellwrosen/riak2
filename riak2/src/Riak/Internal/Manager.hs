@@ -25,9 +25,9 @@ module Riak.Internal.Manager
 
 import Riak.Internal.Debug
 import Riak.Internal.Prelude  hiding (IORef)
-import Riak.Client (Client)
+import Riak.Interface (Interface)
 
-import qualified Riak.Client as Client
+import qualified Riak.Interface as Interface
 
 import Data.Fixed                   (E6, Fixed)
 import Data.Hashable                (hash)
@@ -47,7 +47,7 @@ type IORef
 data Entry
   = NotConnected
   | Connected
-      !Client -- Connection
+      !Interface -- Connection
       !(IORef (IO Bool)) -- Action to cancel the timer that closes the connection
 
 
@@ -99,7 +99,7 @@ createRiakManager host port n inactive = do
           pure ()
 
         Connected conn _ ->
-          void (tryAny (Client.disconnect conn))
+          void (tryAny (Interface.disconnect conn))
 
   -- TODO configurable wheel spokes?
   wheel :: TimerWheel <-
@@ -108,7 +108,7 @@ createRiakManager host port n inactive = do
   pure (RiakManager host port conns' lock wheel inactive)
 
 
-withRiakConnection :: RiakManager -> (Client -> IO a) -> IO a
+withRiakConnection :: RiakManager -> (Interface -> IO a) -> IO a
 withRiakConnection (RiakManager host port conns lock wheel inactive) k = do
   which :: Int <-
     (`mod` sizeofUnliftedArray conns) . hash <$> myThreadId
@@ -131,7 +131,7 @@ acquireRiakConnection
   -> TimerWheel
   -> Fixed E6
   -> IORef Entry
-  -> IO Client
+  -> IO Interface
 acquireRiakConnection host port which lock wheel inactive connVar =
   readMutVar connVar >>= \case
     NotConnected ->
@@ -145,8 +145,8 @@ acquireRiakConnection host port which lock wheel inactive connVar =
             -- returning from this action. Otherwise, we might die from an async
             -- exception and leave the connection open.
             mask $ \unmask -> do
-              conn :: Client <-
-                undefined -- unmask (Client.connect host port)
+              conn :: Interface <-
+                undefined -- unmask (Interface.connect host port)
 
               cancelRef :: IORef (IO Bool) <-
                 newMutVar =<< registerClose conn
@@ -166,7 +166,7 @@ acquireRiakConnection host port which lock wheel inactive connVar =
   -- and return the connection. If canceling fails, that means the reaper thread
   -- snuck in underneath us and closed the connection; just re-acquire the
   -- connection.
-  reregisterClose :: Client -> IORef (IO Bool) -> IO Client
+  reregisterClose :: Interface -> IORef (IO Bool) -> IO Interface
   reregisterClose conn cancelRef = do
     canceled :: Bool <-
       join (readMutVar cancelRef)
@@ -179,7 +179,7 @@ acquireRiakConnection host port which lock wheel inactive connVar =
         acquireRiakConnection host port which lock wheel inactive connVar
 
   -- Register a timer that closes this connection when it fires.
-  registerClose :: Client -> IO (IO Bool)
+  registerClose :: Interface -> IO (IO Bool)
   registerClose conn = do
     TimerWheel.register
       inactive
@@ -189,15 +189,15 @@ acquireRiakConnection host port which lock wheel inactive connVar =
             show inactive ++ " seconds of inactivity"
 
         writeMutVar connVar NotConnected
-        void (tryAny (Client.disconnect conn)))
+        void (tryAny (Interface.disconnect conn)))
       wheel
 
 releaseRiakConnection
   :: Int
   -> IORef Entry
-  -> Client
+  -> Interface
   -> IO ()
 releaseRiakConnection which connVar conn = do
   writeMutVar connVar NotConnected
-  Client.disconnect conn
+  Interface.disconnect conn
   debug ("[riak] manager: exception on connection " ++ show which)

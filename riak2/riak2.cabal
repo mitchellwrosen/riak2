@@ -7,17 +7,17 @@ build-type: Simple
 library
   build-depends:
       riak2-indef
-    , riak2-client-impl-managed-indef
-    , riak2-client-impl-sequential-socket
+    , riak2-iface-managed
+    , riak2-iface-socket
 
   default-language:
     Haskell2010
 
   mixins:
     riak2-indef requires
-      (Riak.Client.Signature as Riak.Client.Impl.Managed),
-    riak2-client-impl-managed-indef requires
-      (Riak.Client.Signature as Riak.Client.Impl.Socket.Sequential)
+      (Riak.Interface.Signature as Riak.Interface.Impl.Managed),
+    riak2-iface-managed requires
+      (Riak.Interface.Signature as Riak.Interface.Impl.Socket)
 
 library riak2-indef
   build-depends:
@@ -41,7 +41,7 @@ library riak2-indef
     , primitive ^>= 0.6.4
     , profunctors ^>= 5.3
     , proto-lens ^>= 0.4.0
-    , riak2-client-sig
+    , riak2-iface
     , riak2-proto
     , stm ^>= 2.4.5 || ^>= 2.5.0
     , stm-containers ^>= 1.0.1
