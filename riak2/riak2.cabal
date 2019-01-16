@@ -94,7 +94,18 @@ library riak2-indef
     -- temporary
     Erlang
     Riak
-    Riak.Internal
+    Riak.Bucket
+    Riak.BucketType
+    Riak.Charset
+    Riak.ContentEncoding
+    Riak.ContentType
+    Riak.Index
+    Riak.IndexName
+    Riak.Metadata
+    Riak.Object
+    Riak.TTL
+    Riak.Key
+    Riak.Vtag
 
   ghc-options:
     -Weverything
@@ -112,6 +123,7 @@ library riak2-indef
 
   other-modules:
     Riak.Client
+    Riak.Internal
     Riak.Internal.Cache
     Riak.Internal.Crdts
     Riak.Internal.Exception

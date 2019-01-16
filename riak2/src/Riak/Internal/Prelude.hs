@@ -29,6 +29,7 @@ import Data.ProtoLens.Message     as X (defMessage)
 import Data.Proxy                 as X (Proxy(Proxy))
 import Data.Set                   as X (Set)
 import Data.Text                  as X (Text)
+import Data.Time                  as X (UTCTime)
 import Data.Traversable           as X (for)
 import Data.Type.Bool             as X (If)
 import Data.Void                  as X
