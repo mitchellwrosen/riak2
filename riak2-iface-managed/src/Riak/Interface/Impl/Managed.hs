@@ -69,11 +69,11 @@ connect =
 
 spawnBackgroundThreadIfNotRunning :: Interface -> IO ()
 spawnBackgroundThreadIfNotRunning iface = do
-  -- TODO background thread lifetime/exception handling
   backgroundThread :: ThreadId <-
     unsafeInterleaveIO
-      (forkIO
-        (runBackgroundThread (inner iface) (statusVar iface)))
+      (forkFinally
+        (runBackgroundThread (inner iface) (statusVar iface))
+        (\_ -> void (takeMVar (backgroundThreadVar iface))))
 
   success :: Bool <-
     tryPutMVar
@@ -95,6 +95,8 @@ runBackgroundThread iface statusVar =
       when continue $ do
         Inner.disconnect iface `catchAny` \_ -> pure ()
         reconnect
+        atomically (writeTVar statusVar Connected)
+        loop
 
     waitForConnecting :: IO Bool
     waitForConnecting = do
@@ -113,7 +115,7 @@ runBackgroundThread iface statusVar =
           reconnect
 
         Right () ->
-          atomically (writeTVar statusVar Connected)
+          pure ()
 
 disconnect :: Interface -> IO ()
 disconnect iface = do
