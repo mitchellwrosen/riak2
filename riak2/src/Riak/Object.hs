@@ -22,7 +22,7 @@ data ObjectR a
   , value :: a
   , vclock :: Vclock
   , vtag :: Maybe Vtag
-  }
+  } deriving stock (Generic, Show)
 
 data ObjectW
   = ObjectW
@@ -32,5 +32,5 @@ data ObjectW
   , indexes :: [Index]
   , metadata :: [(ByteString, Maybe ByteString)]
   , value :: ByteString
-  , vclock :: Vclock
-  }
+  , vclock :: Maybe Vclock
+  } deriving stock (Generic, Show)

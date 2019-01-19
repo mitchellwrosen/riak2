@@ -133,6 +133,7 @@ library riak2-indef
     Riak.Internal.Types
 
     Riak.Internal.Content
+    Riak.Internal.Index
     Riak.Internal.Pair
     Riak.Internal.Panic
     Riak.Internal.Prelude
