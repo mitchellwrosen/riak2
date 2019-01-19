@@ -145,7 +145,7 @@ module Riak
     -- $documentation
   ) where
 
-import Riak.Interface          (Interface, RecvResult(..))
+import Riak.Interface          (Interface, Result(..))
 import Riak.Internal
 import Riak.Internal.Cache     (newSTMRiakCache)
 import Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
@@ -156,7 +156,7 @@ import Riak.Internal.Types     (ObjectReturn(..), ParamObjectReturn(..),
                                 RiakTy(..), SBool(..))
 import Riak.Internal.Utils     (bs2int, int2bs)
 
-import qualified Riak.Interface     as Interface
+import qualified Riak.Interface  as Interface
 import qualified Riak.Proto.Lens as L
 
 import Control.Foldl                (FoldM)
@@ -254,7 +254,7 @@ getRiakObject
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult [RiakObject a])
+  -> m (Result [RiakObject a])
 getRiakObject
     h@(RiakHandle manager _)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -307,7 +307,7 @@ getRiakObjectHead
     => RiakHandle -- ^ Riak handle
     -> RiakKey -- ^ Bucket type, bucket, and key
     -> GetRiakObjectParams -- ^ Optional parameters
-    -> m (RecvResult [RiakObject ()])
+    -> m (Result [RiakObject ()])
 getRiakObjectHead
     h@(RiakHandle manager _)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -363,7 +363,7 @@ getRiakObjectIfModified
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (Modified [RiakObject a]))
+  -> m (Result (Modified [RiakObject a]))
 getRiakObjectIfModified
     h@(RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -427,7 +427,7 @@ getRiakObjectIfModifiedHead
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (Modified [RiakObject ()]))
+  -> m (Result (Modified [RiakObject ()]))
 getRiakObjectIfModifiedHead
     h@(RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key)
@@ -498,7 +498,7 @@ putRiakObject
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult ())
+  -> m (Result ())
 putRiakObject
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   fmap (() <$)
@@ -516,7 +516,7 @@ putRiakObjectHead
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (NonEmpty (RiakObject ())))
+  -> m (Result (NonEmpty (RiakObject ())))
 putRiakObjectHead
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   (_putRiakObject handle bucket (Just key) content a b c d e
@@ -530,7 +530,7 @@ putRiakObjectBody
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (NonEmpty (RiakObject a)))
+  -> m (Result (NonEmpty (RiakObject a)))
 putRiakObjectBody
     handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
   _putRiakObject handle bucket (Just key) content a b c d e
@@ -547,7 +547,7 @@ putNewRiakObject
   -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult RiakKey)
+  -> m (Result RiakKey)
 putNewRiakObject
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   _putRiakObject handle bucket Nothing content a b c d e
@@ -561,7 +561,7 @@ putNewRiakObjectHead
   -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (RiakObject ()))
+  -> m (Result (RiakObject ()))
 putNewRiakObjectHead
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head
@@ -576,7 +576,7 @@ putNewRiakObjectBody
   -> RiakBucket -- ^ Bucket type and bucket
   -> a -- ^ Object
   -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (RiakObject a))
+  -> m (Result (RiakObject a))
 putNewRiakObjectBody
     handle bucket content (PutRiakObjectParams a b c d e f g h) =
   (fmap.fmap) List1.head $
@@ -599,7 +599,7 @@ _putRiakObject
   -> SloppyQuorum
   -> Timeout
   -> W
-  -> m (RecvResult (ObjectReturnTy a return))
+  -> m (Result (ObjectReturnTy a return))
 _putRiakObject
     h@(RiakHandle manager cache) namespace@(RiakBucket type' bucket) key value
     dw indexes metadata n pw return sloppy_quorum timeout w = liftIO $ do
@@ -724,7 +724,7 @@ deleteRiakObject
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
-  -> m (RecvResult ())
+  -> m (Result ())
 deleteRiakObject
     (RiakHandle manager cache)
     loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key) = liftIO $ do
@@ -761,7 +761,7 @@ getRiakCounter
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakObjectParams -- ^ Optional parameters
-  -> m (RecvResult (Maybe Int64))
+  -> m (Result (Maybe Int64))
 getRiakCounter h key (GetRiakObjectParams a b c d e f g) =
   getCrdt (proxy# @_ @'RiakCounterTy) h key
     (GetRiakCrdtParams a (IncludeContext Nothing) b c d e f g)
@@ -778,7 +778,7 @@ updateRiakCounter
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult Int64)
+  -> m (Result Int64)
 updateRiakCounter h (RiakKey bucket key) incr params =
   (fmap.fmap) snd (_updateRiakCounter h bucket (Just key) incr params)
 
@@ -790,7 +790,7 @@ updateNewRiakCounter
   -> RiakBucket -- ^ Bucket type and bucket
   -> Int64 -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult RiakKey)
+  -> m (Result RiakKey)
 updateNewRiakCounter h bucket incr params =
   (fmap.fmap) fst (_updateRiakCounter h bucket Nothing incr params)
 
@@ -801,7 +801,7 @@ _updateRiakCounter
   -> Maybe ByteString
   -> Int64
   -> UpdateRiakCrdtParams
-  -> m (RecvResult (RiakKey, Int64))
+  -> m (Result (RiakKey, Int64))
 _updateRiakCounter h bucket key incr params =
   (fmap.fmap.fmap) (L.view #counterValue)
     (updateCrdt h bucket key Nothing op params)
@@ -827,7 +827,7 @@ getRiakGrowOnlySet
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult (Maybe (Set ByteString)))
+  -> m (Result (Maybe (Set ByteString)))
 getRiakGrowOnlySet =
   getCrdt (proxy# @_ @'RiakGrowOnlySetTy)
 
@@ -851,7 +851,7 @@ getRiakHyperLogLog
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult (Maybe Word64))
+  -> m (Result (Maybe Word64))
 getRiakHyperLogLog =
   getCrdt (proxy# @_ @'RiakHyperLogLogTy)
 
@@ -878,7 +878,7 @@ getRiakMap
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult (Maybe a))
+  -> m (Result (Maybe a))
 getRiakMap =
   getCrdt (proxy# @_ @('RiakMapTy a))
 
@@ -906,7 +906,7 @@ getRiakSet
   => RiakHandle -- ^ Riak handle
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> GetRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult (Maybe (Set a)))
+  -> m (Result (Maybe (Set a)))
 getRiakSet =
   getCrdt (proxy# @_ @('RiakSetTy a))
 
@@ -923,7 +923,7 @@ updateRiakSet
   -> RiakKey -- ^ Bucket type, bucket, and key
   -> RiakSetOp a -- ^
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult (Set a))
+  -> m (Result (Set a))
 updateRiakSet h (RiakKey bucket key) op params =
   (fmap.fmap) snd (_updateSet h bucket (Just key) op params)
 
@@ -934,7 +934,7 @@ updateNewRiakSet
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakSetOp a -- ^ Set operation
   -> UpdateRiakCrdtParams -- ^ Optional parameters
-  -> m (RecvResult RiakKey)
+  -> m (Result RiakKey)
 updateNewRiakSet h bucket op params =
   (fmap.fmap) fst (_updateSet h bucket Nothing op params)
 
@@ -947,7 +947,7 @@ _updateSet
   -> Maybe ByteString
   -> RiakSetOp a
   -> UpdateRiakCrdtParams
-  -> m (RecvResult (RiakKey, (Set a)))
+  -> m (Result (RiakKey, (Set a)))
 _updateSet h namespace key setOp params = liftIO $ do
   context :: Maybe RiakVclock <-
     _updateSetGetContext @a h namespace key removes
@@ -1053,7 +1053,7 @@ getCrdt
   -> RiakHandle
   -> RiakKey
   -> GetRiakCrdtParams
-  -> m (RecvResult (Maybe (CrdtVal ty)))
+  -> m (Result (Maybe (CrdtVal ty)))
 getCrdt
     p h@(RiakHandle manager _) loc@(RiakKey (RiakBucket type' bucket) key)
     (GetRiakCrdtParams basic_quorum (IncludeContext include_context) n
@@ -1116,7 +1116,7 @@ updateCrdt
   -> Maybe RiakVclock
   -> DtOp
   -> UpdateRiakCrdtParams
-  -> m (RecvResult (RiakKey, DtUpdateResp))
+  -> m (Result (RiakKey, DtUpdateResp))
 updateCrdt
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) key context op
     (UpdateRiakCrdtParams dw n pw return_body sloppy_quorum timeout w) =
@@ -1171,7 +1171,7 @@ getRiakBucketTypeProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
-  -> m (RecvResult RpbBucketProps)
+  -> m (Result RpbBucketProps)
 getRiakBucketTypeProps (RiakHandle manager _) type' = liftIO $ do
   fmap (^. L.props) <$>
     withRiakConnection manager
@@ -1194,7 +1194,7 @@ setRiakBucketTypeProps
   => RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
   -> RpbBucketProps -- ^
-  -> m (RecvResult ())
+  -> m (Result ())
 setRiakBucketTypeProps (RiakHandle manager _) type' props =
   liftIO (fmap (() <$)
     (withRiakConnection manager
@@ -1216,7 +1216,7 @@ getRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakBucket -- ^ Bucket type and bucket
-  -> m (RecvResult RpbBucketProps)
+  -> m (Result RpbBucketProps)
 getRiakBucketProps (RiakHandle manager _) (RiakBucket type' bucket) = liftIO $ do
   fmap (^. L.props) <$>
     withRiakConnection manager
@@ -1239,7 +1239,7 @@ setRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RpbSetBucketReq -- ^
-  -> m (RecvResult ())
+  -> m (Result ())
 setRiakBucketProps (RiakHandle manager _) req =
   liftIO (fmap (() <$)
     (withRiakConnection manager
@@ -1254,7 +1254,7 @@ resetRiakBucketProps
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RpbResetBucketReq -- ^
-  -> m (RecvResult ())
+  -> m (Result ())
 resetRiakBucketProps (RiakHandle manager _) req = liftIO $
   fmap (() <$)
     (withRiakConnection manager
@@ -1276,7 +1276,7 @@ streamRiakBuckets
      RiakHandle -- ^ Riak handle
   -> RiakBucketType -- ^ Bucket type
   -> FoldM IO RiakBucket r -- ^ Bucket fold
-  -> IO (RecvResult r)
+  -> IO (Result r)
 streamRiakBuckets (RiakHandle manager _) type' fold =
   withRiakConnection manager $ \conn -> do
     Interface.streamBuckets conn request
@@ -1305,7 +1305,7 @@ streamRiakKeys
   :: RiakHandle -- ^ Riak handle
   -> RiakBucket -- ^ Bucket type and bucket
   -> FoldM IO RiakKey r -- ^ Key fold
-  -> IO (RecvResult r)
+  -> IO (Result r)
 streamRiakKeys (RiakHandle manager _) namespace@(RiakBucket type' bucket) fold =
   withRiakConnection manager $ \conn -> do
     Interface.streamKeys conn request
@@ -1338,7 +1338,7 @@ riakMapReduceBucket
   -> RiakBucket -- ^ Bucket type and bucket
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakMapReduceBucket h bucket =
   _riakMapReduce h (RiakMapReduceInputsBucket bucket)
 
@@ -1347,7 +1347,7 @@ riakMapReduceKeys
   -> [RiakKey] -- ^ Bucket types, buckets, and keys
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakMapReduceKeys h keys =
   _riakMapReduce h (RiakMapReduceInputsKeys keys)
 
@@ -1357,7 +1357,7 @@ riakMapReduceFunction
   -> Text -- ^ Erlang function.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakMapReduceFunction h m f =
   _riakMapReduce h (RiakMapReduceInputsFunction m f)
 
@@ -1367,7 +1367,7 @@ riakMapReduceExactQuery
   -> RiakExactQuery -- ^ Exact query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakMapReduceExactQuery h bucket query =
   _riakMapReduce h (RiakMapReduceInputsExactQuery bucket query)
 
@@ -1377,7 +1377,7 @@ riakMapReduceRangeQuery
   -> RiakRangeQuery a -- ^ Range query.
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakMapReduceRangeQuery h bucket query =
   _riakMapReduce h (RiakMapReduceInputsRangeQuery bucket query)
 
@@ -1386,7 +1386,7 @@ _riakMapReduce
   -> RiakMapReduceInputs -- ^ MapReduce inputs
   -> [RiakMapReducePhase] -- ^ MapReduce phases
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 _riakMapReduce (RiakHandle manager _) inputs query k =
   withRiakConnection manager $ \conn ->
     Interface.mapReduce conn (riakMapReduceRequest inputs query) k
@@ -1411,7 +1411,7 @@ riakExactQuery
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakExactQuery -- ^ Exact query
   -> FoldM IO RiakKey r -- ^ Key fold
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakExactQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
@@ -1452,7 +1452,7 @@ riakRangeQuery
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakRangeQuery a -- ^ Range query
   -> FoldM IO RiakKey r -- ^ Key fold
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakRangeQuery
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
@@ -1500,7 +1500,7 @@ riakRangeQueryTerms
   -> RiakBucket -- ^ Bucket type and bucket
   -> RiakRangeQuery a -- ^ Range query
   -> FoldM IO (RiakKey, a) r -- ^ Key+value fold
-  -> IO (RecvResult r)
+  -> IO (Result r)
 riakRangeQueryTerms
     (RiakHandle manager _) namespace@(RiakBucket type' bucket) query fold =
   withRiakConnection manager $ \conn ->
@@ -1567,7 +1567,7 @@ riakSearch
   -> ByteString -- ^ Query
   -> ByteString -- ^ Index
   -> RiakSearchParams -- ^ Optional parameters
-  -> IO (RecvResult RpbSearchQueryResp)
+  -> IO (Result RpbSearchQueryResp)
 riakSearch (RiakHandle manager _)
     query index
     (RiakSearchParams df filter' fl op presort rows sort start) =
@@ -1593,7 +1593,7 @@ getRiakSchema
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> SolrSchemaName -- ^ Schema name
-  -> m (RecvResult (Maybe RpbYokozunaSchemaGetResp))
+  -> m (Result (Maybe RpbYokozunaSchemaGetResp))
 getRiakSchema (RiakHandle manager _) schema = liftIO $
   withRiakConnection manager
     (\conn ->
@@ -1610,7 +1610,7 @@ putRiakSchema
   => RiakHandle -- ^ Riak handle
   -> SolrSchemaName -- ^ Schema name
   -> ByteString -- ^ Schema contents
-  -> m (RecvResult ())
+  -> m (Result ())
 putRiakSchema (RiakHandle manager _) name bytes = liftIO $
   fmap (() <$)
     (withRiakConnection manager
@@ -1629,7 +1629,7 @@ getRiakIndex
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RiakIndexName -- ^
-  -> m (RecvResult (Maybe RpbYokozunaIndex))
+  -> m (Result (Maybe RpbYokozunaIndex))
 getRiakIndex (RiakHandle manager _) name = liftIO $ do
   withRiakConnection manager action
   where
@@ -1640,7 +1640,7 @@ getRiakIndex (RiakHandle manager _) name = liftIO $ do
 
     action
       :: Interface
-      -> IO (RecvResult (Maybe RpbYokozunaIndex))
+      -> IO (Result (Maybe RpbYokozunaIndex))
     action conn =
       (translateNotfound <$> Interface.getIndex conn request) >>= \case
         RiakClosedConnection ->
@@ -1666,7 +1666,7 @@ getRiakIndex (RiakHandle manager _) name = liftIO $ do
 getRiakIndexes
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> m (RecvResult [RpbYokozunaIndex])
+  -> m (Result [RpbYokozunaIndex])
 getRiakIndexes (RiakHandle manager _) = liftIO $
   fmap (^. L.index) <$>
     (withRiakConnection manager
@@ -1678,7 +1678,7 @@ putRiakIndex
   => RiakHandle -- ^ Riak handle
   -> RiakIndexName -- ^
   -> SolrSchemaName -- ^
-  -> m (RecvResult ())
+  -> m (Result ())
 putRiakIndex (RiakHandle manager _) index schema = liftIO $
   fmap (() <$)
     (withRiakConnection manager
@@ -1699,7 +1699,7 @@ deleteRiakIndex
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
   -> RpbYokozunaIndexDeleteReq -- ^
-  -> m (RecvResult RpbDelResp)
+  -> m (Result RpbDelResp)
 deleteRiakIndex (RiakHandle manager _) req = liftIO $
   withRiakConnection manager
     (\conn -> Interface.deleteIndex conn req)
@@ -1712,7 +1712,7 @@ deleteRiakIndex (RiakHandle manager _) req = liftIO $
 pingRiak
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> m (RecvResult ())
+  -> m (Result ())
 pingRiak (RiakHandle manager _) = liftIO $
   fmap (() <$) (withRiakConnection manager Interface.ping)
 
@@ -1720,7 +1720,7 @@ pingRiak (RiakHandle manager _) = liftIO $
 getRiakServerInfo
   :: MonadIO m
   => RiakHandle -- ^ Riak handle
-  -> m (RecvResult RpbGetServerInfoResp)
+  -> m (Result RpbGetServerInfoResp)
 getRiakServerInfo (RiakHandle manager _) = liftIO $
   withRiakConnection manager Interface.getServerInfo
 
@@ -1890,7 +1890,7 @@ rpbPairToIndex =
         , ("value", v)
         )
 
-translateNotfound :: RecvResult a -> RecvResult (Maybe a)
+translateNotfound :: Result a -> Result (Maybe a)
 translateNotfound = \case
   RiakClosedConnection ->
     RiakClosedConnection

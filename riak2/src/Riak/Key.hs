@@ -1,9 +1,11 @@
 module Riak.Key
   ( Key(..)
+  , pattern Location
   ) where
 
 import Riak.Internal.Prelude
-import Riak.Bucket (Bucket)
+import Riak.Bucket (Bucket(..))
+import Riak.BucketType (BucketType(..))
 
 import Data.Text.Encoding (decodeUtf8')
 
@@ -29,3 +31,7 @@ instance Show Key where
       (const ("base64:" ++ Latin1.unpack (Base64.encode key)))
       Text.unpack
       (decodeUtf8' key)
+
+pattern Location :: ByteString -> ByteString -> ByteString -> Key
+pattern Location typ bucket key =
+  Key (Bucket (BucketType typ) bucket) key

@@ -63,6 +63,7 @@ library riak2-indef
     , DeriveFunctor
     , DeriveGeneric
     , DerivingStrategies
+    , DuplicateRecordFields
     , ExistentialQuantification
     , FlexibleContexts
     , FlexibleInstances
@@ -96,15 +97,12 @@ library riak2-indef
     Riak
     Riak.Bucket
     Riak.BucketType
-    Riak.Charset
-    Riak.ContentEncoding
-    Riak.ContentType
+    Riak.Client
     Riak.Index
-    Riak.IndexName
-    Riak.Metadata
-    Riak.Object
-    Riak.TTL
     Riak.Key
+    Riak.Object
+    Riak.Opts
+    Riak.Quorum
     Riak.Vtag
 
   ghc-options:
@@ -122,19 +120,22 @@ library riak2-indef
     src
 
   other-modules:
-    Riak.Client
     Riak.Internal
     Riak.Internal.Cache
     Riak.Internal.Crdts
-    Riak.Internal.Exception
     Riak.Internal.Debug
+    Riak.Internal.Exception
     Riak.Internal.Manager
     Riak.Internal.MapReduce
     Riak.Internal.Object
-    Riak.Internal.Panic
     Riak.Internal.Params
-    Riak.Internal.Prelude
     Riak.Internal.Types
+
+    Riak.Internal.Content
+    Riak.Internal.Pair
+    Riak.Internal.Panic
+    Riak.Internal.Prelude
+    Riak.Internal.Quorum
     Riak.Internal.Utils
 
 -- executable riakc

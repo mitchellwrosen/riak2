@@ -6,7 +6,7 @@ import Control.Applicative        as X
 import Control.Category           as X
 import Control.Concurrent         as X
 import Control.Concurrent.STM     as X
-import Control.Lens               as X ((^.))
+import Control.Lens               as X ((.~), (^.))
 import Control.Monad              as X hiding (return)
 import Control.Monad.IO.Unlift    as X
 import Control.Monad.Trans.Class  as X
@@ -15,6 +15,7 @@ import Control.Monad.Trans.Maybe  as X
 import Data.Bifunctor             as X (bimap)
 import Data.ByteString            as X (ByteString)
 import Data.Coerce                as X (coerce)
+import Data.Default.Class         as X (Default(def))
 import Data.Foldable              as X (elem, for_, toList, traverse_)
 import Data.Function              as X (fix, (&))
 import Data.Hashable              as X (Hashable)
@@ -24,7 +25,7 @@ import Data.Int                   as X
 import Data.IORef                 as X
 import Data.Kind                  as X (Type)
 import Data.List.NonEmpty         as X (NonEmpty)
-import Data.Maybe                 as X (fromMaybe)
+import Data.Maybe                 as X (fromMaybe, mapMaybe)
 import Data.ProtoLens.Message     as X (defMessage)
 import Data.Proxy                 as X (Proxy(Proxy))
 import Data.Set                   as X (Set)
@@ -37,6 +38,7 @@ import Data.Word                  as X
 import GHC.Exts                   as X (IsString)
 import GHC.Generics               as X (Generic)
 import GHC.Prim                   as X (Proxy#, proxy#)
+import Numeric.Natural            as X (Natural)
 import Prelude                    as X hiding (head, id, return, (.))
 import Text.Read                  as X (readMaybe)
 import UnliftIO.Exception         as X (Exception, SomeException, bracket,

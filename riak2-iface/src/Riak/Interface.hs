@@ -24,7 +24,7 @@ module Riak.Interface
   , streamBuckets
   , streamKeys
   , updateCrdt
-  , RecvResult(..)
+  , Result(..)
   ) where
 
 import Riak.Interface.Signature (Interface)
@@ -43,7 +43,7 @@ import Control.Foldl     (FoldM(..))
 import Control.Lens      (view, (^.))
 
 
-data RecvResult a
+data Result a
   = RiakClosedConnection
   | Failure RpbErrorResp
   | Success a
@@ -54,10 +54,10 @@ exchange ::
      (Request a, Response b)
   => Interface
   -> a
-  -> IO (RecvResult b)
+  -> IO (Result b)
 exchange iface request =
   Interface.exchange iface (Request.toMessage request) >>=
-    toRecvResult
+    toResult
 
 stream ::
      forall a b r.
@@ -66,7 +66,7 @@ stream ::
   -> a -- ^ Request
   -> (b -> Bool) -- ^ Done?
   -> FoldM IO b r -- ^ Fold responses
-  -> IO (RecvResult r)
+  -> IO (Result r)
 stream iface request done (FoldM step initial extract) =
   Interface.stream
     iface
@@ -74,13 +74,13 @@ stream iface request done (FoldM step initial extract) =
     callback
 
   where
-    callback :: IO (Maybe Message) -> IO (RecvResult r)
+    callback :: IO (Maybe Message) -> IO (Result r)
     callback recv =
       loop =<< initial
 
       where
         loop value =
-          recv >>= toRecvResult >>= \case
+          recv >>= toResult >>= \case
             RiakClosedConnection ->
               pure RiakClosedConnection
 
@@ -97,8 +97,8 @@ stream iface request done (FoldM step initial extract) =
                 else
                   loop value'
 
-toRecvResult :: Response a => Maybe Message -> IO (RecvResult a)
-toRecvResult = \case
+toResult :: Response a => Maybe Message -> IO (Result a)
+toResult = \case
   Nothing ->
     pure RiakClosedConnection
 
@@ -121,96 +121,96 @@ toRecvResult = \case
 deleteIndex
   :: Interface -- ^
   -> RpbYokozunaIndexDeleteReq -- ^
-  -> IO (RecvResult RpbDelResp)
+  -> IO (Result RpbDelResp)
 deleteIndex =
   exchange
 
 deleteObject
   :: Interface -- ^
   -> RpbDelReq -- ^
-  -> IO (RecvResult RpbDelResp)
+  -> IO (Result RpbDelResp)
 deleteObject =
   exchange
 
 getBucketProps
   :: Interface -- ^
   -> RpbGetBucketReq -- ^
-  -> IO (RecvResult RpbGetBucketResp)
+  -> IO (Result RpbGetBucketResp)
 getBucketProps =
   exchange
 
 getBucketTypeProps
   :: Interface -- ^
   -> RpbGetBucketTypeReq -- ^
-  -> IO (RecvResult RpbGetBucketResp)
+  -> IO (Result RpbGetBucketResp)
 getBucketTypeProps =
   exchange
 
 getCrdt
   :: Interface -- ^
   -> DtFetchReq -- ^
-  -> IO (RecvResult DtFetchResp)
+  -> IO (Result DtFetchResp)
 getCrdt
   = exchange
 
 getIndex
   :: Interface -- ^
   -> RpbYokozunaIndexGetReq -- ^
-  -> IO (RecvResult RpbYokozunaIndexGetResp)
+  -> IO (Result RpbYokozunaIndexGetResp)
 getIndex =
   exchange
 
 getObject
   :: Interface -- ^
   -> RpbGetReq -- ^
-  -> IO (RecvResult RpbGetResp)
+  -> IO (Result RpbGetResp)
 getObject =
   exchange
 
 getSchema
   :: Interface -- ^
   -> RpbYokozunaSchemaGetReq -- ^
-  -> IO (RecvResult RpbYokozunaSchemaGetResp)
+  -> IO (Result RpbYokozunaSchemaGetResp)
 getSchema =
   exchange
 
 getServerInfo
   :: Interface -- ^
-  -> IO (RecvResult RpbGetServerInfoResp)
+  -> IO (Result RpbGetServerInfoResp)
 getServerInfo conn =
   exchange conn RpbGetServerInfoReq
 
 ping
   :: Interface -- ^
-  -> IO (RecvResult RpbPingResp)
+  -> IO (Result RpbPingResp)
 ping conn = do
   exchange conn RpbPingReq
 
 putIndex
   :: Interface -- ^
   -> RpbYokozunaIndexPutReq -- ^
-  -> IO (RecvResult RpbEmptyPutResp)
+  -> IO (Result RpbEmptyPutResp)
 putIndex =
   exchange
 
 putObject
   :: Interface -- ^
   -> RpbPutReq -- ^
-  -> IO (RecvResult RpbPutResp)
+  -> IO (Result RpbPutResp)
 putObject =
   exchange
 
 putSchema
   :: Interface -- ^
   -> RpbYokozunaSchemaPutReq -- ^
-  -> IO (RecvResult RpbEmptyPutResp)
+  -> IO (Result RpbEmptyPutResp)
 putSchema =
   exchange
 
 resetBucketProps
   :: Interface -- ^
   -> RpbResetBucketReq -- ^
-  -> IO (RecvResult RpbResetBucketResp)
+  -> IO (Result RpbResetBucketResp)
 resetBucketProps =
   exchange
 
@@ -218,7 +218,7 @@ index
   :: Interface -- ^
   -> RpbIndexReq -- ^
   -> FoldM IO RpbIndexResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 index conn request =
   stream conn request (view L.done)
 
@@ -226,28 +226,28 @@ mapReduce
   :: Interface -- ^
   -> RpbMapRedReq -- ^
   -> FoldM IO RpbMapRedResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 mapReduce conn request =
   stream conn request (view L.done)
 
 search
   :: Interface -- ^
   -> RpbSearchQueryReq -- ^
-  -> IO (RecvResult RpbSearchQueryResp)
+  -> IO (Result RpbSearchQueryResp)
 search =
   exchange
 
 setBucketProps
   :: Interface -- ^
   -> RpbSetBucketReq -- ^
-  -> IO (RecvResult RpbSetBucketResp)
+  -> IO (Result RpbSetBucketResp)
 setBucketProps =
   exchange
 
 setBucketTypeProps
   :: Interface -- ^
   -> RpbSetBucketTypeReq -- ^
-  -> IO (RecvResult RpbSetBucketTypeResp)
+  -> IO (Result RpbSetBucketTypeResp)
 setBucketTypeProps =
   exchange
 
@@ -255,7 +255,7 @@ streamBuckets
   :: Interface -- ^
   -> RpbListBucketsReq -- ^
   -> FoldM IO RpbListBucketsResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 streamBuckets conn request =
   stream conn request (view L.done)
 
@@ -263,14 +263,13 @@ streamKeys
   :: Interface -- ^
   -> RpbListKeysReq -- ^
   -> FoldM IO RpbListKeysResp r -- ^
-  -> IO (RecvResult r)
+  -> IO (Result r)
 streamKeys conn request =
   stream conn request (view L.done)
 
 updateCrdt
   :: Interface -- ^
   -> DtUpdateReq -- ^
-  -> IO (RecvResult DtUpdateResp)
+  -> IO (Result DtUpdateResp)
 updateCrdt =
   exchange
-
