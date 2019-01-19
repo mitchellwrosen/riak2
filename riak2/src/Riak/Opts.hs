@@ -9,6 +9,7 @@ import Riak.Quorum (Quorum)
 data GetObjectOpts
   = GetObjectOpts
   { basicQuorum :: !Bool
+  , head :: !Bool
   , n :: !Quorum
   , notfoundOk :: !Bool
   , pr :: !Quorum

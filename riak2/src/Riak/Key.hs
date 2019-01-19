@@ -19,6 +19,7 @@ data Key
   = Key !Bucket !ByteString
   deriving stock (Eq, Generic)
   deriving anyclass (Hashable)
+{-# COMPLETE Location #-}
 
 -- | For debugging; assumes buckets are UTF-8 encoded, but falls back to
 -- base64-encoding.

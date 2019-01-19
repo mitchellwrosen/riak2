@@ -6,28 +6,31 @@ module Riak.Object
 import Riak.Index            (Index)
 import Riak.Internal.Prelude
 import Riak.Key              (Key)
+import Riak.Vclock           (Vclock)
 import Riak.Vtag             (Vtag)
 
-data ObjectR
+data ObjectR a
   = ObjectR
-  { value :: ByteString
-  , contentType :: Maybe ByteString
-  , charset :: Maybe ByteString
+  { charset :: Maybe ByteString
   , contentEncoding :: Maybe ByteString
-  , vtag :: Maybe Vtag
+  , contentType :: Maybe ByteString
+  , deleted :: Bool
+  , indexes :: [Index]
   , lastModified :: Maybe UTCTime
   , metadata :: [(ByteString, Maybe ByteString)]
-  , indexes :: [Index]
-  , deleted :: Bool
   , ttl :: Maybe Word32 -- TODO NominalDiffTime
+  , value :: a
+  , vclock :: Vclock
+  , vtag :: Maybe Vtag
   }
 
 data ObjectW
   = ObjectW
-  { value :: ByteString
-  , contentType :: Maybe ByteString
-  , charset :: Maybe ByteString
+  { charset :: Maybe ByteString
   , contentEncoding :: Maybe ByteString
-  , metadata :: [(ByteString, Maybe ByteString)]
+  , contentType :: Maybe ByteString
   , indexes :: [Index]
+  , metadata :: [(ByteString, Maybe ByteString)]
+  , value :: ByteString
+  , vclock :: Vclock
   }
