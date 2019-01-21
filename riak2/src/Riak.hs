@@ -4,13 +4,6 @@ module Riak
   ( -- * Handle
     createRiakHandle
     -- * Object operations
-    -- ** Put object
-  , putRiakObject
-  , putRiakObjectHead
-  , putRiakObjectBody
-  , putNewRiakObject
-  , putNewRiakObjectHead
-  , putNewRiakObjectBody
     -- ** Delete object
   , deleteRiakObject
     -- * Counter operations
@@ -141,42 +134,45 @@ module Riak
   ) where
 
 import Riak.Interface          (Interface, Result(..))
-import Riak.Internal
-import Riak.Internal.Cache     (newSTMRiakCache)
-import Riak.Internal.Crdts     (CrdtVal, IsRiakCrdt(..))
-import Riak.Internal.MapReduce (riakMapReduceRequest)
+import Riak.Internal.Cache
+import Riak.Internal.Crdts
+import Riak.Internal.Manager
+import Riak.Internal.MapReduce
+import Riak.Internal.Object
 import Riak.Internal.Panic
+import Riak.Internal.Params
 import Riak.Internal.Prelude
-import Riak.Internal.Types     (ObjectReturn(..), ParamObjectReturn(..),
-                                RiakTy(..), SBool(..))
+import Riak.Internal.Types     (ObjectReturn(..), RiakTy(..))
+import Riak.Internal.Types
 import Riak.Internal.Utils     (bs2int, int2bs)
+import Riak.Proto
 
 import qualified Riak.Interface  as Interface
 import qualified Riak.Proto.Lens as L
 
-import Control.Foldl                (FoldM)
-import Control.Lens                 (view)
-import Data.Default.Class           (def)
-import Data.Profunctor              (lmap)
-import Data.Time                    (NominalDiffTime)
-import Data.Time.Clock.POSIX        (posixSecondsToUTCTime)
-import Network.Socket               (HostName, PortNumber)
+import Control.Foldl      (FoldM)
+import Control.Lens       (view)
+import Data.Default.Class (def)
+import Data.Profunctor    (lmap)
+import Network.Socket     (HostName, PortNumber)
 
-import qualified Control.Foldl      as Foldl
-import qualified Data.ByteString    as ByteString
-import qualified Data.List.NonEmpty as List1
-import qualified Lens.Labels        as L
+import qualified Control.Foldl as Foldl
+import qualified Lens.Labels   as L
 
 
 -- TODO _ variants that don't decode replies
-
--- TODO put raw RiakObject
 
 -- TODO since annotations
 
 --------------------------------------------------------------------------------
 -- Handle
 --------------------------------------------------------------------------------
+
+-- | A thread-safe handle to Riak.
+--
+-- TODO: RiakHandle optional cache
+data RiakHandle
+  = RiakHandle !RiakManager !RiakCache
 
 -- | Create a handle to Riak. When the handle is garbage collected, all
 -- outstanding sockets (if any) are closed.
@@ -216,231 +212,6 @@ type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
   ObjectReturnTy _ 'ObjectReturnNone = RiakKey
   ObjectReturnTy _ 'ObjectReturnHead = NonEmpty (RiakObject ())
   ObjectReturnTy a 'ObjectReturnBody = NonEmpty (RiakObject a)
-
--- | Put an object.
-putRiakObject
-  :: forall a m.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle -- ^ Riak handle
-  -> RiakKey -- ^ Bucket type, bucket, and key
-  -> a -- ^ Object
-  -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Result ())
-putRiakObject
-    handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
-  fmap (() <$)
-    (_putRiakObject handle bucket (Just key) content a b c d e
-      ParamObjectReturnNone f g h)
-
--- | Put an object and return its metadata.
---
--- If multiple siblings are returned, you should perform a 'getRiakObject',
--- resolve them, then perform a 'putRiakObject'.
-putRiakObjectHead
-  :: forall a m.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle -- ^ Riak handle
-  -> RiakKey -- ^ Bucket type, bucket, and key
-  -> a -- ^ Object
-  -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Result (NonEmpty (RiakObject ())))
-putRiakObjectHead
-    handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
-  (_putRiakObject handle bucket (Just key) content a b c d e
-    ParamObjectReturnHead f g h)
-
--- | Put an object and return it.
-putRiakObjectBody
-  :: forall a m.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle -- ^ Riak handle
-  -> RiakKey -- ^ Bucket type, bucket, and key
-  -> a -- ^ Object
-  -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Result (NonEmpty (RiakObject a)))
-putRiakObjectBody
-    handle (RiakKey bucket key) content (PutRiakObjectParams a b c d e f g h) =
-  _putRiakObject handle bucket (Just key) content a b c d e
-    ParamObjectReturnBody f g h
-
--- | Put a new object and return its randomly-generated key.
---
--- If multiple siblings are returned, you should resolve them, then perform a
--- 'putRiakObject'.
-putNewRiakObject
-  :: forall a m.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle -- ^ Riak handle
-  -> RiakBucket -- ^ Bucket type and bucket
-  -> a -- ^ Object
-  -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Result RiakKey)
-putNewRiakObject
-    handle bucket content (PutRiakObjectParams a b c d e f g h) =
-  _putRiakObject handle bucket Nothing content a b c d e
-    ParamObjectReturnNone f g h
-
--- | Put an new object and return its metadata.
-putNewRiakObjectHead
-  :: forall a m.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle -- ^ Riak handle
-  -> RiakBucket -- ^ Bucket type and bucket
-  -> a -- ^ Object
-  -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Result (RiakObject ()))
-putNewRiakObjectHead
-    handle bucket content (PutRiakObjectParams a b c d e f g h) =
-  (fmap.fmap) List1.head
-    (_putRiakObject handle bucket Nothing content a b c d e
-      ParamObjectReturnHead f g h)
-
--- | Put an new object and return it.
-putNewRiakObjectBody
-  :: forall a m.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle -- ^ Riak handle
-  -> RiakBucket -- ^ Bucket type and bucket
-  -> a -- ^ Object
-  -> PutRiakObjectParams -- ^ Optional parameters
-  -> m (Result (RiakObject a))
-putNewRiakObjectBody
-    handle bucket content (PutRiakObjectParams a b c d e f g h) =
-  (fmap.fmap) List1.head $
-    _putRiakObject handle bucket Nothing content a b c d e
-      ParamObjectReturnBody f g h
-
-_putRiakObject
-  :: forall a m return.
-     (IsRiakObject a, MonadIO m)
-  => RiakHandle
-  -> RiakBucket
-  -> Maybe ByteString
-  -> a
-  -> DW
-  -> [RiakIndex]
-  -> RiakMetadata
-  -> N
-  -> PW
-  -> ParamObjectReturn return
-  -> SloppyQuorum
-  -> Timeout
-  -> W
-  -> m (Result (ObjectReturnTy a return))
-_putRiakObject
-    h@(RiakHandle manager cache) namespace@(RiakBucket type' bucket) key value
-    dw indexes metadata n pw return sloppy_quorum timeout w = liftIO $ do
-
-  -- Get the cached vclock of this object to pass in the put request.
-  vclock :: Maybe RiakVclock <-
-    maybe
-      (pure Nothing) -- Riak will randomly generate a key for us. No vclock.
-      (riakCacheLookup cache . RiakKey namespace)
-      key
-
-  let
-    request :: RpbPutReq
-    request =
-      defMessage
-        & #bucket L..~ bucket
-        & #content L..~
-            (defMessage
-              & #maybe'charset L..~ coerce (riakObjectCharset value)
-              & #maybe'contentEncoding L..~ coerce (riakObjectContentEncoding value)
-              & #maybe'contentType L..~ coerce (riakObjectContentType value)
-              & #indexes L..~ map indexToRpbPair (coerce indexes)
-              & #links L..~ []
-              & #usermeta L..~ map rpbPair (coerce metadata)
-              & #value L..~ encodeRiakObject value)
-        & #maybe'dw L..~ coerce dw
-        & #maybe'key L..~ coerce key
-        & #maybe'nVal L..~ unN n
-        & #maybe'pw L..~ coerce pw
-        & #maybe'returnBody L..~
-            (case return of
-              ParamObjectReturnNone -> Nothing
-              ParamObjectReturnHead -> Nothing
-              ParamObjectReturnBody -> Just True)
-        & #maybe'returnHead L..~
-            (case return of
-              ParamObjectReturnNone -> Nothing
-              ParamObjectReturnHead -> Just True
-              ParamObjectReturnBody -> Nothing)
-        & #maybe'sloppyQuorum L..~ unSloppyQuorum sloppy_quorum
-        & #maybe'timeout L..~ unTimeout timeout
-        & #type' L..~ unRiakBucketType type'
-        & #maybe'vclock L..~ coerce vclock
-        & #maybe'w L..~ coerce w
-
-  withRiakConnection manager (\conn -> Interface.putObject conn request) >>= \case
-    RiakClosedConnection ->
-      pure RiakClosedConnection
-
-    Failure err ->
-      pure (Failure err)
-
-    Success response -> do
-      let
-        nonsense :: Text -> IO void
-        nonsense s =
-          panic s
-            ( ( "request",  request  )
-            , ( "response", response )
-            )
-
-      theKey :: ByteString <-
-        maybe
-          (maybe
-            (nonsense "missing key")
-            pure
-            (response ^. L.maybe'key))
-          pure
-          key
-
-      let
-        loc :: RiakKey
-        loc =
-          RiakKey namespace theKey
-
-      -- Cache the vclock if asked for it with return_head or return_body.
-      do
-        let
-          doCacheVclock :: IO ()
-          doCacheVclock =
-            case response ^. L.maybe'vclock of
-              Nothing ->
-                nonsense "missing vclock"
-
-              Just theVclock ->
-                cacheVclock h loc (Just (coerce theVclock))
-
-        () <-
-          case return of
-            ParamObjectReturnNone -> pure ()
-            ParamObjectReturnHead -> doCacheVclock
-            ParamObjectReturnBody -> doCacheVclock
-
-        pure ()
-
-      let
-        theValue :: IO (ObjectReturnTy a return)
-        theValue =
-          case return of
-            ParamObjectReturnNone ->
-              pure loc
-
-            ParamObjectReturnHead ->
-              traverse
-                (parseContent @a proxy# loc STrue)
-                (List1.fromList (response L.^. #content))
-
-            ParamObjectReturnBody ->
-              traverse
-                (parseContent @a proxy# loc SFalse)
-                (List1.fromList (response L.^. #content))
-
-      Success <$> theValue
-
 
 --------------------------------------------------------------------------------
 -- Delete object
@@ -1467,75 +1238,6 @@ cacheVclock
 cacheVclock (RiakHandle _ cache) loc =
   liftIO . maybe (riakCacheDelete cache loc) (riakCacheInsert cache loc)
 
-parseContent
-  :: forall a head.
-     IsRiakObject a
-  => Proxy# a
-  -> RiakKey
-  -> SBool head
-  -> RpbContent
-  -> IO (RiakObject (If head () a))
-parseContent _ loc head content = do
-  theValue :: If head () a <-
-    case head of
-      STrue ->
-        pure ()
-
-      SFalse ->
-        either throwIO pure
-          (decodeRiakObject
-            (coerce (content L.^. #maybe'contentType))
-            (coerce (content L.^. #maybe'charset))
-            (coerce (content L.^. #maybe'contentEncoding))
-            (content L.^. #value))
-
-  let
-    theLastMod :: Maybe NominalDiffTime
-    theLastMod = do
-      secs  <- content L.^. #maybe'lastMod
-      usecs <- (content L.^. #maybe'lastModUsecs) <|> pure 0
-      let usecs_d = realToFrac usecs / 1000000 :: Double
-      pure (fromIntegral secs + realToFrac usecs_d)
-
-  pure $ RiakObject
-    loc
-    theValue
-    (coerce (content L.^. #maybe'contentType))
-    (coerce (content L.^. #maybe'charset))
-    (coerce (content L.^. #maybe'contentEncoding))
-    (coerce (content L.^. #maybe'vtag))
-    (posixSecondsToUTCTime <$> theLastMod)
-    (RiakMetadata (map unRpbPair (content L.^. #usermeta)))
-    (map rpbPairToIndex (content L.^. #indexes))
-    (fromMaybe False (content L.^. #maybe'deleted))
-    (TTL (content L.^. #maybe'ttl))
-
--- TODO replace parseContent with parseContent', parseContentHead
-
-indexToRpbPair :: RiakIndex -> RpbPair
-indexToRpbPair = \case
-  RiakIndexInt k v ->
-    rpbPair (unRiakIndexName k <> "_int", Just (int2bs v))
-
-  RiakIndexBin k v ->
-    rpbPair (unRiakIndexName k <> "_bin", Just v)
-
-
-rpbPairToIndex :: RpbPair -> RiakIndex
-rpbPairToIndex =
-  unRpbPair >>> \case
-    (ByteString.stripSuffix "_bin" -> Just k, Just v) ->
-      RiakIndexBin (RiakIndexName k) v
-
-    (ByteString.stripSuffix "_int" -> Just k, Just v) ->
-      RiakIndexInt (RiakIndexName k) (bs2int v)
-
-    (k, v) ->
-      impurePanic "rpbPairToIndex"
-        ( ("key",   k)
-        , ("value", v)
-        )
-
 translateNotfound :: Result a -> Result (Maybe a)
 translateNotfound = \case
   RiakClosedConnection ->
@@ -1549,13 +1251,6 @@ translateNotfound = \case
 
   Success result ->
     Success (Just result)
-
-rpbPair :: (ByteString, Maybe ByteString) -> RpbPair
-rpbPair (k, v) =
-  defMessage
-    & #key L..~ k
-    & #maybe'value L..~ v
-
 
 unRpbPair :: RpbPair -> (ByteString, Maybe ByteString)
 unRpbPair pair =
