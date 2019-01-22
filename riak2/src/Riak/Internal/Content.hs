@@ -1,26 +1,19 @@
 module Riak.Internal.Content where
 
-import Riak.Index            (Index(..))
-import Riak.Internal.Panic   (impurePanic)
+import Riak.Index            (Index)
 import Riak.Internal.Prelude
-import Riak.Internal.Utils   (bs2int, int2bs)
-import Riak.Proto
-
-import qualified Riak.Internal.Pair as Pair
-import qualified Riak.Proto.Lens    as L
-
-import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
-
-import qualified Data.ByteString as ByteString
+import Riak.Key              (Key)
+import Riak.Vclock           (Vclock)
 
 
-lastModified :: RpbContent -> Maybe UTCTime
-lastModified content = do
-  secs <- content ^. L.maybe'lastMod
-  usecs <- (content ^. L.maybe'lastModUsecs) <|> pure 0
-  let usecs_d = realToFrac usecs / 1000000 :: Double
-  pure (posixSecondsToUTCTime (fromIntegral secs + realToFrac usecs_d))
-
-metadata :: RpbContent -> [(ByteString, Maybe ByteString)]
-metadata content =
-  map Pair.toTuple (content ^. L.usermeta)
+data Content a
+  = Content
+  { charset :: Maybe ByteString
+  , encoding :: Maybe ByteString
+  , indexes :: [Index]
+  , key :: Key
+  , metadata :: [(ByteString, Maybe ByteString)]
+  , type' :: Maybe ByteString
+  , value :: a
+  , vclock :: Vclock
+  } deriving stock (Functor, Generic, Show)

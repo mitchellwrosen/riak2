@@ -98,9 +98,11 @@ library riak2-indef
     Riak
     Riak.Bucket
     Riak.BucketType
+    Riak.Content
     Riak.Client
     Riak.Index
     Riak.Key
+    Riak.Metadata
     Riak.Object
     Riak.Opts
     Riak.Quorum
@@ -129,17 +131,16 @@ library riak2-indef
     Riak.Internal.Exception
     Riak.Internal.Manager
     Riak.Internal.MapReduce
-    Riak.Internal.Object
     Riak.Internal.Params
     Riak.Internal.Types
 
     Riak.Internal.Content
     Riak.Internal.Index
-    Riak.Internal.ObjectR
-    Riak.Internal.ObjectW
+    Riak.Internal.Object
     Riak.Internal.Pair
     Riak.Internal.Panic
     Riak.Internal.Prelude
+    Riak.Internal.Proto.Content
     Riak.Internal.Quorum
     Riak.Internal.Utils
 

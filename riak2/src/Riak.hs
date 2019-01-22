@@ -80,14 +80,9 @@ module Riak
   , pingRiak
   , getRiakServerInfo
     -- * Types
-  , Charset(..)
-  , ContentEncoding(..)
-  , ContentType(..)
   , IsRiakMap(..)
-  , IsRiakObject(..)
   , IsRiakRegister(..)
   , IsRiakSet
-  , JsonRiakObject(..)
   , Modified(..)
   , RiakBucket(..)
   , pattern DefaultRiakBucket
@@ -106,7 +101,6 @@ module Riak
   , RiakMapReduceInputs(..)
   , RiakMapReducePhase(..)
   , RiakMetadata(..)
-  , RiakObject(..)
   , RiakQuorum(..)
   , pattern RiakQuorumAll
   , pattern RiakQuorumQuorum
@@ -203,15 +197,6 @@ createRiakHandle host port = liftIO $ do
 
   pure (RiakHandle manager cache)
 
-
---------------------------------------------------------------------------------
--- Put object
---------------------------------------------------------------------------------
-
-type family ObjectReturnTy (a :: Type) (return :: ObjectReturn) where
-  ObjectReturnTy _ 'ObjectReturnNone = RiakKey
-  ObjectReturnTy _ 'ObjectReturnHead = NonEmpty (RiakObject ())
-  ObjectReturnTy a 'ObjectReturnBody = NonEmpty (RiakObject a)
 
 --------------------------------------------------------------------------------
 -- Delete object

@@ -1,7 +1,5 @@
 module Riak.Object
-  ( ObjectR(..)
-  , ObjectW(..)
+  ( Object(..)
   ) where
 
-import Riak.Internal.ObjectR (ObjectR(..))
-import Riak.Internal.ObjectW (ObjectW(..))
+import Riak.Internal.Object (Object(..))
