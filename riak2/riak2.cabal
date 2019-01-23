@@ -95,9 +95,10 @@ library riak2-indef
   exposed-modules:
     Riak.Bucket
     Riak.BucketType
+    Riak.Client
     Riak.Content
     Riak.Context
-    Riak.Client
+    Riak.Counter
     Riak.Index
     Riak.Key
     Riak.Metadata
@@ -131,6 +132,9 @@ library riak2-indef
     src
 
   other-modules:
+    Riak.Internal.Client
+    Riak.Internal.Client.Counter
+    Riak.Internal.Client.Object
     Riak.Internal.Content
     Riak.Internal.Context
     Riak.Internal.Index
