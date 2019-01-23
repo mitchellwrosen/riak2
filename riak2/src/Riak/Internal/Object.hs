@@ -6,10 +6,10 @@ module Riak.Internal.Object
 
 import Riak.Content          (Content(..))
 import Riak.Internal.Prelude
+import Riak.Internal.Vclock  (Vclock(..))
 import Riak.Key              (Key(..))
 import Riak.Metadata         (Metadata(..))
 import Riak.Proto
-import Riak.Vclock           (Vclock(..))
 
 import qualified Riak.Internal.Index         as Index
 import qualified Riak.Internal.Proto.Content as Proto.Content

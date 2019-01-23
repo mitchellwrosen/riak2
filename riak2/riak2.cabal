@@ -140,6 +140,7 @@ library riak2-indef
     Riak.Internal.Proto.Content
     Riak.Internal.Quorum
     Riak.Internal.Utils
+    Riak.Internal.Vclock
 
 -- executable riakc
 --   build-depends:

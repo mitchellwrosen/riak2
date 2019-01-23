@@ -20,11 +20,11 @@ module Riak.Client
 import Riak.Content          (Content(..))
 import Riak.Interface        (Interface, Result(..))
 import Riak.Internal.Prelude
+import Riak.Internal.Vclock  (Vclock(..))
 import Riak.Key              (Key(..))
 import Riak.Object           (Object(..))
 import Riak.Opts             (GetOpts(..), PutOpts(..))
 import Riak.Proto
-import Riak.Vclock           (Vclock(..))
 
 import qualified Riak.Interface       as Interface
 import qualified Riak.Internal.Index  as Index
