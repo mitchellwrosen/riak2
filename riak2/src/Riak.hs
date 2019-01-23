@@ -3,9 +3,6 @@
 module Riak
   ( -- * Handle
     createRiakHandle
-    -- * Object operations
-    -- ** Delete object
-  , deleteRiakObject
     -- * Counter operations
     -- ** Get counter
   , getRiakCounter
@@ -196,36 +193,6 @@ createRiakHandle host port = liftIO $ do
     createRiakManager host port sockets 30
 
   pure (RiakHandle manager cache)
-
-
---------------------------------------------------------------------------------
--- Delete object
---------------------------------------------------------------------------------
-
--- | Delete an object or data type.
-deleteRiakObject
-  :: MonadIO m
-  => RiakHandle -- ^ Riak handle
-  -> RiakKey -- ^ Bucket type, bucket, and key
-  -> m (Result ())
-deleteRiakObject
-    (RiakHandle manager cache)
-    loc@(RiakKey (RiakBucket (RiakBucketType type') bucket) key) = liftIO $ do
-
-  vclock :: Maybe RiakVclock <-
-    riakCacheLookup cache loc
-
-  let
-    request :: RpbDelReq
-    request =
-      defMessage
-        & #bucket L..~ bucket
-        & #key L..~ key
-        & #type' L..~ type'
-        & #maybe'vclock L..~ coerce vclock
-
-  fmap (() <$)
-    (withRiakConnection manager (\conn -> Interface.delete conn request))
 
 
 --------------------------------------------------------------------------------

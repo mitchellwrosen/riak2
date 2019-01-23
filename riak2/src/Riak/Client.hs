@@ -13,6 +13,8 @@ module Riak.Client
   , put
   , putGet
   , putGetHead
+    -- ** Delete object
+  , delete
   ) where
 
 import Riak.Content          (Content(..))
@@ -93,10 +95,10 @@ getHead client key opts = liftIO $
 getIfModified
   :: MonadIO m
   => Client -- ^
-  -> Object a -- ^
+  -> Content a -- ^
   -> GetOpts -- ^
   -> m (Result (IfModified [Object ByteString]))
-getIfModified client (Object { content = Content { key, vclock } }) opts = liftIO $
+getIfModified client (Content { key, vclock }) opts = liftIO $
   (fmap.fmap)
     (\response ->
       if response ^. L.unchanged
@@ -117,10 +119,10 @@ getIfModified client (Object { content = Content { key, vclock } }) opts = liftI
 getHeadIfModified
   :: MonadIO m
   => Client -- ^
-  -> Object a -- ^
+  -> Content a -- ^
   -> GetOpts -- ^
   -> m (Result (IfModified [Object ()]))
-getHeadIfModified client (Object { content = Content { key, vclock } }) opts = liftIO $
+getHeadIfModified client (Content { key, vclock }) opts = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.get (iface client) request)
@@ -163,17 +165,17 @@ put ::
   -> Content ByteString -- ^
   -> PutOpts -- ^
   -> m (Result Key)
-put client object opts = liftIO $
+put client content opts = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.put (iface client) request)
   where
     request :: RpbPutReq
     request =
-      makeRpbPutReq key object opts
+      makeRpbPutReq key content opts
 
     key@(Key type' bucket k) =
-      object ^. field @"key"
+      content ^. field @"key"
 
     fromResponse :: RpbPutResp -> Key
     fromResponse response =
@@ -191,7 +193,7 @@ putGet ::
   -> Content ByteString -- ^
   -> PutOpts -- ^
   -> m (Result (NonEmpty (Object ByteString)))
-putGet client object opts = liftIO $
+putGet client content opts = liftIO $
   (fmap.fmap)
     (Object.fromPutResp key)
     (Interface.put (iface client) request)
@@ -199,12 +201,12 @@ putGet client object opts = liftIO $
   where
     request :: RpbPutReq
     request =
-      makeRpbPutReq key object opts
+      makeRpbPutReq key content opts
         & L.returnBody .~ True
 
     key :: Key
     key =
-      object ^. field @"key"
+      content ^. field @"key"
 
 -- | Put an object and return its metadata.
 --
@@ -216,7 +218,7 @@ putGetHead ::
   -> Content ByteString -- ^
   -> PutOpts -- ^
   -> m (Result (NonEmpty (Object ())))
-putGetHead client object opts = liftIO $
+putGetHead client content opts = liftIO $
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResp key)
     (Interface.put (iface client) request)
@@ -224,12 +226,12 @@ putGetHead client object opts = liftIO $
   where
     request :: RpbPutReq
     request =
-      makeRpbPutReq key object opts
+      makeRpbPutReq key content opts
         & L.returnHead .~ True
 
     key :: Key
     key =
-      object ^. field @"key"
+      content ^. field @"key"
 
 makeRpbPutReq ::
      Key
@@ -268,6 +270,38 @@ makeRpbPutReq (Key type' bucket key) content opts =
     & L.maybe'timeout .~ (opts ^. field @"timeout")
     & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
     & L.type' .~ type'
+
+delete ::
+     MonadIO m
+  => Client
+  -> Content a
+  -> m (Result ())
+delete client content = liftIO $
+  (fmap.fmap)
+    (\RpbDelResp -> ())
+    (Interface.delete (iface client) request)
+
+  where
+    request :: RpbDelReq
+    request =
+      defMessage
+        & L.bucket .~ bucket
+        & L.key .~ key
+        -- TODO delete opts
+        -- & L.maybe'dw .~ undefined
+        -- & L.maybe'nVal .~ undefined
+        -- & L.maybe'pr .~ undefined
+        -- & L.maybe'pw .~ undefined
+        -- & L.maybe'r .~ undefined
+        -- & L.maybe'rw .~ undefined
+        -- & L.maybe'sloppyQuorum .~ undefined
+        -- & L.maybe'timeout .~ undefined
+        -- & L.maybe'w .~ undefined
+        & L.type' .~ type'
+        & L.vclock .~ unVclock (content ^. field @"vclock")
+
+    Key type' bucket key =
+      content ^. field @"key"
 
 defFalse :: Bool -> Maybe Bool
 defFalse = \case
