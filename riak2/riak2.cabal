@@ -134,8 +134,6 @@ library riak2-indef
 
   other-modules:
     Riak.Internal.Client
-    Riak.Internal.Client.Counter
-    Riak.Internal.Client.Object
     Riak.Internal.Content
     Riak.Internal.Context
     Riak.Internal.Index
