@@ -17,16 +17,18 @@ import qualified Riak.Proto.Lens as L
 import qualified Data.ByteString as ByteString
 
 
+-- | A counter data type.
 data Counter
   = Counter
   { key :: !Key
   , value :: !Int64
   } deriving stock (Generic, Show)
 
+-- | Get a counter.
 get ::
      MonadIO m
-  => Client
-  -> Key
+  => Client -- ^
+  -> Key -- ^
   -> m (Result Counter)
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
@@ -57,6 +59,17 @@ get client k@(Key type' bucket key) = liftIO $
         , value = response ^. L.value . L.counterValue
         }
 
+-- | Update a counter.
+--
+-- Note that counters, unlike other data types, represent their own update
+-- operation. Furthermore, counters do not contain a causal context.
+--
+-- So to increment a counter at key __@K@__ by value __@N@__, you need not fetch
+-- it first. Rather, just perform:
+--
+-- @
+-- update client Counter { key = K, value = N }
+-- @
 update ::
      MonadIO m
   => Client

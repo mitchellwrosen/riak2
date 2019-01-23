@@ -26,6 +26,7 @@ data Update
   | Remove ByteString
   deriving stock (Eq, Show)
 
+-- | Get a set.
 get ::
      MonadIO m
   => Client
@@ -62,6 +63,27 @@ get client k@(Key type' bucket key) = liftIO $
         , value = HashSet.fromList (response ^. L.value . L.setValue)
         }
 
+-- | Update a set.
+--
+-- To update a set for the first time, use an empty causal context and empty key
+-- component, like so:
+--
+-- @
+-- Set
+--   { context =
+--       Riak.Context.none
+--   , key =
+--       Key
+--         { type' = \"type\"
+--         , bucket = \"bucket\"
+--         , key = Riak.Key.none
+--         }
+--   , value =
+--      mempty
+--   }
+-- @
+--
+-- But from then on, you must 'get' a map before you 'update' it.
 update ::
      MonadIO m
   => Client

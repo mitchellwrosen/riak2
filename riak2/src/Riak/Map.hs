@@ -25,20 +25,21 @@ import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet        as HashSet
 
 
+-- | A map data type.
 data Map
   = Map
-  { context :: !Context
-  , key :: !Key
-  , value :: !Maps
+  { context :: !Context -- ^ Causal context
+  , key :: !Key -- ^ Key
+  , value :: !Maps -- ^ Inner maps
   } deriving stock (Generic, Show)
 
 data Maps
   = Maps
-  { counters :: !(HashMap ByteString Int64)
-  , flags :: !(HashMap ByteString Bool)
-  , maps :: !(HashMap ByteString Maps)
-  , registers :: !(HashMap ByteString ByteString)
-  , sets :: !(HashMap ByteString (HashSet ByteString))
+  { counters :: !(HashMap ByteString Int64) -- ^ Counters
+  , flags :: !(HashMap ByteString Bool) -- ^ Flags
+  , maps :: !(HashMap ByteString Maps) -- ^ Maps
+  , registers :: !(HashMap ByteString ByteString) -- ^ Registers
+  , sets :: !(HashMap ByteString (HashSet ByteString)) -- ^ Sets
   } deriving stock (Generic, Show)
 
 instance Monoid Maps where
@@ -49,6 +50,7 @@ instance Semigroup Maps where
   Maps a1 b1 c1 d1 e1 <> Maps a2 b2 c2 d2 e2 =
     Maps (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2)
 
+-- | A map update.
 data Update
   = RemoveCounter ByteString
   | RemoveFlag ByteString
@@ -62,6 +64,7 @@ data Update
   | UpdateSet ByteString [Set.Update]
   deriving stock (Eq, Show)
 
+-- | Get a map.
 get ::
      MonadIO m
   => Client
@@ -98,6 +101,27 @@ get client k@(Key type' bucket key) = liftIO $
         , value = mapEntriesToMaps (response ^. L.value . L.mapValue)
         }
 
+-- | Update a map.
+--
+-- To update a map for the first time, use an empty causal context and empty key
+-- component, like so:
+--
+-- @
+-- Map
+--   { context =
+--       Riak.Context.none
+--   , key =
+--       Key
+--         { type' = \"type\"
+--         , bucket = \"bucket\"
+--         , key = Riak.Key.none
+--         }
+--   , value =
+--      mempty
+--   }
+-- @
+--
+-- But from then on, you must 'get' a map before you 'update' it.
 update ::
      MonadIO m
   => Client
