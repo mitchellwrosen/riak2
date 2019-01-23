@@ -17,15 +17,15 @@
 -- * Inactive sockets are closed by a background thread after some seconds
 --   (configurable).
 
-module Riak.Internal.Manager
+module ZZZ.Riak.Internal.Manager
   ( RiakManager(..)
   , createRiakManager
   , withRiakConnection
   ) where
 
-import Riak.Internal.Debug
 import Riak.Internal.Prelude  hiding (IORef)
 import Riak.Interface (Interface)
+import ZZZ.Riak.Internal.Debug
 
 import qualified Riak.Interface as Interface
 

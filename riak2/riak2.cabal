@@ -93,9 +93,6 @@ library riak2-indef
     Haskell2010
 
   exposed-modules:
-    -- temporary
-    Erlang
-    Riak
     Riak.Bucket
     Riak.BucketType
     Riak.Content
@@ -107,6 +104,17 @@ library riak2-indef
     Riak.Opts
     Riak.Quorum
     Riak.Vclock
+
+    ZZZ.Erlang
+    ZZZ.Riak
+    ZZZ.Riak.Internal.Cache
+    ZZZ.Riak.Internal.Crdts
+    ZZZ.Riak.Internal.Debug
+    ZZZ.Riak.Internal.Exception
+    ZZZ.Riak.Internal.Manager
+    ZZZ.Riak.Internal.MapReduce
+    ZZZ.Riak.Internal.Params
+    ZZZ.Riak.Internal.Types
 
   ghc-options:
     -Weverything
@@ -123,16 +131,6 @@ library riak2-indef
     src
 
   other-modules:
-    Riak.Internal
-    Riak.Internal.Cache
-    Riak.Internal.Crdts
-    Riak.Internal.Debug
-    Riak.Internal.Exception
-    Riak.Internal.Manager
-    Riak.Internal.MapReduce
-    Riak.Internal.Params
-    Riak.Internal.Types
-
     Riak.Internal.Content
     Riak.Internal.Index
     Riak.Internal.Object

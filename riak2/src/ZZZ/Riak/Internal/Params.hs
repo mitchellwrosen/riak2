@@ -1,10 +1,10 @@
-module Riak.Internal.Params where
+module ZZZ.Riak.Internal.Params where
 
 import Data.Default.Class
 import GHC.OverloadedLabels
 
 import Riak.Internal.Prelude
-import Riak.Internal.Types
+import ZZZ.Riak.Internal.Types
 
 
 -- TODO default these that can't be set in props?

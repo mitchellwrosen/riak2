@@ -1,6 +1,6 @@
 {-# LANGUAGE UndecidableInstances #-}
 
-module Riak.Internal.Crdts
+module ZZZ.Riak.Internal.Crdts
   ( RiakCrdtError(..)
   , IsRiakCrdt(..)
   , IsRiakMap(..)
@@ -21,8 +21,8 @@ module Riak.Internal.Crdts
   ) where
 
 import Riak.Internal.Prelude
-import Riak.Internal.Types
 import Riak.Proto
+import ZZZ.Riak.Internal.Types
 
 import Data.Bifunctor     (first)
 import Data.DList         (DList)

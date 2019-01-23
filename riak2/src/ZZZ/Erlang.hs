@@ -2,7 +2,7 @@
 --
 -- <http://erlang.org/doc/apps/erts/erl_ext_dist.html>
 
-module Erlang
+module ZZZ.Erlang
   ( ErlTerm(..)
   , buildErlTerm
   , decodeErlTerm

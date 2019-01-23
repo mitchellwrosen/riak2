@@ -3,7 +3,7 @@
 -- TODO $bucket index, only supports equality queries
 -- TODO $key index, only supports range queries
 
-module Riak.Internal.Types where
+module ZZZ.Riak.Internal.Types where
 
 import Data.Default.Class
 import Data.Text.Encoding (decodeUtf8, decodeUtf8')

@@ -1,4 +1,4 @@
-module Riak.Internal.Cache
+module ZZZ.Riak.Internal.Cache
   ( RiakCache(..)
   , newSTMRiakCache
   ) where
@@ -8,9 +8,9 @@ import Control.Concurrent.STM
 import qualified StmContainers.Map as STM (Map)
 import qualified StmContainers.Map as STMMap
 
-import Riak.Internal.Debug
 import Riak.Internal.Prelude
-import Riak.Internal.Types
+import ZZZ.Riak.Internal.Debug
+import ZZZ.Riak.Internal.Types
 
 -- TODO cache ttl
 

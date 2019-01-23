@@ -1,6 +1,6 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports #-}
 
-module Riak.Internal.Debug
+module ZZZ.Riak.Internal.Debug
   ( debug
   ) where
 

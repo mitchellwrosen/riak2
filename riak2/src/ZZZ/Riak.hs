@@ -1,6 +1,6 @@
 {-# LANGUAGE AllowAmbiguousTypes, UndecidableInstances #-}
 
-module Riak
+module ZZZ.Riak
   ( -- * Handle
     createRiakHandle
     -- * Counter operations
@@ -124,19 +124,18 @@ module Riak
     -- $documentation
   ) where
 
-import Riak.Interface          (Interface, Result(..))
-import Riak.Internal.Cache
-import Riak.Internal.Crdts
-import Riak.Internal.Manager
-import Riak.Internal.MapReduce
-import Riak.Internal.Object
+import Riak.Interface              (Interface, Result(..))
 import Riak.Internal.Panic
-import Riak.Internal.Params
 import Riak.Internal.Prelude
-import Riak.Internal.Types     (ObjectReturn(..), RiakTy(..))
-import Riak.Internal.Types
-import Riak.Internal.Utils     (bs2int, int2bs)
+import Riak.Internal.Utils         (bs2int, int2bs)
 import Riak.Proto
+import ZZZ.Riak.Internal.Cache
+import ZZZ.Riak.Internal.Crdts
+import ZZZ.Riak.Internal.Manager
+import ZZZ.Riak.Internal.MapReduce
+import ZZZ.Riak.Internal.Params
+import ZZZ.Riak.Internal.Types     (RiakTy(..))
+import ZZZ.Riak.Internal.Types
 
 import qualified Riak.Interface  as Interface
 import qualified Riak.Proto.Lens as L
