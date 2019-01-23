@@ -101,6 +101,7 @@ library riak2-indef
     Riak.Counter
     Riak.Index
     Riak.Key
+    Riak.Map
     Riak.Metadata
     Riak.Object
     Riak.Opts
@@ -143,6 +144,7 @@ library riak2-indef
     Riak.Internal.Prelude
     Riak.Internal.Proto.Content
     Riak.Internal.Quorum
+    Riak.Internal.Set
     Riak.Internal.Utils
 
 -- executable riakc

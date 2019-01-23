@@ -1,13 +1,9 @@
-module Riak.Counter
-  ( Counter(..)
-  , get
-  , update
-  ) where
+module Riak.Internal.Set where
 
-import Riak.Interface        (Result(..))
+import Riak.Interface        (Result)
 import Riak.Internal.Client  (Client(..))
-import Riak.Internal.Prelude
-import Riak.Key              (Key)
+import Riak.Internal.Context (Context(..))
+import Riak.Internal.Prelude hiding (Set)
 import Riak.Key              (Key(..))
 import Riak.Proto
 
@@ -15,19 +11,26 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto.Lens as L
 
 import qualified Data.ByteString as ByteString
+import qualified Data.HashSet    as HashSet
 
 
-data Counter
-  = Counter
-  { key :: !Key
-  , value :: !Int64
+data Set
+  = Set
+  { context :: !Context
+  , key :: !Key
+  , value :: !(HashSet ByteString)
   } deriving stock (Generic, Show)
+
+data Update
+  = Add ByteString
+  | Remove ByteString
+  deriving stock (Eq, Show)
 
 get ::
      MonadIO m
   => Client
   -> Key
-  -> m (Result Counter)
+  -> m (Result Set)
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -38,10 +41,11 @@ get client k@(Key type' bucket key) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.includeContext .~ True
         & L.key .~ key
         & L.type' .~ type'
 
-        -- TODO get counter opts
+        -- TODO get set opts
         -- & L.maybe'basicQuorum .~ undefined
         -- & L.maybe'nVal .~ undefined
         -- & L.maybe'notfoundOk .~ undefined
@@ -50,19 +54,21 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Counter
+    fromResponse :: DtFetchResp -> Set
     fromResponse response =
-      Counter
-        { key = k
-        , value = response ^. L.value . L.counterValue
+      Set
+        { context = Context (response ^. L.context)
+        , key = k
+        , value = HashSet.fromList (response ^. L.value . L.setValue)
         }
 
 update ::
      MonadIO m
   => Client
-  -> Counter
-  -> m (Result Counter)
-update client (Counter { key, value }) = liftIO $
+  -> Set
+  -> [Update]
+  -> m (Result Set)
+update client (Set { context, key }) updates = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt (iface client) request)
@@ -72,35 +78,54 @@ update client (Counter { key, value }) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.includeContext .~ True
+        & L.maybe'context .~
+            (if ByteString.null (unContext context)
+              then Nothing
+              else Just (unContext context))
         & L.maybe'key .~
             (if ByteString.null k
               then Nothing
               else Just k)
         & L.op .~
             (defMessage
-              & L.counterOp .~
-                  (defMessage
-                    & L.increment .~ value))
+              & L.setOp .~ updatesToOp updates)
         & L.returnBody .~ True
         & L.type' .~ type'
--- TODO counter update opts
+
+-- TODO set update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'dw :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'pw :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'timeout :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
--- _DtUpdateReq'includeContext :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Counter
+    fromResponse :: DtUpdateResp -> Set
     fromResponse response =
-      Counter
-        { key =
+      Set
+        { context = Context (response ^. L.context)
+        , key =
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = response ^. L.counterValue
+        , value = HashSet.fromList (response ^. L.setValue)
         }
+
+updatesToOp :: [Update] -> SetOp
+updatesToOp updates =
+  defMessage
+    & L.adds .~ adds
+    & L.removes .~ removes
+
+  where
+    adds :: [ByteString]
+    adds =
+      [ value | Add value <- updates ]
+
+    removes :: [ByteString]
+    removes =
+      [ value | Remove value <- updates ]
