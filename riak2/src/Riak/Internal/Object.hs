@@ -10,7 +10,6 @@ import Riak.Key              (Key(..))
 import Riak.Metadata         (Metadata(..))
 import Riak.Proto
 import Riak.Vclock           (Vclock(..))
-import Riak.Vtag             (Vtag(..))
 
 import qualified Riak.Internal.Index         as Index
 import qualified Riak.Internal.Proto.Content as Proto.Content
@@ -49,7 +48,6 @@ fromProtoContent key vclock proto =
           { deleted = proto ^. L.deleted
           , lastModified = Proto.Content.lastModified proto
           , ttl = proto ^. L.maybe'ttl
-          , vtag = coerce (proto ^. L.maybe'vtag)
           }
     }
 

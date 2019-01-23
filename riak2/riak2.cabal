@@ -107,7 +107,6 @@ library riak2-indef
     Riak.Opts
     Riak.Quorum
     Riak.Vclock
-    Riak.Vtag
 
   ghc-options:
     -Weverything

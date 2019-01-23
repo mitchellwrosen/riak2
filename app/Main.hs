@@ -1,18 +1,19 @@
 {-# LANGUAGE DataKinds, FlexibleContexts, GADTs, LambdaCase, OverloadedLabels,
              OverloadedStrings, RankNTypes, ScopedTypeVariables,
-             TypeApplications #-}
+             TypeApplications, ViewPatterns #-}
 
-import Control.Monad       (join, when, (<=<))
-import Data.ByteString     (ByteString)
-import Data.Foldable       (asum, for_, toList, traverse_)
+import Control.Monad      (join, when, (<=<))
+import Data.ByteString    (ByteString)
+import Data.Foldable      (asum, for_, toList, traverse_)
 import Data.Int
-import Data.Text           (Text)
+import Data.Text          (Text)
+import Data.Text.Encoding (encodeUtf8)
 import Data.Word
 import Lens.Family2
-import Network.Socket      (HostName, PortNumber)
-import Options.Applicative
-import Prelude             hiding (head, return)
-import Text.Read           (readMaybe)
+import Network.Socket     (HostName, PortNumber)
+import Options.Micro
+import Prelude            hiding (head, return)
+import Text.Read          (readMaybe)
 
 import qualified Control.Foldl          as Foldl
 import qualified Data.ByteString.Base64 as Base64
