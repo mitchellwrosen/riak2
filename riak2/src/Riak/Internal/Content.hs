@@ -1,19 +1,19 @@
 module Riak.Internal.Content where
 
+import Riak.Context          (Context)
 import Riak.Index            (Index)
 import Riak.Internal.Prelude
 import Riak.Key              (Key)
-import Riak.Vclock           (Vclock)
 
 
 data Content a
   = Content
-  { charset :: Maybe ByteString
-  , encoding :: Maybe ByteString
-  , indexes :: [Index]
-  , key :: Key
-  , metadata :: [(ByteString, Maybe ByteString)]
-  , type' :: Maybe ByteString
-  , value :: a
-  , vclock :: Vclock
+  { charset :: Maybe ByteString -- ^ Charset.
+  , context :: Context -- ^ Causal context.
+  , encoding :: Maybe ByteString -- ^ Content encoding.
+  , indexes :: [Index] -- ^ Secondary indexes.
+  , key :: Key -- ^ Key.
+  , metadata :: [(ByteString, Maybe ByteString)] -- ^ User metadata.
+  , type' :: Maybe ByteString -- ^ Content type.
+  , value :: a -- ^ Value.
   } deriving stock (Functor, Generic, Show)

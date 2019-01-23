@@ -5,8 +5,8 @@ module Riak.Internal.Object
   ) where
 
 import Riak.Content          (Content(..))
+import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
-import Riak.Internal.Vclock  (Vclock(..))
 import Riak.Key              (Key(..))
 import Riak.Metadata         (Metadata(..))
 import Riak.Proto
@@ -30,18 +30,18 @@ fromProtoContent ::
   -> ByteString
   -> RpbContent
   -> Object ByteString
-fromProtoContent key vclock proto =
+fromProtoContent key context proto =
   Object
     { content =
         Content
           { charset = proto ^. L.maybe'charset
+          , context = Context context
           , encoding = proto ^. L.maybe'contentEncoding
           , indexes = map Index.fromPair (proto ^. L.indexes)
           , key = key
           , metadata = Proto.Content.metadata proto
           , type' = proto ^. L.maybe'contentType
           , value = proto ^. L.value
-          , vclock = Vclock vclock
           }
     , metadata =
         Metadata

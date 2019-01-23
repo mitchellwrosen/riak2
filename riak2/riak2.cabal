@@ -96,6 +96,7 @@ library riak2-indef
     Riak.Bucket
     Riak.BucketType
     Riak.Content
+    Riak.Context
     Riak.Client
     Riak.Index
     Riak.Key
@@ -103,7 +104,6 @@ library riak2-indef
     Riak.Object
     Riak.Opts
     Riak.Quorum
-    Riak.Vclock
 
     ZZZ.Erlang
     ZZZ.Riak
@@ -132,6 +132,7 @@ library riak2-indef
 
   other-modules:
     Riak.Internal.Content
+    Riak.Internal.Context
     Riak.Internal.Index
     Riak.Internal.Object
     Riak.Internal.Pair
@@ -140,7 +141,6 @@ library riak2-indef
     Riak.Internal.Proto.Content
     Riak.Internal.Quorum
     Riak.Internal.Utils
-    Riak.Internal.Vclock
 
 -- executable riakc
 --   build-depends:

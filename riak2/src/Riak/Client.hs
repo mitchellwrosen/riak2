@@ -19,8 +19,8 @@ module Riak.Client
 
 import Riak.Content          (Content(..))
 import Riak.Interface        (Interface, Result(..))
+import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
-import Riak.Internal.Vclock  (Vclock(..))
 import Riak.Key              (Key(..))
 import Riak.Object           (Object(..))
 import Riak.Opts             (GetOpts(..), PutOpts(..))
@@ -98,7 +98,7 @@ getIfModified
   -> Content a -- ^
   -> GetOpts -- ^
   -> m (Result (IfModified [Object ByteString]))
-getIfModified client (Content { key, vclock }) opts = liftIO $
+getIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     (\response ->
       if response ^. L.unchanged
@@ -110,7 +110,7 @@ getIfModified client (Content { key, vclock }) opts = liftIO $
     request :: RpbGetReq
     request =
       makeRpbGetReq key opts
-        & L.ifModified .~ unVclock vclock
+        & L.ifModified .~ unContext context
 
 -- | Get an object's metadata if it has been modified since the given version.
 --
@@ -122,7 +122,7 @@ getHeadIfModified
   -> Content a -- ^
   -> GetOpts -- ^
   -> m (Result (IfModified [Object ()]))
-getHeadIfModified client (Content { key, vclock }) opts = liftIO $
+getHeadIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.get (iface client) request)
@@ -131,7 +131,7 @@ getHeadIfModified client (Content { key, vclock }) opts = liftIO $
     request =
       makeRpbGetReq key opts
         & L.head .~ True
-        & L.ifModified .~ unVclock vclock
+        & L.ifModified .~ unContext context
 
     fromResponse :: RpbGetResp -> IfModified [Object ()]
     fromResponse response =
@@ -259,13 +259,13 @@ makeRpbPutReq (Key type' bucket key) content opts =
     & L.maybe'pw .~ Quorum.toWord32 (pw opts)
     & L.maybe'vclock .~
         (let
-          vclock :: ByteString
-          vclock =
-            unVclock (content ^. field @"vclock")
+          context :: ByteString
+          context =
+            unContext (content ^. field @"context")
         in
-          if ByteString.null vclock
+          if ByteString.null context
             then Nothing
-            else Just vclock)
+            else Just context)
     & L.maybe'w .~ Quorum.toWord32 (w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
     & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
@@ -298,7 +298,7 @@ delete client content = liftIO $
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
         & L.type' .~ type'
-        & L.vclock .~ unVclock (content ^. field @"vclock")
+        & L.vclock .~ unContext (content ^. field @"context")
 
     Key type' bucket key =
       content ^. field @"key"
