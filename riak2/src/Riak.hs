@@ -225,7 +225,7 @@ deleteRiakObject
         & #maybe'vclock L..~ coerce vclock
 
   fmap (() <$)
-    (withRiakConnection manager (\conn -> Interface.deleteObject conn request))
+    (withRiakConnection manager (\conn -> Interface.delete conn request))
 
 
 --------------------------------------------------------------------------------

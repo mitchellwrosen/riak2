@@ -1,14 +1,14 @@
 module Riak.Opts
-  ( GetObjectOpts(..)
-  , PutObjectOpts(..)
+  ( GetOpts(..)
+  , PutOpts(..)
   ) where
 
 import Riak.Internal.Prelude
 import Riak.Quorum           (Quorum)
 
 
-data GetObjectOpts
-  = GetObjectOpts
+data GetOpts
+  = GetOpts
   { basicQuorum :: !Bool
   , n :: !Quorum
   , notfoundOk :: !Bool
@@ -18,8 +18,8 @@ data GetObjectOpts
   , timeout :: !(Maybe Word32)
   } deriving stock (Generic, Show)
 
-data PutObjectOpts
-  = PutObjectOpts
+data PutOpts
+  = PutOpts
   { dw :: !Quorum
   , pw :: !Quorum
   , n :: !Quorum
@@ -27,6 +27,3 @@ data PutObjectOpts
   , timeout :: !(Maybe Word32)
   , w :: !Quorum
   } deriving stock (Generic, Show)
--- _RpbPutReq'ifNotModified :: !(Prelude.Maybe Prelude.Bool),
--- _RpbPutReq'ifNoneMatch :: !(Prelude.Maybe Prelude.Bool),
--- _RpbPutReq'asis :: !(Prelude.Maybe Prelude.Bool),

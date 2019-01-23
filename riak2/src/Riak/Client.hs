@@ -20,7 +20,7 @@ import Riak.Interface        (Interface, Result(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Object           (Object(..))
-import Riak.Opts             (GetObjectOpts(..), PutObjectOpts(..))
+import Riak.Opts             (GetOpts(..), PutOpts(..))
 import Riak.Proto
 import Riak.Vclock           (Vclock(..))
 
@@ -55,12 +55,12 @@ get
   :: MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> GetObjectOpts -- ^
+  -> GetOpts -- ^
   -> m (Result [Object ByteString])
 get client key opts = liftIO $
   (fmap.fmap)
     (Object.fromGetResp key)
-    (Interface.getObject (iface client) request)
+    (Interface.get (iface client) request)
   where
     request :: RpbGetReq
     request =
@@ -74,12 +74,12 @@ getHead
   :: MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> GetObjectOpts -- ^
+  -> GetOpts -- ^
   -> m (Result [Object ()])
 getHead client key opts = liftIO $
   (fmap.fmap)
     (map (() <$) . Object.fromGetResp key)
-    (Interface.getObject (iface client) request)
+    (Interface.get (iface client) request)
   where
     request :: RpbGetReq
     request =
@@ -94,7 +94,7 @@ getIfModified
   :: MonadIO m
   => Client -- ^
   -> Object a -- ^
-  -> GetObjectOpts -- ^
+  -> GetOpts -- ^
   -> m (Result (IfModified [Object ByteString]))
 getIfModified client (Object { content = Content { key, vclock } }) opts = liftIO $
   (fmap.fmap)
@@ -102,7 +102,7 @@ getIfModified client (Object { content = Content { key, vclock } }) opts = liftI
       if response ^. L.unchanged
         then Unmodified
         else Modified (Object.fromGetResp key response))
-    (Interface.getObject (iface client) request)
+    (Interface.get (iface client) request)
 
   where
     request :: RpbGetReq
@@ -118,12 +118,12 @@ getHeadIfModified
   :: MonadIO m
   => Client -- ^
   -> Object a -- ^
-  -> GetObjectOpts -- ^
+  -> GetOpts -- ^
   -> m (Result (IfModified [Object ()]))
 getHeadIfModified client (Object { content = Content { key, vclock } }) opts = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getObject (iface client) request)
+    (Interface.get (iface client) request)
   where
     request :: RpbGetReq
     request =
@@ -137,7 +137,7 @@ getHeadIfModified client (Object { content = Content { key, vclock } }) opts = l
         then Unmodified
         else Modified ((() <$) <$> Object.fromGetResp key response)
 
-makeRpbGetReq :: Key -> GetObjectOpts -> RpbGetReq
+makeRpbGetReq :: Key -> GetOpts -> RpbGetReq
 makeRpbGetReq key opts =
   defMessage
     & L.bucket .~ (key ^. field @"bucket")
@@ -161,12 +161,12 @@ put ::
      MonadIO m
   => Client -- ^
   -> Content ByteString -- ^
-  -> PutObjectOpts -- ^
+  -> PutOpts -- ^
   -> m (Result Key)
 put client object opts = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.putObject (iface client) request)
+    (Interface.put (iface client) request)
   where
     request :: RpbPutReq
     request =
@@ -189,12 +189,12 @@ putGet ::
      MonadIO m
   => Client -- ^
   -> Content ByteString -- ^
-  -> PutObjectOpts -- ^
+  -> PutOpts -- ^
   -> m (Result (NonEmpty (Object ByteString)))
 putGet client object opts = liftIO $
   (fmap.fmap)
     (Object.fromPutResp key)
-    (Interface.putObject (iface client) request)
+    (Interface.put (iface client) request)
 
   where
     request :: RpbPutReq
@@ -214,12 +214,12 @@ putGetHead ::
      MonadIO m
   => Client -- ^
   -> Content ByteString -- ^
-  -> PutObjectOpts -- ^
+  -> PutOpts -- ^
   -> m (Result (NonEmpty (Object ())))
 putGetHead client object opts = liftIO $
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResp key)
-    (Interface.putObject (iface client) request)
+    (Interface.put (iface client) request)
 
   where
     request :: RpbPutReq
@@ -234,7 +234,7 @@ putGetHead client object opts = liftIO $
 makeRpbPutReq ::
      Key
   -> Content ByteString
-  -> PutObjectOpts
+  -> PutOpts
   -> RpbPutReq
 makeRpbPutReq (Key type' bucket key) content opts =
   defMessage

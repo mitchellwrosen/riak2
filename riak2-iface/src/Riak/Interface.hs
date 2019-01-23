@@ -3,19 +3,19 @@ module Riak.Interface
   , Interface.connect
   , Interface.disconnect
   , deleteIndex
-  , deleteObject
+  , delete
   , getBucketProps
   , getBucketTypeProps
   , getCrdt
   , getIndex
-  , getObject
+  , get
   , getSchema
   , getServerInfo
   , index
   , mapReduce
   , ping
   , putIndex
-  , putObject
+  , put
   , putSchema
   , resetBucketProps
   , search
@@ -125,11 +125,11 @@ deleteIndex
 deleteIndex =
   exchange
 
-deleteObject
+delete
   :: Interface -- ^
   -> RpbDelReq -- ^
   -> IO (Result RpbDelResp)
-deleteObject =
+delete =
   exchange
 
 getBucketProps
@@ -160,11 +160,11 @@ getIndex
 getIndex =
   exchange
 
-getObject
+get
   :: Interface -- ^
   -> RpbGetReq -- ^
   -> IO (Result RpbGetResp)
-getObject =
+get =
   exchange
 
 getSchema
@@ -193,11 +193,11 @@ putIndex
 putIndex =
   exchange
 
-putObject
+put
   :: Interface -- ^
   -> RpbPutReq -- ^
   -> IO (Result RpbPutResp)
-putObject =
+put =
   exchange
 
 putSchema

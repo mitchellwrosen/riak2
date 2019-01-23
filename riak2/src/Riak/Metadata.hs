@@ -6,6 +6,7 @@ import Riak.Internal.Prelude
 import Riak.Vtag             (Vtag)
 
 
+-- | Object metadata.
 data Metadata
   = Metadata
   { deleted :: Bool
