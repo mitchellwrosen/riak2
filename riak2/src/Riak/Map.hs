@@ -26,11 +26,14 @@ import qualified Data.HashSet        as HashSet
 
 
 -- | A map data type.
-data Map
+--
+-- A map is parameterized by the value contained within, so the same data
+-- structure can be used for reading and modifying.
+data Map a
   = Map
   { context :: !Context -- ^ Causal context
   , key :: !Key -- ^ Key
-  , value :: !Maps -- ^ Inner maps
+  , value :: !a -- ^
   } deriving stock (Generic, Show)
 
 data Maps
@@ -69,7 +72,7 @@ get ::
      MonadIO m
   => Client
   -> Key
-  -> m (Result Map)
+  -> m (Result (Map Maps))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -93,7 +96,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Map
+    fromResponse :: DtFetchResp -> Map Maps
     fromResponse response =
       Map
         { context = Context (response ^. L.context)
@@ -103,32 +106,23 @@ get client k@(Key type' bucket key) = liftIO $
 
 -- | Update a map.
 --
--- To update a map for the first time, use an empty causal context and empty key
--- component, like so:
+-- To update a map for the first time, use an empty causal context like so:
 --
 -- @
 -- Map
---   { context =
---       Riak.Context.none
---   , key =
---       Key
---         { type' = \"type\"
---         , bucket = \"bucket\"
---         , key = Riak.Key.none
---         }
---   , value =
---      mempty
+--   { context = Riak.Context.none
+--   , key = ...
+--   , value = ...
 --   }
 -- @
 --
--- But from then on, you must 'get' a map before you 'update' it.
+-- Otherwise, you must 'get' a map before you 'update' it.
 update ::
      MonadIO m
   => Client
-  -> Map
-  -> [Update]
-  -> m (Result Map)
-update client (Map { context, key }) updates = liftIO $
+  -> Map [Update]
+  -> m (Result (Map Maps))
+update client (Map { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt (iface client) request)
@@ -149,7 +143,7 @@ update client (Map { context, key }) updates = liftIO $
               else Just k)
         & L.op .~
             (defMessage
-              & L.mapOp .~ updatesToOp updates)
+              & L.mapOp .~ updatesToOp value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -164,7 +158,7 @@ update client (Map { context, key }) updates = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Map
+    fromResponse :: DtUpdateResp -> Map Maps
     fromResponse response =
       Map
         { context = Context (response ^. L.context)

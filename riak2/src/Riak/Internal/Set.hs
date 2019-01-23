@@ -14,13 +14,18 @@ import qualified Data.ByteString as ByteString
 import qualified Data.HashSet    as HashSet
 
 
-data Set
+-- | A set data type.
+--
+-- A set is parameterized by the value contained within, so the same data
+-- structure can be used for reading and modifying.
+data Set a
   = Set
   { context :: !Context
   , key :: !Key
-  , value :: !(HashSet ByteString)
+  , value :: !a
   } deriving stock (Generic, Show)
 
+-- | A set update.
 data Update
   = Add ByteString
   | Remove ByteString
@@ -31,7 +36,7 @@ get ::
      MonadIO m
   => Client
   -> Key
-  -> m (Result Set)
+  -> m (Result (Set (HashSet ByteString)))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -55,7 +60,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Set
+    fromResponse :: DtFetchResp -> Set (HashSet ByteString)
     fromResponse response =
       Set
         { context = Context (response ^. L.context)
@@ -65,32 +70,23 @@ get client k@(Key type' bucket key) = liftIO $
 
 -- | Update a set.
 --
--- To update a set for the first time, use an empty causal context and empty key
--- component, like so:
+-- To update a set for the first time, use an empty causal context like so:
 --
 -- @
 -- Set
---   { context =
---       Riak.Context.none
---   , key =
---       Key
---         { type' = \"type\"
---         , bucket = \"bucket\"
---         , key = Riak.Key.none
---         }
---   , value =
---      mempty
+--   { context = Riak.Context.none
+--   , key = ...
+--   , value = ...
 --   }
 -- @
 --
--- But from then on, you must 'get' a map before you 'update' it.
+-- Otherwise, you must 'get' a set before you 'update' it.
 update ::
      MonadIO m
   => Client
-  -> Set
-  -> [Update]
-  -> m (Result Set)
-update client (Set { context, key }) updates = liftIO $
+  -> Set [Update]
+  -> m (Result (Set (HashSet ByteString)))
+update client (Set { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt (iface client) request)
@@ -111,7 +107,7 @@ update client (Set { context, key }) updates = liftIO $
               else Just k)
         & L.op .~
             (defMessage
-              & L.setOp .~ updatesToOp updates)
+              & L.setOp .~ updatesToOp value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -126,7 +122,7 @@ update client (Set { context, key }) updates = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Set
+    fromResponse :: DtUpdateResp -> Set (HashSet ByteString)
     fromResponse response =
       Set
         { context = Context (response ^. L.context)

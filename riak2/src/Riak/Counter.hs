@@ -18,6 +18,9 @@ import qualified Data.ByteString as ByteString
 
 
 -- | A counter data type.
+--
+-- Unlike other data types, a counter is _not_ parameterized by a type variable,
+-- because reading and modifying a counter both carry an 'Int64'.
 data Counter
   = Counter
   { key :: !Key
