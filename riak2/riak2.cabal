@@ -105,6 +105,7 @@ library riak2-indef
     Riak.Object
     Riak.Opts
     Riak.Quorum
+    Riak.Set
 
     ZZZ.Erlang
     ZZZ.Riak
