@@ -1,38 +1,37 @@
-module Riak.Counter
-  ( Counter(..)
+module Riak.HyperLogLog
+  ( HyperLogLog(..)
   , get
   , update
   ) where
 
-import Riak.Interface        (Result(..))
+import Riak.Interface        (Result)
 import Riak.Internal.Client  (Client(..))
 import Riak.Internal.Prelude
-import Riak.Key              (Key)
 import Riak.Key              (Key(..))
 import Riak.Proto
 
-import qualified Riak.Interface  as Interface
-import qualified Riak.Proto.Lens as L
+import qualified Riak.Interface    as Interface
+import qualified Riak.Proto.Lens   as L
 
-import qualified Data.ByteString as ByteString
+import qualified Data.ByteString     as ByteString
 
 
--- | A counter data type.
+-- | A HyperLogLog data type.
 --
--- Unlike other data types, a counter is _not_ parameterized by a type variable,
--- because reading and modifying a counter both carry an 'Int64'.
-data Counter
-  = Counter
+-- A HyperLogLog is parameterized by the value contained within, so the same
+-- data structure can be used for reading and modifying.
+data HyperLogLog a
+  = HyperLogLog
   { key :: !Key
-  , value :: !Int64
-  } deriving stock (Generic, Show)
+  , value :: !a
+  } deriving stock (Functor, Generic, Show)
 
--- | Get a counter.
+-- | Get a HyperLogLog.
 get ::
      MonadIO m
-  => Client -- ^
-  -> Key -- ^
-  -> m (Result Counter)
+  => Client
+  -> Key
+  -> m (Result (HyperLogLog Word64))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -46,7 +45,7 @@ get client k@(Key type' bucket key) = liftIO $
         & L.key .~ key
         & L.type' .~ type'
 
-        -- TODO get counter opts
+        -- TODO get hll opts
         -- & L.maybe'basicQuorum .~ undefined
         -- & L.maybe'nVal .~ undefined
         -- & L.maybe'notfoundOk .~ undefined
@@ -55,30 +54,20 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Counter
+    fromResponse :: DtFetchResp -> HyperLogLog Word64
     fromResponse response =
-      Counter
+      HyperLogLog
         { key = k
-        , value = response ^. L.value . L.counterValue
+        , value = response ^. L.value . L.hllValue
         }
 
--- | Update a counter.
---
--- Note that counters, unlike other data types, represent their own update
--- operation. Furthermore, counters do not contain a causal context.
---
--- So to increment a counter at key __@K@__ by value __@N@__, you need not fetch
--- it first. Rather, just perform:
---
--- @
--- 'update' client 'Counter' { key = K, value = N }
--- @
+-- | Update a HyperLogLog.
 update ::
      MonadIO m
   => Client
-  -> Counter
-  -> m (Result Counter)
-update client (Counter { key, value }) = liftIO $
+  -> HyperLogLog [ByteString]
+  -> m (Result (HyperLogLog Word64))
+update client (HyperLogLog { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt (iface client) request)
@@ -94,29 +83,29 @@ update client (Counter { key, value }) = liftIO $
               else Just k)
         & L.op .~
             (defMessage
-              & L.counterOp .~
+              & L.hllOp .~
                   (defMessage
-                    & L.increment .~ value))
+                    & L.adds .~ value))
         & L.returnBody .~ True
         & L.type' .~ type'
--- TODO counter update opts
+
+-- TODO map update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'dw :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'pw :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'timeout :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
--- _DtUpdateReq'includeContext :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Counter
+    fromResponse :: DtUpdateResp -> HyperLogLog Word64
     fromResponse response =
-      Counter
+      HyperLogLog
         { key =
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = response ^. L.counterValue
+        , value = response ^. L.hllValue
         }

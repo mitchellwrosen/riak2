@@ -34,7 +34,7 @@ data Map a
   { context :: !Context -- ^ Causal context
   , key :: !Key -- ^ Key
   , value :: !a -- ^
-  } deriving stock (Generic, Show)
+  } deriving stock (Functor, Generic, Show)
 
 data Maps
   = Maps
@@ -106,11 +106,11 @@ get client k@(Key type' bucket key) = liftIO $
 
 -- | Update a map.
 --
--- To update a map for the first time, use an empty causal context like so:
+-- To update a map for the first time, use an empty causal context:
 --
 -- @
--- Map
---   { context = Riak.Context.none
+-- 'Map'
+--   { context = Riak.Context.'Riak.Context.none'
 --   , key = ...
 --   , value = ...
 --   }

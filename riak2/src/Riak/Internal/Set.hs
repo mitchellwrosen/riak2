@@ -23,7 +23,7 @@ data Set a
   { context :: !Context
   , key :: !Key
   , value :: !a
-  } deriving stock (Generic, Show)
+  } deriving stock (Functor, Generic, Show)
 
 -- | A set update.
 data Update
@@ -70,11 +70,11 @@ get client k@(Key type' bucket key) = liftIO $
 
 -- | Update a set.
 --
--- To update a set for the first time, use an empty causal context like so:
+-- To update a set for the first time, use an empty causal context:
 --
 -- @
--- Set
---   { context = Riak.Context.none
+-- 'Set'
+--   { context = Riak.Context.'Riak.Context.none'
 --   , key = ...
 --   , value = ...
 --   }

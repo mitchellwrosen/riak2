@@ -99,6 +99,7 @@ library riak2-indef
     Riak.Content
     Riak.Context
     Riak.Counter
+    Riak.HyperLogLog
     Riak.Index
     Riak.Key
     Riak.Map

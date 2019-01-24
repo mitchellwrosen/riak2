@@ -5,7 +5,8 @@ module Riak.Metadata
 import Riak.Internal.Prelude
 
 
--- | Object metadata.
+-- | Object metadata. This is data that is provided when reading an object, but
+-- not when writing.
 data Metadata
   = Metadata
   { deleted :: Bool

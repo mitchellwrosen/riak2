@@ -6,6 +6,8 @@ import Riak.Internal.Prelude
 import Riak.Key              (Key)
 
 
+-- | Object content. This is data that is provided when reading and writing an
+-- object.
 data Content a
   = Content
   { charset :: Maybe ByteString -- ^ Charset.
