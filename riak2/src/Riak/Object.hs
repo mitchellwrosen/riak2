@@ -142,7 +142,6 @@ makeGetRequest key opts =
     & L.maybe'notfoundOk .~ defTrue (notfoundOk opts)
     & L.maybe'pr .~ Quorum.toWord32 (pr opts)
     & L.maybe'r .~ Quorum.toWord32 (r opts)
-    -- TODO Doesn't sloppy quorum default to true...?
     & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
     & L.maybe'timeout .~ (opts ^. field @"timeout")
     & L.type' .~ key ^. field @"type'"

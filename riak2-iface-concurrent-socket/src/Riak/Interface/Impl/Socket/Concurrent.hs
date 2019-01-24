@@ -8,7 +8,8 @@ module Riak.Interface.Impl.Socket.Concurrent
   , stream
   ) where
 
-import Riak.Message (Message)
+import Riak.Request  (Request)
+import Riak.Response (Response)
 
 import Riak.Interface.Impl.Socket (EventHandlers(..))
 
@@ -48,8 +49,8 @@ disconnect =
 
 exchange ::
      Interface
-  -> Message
-  -> IO (Maybe Message)
+  -> Request
+  -> IO (Maybe Response)
 exchange iface request = do
   baton :: Baton <-
     synchronized (sync iface) $ do
@@ -61,8 +62,8 @@ exchange iface request = do
 
 stream ::
      Interface
-  -> Message
-  -> (IO (Maybe Message) -> IO r)
+  -> Request
+  -> (IO (Maybe Response) -> IO r)
   -> IO r
 stream iface request callback =
   -- Riak request handling state machine is odd. Streaming responses are

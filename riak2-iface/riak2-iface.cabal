@@ -13,10 +13,12 @@ library
     , riak2-proto
 
   default-extensions:
+    DeriveAnyClass
     DeriveFunctor
     DerivingStrategies
     LambdaCase
     ScopedTypeVariables
+    ViewPatterns
 
   default-language:
     Haskell2010

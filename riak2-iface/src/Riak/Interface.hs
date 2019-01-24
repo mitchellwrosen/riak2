@@ -28,91 +28,95 @@ module Riak.Interface
   ) where
 
 import Riak.Interface.Signature (Interface)
-import Riak.Message             (Message)
 import Riak.Proto
-import Riak.Request             (Request)
-import Riak.Response            (Response)
+import Riak.Request             (Request(..))
+import Riak.Response            (Response(..))
 
 import qualified Riak.Interface.Signature as Interface
 import qualified Riak.Proto.Lens          as L
 import qualified Riak.Request             as Request
 import qualified Riak.Response            as Response
 
-import Control.Exception      (throwIO)
+import Control.Exception      (Exception, throwIO)
 import Control.Foldl          (FoldM(..))
 import Control.Lens           (view, (^.))
 import Data.ProtoLens.Message (defMessage)
 
 
 data Result a
-  = RiakClosedConnection
+  = Success a
   | Failure ErrorResponse
-  | Success a
-  deriving stock (Eq, Functor, Show)
+  | ConnectionClosed
+  deriving stock (Functor, Show)
+
+data UnexpectedResponse
+  = UnexpectedResponse !Request !Response
+  deriving stock (Show)
+  deriving anyclass (Exception)
 
 exchange ::
-     forall a b.
-     (Request a, Response b)
-  => Interface
-  -> a
-  -> IO (Result b)
-exchange iface request =
-  Interface.exchange iface (Request.toMessage request) >>=
-    toResult
+     Interface
+  -> Request
+  -> (Response -> Maybe a)
+  -> IO (Result a)
+exchange conn request f =
+  Interface.exchange conn request >>= \case
+    Nothing ->
+      pure ConnectionClosed
+
+    Just (ResponseError response) ->
+      pure (Failure response)
+
+    Just response ->
+      case f response of
+        Nothing ->
+          throwIO (UnexpectedResponse request response)
+
+        Just response' ->
+          pure (Success response')
 
 stream ::
-     forall a b r.
-     (Request a, Response b)
-  => Interface
-  -> a -- ^ Request
-  -> (b -> Bool) -- ^ Done?
-  -> FoldM IO b r -- ^ Fold responses
+     forall a r.
+     Interface
+  -> Request -- ^ Request
+  -> (Response -> Maybe a) -- ^ Correct response?
+  -> (a -> Bool) -- ^ Done?
+  -> FoldM IO a r -- ^ Fold responses
   -> IO (Result r)
-stream iface request done (FoldM step initial extract) =
+stream iface request f done (FoldM step initial extract) =
   Interface.stream
     iface
-    (Request.toMessage request)
+    request
     callback
 
   where
-    callback :: IO (Maybe Message) -> IO (Result r)
+    callback :: IO (Maybe Response) -> IO (Result r)
     callback recv =
       loop =<< initial
 
       where
         loop value =
-          recv >>= toResult >>= \case
-            RiakClosedConnection ->
-              pure RiakClosedConnection
+          recv >>= \case
+            Nothing ->
+              pure ConnectionClosed
 
-            Failure err ->
-              pure (Failure err)
+            Just (ResponseError response) ->
+              pure (Failure response)
 
-            Success message -> do
-              value' <-
-                step value message
+            Just response ->
+              case f response of
+                Nothing ->
+                  throwIO (UnexpectedResponse request response)
 
-              if done message
-                then
-                  Success <$> extract value'
-                else
-                  loop value'
+                Just response' -> do
+                  value' <-
+                    step value response'
 
-toResult :: Response a => Maybe Message -> IO (Result a)
-toResult = \case
-  Nothing ->
-    pure RiakClosedConnection
-
-  Just message ->
-    case Response.parse message of
-      Left err ->
-        throwIO err
-
-      Right (Left response) ->
-        pure (Failure response)
-
-      Right (Right response) ->
-        pure (Success response)
+                  if done response'
+                    then
+                      Success <$> extract value'
+                    else
+                      loop value'
 
 
 --------------------------------------------------------------------------------
@@ -130,29 +134,49 @@ delete
   :: Interface -- ^
   -> DeleteRequest -- ^
   -> IO (Result DeleteResponse)
-delete =
+delete conn request =
   exchange
+    conn
+    (RequestDelete request)
+    (\case
+      ResponseDelete response -> Just response
+      _ -> Nothing)
 
 getBucketProperties
   :: Interface -- ^
   -> GetBucketPropertiesRequest -- ^
   -> IO (Result GetBucketPropertiesResponse)
-getBucketProperties =
+getBucketProperties conn request =
   exchange
+    conn
+    (RequestGetBucketProperties request)
+    (\case
+      ResponseGetBucketProperties response -> Just response
+      _ -> Nothing)
 
 getBucketTypeProperties
   :: Interface -- ^
   -> GetBucketTypePropertiesRequest -- ^
   -> IO (Result GetBucketPropertiesResponse)
-getBucketTypeProperties =
+getBucketTypeProperties conn request =
   exchange
+    conn
+    (RequestGetBucketTypeProperties request)
+    (\case
+      ResponseGetBucketProperties response -> Just response
+      _ -> Nothing)
 
 getCrdt
   :: Interface -- ^
   -> GetCrdtRequest -- ^
   -> IO (Result GetCrdtResponse)
-getCrdt
-  = exchange
+getCrdt conn request =
+  exchange
+    conn
+    (RequestGetCrdt request)
+    (\case
+      ResponseGetCrdt response -> Just response
+      _ -> Nothing)
 
 -- getIndex
 --   :: Interface -- ^
@@ -165,8 +189,13 @@ get
   :: Interface -- ^
   -> GetRequest -- ^
   -> IO (Result GetResponse)
-get =
+get conn request =
   exchange
+    conn
+    (RequestGet request)
+    (\case
+      ResponseGet response -> Just response
+      _ -> Nothing)
 
 -- getSchema
 --   :: Interface -- ^
@@ -179,13 +208,23 @@ getServerInfo
   :: Interface -- ^
   -> IO (Result GetServerInfoResponse)
 getServerInfo conn =
-  exchange conn GetServerInfoRequest
+  exchange
+    conn
+    (RequestGetServerInfo defMessage)
+    (\case
+      ResponseGetServerInfo response -> Just response
+      _ -> Nothing)
 
 ping
   :: Interface -- ^
   -> IO (Result PingResponse)
 ping conn = do
-  exchange conn (defMessage :: PingRequest)
+  exchange
+    conn
+    (RequestPing defMessage)
+    (\case
+      ResponsePing response -> Just response
+      _ -> Nothing)
 
 -- putIndex
 --   :: Interface -- ^
@@ -198,8 +237,13 @@ put
   :: Interface -- ^
   -> PutRequest -- ^
   -> IO (Result PutResponse)
-put =
+put conn request =
   exchange
+    conn
+    (RequestPut request)
+    (\case
+      ResponsePut response -> Just response
+      _ -> Nothing)
 
 -- putSchema
 --   :: Interface -- ^
@@ -212,8 +256,13 @@ resetBucketProperties
   :: Interface -- ^
   -> ResetBucketPropertiesRequest -- ^
   -> IO (Result ResetBucketPropertiesResponse)
-resetBucketProperties =
+resetBucketProperties conn request =
   exchange
+    conn
+    (RequestResetBucketProperties request)
+    (\case
+      ResponseResetBucketProperties response -> Just response
+      _ -> Nothing)
 
 index
   :: Interface -- ^
@@ -221,7 +270,13 @@ index
   -> FoldM IO IndexResponse r -- ^
   -> IO (Result r)
 index conn request =
-  stream conn request (view L.done)
+  stream
+    conn
+    (RequestIndex request)
+    (\case
+      ResponseIndex response -> Just response
+      _ -> Nothing)
+    (view L.done)
 
 mapReduce
   :: Interface -- ^
@@ -229,7 +284,13 @@ mapReduce
   -> FoldM IO MapReduceResponse r -- ^
   -> IO (Result r)
 mapReduce conn request =
-  stream conn request (view L.done)
+  stream
+    conn
+    (RequestMapReduce request)
+    (\case
+      ResponseMapReduce response -> Just response
+      _ -> Nothing)
+    (view L.done)
 
 -- search
 --   :: Interface -- ^
@@ -242,15 +303,25 @@ setBucketProperties
   :: Interface -- ^
   -> SetBucketPropertiesRequest -- ^
   -> IO (Result SetBucketPropertiesResponse)
-setBucketProperties =
+setBucketProperties conn request =
   exchange
+    conn
+    (RequestSetBucketProperties request)
+    (\case
+      ResponseSetBucketProperties response -> Just response
+      _ -> Nothing)
 
 setBucketTypeProperties
   :: Interface -- ^
   -> SetBucketTypePropertiesRequest -- ^
   -> IO (Result SetBucketPropertiesResponse)
-setBucketTypeProperties =
+setBucketTypeProperties conn request =
   exchange
+    conn
+    (RequestSetBucketTypeProperties request)
+    (\case
+      ResponseSetBucketProperties response -> Just response
+      _ -> Nothing)
 
 streamBuckets
   :: Interface -- ^
@@ -258,7 +329,13 @@ streamBuckets
   -> FoldM IO StreamBucketsResponse r -- ^
   -> IO (Result r)
 streamBuckets conn request =
-  stream conn request (view L.done)
+  stream
+    conn
+    (RequestStreamBuckets request)
+    (\case
+      ResponseStreamBuckets response -> Just response
+      _ -> Nothing)
+    (view L.done)
 
 streamKeys
   :: Interface -- ^
@@ -266,11 +343,22 @@ streamKeys
   -> FoldM IO StreamKeysResponse r -- ^
   -> IO (Result r)
 streamKeys conn request =
-  stream conn request (view L.done)
+  stream
+    conn
+    (RequestStreamKeys request)
+    (\case
+      ResponseStreamKeys response -> Just response
+      _ -> Nothing)
+    (view L.done)
 
 updateCrdt
   :: Interface -- ^
   -> UpdateCrdtRequest -- ^
   -> IO (Result UpdateCrdtResponse)
-updateCrdt =
+updateCrdt conn request =
   exchange
+    conn
+    (RequestUpdateCrdt request)
+    (\case
+      ResponseUpdateCrdt response -> Just response
+      _ -> Nothing)

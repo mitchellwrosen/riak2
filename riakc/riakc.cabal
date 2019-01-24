@@ -8,6 +8,7 @@ executable riakc-new
   build-depends:
       base
     , bytestring
+    , data-default-class
     , generic-lens
     , lens
     , network

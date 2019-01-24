@@ -190,7 +190,7 @@ message GetCrdtRequest {
     // The identifier: bucket, key and bucket-type
     required bytes bucket = 1;
     required bytes key    = 2;
-    required bytes type  = 3;
+    required bytes type   = 3;
 
     // Request options
     optional uint32 r             =  4;
@@ -199,7 +199,7 @@ message GetCrdtRequest {
     optional bool   notfound_ok   =  7;
     optional uint32 timeout       =  8;
     optional bool   sloppy_quorum =  9;  // Experimental, may change/disappear
-    optional uint32 n         = 10;  // Experimental, may change/disappear
+    optional uint32 n             = 10;  // Experimental, may change/disappear
 
     // For read-only requests or context-free operations, you can set
     // this to false to reduce the size of the response payload.
@@ -301,7 +301,7 @@ message MapFieldUpdate {
         DISABLE = 2;
     }
 
-    required MapField  field       = 1;
+    required MapField  field        = 1;
 
     optional CounterUpdate counter  = 2;
     optional SetUpdate     set      = 3;
@@ -361,7 +361,7 @@ message UpdateCrdtRequest {
     optional bytes context = 4;
 
     // The operations
-    required CrdtUpdate  update = 5;
+    required CrdtUpdate update = 5;
 
     // Request options
     optional uint32 w               =  6;
@@ -370,7 +370,7 @@ message UpdateCrdtRequest {
     optional bool   return_body     =  9 [default=false];
     optional uint32 timeout         = 10;
     optional bool   sloppy_quorum   = 11;  // Experimental, may change/disappear
-    optional uint32 n           = 12;  // Experimental, may change/disappear
+    optional uint32 n               = 12;  // Experimental, may change/disappear
     optional bool   include_context = 13 [default=true]; // When return_body is true, should the context be returned too?
 }
 
@@ -395,55 +395,55 @@ message UpdateCrdtResponse {
 
 // Get Request - retrieve bucket/key
 message GetRequest {
-    required bytes bucket = 1;
-    required bytes key = 2;
-    optional uint32 r = 3;
-    optional uint32 pr = 4;
-    optional bool basic_quorum = 5;
-    optional bool notfound_ok = 6;
-    optional bytes if_modified = 7;     // fail if the supplied vclock does not match
-    optional bool head = 8;             // return everything but the value
+    required bytes bucket       = 1;
+    required bytes key          = 2;
+    optional uint32 r           = 3;
+    optional uint32 pr          = 4;
+    optional bool basic_quorum  = 5;
+    optional bool notfound_ok   = 6;
+    optional bytes if_modified  = 7;    // fail if the supplied vclock does not match
+    optional bool head          = 8;    // return everything but the value
     optional bool deletedvclock = 9;    // return the tombstone's vclock, if applicable
-    optional uint32 timeout = 10;
+    optional uint32 timeout     = 10;
     optional bool sloppy_quorum = 11;   // Experimental, may change/disappear
-    optional uint32 n = 12;             // Experimental, may change/disappear
-    optional bytes type = 13;           // Bucket type, if not set we assume the 'default' type
+    optional uint32 n           = 12;   // Experimental, may change/disappear
+    optional bytes type         = 13;   // Bucket type, if not set we assume the 'default' type
 }
 
 // Get Response - if the record was not found there will be no content/vclock
 message GetResponse {
     repeated Content content = 1;
-    optional bytes vclock = 2;        // the opaque vector clock for the object
-    optional bool unchanged = 3;
+    optional bytes vclock    = 2;       // the opaque vector clock for the object
+    optional bool unchanged  = 3;
 }
 
 
 // Put request - if options.return_body is set then the updated metadata/data for
 //               the key will be returned.
 message PutRequest {
-    required bytes bucket = 1;
-    optional bytes key = 2;
-    optional bytes vclock = 3;
-    required Content content = 4;
-    optional uint32 w = 5;
-    optional uint32 dw = 6;
-    optional bool return_body = 7;
-    optional uint32 pw = 8;
+    required bytes bucket         = 1;
+    optional bytes key            = 2;
+    optional bytes vclock         = 3;
+    required Content content      = 4;
+    optional uint32 w             = 5;
+    optional uint32 dw            = 6;
+    optional bool return_body     = 7;
+    optional uint32 pw            = 8;
     optional bool if_not_modified = 9;
-    optional bool if_none_match = 10;
-    optional bool return_head = 11;
-    optional uint32 timeout = 12;
-    optional bool asis = 13;
-    optional bool sloppy_quorum = 14; // Experimental, may change/disappear
-    optional uint32 n = 15;       // Experimental, may change/disappear
-    optional bytes type = 16;         // Bucket type, if not set we assume the 'default' type
+    optional bool if_none_match   = 10;
+    optional bool return_head     = 11;
+    optional uint32 timeout       = 12;
+    optional bool asis            = 13;
+    optional bool sloppy_quorum   = 14; // Experimental, may change/disappear
+    optional uint32 n             = 15; // Experimental, may change/disappear
+    optional bytes type           = 16; // Bucket type, if not set we assume the 'default' type
 }
 
 // Put response - same as get response with optional key if one was generated
 message PutResponse {
     repeated Content content = 1;
-    optional bytes vclock = 2;        // the opaque vector clock for the object
-    optional bytes key = 3;           // the key generated, if any
+    optional bytes vclock    = 2;        // the opaque vector clock for the object
+    optional bytes key       = 3;        // the key generated, if any
 }
 
 
@@ -842,4 +842,11 @@ message Link {
 /*   required RpbYokozunaSchema schema =  1; */
 /* } */
 
-message PingRequest { }
+message GetServerInfoRequest {}
+message PingRequest {}
+message DeleteResponse {}
+message EmptyPutResponse {}
+message PingResponse {}
+message ResetBucketPropertiesResponse {}
+message SetBucketPropertiesResponse {}
+message SetBucketTypePropertiesResponse {}

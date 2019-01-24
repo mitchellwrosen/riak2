@@ -10,11 +10,14 @@ module Riak.Interface.Impl.Socket
   , stream
   ) where
 
-import Riak.Message (Message)
+import Riak.Request  (Request)
+import Riak.Response (DecodeError, Response)
 
-import qualified Riak.Message as Message
+import qualified Riak.Request  as Request
+import qualified Riak.Response as Response
 
 import Control.Concurrent.MVar
+import Control.Exception       (throwIO)
 import Data.ByteString         (ByteString)
 import Data.IORef
 import Network.Socket          (HostName, PortNumber, SockAddr, Socket)
@@ -39,8 +42,8 @@ data EventHandlers
   = EventHandlers
   { onConnect :: IO ()
   , onDisconnect :: IO ()
-  , onSend :: Message -> IO ()
-  , onReceive :: Maybe Message -> IO ()
+  , onSend :: Request -> IO ()
+  , onReceive :: Maybe Response -> IO ()
   }
 
 new ::
@@ -84,31 +87,31 @@ disconnect iface = do
   Network.close (socket iface)
   writeIORef (bufferRef iface) ByteString.empty
 
-send :: Interface -> Message -> IO ()
-send iface message = do
-  onSend (handlers iface) message
-  Network.sendAll (socket iface) (Message.encode message)
+send :: Interface -> Request -> IO ()
+send iface request = do
+  onSend (handlers iface) request
+  Network.sendAll (socket iface) (Request.encode request)
 
-receive :: Interface -> IO (Maybe Message)
+receive :: Interface -> IO (Maybe Response)
 receive iface = do
   buffer <- readIORef (bufferRef iface)
 
-  result :: Maybe Message <-
+  result :: Maybe Response <-
     loop
       (if ByteString.null buffer
-        then Atto.Partial Message.parse
-        else Message.parse buffer)
+        then Atto.Partial Response.parse
+        else Response.parse buffer)
 
   onReceive (handlers iface) result
   pure result
 
   where
     loop ::
-         Atto.IResult ByteString Message
-      -> IO (Maybe Message)
+         Atto.IResult ByteString (Either DecodeError Response)
+      -> IO (Maybe Response)
     loop = \case
-      -- The message parser is just a 4-byte length followed by that many bytes,
-      -- so just assume that can only fail due to not enough bytes.
+      -- The response parser is just a 4-byte length followed by that many
+      -- bytes, so just assume that can only fail due to not enough bytes.
       Atto.Fail _unconsumed _context _reason ->
         pure Nothing
 
@@ -118,16 +121,21 @@ receive iface = do
         loop
           (if ByteString.null bytes
             then k ByteString.empty
-            else Message.parse bytes)
+            else Response.parse bytes)
 
-      Atto.Done unconsumed message -> do
-        writeIORef (bufferRef iface) unconsumed
-        pure (Just message)
+      Atto.Done unconsumed result ->
+        case result of
+          Left err ->
+            throwIO err
+
+          Right response -> do
+            writeIORef (bufferRef iface) unconsumed
+            pure (Just response)
 
 exchange ::
      Interface
-  -> Message
-  -> IO (Maybe Message)
+  -> Request
+  -> IO (Maybe Response)
 exchange iface request =
   withMVar (lock iface) $ \_ -> do
     send iface request
@@ -135,8 +143,8 @@ exchange iface request =
 
 stream ::
      Interface
-  -> Message
-  -> (IO (Maybe Message) -> IO r)
+  -> Request
+  -> (IO (Maybe Response) -> IO r)
   -> IO r
 stream iface request callback =
   withMVar (lock iface) $ \_ -> do

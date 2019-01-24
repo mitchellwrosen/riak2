@@ -1,6 +1,7 @@
 signature Riak.Interface.Signature where
 
-import Riak.Message (Message)
+import Riak.Request (Request)
+import Riak.Response (Response)
 
 data Interface
 
@@ -12,13 +13,19 @@ disconnect ::
      Interface
   -> IO ()
 
+-- | Send a request and receive the response.
+--
+-- /Throws/: 'Riak.Response.DecodeError' if the response fails to decode.
 exchange ::
      Interface
-  -> Message
-  -> IO (Maybe Message)
+  -> Request
+  -> IO (Maybe Response)
 
+-- | Send a request and stream the response.
+--
+-- /Throws/: 'Riak.Response.DecodeError' if the response fails to decode.
 stream ::
      Interface
-  -> Message
-  -> (IO (Maybe Message) -> IO r)
+  -> Request
+  -> (IO (Maybe Response) -> IO r)
   -> IO r

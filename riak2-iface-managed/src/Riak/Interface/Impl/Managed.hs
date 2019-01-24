@@ -31,7 +31,8 @@ module Riak.Interface.Impl.Managed
   , stream
   ) where
 
-import Riak.Message (Message)
+import Riak.Request  (Request)
+import Riak.Response (Response)
 
 import qualified Riak.Interface.Signature as Inner
 
@@ -133,13 +134,13 @@ waitForConnected statusVar = do
 
 exchange ::
      Interface
-  -> Message
-  -> IO (Maybe Message)
+  -> Request
+  -> IO (Maybe Response)
 exchange iface request =
   loop
 
   where
-    loop :: IO (Maybe Message)
+    loop :: IO (Maybe Response)
     loop = do
       waitForConnected (statusVar iface)
 
@@ -154,8 +155,8 @@ exchange iface request =
 stream ::
      forall r.
      Interface
-  -> Message
-  -> (IO (Maybe Message) -> IO r)
+  -> Request
+  -> (IO (Maybe Response) -> IO r)
   -> IO r
 stream iface request callback =
   loop

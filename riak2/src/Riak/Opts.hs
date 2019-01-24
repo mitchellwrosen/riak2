@@ -6,6 +6,8 @@ module Riak.Opts
 import Riak.Internal.Prelude
 import Riak.Quorum           (Quorum)
 
+import qualified Riak.Quorum as Quorum
+
 
 data GetOpts
   = GetOpts
@@ -15,8 +17,21 @@ data GetOpts
   , pr :: !Quorum
   , r :: !Quorum
   , sloppyQuorum :: !Bool
-  , timeout :: !(Maybe Word32)
+  , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   } deriving stock (Generic, Show)
+
+instance Default GetOpts where
+  def :: GetOpts
+  def =
+    GetOpts
+      { basicQuorum = False
+      , n = Quorum.Default
+      , notfoundOk = True
+      , pr = Quorum.Default
+      , r = Quorum.Default
+      , sloppyQuorum = False
+      , timeout = Nothing
+      }
 
 data PutOpts
   = PutOpts
@@ -24,6 +39,6 @@ data PutOpts
   , pw :: !Quorum
   , n :: !Quorum
   , sloppyQuorum :: !Bool
-  , timeout :: !(Maybe Word32)
+  , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   , w :: !Quorum
   } deriving stock (Generic, Show)

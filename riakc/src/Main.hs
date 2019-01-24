@@ -3,6 +3,7 @@ module Main where
 import Options.Applicative
 
 import Control.Lens               ((.~))
+import Data.Default.Class         (def)
 import Data.Function              ((&))
 import Data.Generics.Product      (field)
 import Data.List.Split            (splitOn)
@@ -16,6 +17,7 @@ import qualified Riak.Client
 import qualified Riak.Client                as Riak (Client)
 import qualified Riak.Interface.Impl.Socket as Riak.Interface
 import qualified Riak.Key                   as Riak (Key(..))
+import qualified Riak.Object
 
 main :: IO ()
 main = do
@@ -39,7 +41,7 @@ main = do
         , onReceive = \msg -> putStrLn ("<<< " ++ maybe "" show msg)
         }
 
-  -- Riak.Interface.connect iface
+  Riak.Interface.connect iface
 
   run (Riak.Client.new iface)
 
@@ -75,8 +77,8 @@ getParser =
     <$> argument (eitherReader parseKey) keyMod
   where
     doGet :: Riak.Key -> Riak.Client -> IO ()
-    doGet key client = do
-      print key
+    doGet key client =
+      Riak.Object.get client key def >>= print
 
 parseKey :: String -> Either String Riak.Key
 parseKey string =

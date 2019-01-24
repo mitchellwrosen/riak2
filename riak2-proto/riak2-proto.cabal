@@ -30,15 +30,17 @@ library
     DeriveAnyClass
     DerivingStrategies
     GeneralizedNewtypeDeriving
+    InstanceSigs
+    LambdaCase
     OverloadedLabels
     ScopedTypeVariables
+    TupleSections
     TypeApplications
 
   default-language:
     Haskell2010
 
   exposed-modules:
-    Riak.Message
     Riak.Proto
     Riak.Proto.Lens
     Riak.Request
