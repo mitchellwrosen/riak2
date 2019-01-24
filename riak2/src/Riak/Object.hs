@@ -23,14 +23,14 @@ import Riak.Internal.Object  (Object(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Opts             (GetOpts(..), PutOpts(..))
-import Riak.Proto
 
-import qualified Riak.Interface       as Interface
-import qualified Riak.Internal.Index  as Index
-import qualified Riak.Internal.Object as Object
-import qualified Riak.Internal.Pair   as Pair
-import qualified Riak.Internal.Quorum as Quorum
-import qualified Riak.Proto.Lens      as L
+import qualified Riak.Interface           as Interface
+import qualified Riak.Internal.Index      as Index
+import qualified Riak.Internal.Object     as Object
+import qualified Riak.Internal.Proto.Pair as Proto.Pair
+import qualified Riak.Internal.Quorum     as Quorum
+import qualified Riak.Proto               as Proto
+import qualified Riak.Proto.Lens          as L
 
 import qualified Data.ByteString as ByteString
 
@@ -51,13 +51,13 @@ get
   -> m (Result [Object ByteString])
 get client key opts = liftIO $
   (fmap.fmap)
-    (Object.fromGetResp key)
+    (Object.fromGetResponse key)
     (Interface.get (iface client) request)
 
   where
-    request :: RpbGetReq
+    request :: Proto.GetRequest
     request =
-      makeRpbGetReq key opts
+      makeGetRequest key opts
 
 -- | Get an object's metadata.
 --
@@ -71,12 +71,12 @@ getHead
   -> m (Result [Object ()])
 getHead client key opts = liftIO $
   (fmap.fmap)
-    (map (() <$) . Object.fromGetResp key)
+    (map (() <$) . Object.fromGetResponse key)
     (Interface.get (iface client) request)
   where
-    request :: RpbGetReq
+    request :: Proto.GetRequest
     request =
-      makeRpbGetReq key opts
+      makeGetRequest key opts
         & L.head .~ True
 
 -- | Get an object if it has been modified since the given version.
@@ -94,13 +94,13 @@ getIfModified client (Content { key, context }) opts = liftIO $
     (\response ->
       if response ^. L.unchanged
         then Unmodified
-        else Modified (Object.fromGetResp key response))
+        else Modified (Object.fromGetResponse key response))
     (Interface.get (iface client) request)
 
   where
-    request :: RpbGetReq
+    request :: Proto.GetRequest
     request =
-      makeRpbGetReq key opts
+      makeGetRequest key opts
         & L.ifModified .~ unContext context
 
 -- | Get an object's metadata if it has been modified since the given version.
@@ -118,27 +118,27 @@ getHeadIfModified client (Content { key, context }) opts = liftIO $
     fromResponse
     (Interface.get (iface client) request)
   where
-    request :: RpbGetReq
+    request :: Proto.GetRequest
     request =
-      makeRpbGetReq key opts
+      makeGetRequest key opts
         & L.head .~ True
         & L.ifModified .~ unContext context
 
-    fromResponse :: RpbGetResp -> IfModified [Object ()]
+    fromResponse :: Proto.GetResponse -> IfModified [Object ()]
     fromResponse response =
       if response ^. L.unchanged
         then Unmodified
-        else Modified ((() <$) <$> Object.fromGetResp key response)
+        else Modified ((() <$) <$> Object.fromGetResponse key response)
 
-makeRpbGetReq :: Key -> GetOpts -> RpbGetReq
-makeRpbGetReq key opts =
+makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
+makeGetRequest key opts =
   defMessage
     & L.bucket .~ (key ^. field @"bucket")
     & L.deletedvclock .~ True
     & L.head .~ True
     & L.key .~ (key ^. field @"key")
     & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
-    & L.maybe'nVal .~ Quorum.toWord32 (opts ^. field @"n")
+    & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
     & L.maybe'notfoundOk .~ defTrue (notfoundOk opts)
     & L.maybe'pr .~ Quorum.toWord32 (pr opts)
     & L.maybe'r .~ Quorum.toWord32 (r opts)
@@ -162,14 +162,14 @@ put client content opts = liftIO $
     fromResponse
     (Interface.put (iface client) request)
   where
-    request :: RpbPutReq
+    request :: Proto.PutRequest
     request =
-      makeRpbPutReq key content opts
+      makePutRequest key content opts
 
     key@(Key _ _ k) =
       content ^. field @"key"
 
-    fromResponse :: RpbPutResp -> Key
+    fromResponse :: Proto.PutResponse -> Key
     fromResponse response =
       if ByteString.null k
         then key { key = response ^. L.key }
@@ -187,13 +187,13 @@ putGet ::
   -> m (Result (NonEmpty (Object ByteString)))
 putGet client content opts = liftIO $
   (fmap.fmap)
-    (Object.fromPutResp key)
+    (Object.fromPutResponse key)
     (Interface.put (iface client) request)
 
   where
-    request :: RpbPutReq
+    request :: Proto.PutRequest
     request =
-      makeRpbPutReq key content opts
+      makePutRequest key content opts
         & L.returnBody .~ True
 
     key :: Key
@@ -212,25 +212,25 @@ putGetHead ::
   -> m (Result (NonEmpty (Object ())))
 putGetHead client content opts = liftIO $
   (fmap.fmap)
-    (fmap (() <$) . Object.fromPutResp key)
+    (fmap (() <$) . Object.fromPutResponse key)
     (Interface.put (iface client) request)
 
   where
-    request :: RpbPutReq
+    request :: Proto.PutRequest
     request =
-      makeRpbPutReq key content opts
+      makePutRequest key content opts
         & L.returnHead .~ True
 
     key :: Key
     key =
       content ^. field @"key"
 
-makeRpbPutReq ::
+makePutRequest ::
      Key
   -> Content ByteString
   -> PutOpts
-  -> RpbPutReq
-makeRpbPutReq (Key type' bucket key) content opts =
+  -> Proto.PutRequest
+makePutRequest (Key type' bucket key) content opts =
   defMessage
     & L.bucket .~ bucket
     & L.content .~
@@ -239,7 +239,7 @@ makeRpbPutReq (Key type' bucket key) content opts =
           & L.maybe'charset .~ (content ^. field @"charset")
           & L.maybe'contentEncoding .~ (content ^. field @"encoding")
           & L.maybe'contentType .~ (content ^. field @"type'")
-          & L.usermeta .~ map Pair.fromTuple (content ^. field @"metadata")
+          & L.usermeta .~ map Proto.Pair.fromTuple (content ^. field @"metadata")
           & L.value .~ (content ^. field @"value")
         )
     & L.maybe'dw .~ Quorum.toWord32 (dw opts)
@@ -247,7 +247,7 @@ makeRpbPutReq (Key type' bucket key) content opts =
         (if ByteString.null key
           then Nothing
           else Just key)
-    & L.maybe'nVal .~ Quorum.toWord32 (opts ^. field @"n")
+    & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
     & L.maybe'pw .~ Quorum.toWord32 (pw opts)
     & L.maybe'vclock .~
         (let
@@ -270,18 +270,18 @@ delete ::
   -> m (Result ())
 delete client content = liftIO $
   (fmap.fmap)
-    (\RpbDelResp -> ())
+    (const ())
     (Interface.delete (iface client) request)
 
   where
-    request :: RpbDelReq
+    request :: Proto.DeleteRequest
     request =
       defMessage
         & L.bucket .~ bucket
         & L.key .~ key
         -- TODO delete opts
         -- & L.maybe'dw .~ undefined
-        -- & L.maybe'nVal .~ undefined
+        -- & L.maybe'n .~ undefined
         -- & L.maybe'pr .~ undefined
         -- & L.maybe'pw .~ undefined
         -- & L.maybe'r .~ undefined

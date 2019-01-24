@@ -5,3 +5,4 @@ packages:
   , riak2-iface-managed
   , riak2-iface-socket
   , riak2-proto
+  , riakc

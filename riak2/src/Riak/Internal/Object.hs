@@ -1,7 +1,7 @@
 module Riak.Internal.Object
   ( Object(..)
-  , fromGetResp
-  , fromPutResp
+  , fromGetResponse
+  , fromPutResponse
   ) where
 
 import Riak.Content          (Content(..))
@@ -9,10 +9,10 @@ import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Metadata         (Metadata(..))
-import Riak.Proto
 
 import qualified Riak.Internal.Index         as Index
 import qualified Riak.Internal.Proto.Content as Proto.Content
+import qualified Riak.Proto                  as Proto
 import qualified Riak.Proto.Lens             as L
 
 import qualified Data.ByteString    as ByteString
@@ -28,7 +28,7 @@ data Object a
 fromProtoContent ::
      Key
   -> ByteString
-  -> RpbContent
+  -> Proto.Content
   -> Object ByteString
 fromProtoContent key context proto =
   Object
@@ -51,16 +51,16 @@ fromProtoContent key context proto =
           }
     }
 
-fromGetResp :: Key -> RpbGetResp -> [Object ByteString]
-fromGetResp key response =
+fromGetResponse :: Key -> Proto.GetResponse -> [Object ByteString]
+fromGetResponse key response =
   fromProtoContent key (response ^. L.vclock) <$>
     response ^. L.content
 
 -- | Parse an object from a put response.
 --
 -- Assumes that either @return_body@ or @return_head@ was set on the request.
-fromPutResp :: Key -> RpbPutResp -> NonEmpty (Object ByteString)
-fromPutResp k@(Key type' bucket key) response =
+fromPutResponse :: Key -> Proto.PutResponse -> NonEmpty (Object ByteString)
+fromPutResponse k@(Key type' bucket key) response =
   List1.fromList
     (fromProtoContent key' (response ^. L.vclock) <$>
       response ^. L.content)

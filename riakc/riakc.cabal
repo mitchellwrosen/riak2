@@ -1,0 +1,40 @@
+cabal-version: 2.2
+
+name: riakc
+version: 0.1.0
+build-type: Simple
+
+executable riakc-new
+  build-depends:
+      base
+    , bytestring
+    , generic-lens
+    , lens
+    , network
+    , optparse-applicative
+    , riak2
+    , riak2-iface-socket
+    , split
+
+  default-extensions:
+    DataKinds
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
+    TypeApplications
+
+  default-language:
+    Haskell2010
+
+  ghc-options:
+    -Wall
+
+  hs-source-dirs:
+    src
+
+  main-is:
+    Main.hs
+
+  mixins:
+    riak2 requires
+      (Riak.Interface.Signature as Riak.Interface.Impl.Socket)

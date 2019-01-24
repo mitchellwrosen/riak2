@@ -6,21 +6,6 @@ build-type: Simple
 
 library
   build-depends:
-      riak2-indef
-    , riak2-iface-managed
-    , riak2-iface-socket
-
-  default-language:
-    Haskell2010
-
-  mixins:
-    riak2-indef requires
-      (Riak.Interface.Signature as Riak.Interface.Impl.Managed),
-    riak2-iface-managed requires
-      (Riak.Interface.Signature as Riak.Interface.Impl.Socket)
-
-library riak2-indef
-  build-depends:
       aeson ^>= 1.4.0
     , attoparsec ^>= 0.13.2
     , base ^>= 4.11.1 || ^>= 4.12.0
@@ -148,29 +133,8 @@ library riak2-indef
     Riak.Internal.Set
     Riak.Internal.Utils
 
--- executable riakc
---   build-depends:
---       base
---     , base64-bytestring
---     , bytestring
---     , foldl
---     , lens-family
---     , microcli
---     , network
---     , riak-but-better
---     , utf8-string
---     , text
---     , unordered-containers
---   buildable:
---     True
---   default-language:
---     Haskell2010
---   ghc-options:
---     -Wall
---   hs-source-dirs:
---     app
---   main-is:
---     Main.hs
+  reexported-modules:
+    Riak.Interface
 
 -- test-suite tests
 --   build-depends:

@@ -55,7 +55,7 @@ get client k@(Key type' bucket key) = liftIO $
     fromResponse response =
       HyperLogLog
         { key = k
-        , value = response ^. L.value . L.hllValue
+        , value = response ^. L.value . L.hll
         }
 
 -- | Update a HyperLogLog.

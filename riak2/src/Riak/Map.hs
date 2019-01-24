@@ -76,7 +76,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: DtFetchReq
+    request :: GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -92,12 +92,12 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Map Maps
+    fromResponse :: GetCrdtResponse -> Map Maps
     fromResponse response =
       Map
         { context = Context (response ^. L.context)
         , key = k
-        , value = mapEntriesToMaps (response ^. L.value . L.mapValue)
+        , value = mapEntriesToMaps (response ^. L.value . L.map)
         }
 
 -- | Update a map.
@@ -124,7 +124,7 @@ update client (Map { context, key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: DtUpdateReq
+    request :: UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -136,9 +136,9 @@ update client (Map { context, key, value }) = liftIO $
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.op .~
+        & L.update .~
             (defMessage
-              & L.mapOp .~ updatesToOp value)
+              & L.map .~ updatesToMapUpdate value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -153,7 +153,7 @@ update client (Map { context, key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Map Maps
+    fromResponse :: UpdateCrdtResponse -> Map Maps
     fromResponse response =
       Map
         { context = Context (response ^. L.context)
@@ -161,7 +161,7 @@ update client (Map { context, key, value }) = liftIO $
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = mapEntriesToMaps (response ^. L.mapValue)
+        , value = mapEntriesToMaps (response ^. L.map)
         }
 
 mapEntriesToMaps :: [MapEntry] -> Maps
@@ -191,12 +191,12 @@ mapEntryToMaps entry =
     name =
       entry ^. L.field . L.name
 
-updatesToOp :: [Update] -> MapOp
-updatesToOp =
-  ($ defMessage) . appEndo . foldMap (coerce updateToEndoOp)
+updatesToMapUpdate :: [Update] -> MapUpdate
+updatesToMapUpdate =
+  ($ defMessage) . appEndo . foldMap (coerce updateToEndoMapUpdate)
 
-updateToEndoOp :: Update -> MapOp -> MapOp
-updateToEndoOp = \case
+updateToEndoMapUpdate :: Update -> MapUpdate -> MapUpdate
+updateToEndoMapUpdate = \case
   RemoveCounter name ->
     L.removes %~ (mapfield name MapField'COUNTER :)
 
@@ -214,54 +214,54 @@ updateToEndoOp = \case
 
   UpdateCounter name value ->
     let
-      update :: MapUpdate
+      update :: MapFieldUpdate
       update =
         defMessage
           & L.field .~ mapfield name MapField'COUNTER
-          & L.counterOp .~ (defMessage & L.increment .~ value)
+          & L.counter .~ (defMessage & L.increment .~ value)
     in
       L.updates %~ (update :)
 
   UpdateFlag name value ->
     let
-      update :: MapUpdate
+      update :: MapFieldUpdate
       update =
         defMessage
           & L.field .~ mapfield name MapField'FLAG
-          & L.flagOp .~
+          & L.flag .~
               case value of
-                False -> MapUpdate'DISABLE
-                True  -> MapUpdate'ENABLE
+                False -> MapFieldUpdate'DISABLE
+                True  -> MapFieldUpdate'ENABLE
     in
       L.updates %~ (update :)
 
   UpdateMap name value ->
     let
-      update :: MapUpdate
+      update :: MapFieldUpdate
       update =
         defMessage
           & L.field .~ mapfield name MapField'MAP
-          & L.mapOp .~ updatesToOp value
+          & L.map .~ updatesToMapUpdate value
     in
       L.updates %~ (update :)
 
   UpdateRegister name value ->
     let
-      update :: MapUpdate
+      update :: MapFieldUpdate
       update =
         defMessage
           & L.field .~ mapfield name MapField'REGISTER
-          & L.registerOp .~ value
+          & L.register .~ value
     in
       L.updates %~ (update :)
 
   UpdateSet name value ->
     let
-      update :: MapUpdate
+      update :: MapFieldUpdate
       update =
         defMessage
           & L.field .~ mapfield name MapField'SET
-          & L.setOp .~ Set.updatesToOp value
+          & L.set .~ Set.updatesToSetUpdate value
     in
       L.updates %~ (update :)
 

@@ -61,7 +61,7 @@ get client k@(Key type' bucket key) = liftIO $
       Set
         { context = Context (response ^. L.context)
         , key = k
-        , value = HashSet.fromList (response ^. L.value . L.setValue)
+        , value = HashSet.fromList (response ^. L.value . L.set)
         }
 
 -- | Update a set.
