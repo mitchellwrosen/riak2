@@ -40,11 +40,10 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: DtFetchReq
+    request :: GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
-        & L.includeContext .~ True
         & L.key .~ key
         & L.type' .~ type'
 
@@ -57,7 +56,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Set (HashSet ByteString)
+    fromResponse :: GetCrdtResponse -> Set (HashSet ByteString)
     fromResponse response =
       Set
         { context = Context (response ^. L.context)
@@ -89,11 +88,10 @@ update client (Set { context, key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: DtUpdateReq
+    request :: UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
-        & L.includeContext .~ True
         & L.maybe'context .~
             (if ByteString.null (unContext context)
               then Nothing
@@ -102,9 +100,9 @@ update client (Set { context, key, value }) = liftIO $
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.op .~
+        & L.update .~
             (defMessage
-              & L.setOp .~ updatesToOp value)
+              & L.set .~ updatesToSetUpdate value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -119,7 +117,7 @@ update client (Set { context, key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Set (HashSet ByteString)
+    fromResponse :: UpdateCrdtResponse -> Set (HashSet ByteString)
     fromResponse response =
       Set
         { context = Context (response ^. L.context)
@@ -127,11 +125,11 @@ update client (Set { context, key, value }) = liftIO $
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = HashSet.fromList (response ^. L.setValue)
+        , value = HashSet.fromList (response ^. L.set)
         }
 
-updatesToOp :: [Update] -> SetOp
-updatesToOp updates =
+updatesToSetUpdate :: [Update] -> SetUpdate
+updatesToSetUpdate updates =
   defMessage
     & L.adds .~ adds
     & L.removes .~ removes

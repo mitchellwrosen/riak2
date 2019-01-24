@@ -1,16 +1,16 @@
 module Riak.Internal.Proto.Content where
 
 import Riak.Internal.Prelude
-import Riak.Proto
 
-import qualified Riak.Internal.Pair as Pair
-import qualified Riak.Proto.Lens    as L
+import qualified Riak.Internal.Proto.Pair as Pair
+import qualified Riak.Proto               as Proto
+import qualified Riak.Proto.Lens          as L
 
 import Data.Time             (NominalDiffTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 
-lastModified :: RpbContent -> UTCTime
+lastModified :: Proto.Content -> UTCTime
 lastModified content =
   posixSecondsToUTCTime (seconds + microseconds)
 
@@ -23,6 +23,6 @@ lastModified content =
     microseconds =
       realToFrac (content ^. L.lastModUsecs) / 1000000
 
-metadata :: RpbContent -> [(ByteString, Maybe ByteString)]
+metadata :: Proto.Content -> [(ByteString, Maybe ByteString)]
 metadata content =
   map Pair.toTuple (content ^. L.usermeta)

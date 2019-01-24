@@ -35,7 +35,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: DtFetchReq
+    request :: GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -51,7 +51,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> HyperLogLog Word64
+    fromResponse :: GetCrdtResponse -> HyperLogLog Word64
     fromResponse response =
       HyperLogLog
         { key = k
@@ -70,7 +70,7 @@ update client (HyperLogLog { key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: DtUpdateReq
+    request :: UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -78,9 +78,9 @@ update client (HyperLogLog { key, value }) = liftIO $
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.op .~
+        & L.update .~
             (defMessage
-              & L.hllOp .~
+              & L.hll .~
                   (defMessage
                     & L.adds .~ value))
         & L.returnBody .~ True
@@ -97,12 +97,12 @@ update client (HyperLogLog { key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> HyperLogLog Word64
+    fromResponse :: UpdateCrdtResponse -> HyperLogLog Word64
     fromResponse response =
       HyperLogLog
         { key =
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = response ^. L.hllValue
+        , value = response ^. L.hll
         }

@@ -22,44 +22,41 @@ class Show a => Response a where
   default decode :: Proto.Message a => ByteString -> Either String a
   decode = Proto.decodeMessage
 
-instance Response DtFetchResp              where code = 81
-instance Response DtUpdateResp             where code = 83
-instance Response RpbErrorResp             where code =  0
-instance Response RpbGetBucketResp         where code = 20
-instance Response RpbGetResp               where code = 10
-instance Response RpbGetServerInfoResp     where code =  8
-instance Response RpbIndexResp             where code = 26
-instance Response RpbListBucketsResp       where code = 16
-instance Response RpbListKeysResp          where code = 18
-instance Response RpbMapRedResp            where code = 24
-instance Response RpbPutResp               where code = 12
-instance Response RpbSearchQueryResp       where code = 28
-instance Response RpbYokozunaIndexGetResp  where code = 55
-instance Response RpbYokozunaSchemaGetResp where code = 59
+instance Response ErrorResponse               where code =  0
+instance Response GetBucketPropertiesResponse where code = 20
+instance Response GetCrdtResponse             where code = 81
+instance Response GetResponse                 where code = 10
+instance Response GetServerInfoResponse       where code =  8
+instance Response IndexResponse               where code = 26
+instance Response MapReduceResponse           where code = 24
+instance Response PutResponse                 where code = 12
+instance Response StreamBucketsResponse       where code = 16
+instance Response StreamKeysResponse          where code = 18
+instance Response UpdateCrdtResponse          where code = 83
 
-instance Response RpbDelResp where
+-- instance Response RpbSearchQueryResp       where code = 28
+-- instance Response RpbYokozunaIndexGetResp  where code = 55
+-- instance Response RpbYokozunaSchemaGetResp where code = 59
+
+instance Response DeleteResponse where
   code = 14
-  decode _ = Right RpbDelResp
+  decode _ = Right DeleteResponse
 
-instance Response RpbEmptyPutResp where
+instance Response EmptyPutResponse where
   code = 12
-  decode _ = Right RpbEmptyPutResp
+  decode _ = Right EmptyPutResponse
 
-instance Response RpbPingResp where
+instance Response PingResponse where
   code = 2
-  decode _ = Right RpbPingResp
+  decode _ = Right PingResponse
 
-instance Response RpbResetBucketResp where
+instance Response ResetBucketPropertiesResponse where
   code = 30
-  decode _ = Right RpbResetBucketResp
+  decode _ = Right ResetBucketPropertiesResponse
 
-instance Response RpbSetBucketResp where
+instance Response SetBucketPropertiesResponse where
   code = 22
-  decode _ = Right RpbSetBucketResp
-
-instance Response RpbSetBucketTypeResp where
-  code = 32
-  decode _ = Right RpbSetBucketTypeResp
+  decode _ = Right SetBucketPropertiesResponse
 
 
 data ParseError
@@ -73,7 +70,7 @@ parse ::
      forall a.
      Response a
   => Message
-  -> Either ParseError (Either RpbErrorResp a)
+  -> Either ParseError (Either ErrorResponse a)
 parse message@(Message actual bytes)
   | actual == expected =
       case decode bytes of

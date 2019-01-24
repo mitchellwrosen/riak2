@@ -80,7 +80,6 @@ get client k@(Key type' bucket key) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
-        & L.includeContext .~ True
         & L.key .~ key
         & L.type' .~ type'
 
@@ -129,7 +128,6 @@ update client (Map { context, key, value }) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
-        & L.includeContext .~ True
         & L.maybe'context .~
             (if ByteString.null (unContext context)
               then Nothing

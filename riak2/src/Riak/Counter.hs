@@ -36,7 +36,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: DtFetchReq
+    request :: GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -52,11 +52,11 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: DtFetchResp -> Counter
+    fromResponse :: GetCrdtResponse -> Counter
     fromResponse response =
       Counter
         { key = k
-        , value = response ^. L.value . L.counterValue
+        , value = response ^. L.value . L.counter
         }
 
 -- | Update a counter.
@@ -81,7 +81,7 @@ update client (Counter { key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: DtUpdateReq
+    request :: UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -89,9 +89,9 @@ update client (Counter { key, value }) = liftIO $
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.op .~
+        & L.update .~
             (defMessage
-              & L.counterOp .~
+              & L.counter .~
                   (defMessage
                     & L.increment .~ value))
         & L.returnBody .~ True
@@ -102,18 +102,17 @@ update client (Counter { key, value }) = liftIO $
 -- _DtUpdateReq'pw :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'timeout :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
--- _DtUpdateReq'includeContext :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
     Key type' bucket k =
       key
 
-    fromResponse :: DtUpdateResp -> Counter
+    fromResponse :: UpdateCrdtResponse -> Counter
     fromResponse response =
       Counter
         { key =
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = response ^. L.counterValue
+        , value = response ^. L.counter
         }

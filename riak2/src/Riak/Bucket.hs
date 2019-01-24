@@ -29,19 +29,19 @@ get ::
      MonadIO m
   => Client
   -> Bucket
-  -> m (Result RpbBucketProps)
+  -> m (Result BucketProperties)
 get client (Bucket type' bucket) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getBucketProps (iface client) request)
+    (Interface.getBucketProperties (iface client) request)
 
   where
-    request :: RpbGetBucketReq
+    request :: GetBucketPropertiesRequest
     request =
       defMessage
         & L.bucket .~ bucket
         & L.type' .~ type'
 
-    fromResponse :: RpbGetBucketResp -> RpbBucketProps
+    fromResponse :: GetBucketPropertiesResponse -> BucketProperties
     fromResponse =
       view L.props

@@ -9,6 +9,7 @@ library
       base
     , foldl
     , lens
+    , proto-lens
     , riak2-proto
 
   default-extensions:

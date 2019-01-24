@@ -3,9 +3,9 @@ module Riak.Internal.Index where
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
 import Riak.Internal.Utils
-import Riak.Proto
+import Riak.Proto (Pair)
 
-import qualified Riak.Internal.Pair as Pair
+import qualified Riak.Internal.Proto.Pair as Pair
 
 import qualified Data.ByteString as ByteString
 
@@ -17,7 +17,7 @@ data Index
   | IndexBin !ByteString !ByteString
   deriving (Eq, Show)
 
-fromPair :: RpbPair -> Index
+fromPair :: Pair -> Index
 fromPair =
   Pair.toTuple >>> \case
     (ByteString.stripSuffix "_bin" -> Just k, Just v) ->
@@ -32,7 +32,7 @@ fromPair =
         , ("value", v)
         )
 
-toPair :: Index -> RpbPair
+toPair :: Index -> Pair
 toPair = \case
   IndexInt k v ->
     Pair.fromTuple (k <> "_int", Just (int2bs v))
