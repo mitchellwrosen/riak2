@@ -15,14 +15,11 @@ import qualified Data.HashSet    as HashSet
 
 
 -- | A set data type.
---
--- A set is parameterized by the value contained within, so the same data
--- structure can be used for reading and modifying.
 data Set a
   = Set
-  { context :: !Context
-  , key :: !Key
-  , value :: !a
+  { context :: !Context -- ^ Causal context
+  , key :: !Key -- ^
+  , value :: !a -- ^
   } deriving stock (Functor, Generic, Show)
 
 -- | A set update.
@@ -34,8 +31,8 @@ data Update
 -- | Get a set.
 get ::
      MonadIO m
-  => Client
-  -> Key
+  => Client -- ^
+  -> Key -- ^
   -> m (Result (Set (HashSet ByteString)))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
@@ -83,8 +80,8 @@ get client k@(Key type' bucket key) = liftIO $
 -- Otherwise, you must 'get' a set before you 'update' it.
 update ::
      MonadIO m
-  => Client
-  -> Set [Update]
+  => Client -- ^
+  -> Set [Update] -- ^
   -> m (Result (Set (HashSet ByteString)))
 update client (Set { context, key, value }) = liftIO $
   (fmap.fmap)

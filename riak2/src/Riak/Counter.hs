@@ -18,13 +18,10 @@ import qualified Data.ByteString as ByteString
 
 
 -- | A counter data type.
---
--- Unlike other data types, a counter is _not_ parameterized by a type variable,
--- because reading and modifying a counter both carry an 'Int64'.
 data Counter
   = Counter
-  { key :: !Key
-  , value :: !Int64
+  { key :: !Key -- ^
+  , value :: !Int64 -- ^
   } deriving stock (Generic, Show)
 
 -- | Get a counter.
@@ -75,8 +72,8 @@ get client k@(Key type' bucket key) = liftIO $
 -- @
 update ::
      MonadIO m
-  => Client
-  -> Counter
+  => Client -- ^
+  -> Counter -- ^
   -> m (Result Counter)
 update client (Counter { key, value }) = liftIO $
   (fmap.fmap)

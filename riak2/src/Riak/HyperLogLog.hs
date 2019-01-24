@@ -17,20 +17,17 @@ import qualified Data.ByteString     as ByteString
 
 
 -- | A HyperLogLog data type.
---
--- A HyperLogLog is parameterized by the value contained within, so the same
--- data structure can be used for reading and modifying.
 data HyperLogLog a
   = HyperLogLog
-  { key :: !Key
-  , value :: !a
+  { key :: !Key -- ^
+  , value :: !a -- ^
   } deriving stock (Functor, Generic, Show)
 
 -- | Get a HyperLogLog.
 get ::
      MonadIO m
-  => Client
-  -> Key
+  => Client -- ^
+  -> Key -- ^
   -> m (Result (HyperLogLog Word64))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
@@ -64,8 +61,8 @@ get client k@(Key type' bucket key) = liftIO $
 -- | Update a HyperLogLog.
 update ::
      MonadIO m
-  => Client
-  -> HyperLogLog [ByteString]
+  => Client -- ^
+  -> HyperLogLog [ByteString] -- ^
   -> m (Result (HyperLogLog Word64))
 update client (HyperLogLog { key, value }) = liftIO $
   (fmap.fmap)

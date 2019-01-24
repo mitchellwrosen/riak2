@@ -26,9 +26,6 @@ import qualified Data.HashSet        as HashSet
 
 
 -- | A map data type.
---
--- A map is parameterized by the value contained within, so the same data
--- structure can be used for reading and modifying.
 data Map a
   = Map
   { context :: !Context -- ^ Causal context
@@ -119,8 +116,8 @@ get client k@(Key type' bucket key) = liftIO $
 -- Otherwise, you must 'get' a map before you 'update' it.
 update ::
      MonadIO m
-  => Client
-  -> Map [Update]
+  => Client -- ^
+  -> Map [Update] -- ^
   -> m (Result (Map Maps))
 update client (Map { context, key, value }) = liftIO $
   (fmap.fmap)
