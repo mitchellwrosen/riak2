@@ -8,17 +8,15 @@ module Riak.Interface.Impl.Socket.Concurrent
   , stream
   ) where
 
-import Riak.Request  (Request)
-import Riak.Response (Response)
-
+import Control.Concurrent.MVar
+import Data.Coerce                (coerce)
 import Riak.Interface.Impl.Socket (EventHandlers(..))
+import Riak.Request               (Request)
+import Riak.Response              (Response)
+import Socket.Signature           (Socket)
+import UnliftIO.Exception         (finally)
 
 import qualified Riak.Interface.Impl.Socket as Inner
-
-import Control.Concurrent.MVar
-import Data.Coerce             (coerce)
-import Network.Socket          (HostName, PortNumber, SockAddr)
-import UnliftIO.Exception      (finally)
 
 
 data Interface
@@ -29,13 +27,12 @@ data Interface
   }
 
 new ::
-     HostName
-  -> PortNumber
+     Socket
   -> EventHandlers
   -> IO Interface
-new host port handlers =
+new socket handlers =
   Interface
-    <$> Inner.new host port handlers
+    <$> Inner.new socket handlers
     <*> newSynchronized
     <*> newRelay
 

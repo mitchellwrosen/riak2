@@ -1,0 +1,26 @@
+cabal-version: 2.4
+
+name: socket-impl-network
+version: 0.1.0
+build-type: Simple
+
+library
+  build-depends:
+    base,
+    bytestring,
+    network
+
+  default-extensions:
+    ScopedTypeVariables
+
+  default-language:
+    Haskell2010
+
+  exposed-modules:
+    Socket.Impl.Network
+
+  hs-source-dirs:
+    src
+
+  reexported-modules:
+    Socket.Impl.Network as Socket.Signature

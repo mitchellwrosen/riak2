@@ -8,9 +8,9 @@ library
   build-depends:
       base
     , bytestring
-    , network
     , riak2-iface-socket
     , riak2-proto
+    , socket-sig
     , unliftio
 
   default-extensions:
@@ -28,3 +28,6 @@ library
 
   hs-source-dirs:
     src
+
+  reexported-modules:
+    Riak.Interface.Impl.Socket.Concurrent as Riak.Interface.Signature

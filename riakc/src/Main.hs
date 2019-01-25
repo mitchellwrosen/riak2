@@ -1,16 +1,15 @@
 module Main where
 
-import Options.Applicative
-
--- import Control.Lens               ((.~))
 import Data.Default.Class         (def)
--- import Data.Function              ((&))
--- import Data.Generics.Product      (field)
 import Data.List.Split            (splitOn)
-import Network.Socket             (HostName, PortNumber)
+import Options.Applicative
 import Riak.Interface             (Interface)
 import Riak.Interface.Impl.Socket (EventHandlers(..))
+import Socket.Impl.Network        (HostName, PortNumber, Socket)
 import Text.Read                  (readMaybe)
+-- import Data.Function              ((&))
+-- import Control.Lens               ((.~))
+-- import Data.Generics.Product      (field)
 
 import qualified Data.ByteString.Char8      as Latin1
 import qualified Riak.Client
@@ -18,6 +17,7 @@ import qualified Riak.Client                as Riak (Client)
 import qualified Riak.Interface.Impl.Socket as Riak.Interface
 import qualified Riak.Key                   as Riak (Key(..))
 import qualified Riak.Object
+import qualified Socket.Impl.Network        as Socket
 
 main :: IO ()
 main = do
@@ -30,10 +30,12 @@ main = do
           <*> commandParser)
         (progDesc "Riak command-line client")))
 
+  socket :: Socket <-
+    Socket.new host port
+
   iface :: Interface <-
     Riak.Interface.new
-      host
-      port
+      socket
       EventHandlers
         { onConnect = pure ()
         , onDisconnect = pure ()

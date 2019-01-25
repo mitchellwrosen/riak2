@@ -11,10 +11,10 @@ executable riakc-new
     , data-default-class
     , generic-lens
     , lens
-    , network
     , optparse-applicative
     , riak2
     , riak2-iface-socket
+    , socket-impl-network
     , split
 
   default-extensions:
@@ -35,7 +35,3 @@ executable riakc-new
 
   main-is:
     Main.hs
-
-  mixins:
-    riak2 requires
-      (Riak.Interface.Signature as Riak.Interface.Impl.Socket)

@@ -20,19 +20,15 @@ import Control.Concurrent.MVar
 import Control.Exception       (throwIO)
 import Data.ByteString         (ByteString)
 import Data.IORef
-import Network.Socket          (HostName, PortNumber, SockAddr, Socket)
 
-import qualified Data.Attoparsec.ByteString     as Atto
-import qualified Data.ByteString                as ByteString
-import qualified Network.Socket                 as Network hiding (recv)
-import qualified Network.Socket.ByteString      as Network (recv)
-import qualified Network.Socket.ByteString.Lazy as Network (sendAll)
+import qualified Data.Attoparsec.ByteString as Atto
+import qualified Data.ByteString            as ByteString
+import qualified Socket.Signature           as Socket
 
 
 data Interface
   = Interface
-  { sockaddr :: !SockAddr
-  , socket :: !Socket
+  { socket :: !Socket.Socket
   , bufferRef :: !(IORef ByteString)
   , lock :: !(MVar ())
   , handlers :: !EventHandlers
@@ -47,52 +43,46 @@ data EventHandlers
   }
 
 new ::
-     HostName
-  -> PortNumber
-  -> EventHandlers
+     Socket.Socket -- ^
+  -> EventHandlers -- ^
   -> IO Interface
-new host port handlers = do
-  info : _ <-
-    let
-      hints =
-        Network.defaultHints { Network.addrSocketType = Network.Stream }
-    in
-      Network.getAddrInfo (Just hints) (Just host) (Just (show port))
-
-  socket :: Socket <-
-    Network.socket
-      (Network.addrFamily info)
-      (Network.addrSocketType info)
-      (Network.addrProtocol info)
-
+new socket handlers = do
   bufferRef <- newIORef ByteString.empty
   lock <- newMVar ()
 
   pure Interface
-    { sockaddr = Network.addrAddress info
-    , socket = socket
+    { socket = socket
     , bufferRef = bufferRef
     , lock = lock
     , handlers = handlers
     }
 
-connect :: Interface -> IO ()
+connect ::
+     Interface -- ^
+  -> IO ()
 connect iface = do
   onConnect (handlers iface)
-  Network.connect (socket iface) (sockaddr iface)
+  Socket.connect (socket iface)
 
-disconnect :: Interface -> IO ()
+disconnect ::
+     Interface -- ^
+  -> IO ()
 disconnect iface = do
   onDisconnect (handlers iface)
-  Network.close (socket iface)
+  Socket.disconnect (socket iface)
   writeIORef (bufferRef iface) ByteString.empty
 
-send :: Interface -> Request -> IO ()
+send ::
+     Interface -- ^
+  -> Request -- ^
+  -> IO ()
 send iface request = do
   onSend (handlers iface) request
-  Network.sendAll (socket iface) (Request.encode request)
+  Socket.send (socket iface) (Request.encode request)
 
-receive :: Interface -> IO (Maybe Response)
+receive ::
+     Interface -- ^
+  -> IO (Maybe Response)
 receive iface = do
   buffer <- readIORef (bufferRef iface)
 
@@ -116,7 +106,7 @@ receive iface = do
         pure Nothing
 
       Atto.Partial k -> do
-        bytes <- Network.recv (socket iface) 16384
+        bytes <- Socket.receive (socket iface) 16384
 
         loop
           (if ByteString.null bytes
@@ -133,8 +123,8 @@ receive iface = do
             pure (Just response)
 
 exchange ::
-     Interface
-  -> Request
+     Interface -- ^
+  -> Request -- ^
   -> IO (Maybe Response)
 exchange iface request =
   withMVar (lock iface) $ \_ -> do
@@ -142,9 +132,9 @@ exchange iface request =
     receive iface
 
 stream ::
-     Interface
-  -> Request
-  -> (IO (Maybe Response) -> IO r)
+     Interface -- ^
+  -> Request -- ^
+  -> (IO (Maybe Response) -> IO r) -- ^
   -> IO r
 stream iface request callback =
   withMVar (lock iface) $ \_ -> do

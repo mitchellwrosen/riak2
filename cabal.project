@@ -1,8 +1,10 @@
 packages:
-    riak2
-  , riak2-iface
-  , riak2-iface-concurrent-socket
-  , riak2-iface-managed
-  , riak2-iface-socket
-  , riak2-proto
-  , riakc
+  riak2,
+  riak2-iface,
+  riak2-iface-concurrent-socket,
+  riak2-iface-managed,
+  riak2-iface-socket,
+  riak2-proto,
+  riakc,
+  socket-impl-network,
+  socket-sig

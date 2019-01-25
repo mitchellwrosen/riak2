@@ -124,30 +124,30 @@ module ZZZ.Riak where
   --   -- $documentation
   -- ) where
 
-import Riak.Interface              (Interface, Result(..))
-import Riak.Internal.Panic
-import Riak.Internal.Prelude
-import Riak.Internal.Utils         (bs2int, int2bs)
-import Riak.Proto
-import ZZZ.Riak.Internal.Cache
-import ZZZ.Riak.Internal.Crdts
-import ZZZ.Riak.Internal.Manager
-import ZZZ.Riak.Internal.MapReduce
-import ZZZ.Riak.Internal.Params
--- import ZZZ.Riak.Internal.Types     (RiakTy(..))
-import ZZZ.Riak.Internal.Types
+-- import Riak.Interface              (Interface, Result(..))
+-- import Riak.Internal.Panic
+-- import Riak.Internal.Prelude
+-- import Riak.Internal.Utils         (bs2int, int2bs)
+-- import Riak.Proto
+-- import ZZZ.Riak.Internal.Cache
+-- import ZZZ.Riak.Internal.Crdts
+-- import ZZZ.Riak.Internal.Manager
+-- import ZZZ.Riak.Internal.MapReduce
+-- import ZZZ.Riak.Internal.Params
+-- -- import ZZZ.Riak.Internal.Types     (RiakTy(..))
+-- import ZZZ.Riak.Internal.Types
 
-import qualified Riak.Interface  as Interface
-import qualified Riak.Proto.Lens as L
+-- import qualified Riak.Interface  as Interface
+-- import qualified Riak.Proto.Lens as L
 
-import Control.Foldl      (FoldM)
-import Control.Lens       (view)
-import Data.Default.Class (def)
-import Data.Profunctor    (lmap)
-import Network.Socket     (HostName, PortNumber)
+-- import Control.Foldl      (FoldM)
+-- import Control.Lens       (view)
+-- import Data.Default.Class (def)
+-- import Data.Profunctor    (lmap)
+-- import Network.Socket     (HostName, PortNumber)
 
-import qualified Control.Foldl as Foldl
-import qualified Lens.Labels   as L
+-- import qualified Control.Foldl as Foldl
+-- import qualified Lens.Labels   as L
 
 
 -- TODO _ variants that don't decode replies
