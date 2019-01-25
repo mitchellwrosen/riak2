@@ -1,6 +1,5 @@
 module Riak.Response
   ( Response(..)
-  , decode
   , parse
   , DecodeError(..)
   ) where
@@ -61,10 +60,6 @@ data DecodeError
   deriving stock (Show)
   deriving anyclass (Exception)
 
-decode :: ByteString -> Either DecodeError Response
-decode =
-  undefined
-
 parse :: ByteString -> Atto.IResult ByteString (Either DecodeError Response)
 parse =
   Atto.parse parser
@@ -79,39 +74,9 @@ parser = do
       then Atto.take (fromIntegral (len-1))
       else pure ByteString.empty
 
-  pure $
-    case code of
-      14 -> go bytes ResponseDelete
-      0  -> go bytes ResponseError
-      20 -> go bytes ResponseGetBucketProperties
-      81 -> go bytes ResponseGetCrdt
-      10 -> go bytes ResponseGet
-      8  -> go bytes ResponseGetServerInfo
-      26 -> go bytes ResponseIndex
-      24 -> go bytes ResponseMapReduce
-      2  -> go bytes ResponsePing
-      12 -> go bytes ResponsePut
-      30 -> go bytes ResponseResetBucketProperties
-      22 -> go bytes ResponseSetBucketProperties
-      16 -> go bytes ResponseStreamBuckets
-      18 -> go bytes ResponseStreamKeys
-      83 -> go bytes ResponseUpdateCrdt
-
--- instance Response RpbSearchQueryResp       where code = 28
--- instance Response RpbYokozunaIndexGetResp  where code = 55
--- instance Response RpbYokozunaSchemaGetResp where code = 59
-
-      code -> Left (UnknownMessageCode code bytes)
+  pure (decode code bytes)
 
   where
-    go ::
-         Proto.Message a
-      => ByteString
-      -> (a -> Response)
-      -> Either DecodeError Response
-    go bytes f =
-      bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
-
     -- | Attoparsec parser for a 32-bit big-endian integer.
     int32be :: Atto.Parser Int32
     int32be = do
@@ -124,3 +89,37 @@ parser = do
         shiftL (fromIntegral w1) 16 .|.
         shiftL (fromIntegral w2)  8 .|.
                 fromIntegral w3
+
+decode :: Word8 -> ByteString -> Either DecodeError Response
+decode code bytes =
+  case code of
+    14 -> go bytes ResponseDelete
+    0  -> go bytes ResponseError
+    20 -> go bytes ResponseGetBucketProperties
+    81 -> go bytes ResponseGetCrdt
+    10 -> go bytes ResponseGet
+    8  -> go bytes ResponseGetServerInfo
+    26 -> go bytes ResponseIndex
+    24 -> go bytes ResponseMapReduce
+    2  -> go bytes ResponsePing
+    12 -> go bytes ResponsePut
+    30 -> go bytes ResponseResetBucketProperties
+    22 -> go bytes ResponseSetBucketProperties
+    16 -> go bytes ResponseStreamBuckets
+    18 -> go bytes ResponseStreamKeys
+    83 -> go bytes ResponseUpdateCrdt
+
+-- instance Response RpbSearchQueryResp       where code = 28
+-- instance Response RpbYokozunaIndexGetResp  where code = 55
+-- instance Response RpbYokozunaSchemaGetResp where code = 59
+
+    code -> Left (UnknownMessageCode code bytes)
+
+  where
+    go ::
+         Proto.Message a
+      => ByteString
+      -> (a -> Response)
+      -> Either DecodeError Response
+    go bytes f =
+      bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
