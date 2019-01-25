@@ -1,10 +1,12 @@
 module Riak.Internal.Index where
 
+import Riak.Internal.IndexValue (IndexValue)
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
 import Riak.Internal.Utils
-import Riak.Proto            (Pair)
+import Riak.Proto               (Pair)
 
+import qualified Riak.Internal.IndexValue as IndexValue
 import qualified Riak.Internal.Proto.Pair as Pair
 
 import qualified Data.ByteString as ByteString
@@ -13,18 +15,19 @@ import qualified Data.ByteString as ByteString
 -- TODO Index values should be a set
 -- | A secondary index.
 data Index
-  = IndexInt !ByteString !Int64
-  | IndexBin !ByteString !ByteString
-  deriving (Eq, Show)
+  = forall a.
+    Index !ByteString !(IndexValue a)
+
+deriving stock instance Show Index
 
 fromPair :: Pair -> Index
 fromPair =
   Pair.toTuple >>> \case
     (ByteString.stripSuffix "_bin" -> Just k, Just v) ->
-      IndexBin k v
+      Index k (IndexValue.Binary v)
 
     (ByteString.stripSuffix "_int" -> Just k, Just v) ->
-      IndexInt k (bs2int v)
+      Index k (IndexValue.Integer (bs2int v))
 
     (k, v) ->
       impurePanic "Riak.Internal.Index.fromPair"
@@ -34,8 +37,8 @@ fromPair =
 
 toPair :: Index -> Pair
 toPair = \case
-  IndexInt k v ->
-    Pair.fromTuple (k <> "_int", Just (int2bs v))
-
-  IndexBin k v ->
+  Index k (IndexValue.Binary v) ->
     Pair.fromTuple (k <> "_bin", Just v)
+
+  Index k (IndexValue.Integer v) ->
+    Pair.fromTuple (k <> "_int", Just (int2bs v))

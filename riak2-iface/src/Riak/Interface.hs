@@ -7,7 +7,6 @@ module Riak.Interface
   -- , deleteIndex
   -- , getIndex
   -- , getSchema
-  , index
   , mapReduce
   -- , putIndex
   -- , putSchema
@@ -145,20 +144,6 @@ stream iface request f done (FoldM step initial extract) =
 --   -> IO (Result RpbEmptyPutResp)
 -- putSchema =
 --   exchange
-
-index
-  :: Interface -- ^
-  -> IndexRequest -- ^
-  -> FoldM IO IndexResponse r -- ^
-  -> IO (Result r)
-index conn request =
-  stream
-    conn
-    (RequestIndex request)
-    (\case
-      ResponseIndex response -> Just response
-      _ -> Nothing)
-    (view L.done)
 
 mapReduce
   :: Interface -- ^

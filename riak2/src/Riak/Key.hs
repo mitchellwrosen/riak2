@@ -12,7 +12,7 @@ module Riak.Key
 
 import Riak.Bucket              (Bucket(..))
 import Riak.Internal.Client     (Client, Result)
-import Riak.Internal.ExactQuery (ExactQuery)
+import Riak.Internal.ExactQuery (ExactQuery(..))
 import Riak.Internal.Prelude
 import Riak.Internal.RangeQuery (RangeQuery)
 import Riak.Internal.Utils      (bs2int)
@@ -21,6 +21,7 @@ import Riak.Response            (Response(..))
 
 import qualified Riak.Internal.Client     as Client
 import qualified Riak.Internal.ExactQuery as ExactQuery
+import qualified Riak.Internal.IndexValue as IndexValue
 import qualified Riak.Internal.RangeQuery as RangeQuery
 import qualified Riak.Proto               as Proto
 import qualified Riak.Proto.Lens          as L
@@ -60,23 +61,25 @@ none =
 -- TODO exact query pagination
 exactQuery
   :: Client -- ^
-  -> Bucket -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
   -> IO (Result r)
-exactQuery client (Bucket type' bucket) query keyFold =
+exactQuery client query@(ExactQuery { value }) keyFold =
   doIndex
     client
     request
     (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
 
   where
+    Bucket type' bucket =
+      ExactQuery.bucket query
+
     request :: Proto.IndexRequest
     request =
       defMessage
         & L.bucket .~ bucket
         & L.index .~ ExactQuery.name query
-        & L.key .~ ExactQuery.value query
+        & L.key .~ IndexValue.encode value
         & L.qtype .~ Proto.IndexRequest'eq
         & L.stream .~ True
         & L.type' .~ type'
@@ -85,34 +88,36 @@ exactQuery client (Bucket type' bucket) query keyFold =
 rangeQuery
   :: forall a r.
      Client -- ^
-  -> Bucket -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
   -> IO (Result r)
-rangeQuery client (Bucket type' bucket) query keyFold =
+rangeQuery client query keyFold =
   doIndex
     client
     request
     (Foldl.handlesM (L.results . folded . to fromResult) keyFold)
 
   where
+    Bucket type' bucket =
+      RangeQuery.bucket query
+
     request :: Proto.IndexRequest
     request =
       defMessage
         & L.bucket .~ bucket
         & L.index .~ RangeQuery.name query
         & L.qtype .~ Proto.IndexRequest'range
-        & L.rangeMax .~ RangeQuery.maxValue query
-        & L.rangeMax .~ RangeQuery.minValue query
+        & L.rangeMax .~ IndexValue.encode (RangeQuery.max query)
+        & L.rangeMax .~ IndexValue.encode (RangeQuery.min query)
         & L.returnTerms .~ True
         & L.stream .~ True
         & L.type' .~ type'
 
     fromResult :: Proto.Pair -> (a, Key)
     fromResult pair =
-      ( case query of
-          RangeQuery.Binary{}  -> pair ^. L.key
-          RangeQuery.Integer{} -> bs2int (pair ^. L.key)
+      ( case RangeQuery.min query of
+          IndexValue.Binary{}  -> pair ^. L.key
+          IndexValue.Integer{} -> bs2int (pair ^. L.key)
       , Key type' bucket (pair ^. L.value)
       )
 

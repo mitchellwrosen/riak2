@@ -87,6 +87,7 @@ library
     Riak.ExactQuery
     Riak.HyperLogLog
     Riak.Index
+    Riak.IndexValue
     Riak.Key
     Riak.Map
     Riak.Metadata
@@ -128,6 +129,7 @@ library
     Riak.Internal.Context
     Riak.Internal.ExactQuery
     Riak.Internal.Index
+    Riak.Internal.IndexValue
     Riak.Internal.Object
     Riak.Internal.Panic
     Riak.Internal.Prelude
