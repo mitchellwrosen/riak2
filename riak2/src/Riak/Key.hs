@@ -15,6 +15,7 @@ import Riak.Internal.Client     (Client, Result)
 import Riak.Internal.ExactQuery (ExactQuery)
 import Riak.Internal.Prelude
 import Riak.Internal.RangeQuery (RangeQuery)
+import Riak.Internal.Utils      (bs2int)
 import Riak.Request             (Request(..))
 import Riak.Response            (Response(..))
 
@@ -64,7 +65,10 @@ exactQuery
   -> FoldM IO Key r -- ^
   -> IO (Result r)
 exactQuery client (Bucket type' bucket) query keyFold =
-  doIndex client request (makeIndexFold (Key type' bucket) keyFold)
+  doIndex
+    client
+    request
+    (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
 
   where
     request :: Proto.IndexRequest
@@ -79,13 +83,17 @@ exactQuery client (Bucket type' bucket) query keyFold =
 
 -- TODO range query pagination
 rangeQuery
-  :: Client -- ^
+  :: forall a r.
+     Client -- ^
   -> Bucket -- ^
   -> RangeQuery a -- ^
-  -> FoldM IO Key r -- ^
+  -> FoldM IO (a, Key) r -- ^
   -> IO (Result r)
 rangeQuery client (Bucket type' bucket) query keyFold =
-  doIndex client request (makeIndexFold (Key type' bucket) keyFold)
+  doIndex
+    client
+    request
+    (Foldl.handlesM (L.results . folded . to fromResult) keyFold)
 
   where
     request :: Proto.IndexRequest
@@ -96,16 +104,17 @@ rangeQuery client (Bucket type' bucket) query keyFold =
         & L.qtype .~ Proto.IndexRequest'range
         & L.rangeMax .~ RangeQuery.maxValue query
         & L.rangeMax .~ RangeQuery.minValue query
+        & L.returnTerms .~ True
         & L.stream .~ True
         & L.type' .~ type'
 
-makeIndexFold ::
-     Monad m
-  => (ByteString -> Key)
-  -> FoldM m Key r
-  -> FoldM m Proto.IndexResponse r
-makeIndexFold toKey =
-  Foldl.handlesM (L.keys . folded . to toKey)
+    fromResult :: Proto.Pair -> (a, Key)
+    fromResult pair =
+      ( case query of
+          RangeQuery.Binary{}  -> pair ^. L.key
+          RangeQuery.Integer{} -> bs2int (pair ^. L.key)
+      , Key type' bucket (pair ^. L.value)
+      )
 
 doIndex ::
      Client
@@ -134,7 +143,7 @@ stream client (Bucket type' bucket) keyFold =
       ResponseStreamKeys response -> Just response
       _ -> Nothing)
     (view L.done)
-    (makeStreamKeysFold (Key type' bucket) keyFold)
+    (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
 
   where
     request :: Proto.StreamKeysRequest
@@ -150,11 +159,3 @@ list
   -> IO (Result [Key])
 list client type' =
   stream client type' (Foldl.generalize Foldl.list)
-
-makeStreamKeysFold ::
-     Monad m
-  => (ByteString -> Key)
-  -> FoldM m Key r
-  -> FoldM m Proto.StreamKeysResponse r
-makeStreamKeysFold toKey =
-  Foldl.handlesM (L.keys . folded . to toKey)
