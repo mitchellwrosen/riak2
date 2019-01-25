@@ -4,6 +4,7 @@ import Riak.Internal.Prelude
 import Riak.Internal.Utils (int2bs)
 
 
+-- | A secondary index value.
 data IndexValue :: Type -> Type where
   Binary :: !ByteString -> IndexValue ByteString
   Integer :: !Int64 -> IndexValue Int64

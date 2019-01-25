@@ -9,9 +9,10 @@ import Riak.Internal.Prelude
 import Riak.Request          (Request(..))
 import Riak.Response         (Response(..))
 
+-- | Ping the server.
 ping ::
      MonadIO m
-  => Client
+  => Client -- ^
   -> m (Result ())
 ping client = liftIO $
   exchange

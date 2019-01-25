@@ -3,13 +3,13 @@ module Riak.Bucket
   , get
   , set
   , reset
-  , stream
-  , list
+  , keys
+  , streamKeys
   ) where
 
-import Riak.BucketType       (BucketType(..))
 import Riak.Interface        (Result)
 import Riak.Internal.Client  (Client)
+import Riak.Internal.Key     (Key(..))
 import Riak.Internal.Prelude
 import Riak.Request          (Request(..))
 import Riak.Response         (Response(..))
@@ -39,8 +39,8 @@ data Bucket
 -- TODO BucketProps
 get ::
      MonadIO m
-  => Client
-  -> Bucket
+  => Client -- ^
+  -> Bucket -- ^
   -> m (Result Proto.BucketProperties)
 get client (Bucket type' bucket) = liftIO $
   (fmap.fmap)
@@ -63,6 +63,8 @@ get client (Bucket type' bucket) = liftIO $
     fromResponse =
       view L.props
 
+-- | Set bucket properties.
+-- TODO better set bucket properties type
 set
   :: Client -- ^
   -> Proto.SetBucketPropertiesRequest -- ^
@@ -75,6 +77,7 @@ set client request =
       ResponseSetBucketProperties response -> Just response
       _ -> Nothing)
 
+-- | Reset bucket properties.
 reset ::
      MonadIO m
   => Client
@@ -95,40 +98,54 @@ reset client (Bucket type' bucket) = liftIO $
         & L.bucket .~ bucket
         & L.type' .~ type'
 
-stream
+-- | Stream all of the keys in a bucket.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
+--
+-- /Note/: If your backend supports secondary indexes, it is faster to use the
+-- 'Riak.ExactQuery.inBucket' query.
+--
+-- /See also/: 'keys'
+streamKeys
   :: Client -- ^
-  -> BucketType -- ^
-  -> FoldM IO Bucket r -- ^
+  -> Bucket -- ^
+  -> FoldM IO Key r -- ^
   -> IO (Result r)
-stream client (BucketType type') bucketFold =
+streamKeys client (Bucket type' bucket) keyFold =
   Client.stream
     client
-    (RequestStreamBuckets request)
+    (RequestStreamKeys request)
     (\case
-      ResponseStreamBuckets response -> Just response
+      ResponseStreamKeys response -> Just response
       _ -> Nothing)
     (view L.done)
-    (makeResponseFold type' bucketFold)
+    (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
 
   where
-    request :: Proto.StreamBucketsRequest
+    request :: Proto.StreamKeysRequest
     request =
       defMessage
         & L.type' .~ type'
-        & L.stream .~ True
-        -- TODO stream buckets timeout
+        & L.bucket .~ bucket
+        -- TODO stream keys timeout
 
-list
-  :: Client -- ^
-  -> BucketType -- ^
-  -> IO (Result [Bucket])
-list client type' =
-  stream client type' (Foldl.generalize Foldl.list)
-
-makeResponseFold ::
-     Monad m
-  => ByteString
-  -> FoldM m Bucket r
-  -> FoldM m Proto.StreamBucketsResponse r
-makeResponseFold type' =
-  Foldl.handlesM (L.buckets . folded . to (Bucket type'))
+-- | List all of the keys in a bucket.
+--
+-- This is 'streamKeys' with a simpler type, but pulls all keys into memory
+-- before returning them.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
+--
+-- /Note/: If your backend supports secondary indexes, it is faster to use the
+-- 'Riak.ExactQuery.inBucket' query.
+--
+-- /See also/: 'streamKeys'
+keys ::
+     MonadIO m
+  => Client -- ^
+  -> Bucket -- ^
+  -> m (Result [Key])
+keys client bucket =
+  liftIO (streamKeys client bucket (Foldl.generalize Foldl.list))

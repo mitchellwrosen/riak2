@@ -14,6 +14,8 @@ import qualified Data.HashSet    as HashSet
 
 
 -- | A set data type.
+--
+-- Sets must be stored in a bucket type with the __@datatype = set@__ property.
 data Set a
   = Set
   { context :: !Context -- ^ Causal context
@@ -76,6 +78,8 @@ get client k@(Key type' bucket key) = liftIO $
 -- @
 --
 -- Otherwise, you must 'get' a set before you 'update' it.
+--
+-- /See also/: Riak.Key.'Riak.Key.none'
 update ::
      MonadIO m
   => Client -- ^

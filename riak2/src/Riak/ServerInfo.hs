@@ -22,7 +22,7 @@ data ServerInfo
 
 get ::
      MonadIO m
-  => Client
+  => Client -- ^
   -> m (Result ServerInfo)
 get client = liftIO $
   (fmap.fmap)

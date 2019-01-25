@@ -7,15 +7,21 @@ module Riak.Counter
 import Riak.Internal.Client  (Client, Result(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
-import Riak.Proto
 
 import qualified Riak.Internal.Client as Client
+import qualified Riak.Proto           as Proto
 import qualified Riak.Proto.Lens      as L
 
 import qualified Data.ByteString as ByteString
 
 
 -- | A counter data type.
+--
+-- Counters must be stored in a bucket type with the __@datatype = counter@__
+-- property.
+--
+-- /Note/: Counters do not contain a causal context, so it is not necessary to
+-- read a counter before updating it.
 data Counter
   = Counter
   { key :: !Key -- ^
@@ -34,7 +40,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Client.getCrdt client request)
 
   where
-    request :: GetCrdtRequest
+    request :: Proto.GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -50,7 +56,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: GetCrdtResponse -> Counter
+    fromResponse :: Proto.GetCrdtResponse -> Counter
     fromResponse response =
       Counter
         { key = k
@@ -59,15 +65,10 @@ get client k@(Key type' bucket key) = liftIO $
 
 -- | Update a counter.
 --
--- Note that counters, unlike other data types, represent their own update
--- operation. Furthermore, counters do not contain a causal context.
+-- /Note/: Counters, unlike other data types, represent their own update
+-- operation.
 --
--- So to increment a counter at key __@K@__ by value __@N@__, you need not fetch
--- it first. Rather, just perform:
---
--- @
--- 'update' client 'Counter' { key = K, value = N }
--- @
+-- /See also/: Riak.Key.'Riak.Key.none'
 update ::
      MonadIO m
   => Client -- ^
@@ -79,7 +80,7 @@ update client (Counter { key, value }) = liftIO $
     (Client.updateCrdt client request)
 
   where
-    request :: UpdateCrdtRequest
+    request :: Proto.UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -88,10 +89,16 @@ update client (Counter { key, value }) = liftIO $
               then Nothing
               else Just k)
         & L.update .~
-            (defMessage
-              & L.counter .~
-                  (defMessage
-                    & L.increment .~ value))
+            -- Missing value defaults to 1, so don't bother sending it
+            case value of
+              1 ->
+                defMessage
+
+              _ ->
+                defMessage
+                  & L.counter .~
+                      (defMessage
+                        & L.increment .~ value)
         & L.returnBody .~ True
         & L.type' .~ type'
 -- TODO counter update opts
@@ -105,7 +112,7 @@ update client (Counter { key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: UpdateCrdtResponse -> Counter
+    fromResponse :: Proto.UpdateCrdtResponse -> Counter
     fromResponse response =
       Counter
         { key =

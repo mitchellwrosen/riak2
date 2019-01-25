@@ -20,6 +20,16 @@ data Index
 
 deriving stock instance Show Index
 
+-- | Binary index smart constructor.
+binary :: ByteString -> ByteString -> Index
+binary index value =
+  Index index (IndexValue.Binary value)
+
+-- | Integer index smart constructor.
+integer :: ByteString -> Int64 -> Index
+integer index value =
+  Index index (IndexValue.Integer value)
+
 fromPair :: Pair -> Index
 fromPair =
   Pair.toTuple >>> \case

@@ -3,16 +3,15 @@ module Riak.Key
     Key(..)
   , none
     -- ** Search
+    -- TODO Move exact/range query to Riak.Bucket
   , exactQuery
   , rangeQuery
-    -- ** List
-  , stream
-  , list
   ) where
 
 import Riak.Bucket              (Bucket(..))
 import Riak.Internal.Client     (Client, Result)
 import Riak.Internal.ExactQuery (ExactQuery(..))
+import Riak.Internal.Key        (Key(..))
 import Riak.Internal.Prelude
 import Riak.Internal.RangeQuery (RangeQuery)
 import Riak.Internal.Utils      (bs2int)
@@ -33,19 +32,8 @@ import qualified Control.Foldl   as Foldl
 import qualified Data.ByteString as ByteString
 
 
--- | A bucket type, bucket, and key.
---
--- /Note/: The bucket type must be UTF-8 encoded.
-data Key
-  = Key
-  { type' :: !ByteString
-  , bucket :: !ByteString
-  , key :: !ByteString
-  } deriving stock (Eq, Generic, Show)
-    deriving anyclass (Hashable)
-
--- Use 'none' to ask Riak to generate a random key when writing a new object or
--- data type:
+-- | Use 'none' to ask Riak to generate a random key when writing a new object
+-- or data type:
 --
 -- @
 -- Key
@@ -58,6 +46,8 @@ none :: ByteString
 none =
   ByteString.empty
 
+-- | Perform an exact query on a secondary index.
+--
 -- TODO exact query pagination
 exactQuery
   :: Client -- ^
@@ -84,6 +74,8 @@ exactQuery client query@(ExactQuery { value }) keyFold =
         & L.stream .~ True
         & L.type' .~ type'
 
+-- | Perform a range query on a secondary index.
+--
 -- TODO range query pagination
 rangeQuery
   :: forall a r.
@@ -134,33 +126,3 @@ doIndex client request =
       ResponseIndex response -> Just response
       _ -> Nothing)
     (view L.done)
-
-stream
-  :: Client -- ^
-  -> Bucket -- ^
-  -> FoldM IO Key r -- ^
-  -> IO (Result r)
-stream client (Bucket type' bucket) keyFold =
-  Client.stream
-    client
-    (RequestStreamKeys request)
-    (\case
-      ResponseStreamKeys response -> Just response
-      _ -> Nothing)
-    (view L.done)
-    (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
-
-  where
-    request :: Proto.StreamKeysRequest
-    request =
-      defMessage
-        & L.type' .~ type'
-        & L.bucket .~ bucket
-        -- TODO stream keys timeout
-
-list
-  :: Client -- ^
-  -> Bucket -- ^
-  -> IO (Result [Key])
-list client type' =
-  stream client type' (Foldl.generalize Foldl.list)

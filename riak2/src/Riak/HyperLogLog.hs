@@ -1,3 +1,7 @@
+-- |
+-- * <http://docs.basho.com/riak/kv/2.2.3/developing/data-types/hyperloglogs/>
+-- * <http://basho.com/posts/technical/what-in-the-hell-is-hyperloglog/>
+-- * <https://github.com/basho/riak_kv/blob/develop/docs/hll/hll.pdf>
 module Riak.HyperLogLog
   ( HyperLogLog(..)
   , get
@@ -15,7 +19,18 @@ import qualified Riak.Proto.Lens      as L
 import qualified Data.ByteString as ByteString
 
 
--- | A HyperLogLog data type.
+-- | A HyperLogLog data type, which provides an approximate cardinality of a
+-- set.
+--
+-- HyperLogLogs must be stored in a bucket type with the __@datatype = hll@__
+-- property.
+--
+-- The @hllPrecision@ bucket type property controls the number of precision bits
+-- to use. Valid values are 4-16 (inclusive), and the default value is 14. The
+-- precision may only be decreased, never increased.
+--
+-- /Note/: HyperLogLogs do not contain a causal context, so it is not necessary
+-- to read a HyperLogLog before updating it.
 data HyperLogLog a
   = HyperLogLog
   { key :: !Key -- ^
@@ -58,6 +73,8 @@ get client k@(Key type' bucket key) = liftIO $
         }
 
 -- | Update a HyperLogLog.
+--
+-- /See also/: Riak.Key.'Riak.Key.none'
 update ::
      MonadIO m
   => Client -- ^

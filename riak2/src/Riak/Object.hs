@@ -44,6 +44,9 @@ data IfModified a
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
+--
+-- /Note/: The object(s) returned may be tombstones; check
+-- 'Riak.Metadata.deleted'.
 get
   :: MonadIO m
   => Client -- ^
@@ -63,7 +66,10 @@ get client key opts = liftIO $
 -- | Get an object's metadata.
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
--- 'putRiakObject'.
+-- 'put'.
+--
+-- /Note/: The object(s) returned may be tombstones; check
+-- 'Riak.Metadata.deleted'.
 getHead
   :: MonadIO m
   => Client -- ^
@@ -84,6 +90,9 @@ getHead client key opts = liftIO $
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
+--
+-- /Note/: The object(s) returned may be tombstones; check
+-- 'Riak.Metadata.deleted'.
 getIfModified
   :: MonadIO m
   => Client -- ^
@@ -108,6 +117,9 @@ getIfModified client (Content { key, context }) opts = liftIO $
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
+--
+-- /Note/: The object(s) returned may be tombstones; check
+-- 'Riak.Metadata.deleted'.
 getHeadIfModified
   :: MonadIO m
   => Client -- ^
@@ -162,7 +174,7 @@ makeGetRequest key opts =
 
 -- | Put an object and return its key.
 --
--- If you set its key component to @""@, Riak will randomly generate one.
+-- /See also/: Riak.Key.'Riak.Key.none'
 put ::
      MonadIO m
   => Client -- ^
@@ -191,6 +203,11 @@ put client content opts = liftIO $
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
+--
+-- /Note/: The object(s) returned may be tombstones; check
+-- 'Riak.Metadata.deleted'.
+--
+-- /See also/: Riak.Key.'Riak.Key.none'
 putGet ::
      MonadIO m
   => Client -- ^
@@ -216,6 +233,11 @@ putGet client content opts = liftIO $
 --
 -- If multiple siblings are returned, you should perform a 'get', resolve them,
 -- then perform a 'put'.
+--
+-- /Note/: The object(s) returned may be tombstones; check
+-- 'Riak.Metadata.deleted'.
+--
+-- /See also/: Riak.Key.'Riak.Key.none'
 putGetHead ::
      MonadIO m
   => Client -- ^
@@ -289,8 +311,8 @@ makePutRequest (Key type' bucket key) content opts =
 
 delete ::
      MonadIO m
-  => Client
-  -> Content a
+  => Client -- ^
+  -> Content a -- ^
   -> m (Result ())
 delete client content = liftIO $
   (fmap.fmap)

@@ -25,6 +25,8 @@ import qualified Data.HashSet        as HashSet
 
 
 -- | A map data type.
+--
+-- Maps must be stored in a bucket type with the __@datatype = set@__ property.
 data Map a
   = Map
   { context :: !Context -- ^ Causal context
@@ -32,6 +34,10 @@ data Map a
   , value :: !a -- ^
   } deriving stock (Functor, Generic, Show)
 
+-- | The map data.
+--
+-- In Riak, map values are uniquely keyed by both a name and type (it is
+-- possible to have both a counter and a flag at key @"foo"@, for example).
 data Maps
   = Maps
   { counters :: !(HashMap ByteString Int64) -- ^ Counters
@@ -41,10 +47,12 @@ data Maps
   , sets :: !(HashMap ByteString (HashSet ByteString)) -- ^ Sets
   } deriving stock (Generic, Show)
 
+-- | Left-biased union.
 instance Monoid Maps where
   mempty = Maps mempty mempty mempty mempty mempty
   mappend = (<>)
 
+-- | Left-biased union.
 instance Semigroup Maps where
   Maps a1 b1 c1 d1 e1 <> Maps a2 b2 c2 d2 e2 =
     Maps (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2)
@@ -66,8 +74,8 @@ data Update
 -- | Get a map.
 get ::
      MonadIO m
-  => Client
-  -> Key
+  => Client -- ^
+  -> Key -- ^
   -> m (Result (Map Maps))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
@@ -112,6 +120,8 @@ get client k@(Key type' bucket key) = liftIO $
 -- @
 --
 -- Otherwise, you must 'get' a map before you 'update' it.
+--
+-- /See also/: Riak.Key.'Riak.Key.none'
 update ::
      MonadIO m
   => Client -- ^
