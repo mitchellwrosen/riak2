@@ -93,6 +93,7 @@ library
     Riak.Object
     Riak.Opts
     Riak.Quorum
+    Riak.RangeQuery
     Riak.ServerInfo
     Riak.Set
 
@@ -125,6 +126,7 @@ library
     Riak.Internal.Client
     Riak.Internal.Content
     Riak.Internal.Context
+    Riak.Internal.ExactQuery
     Riak.Internal.Index
     Riak.Internal.Object
     Riak.Internal.Panic
@@ -132,6 +134,7 @@ library
     Riak.Internal.Proto.Content
     Riak.Internal.Proto.Pair
     Riak.Internal.Quorum
+    Riak.Internal.RangeQuery
     Riak.Internal.Set
     Riak.Internal.Utils
 
