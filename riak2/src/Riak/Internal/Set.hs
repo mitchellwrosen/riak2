@@ -5,9 +5,9 @@ import Riak.Internal.Client  (Client(..))
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude hiding (Set)
 import Riak.Key              (Key(..))
-import Riak.Proto
 
 import qualified Riak.Interface  as Interface
+import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
 import qualified Data.ByteString as ByteString
@@ -40,7 +40,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: GetCrdtRequest
+    request :: Proto.GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -56,7 +56,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: GetCrdtResponse -> Set (HashSet ByteString)
+    fromResponse :: Proto.GetCrdtResponse -> Set (HashSet ByteString)
     fromResponse response =
       Set
         { context = Context (response ^. L.context)
@@ -88,7 +88,7 @@ update client (Set { context, key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: UpdateCrdtRequest
+    request :: Proto.UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -117,7 +117,7 @@ update client (Set { context, key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: UpdateCrdtResponse -> Set (HashSet ByteString)
+    fromResponse :: Proto.UpdateCrdtResponse -> Set (HashSet ByteString)
     fromResponse response =
       Set
         { context = Context (response ^. L.context)
@@ -128,7 +128,7 @@ update client (Set { context, key, value }) = liftIO $
         , value = HashSet.fromList (response ^. L.set)
         }
 
-updatesToSetUpdate :: [Update] -> SetUpdate
+updatesToSetUpdate :: [Update] -> Proto.SetUpdate
 updatesToSetUpdate updates =
   defMessage
     & L.adds .~ adds

@@ -1,3 +1,5 @@
+-- TODO Move exchange/stream to Riak.Internal.Client, inline everything else
+
 module Riak.Interface
   ( Interface
   , Interface.connect
@@ -217,13 +219,13 @@ getServerInfo conn =
 
 ping
   :: Interface -- ^
-  -> IO (Result PingResponse)
+  -> IO (Result ())
 ping conn = do
   exchange
     conn
     (RequestPing defMessage)
     (\case
-      ResponsePing response -> Just response
+      ResponsePing _ -> Just ()
       _ -> Nothing)
 
 -- putIndex
@@ -255,13 +257,13 @@ put conn request =
 resetBucketProperties
   :: Interface -- ^
   -> ResetBucketPropertiesRequest -- ^
-  -> IO (Result ResetBucketPropertiesResponse)
+  -> IO (Result ())
 resetBucketProperties conn request =
   exchange
     conn
     (RequestResetBucketProperties request)
     (\case
-      ResponseResetBucketProperties response -> Just response
+      ResponseResetBucketProperties _ -> Just ()
       _ -> Nothing)
 
 index

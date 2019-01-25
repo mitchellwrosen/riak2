@@ -12,10 +12,10 @@ import Riak.Internal.Client  (Client(..))
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
-import Riak.Proto
 
 import qualified Riak.Interface    as Interface
 import qualified Riak.Internal.Set as Set
+import qualified Riak.Proto        as Proto
 import qualified Riak.Proto.Lens   as L
 
 import Data.Monoid (Endo(..))
@@ -76,7 +76,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: GetCrdtRequest
+    request :: Proto.GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -92,7 +92,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: GetCrdtResponse -> Map Maps
+    fromResponse :: Proto.GetCrdtResponse -> Map Maps
     fromResponse response =
       Map
         { context = Context (response ^. L.context)
@@ -124,7 +124,7 @@ update client (Map { context, key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: UpdateCrdtRequest
+    request :: Proto.UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -153,7 +153,7 @@ update client (Map { context, key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: UpdateCrdtResponse -> Map Maps
+    fromResponse :: Proto.UpdateCrdtResponse -> Map Maps
     fromResponse response =
       Map
         { context = Context (response ^. L.context)
@@ -164,26 +164,26 @@ update client (Map { context, key, value }) = liftIO $
         , value = mapEntriesToMaps (response ^. L.map)
         }
 
-mapEntriesToMaps :: [MapEntry] -> Maps
+mapEntriesToMaps :: [Proto.MapEntry] -> Maps
 mapEntriesToMaps =
   foldMap mapEntryToMaps
 
-mapEntryToMaps :: MapEntry -> Maps
+mapEntryToMaps :: Proto.MapEntry -> Maps
 mapEntryToMaps entry =
   case entry ^. L.field . L.type' of
-    MapField'COUNTER ->
+    Proto.MapField'COUNTER ->
       mempty { counters = HashMap.singleton name (entry ^. L.counterValue) }
 
-    MapField'FLAG ->
+    Proto.MapField'FLAG ->
       mempty { flags = HashMap.singleton name (entry ^. L.flagValue) }
 
-    MapField'MAP ->
+    Proto.MapField'MAP ->
       mempty { maps = HashMap.singleton name (mapEntriesToMaps (entry ^. L.mapValue)) }
 
-    MapField'REGISTER ->
+    Proto.MapField'REGISTER ->
       mempty { registers = HashMap.singleton name (entry ^. L.registerValue) }
 
-    MapField'SET ->
+    Proto.MapField'SET ->
       mempty { sets = HashMap.singleton name (HashSet.fromList (entry ^. L.setValue)) }
 
   where
@@ -191,82 +191,82 @@ mapEntryToMaps entry =
     name =
       entry ^. L.field . L.name
 
-updatesToMapUpdate :: [Update] -> MapUpdate
+updatesToMapUpdate :: [Update] -> Proto.MapUpdate
 updatesToMapUpdate =
   ($ defMessage) . appEndo . foldMap (coerce updateToEndoMapUpdate)
 
-updateToEndoMapUpdate :: Update -> MapUpdate -> MapUpdate
+updateToEndoMapUpdate :: Update -> Proto.MapUpdate -> Proto.MapUpdate
 updateToEndoMapUpdate = \case
   RemoveCounter name ->
-    L.removes %~ (mapfield name MapField'COUNTER :)
+    L.removes %~ (mapfield name Proto.MapField'COUNTER :)
 
   RemoveFlag name ->
-    L.removes %~ (mapfield name MapField'FLAG :)
+    L.removes %~ (mapfield name Proto.MapField'FLAG :)
 
   RemoveMap name ->
-    L.removes %~ (mapfield name MapField'MAP :)
+    L.removes %~ (mapfield name Proto.MapField'MAP :)
 
   RemoveRegister name ->
-    L.removes %~ (mapfield name MapField'REGISTER :)
+    L.removes %~ (mapfield name Proto.MapField'REGISTER :)
 
   RemoveSet name ->
-    L.removes %~ (mapfield name MapField'SET :)
+    L.removes %~ (mapfield name Proto.MapField'SET :)
 
   UpdateCounter name value ->
     let
-      update :: MapFieldUpdate
+      update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name MapField'COUNTER
+          & L.field .~ mapfield name Proto.MapField'COUNTER
           & L.counter .~ (defMessage & L.increment .~ value)
     in
       L.updates %~ (update :)
 
   UpdateFlag name value ->
     let
-      update :: MapFieldUpdate
+      update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name MapField'FLAG
+          & L.field .~ mapfield name Proto.MapField'FLAG
           & L.flag .~
               case value of
-                False -> MapFieldUpdate'DISABLE
-                True  -> MapFieldUpdate'ENABLE
+                False -> Proto.MapFieldUpdate'DISABLE
+                True  -> Proto.MapFieldUpdate'ENABLE
     in
       L.updates %~ (update :)
 
   UpdateMap name value ->
     let
-      update :: MapFieldUpdate
+      update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name MapField'MAP
+          & L.field .~ mapfield name Proto.MapField'MAP
           & L.map .~ updatesToMapUpdate value
     in
       L.updates %~ (update :)
 
   UpdateRegister name value ->
     let
-      update :: MapFieldUpdate
+      update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name MapField'REGISTER
+          & L.field .~ mapfield name Proto.MapField'REGISTER
           & L.register .~ value
     in
       L.updates %~ (update :)
 
   UpdateSet name value ->
     let
-      update :: MapFieldUpdate
+      update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name MapField'SET
+          & L.field .~ mapfield name Proto.MapField'SET
           & L.set .~ Set.updatesToSetUpdate value
     in
       L.updates %~ (update :)
 
   where
-    mapfield :: ByteString -> MapField'MapFieldType -> MapField
+    mapfield :: ByteString -> Proto.MapField'MapFieldType -> Proto.MapField
     mapfield name type' =
       defMessage
         & L.name .~ name

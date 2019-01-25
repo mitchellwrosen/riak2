@@ -8,12 +8,12 @@ import Riak.Interface        (Result)
 import Riak.Internal.Client  (Client(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
-import Riak.Proto
 
-import qualified Riak.Interface    as Interface
-import qualified Riak.Proto.Lens   as L
+import qualified Riak.Interface  as Interface
+import qualified Riak.Proto      as Proto
+import qualified Riak.Proto.Lens as L
 
-import qualified Data.ByteString     as ByteString
+import qualified Data.ByteString as ByteString
 
 
 -- | A HyperLogLog data type.
@@ -35,7 +35,7 @@ get client k@(Key type' bucket key) = liftIO $
     (Interface.getCrdt (iface client) request)
 
   where
-    request :: GetCrdtRequest
+    request :: Proto.GetCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -51,7 +51,7 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: GetCrdtResponse -> HyperLogLog Word64
+    fromResponse :: Proto.GetCrdtResponse -> HyperLogLog Word64
     fromResponse response =
       HyperLogLog
         { key = k
@@ -70,7 +70,7 @@ update client (HyperLogLog { key, value }) = liftIO $
     (Interface.updateCrdt (iface client) request)
 
   where
-    request :: UpdateCrdtRequest
+    request :: Proto.UpdateCrdtRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -97,7 +97,7 @@ update client (HyperLogLog { key, value }) = liftIO $
     Key type' bucket k =
       key
 
-    fromResponse :: UpdateCrdtResponse -> HyperLogLog Word64
+    fromResponse :: Proto.UpdateCrdtResponse -> HyperLogLog Word64
     fromResponse response =
       HyperLogLog
         { key =
