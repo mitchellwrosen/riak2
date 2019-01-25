@@ -84,6 +84,7 @@ library
     Riak.Content
     Riak.Context
     Riak.Counter
+    Riak.ExactQuery
     Riak.HyperLogLog
     Riak.Index
     Riak.Key

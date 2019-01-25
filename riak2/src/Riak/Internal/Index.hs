@@ -3,7 +3,7 @@ module Riak.Internal.Index where
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
 import Riak.Internal.Utils
-import Riak.Proto (Pair)
+import Riak.Proto            (Pair)
 
 import qualified Riak.Internal.Proto.Pair as Pair
 
@@ -27,7 +27,7 @@ fromPair =
       IndexInt k (bs2int v)
 
     (k, v) ->
-      impurePanic "Riak.Internal.Content.parseIndex"
+      impurePanic "Riak.Internal.Index.fromPair"
         ( ("key",   k)
         , ("value", v)
         )
