@@ -7,16 +7,15 @@ module Riak.Map
   ) where
 
 import Riak.Context          (Context)
-import Riak.Interface        (Result)
-import Riak.Internal.Client  (Client(..))
+import Riak.Internal.Client  (Client, Result)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Interface    as Interface
-import qualified Riak.Internal.Set as Set
-import qualified Riak.Proto        as Proto
-import qualified Riak.Proto.Lens   as L
+import qualified Riak.Internal.Client as Client
+import qualified Riak.Internal.Set    as Set
+import qualified Riak.Proto           as Proto
+import qualified Riak.Proto.Lens      as L
 
 import Data.Monoid (Endo(..))
 
@@ -73,7 +72,7 @@ get ::
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getCrdt (iface client) request)
+    (Client.getCrdt client request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -121,7 +120,7 @@ update ::
 update client (Map { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.updateCrdt (iface client) request)
+    (Client.updateCrdt client request)
 
   where
     request :: Proto.UpdateCrdtRequest

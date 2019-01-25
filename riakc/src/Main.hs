@@ -2,10 +2,10 @@ module Main where
 
 import Options.Applicative
 
-import Control.Lens               ((.~))
+-- import Control.Lens               ((.~))
 import Data.Default.Class         (def)
-import Data.Function              ((&))
-import Data.Generics.Product      (field)
+-- import Data.Function              ((&))
+-- import Data.Generics.Product      (field)
 import Data.List.Split            (splitOn)
 import Network.Socket             (HostName, PortNumber)
 import Riak.Interface             (Interface)

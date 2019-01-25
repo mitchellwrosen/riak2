@@ -1,15 +1,19 @@
 module Riak.BucketType
   ( BucketType(..)
   , get
+  , set
   ) where
 
 import Riak.Interface        (Result)
-import Riak.Internal.Client  (Client(..))
+import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
 import Riak.Proto
+import Riak.Request          (Request(..))
+import Riak.Response         (Response(..))
 
-import qualified Riak.Interface  as Interface
-import qualified Riak.Proto.Lens as L
+import qualified Riak.Internal.Client as Client
+import qualified Riak.Proto           as Proto
+import qualified Riak.Proto.Lens      as L
 
 
 -- | A bucket type.
@@ -32,7 +36,12 @@ get ::
 get client (BucketType type') = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getBucketTypeProperties (iface client) request)
+    (Client.exchange
+      client
+      (RequestGetBucketTypeProperties request)
+      (\case
+        ResponseGetBucketProperties response -> Just response
+        _ -> Nothing))
 
   where
     request :: GetBucketTypePropertiesRequest
@@ -43,3 +52,15 @@ get client (BucketType type') = liftIO $
     fromResponse :: GetBucketPropertiesResponse -> BucketProperties
     fromResponse =
       view L.props
+
+set
+  :: Client -- ^
+  -> Proto.SetBucketTypePropertiesRequest -- ^
+  -> IO (Result Proto.SetBucketPropertiesResponse)
+set client request =
+  Client.exchange
+    client
+    (RequestSetBucketTypeProperties request)
+    (\case
+      ResponseSetBucketProperties response -> Just response
+      _ -> Nothing)

@@ -92,6 +92,7 @@ library
     Riak.Object
     Riak.Opts
     Riak.Quorum
+    Riak.ServerInfo
     Riak.Set
 
     ZZZ.Erlang

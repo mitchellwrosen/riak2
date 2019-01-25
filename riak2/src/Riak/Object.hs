@@ -16,15 +16,16 @@ module Riak.Object
   ) where
 
 import Riak.Content          (Content(..))
-import Riak.Interface        (Result(..))
-import Riak.Internal.Client  (Client(..))
+import Riak.Internal.Client  (Client, Result(..))
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Object  (Object(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Opts             (GetOpts(..), PutOpts(..))
+import Riak.Request          (Request(..))
+import Riak.Response         (Response(..))
 
-import qualified Riak.Interface           as Interface
+import qualified Riak.Internal.Client     as Client
 import qualified Riak.Internal.Index      as Index
 import qualified Riak.Internal.Object     as Object
 import qualified Riak.Internal.Proto.Pair as Proto.Pair
@@ -52,7 +53,7 @@ get
 get client key opts = liftIO $
   (fmap.fmap)
     (Object.fromGetResponse key)
-    (Interface.get (iface client) request)
+    (doGet client request)
 
   where
     request :: Proto.GetRequest
@@ -72,7 +73,7 @@ getHead
 getHead client key opts = liftIO $
   (fmap.fmap)
     (map (() <$) . Object.fromGetResponse key)
-    (Interface.get (iface client) request)
+    (doGet client request)
   where
     request :: Proto.GetRequest
     request =
@@ -95,7 +96,7 @@ getIfModified client (Content { key, context }) opts = liftIO $
       if response ^. L.unchanged
         then Unmodified
         else Modified (Object.fromGetResponse key response))
-    (Interface.get (iface client) request)
+    (doGet client request)
 
   where
     request :: Proto.GetRequest
@@ -116,7 +117,7 @@ getHeadIfModified
 getHeadIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.get (iface client) request)
+    (doGet client request)
   where
     request :: Proto.GetRequest
     request =
@@ -129,6 +130,18 @@ getHeadIfModified client (Content { key, context }) opts = liftIO $
       if response ^. L.unchanged
         then Unmodified
         else Modified ((() <$) <$> Object.fromGetResponse key response)
+
+doGet ::
+     Client
+  -> Proto.GetRequest
+  -> IO (Result Proto.GetResponse)
+doGet client request =
+  Client.exchange
+    client
+    (RequestGet request)
+    (\case
+      ResponseGet response -> Just response
+      _ -> Nothing)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest key opts =
@@ -159,7 +172,7 @@ put ::
 put client content opts = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.put (iface client) request)
+    (doPut client request)
   where
     request :: Proto.PutRequest
     request =
@@ -187,7 +200,7 @@ putGet ::
 putGet client content opts = liftIO $
   (fmap.fmap)
     (Object.fromPutResponse key)
-    (Interface.put (iface client) request)
+    (doPut client request)
 
   where
     request :: Proto.PutRequest
@@ -212,7 +225,7 @@ putGetHead ::
 putGetHead client content opts = liftIO $
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResponse key)
-    (Interface.put (iface client) request)
+    (doPut client request)
 
   where
     request :: Proto.PutRequest
@@ -223,6 +236,18 @@ putGetHead client content opts = liftIO $
     key :: Key
     key =
       content ^. field @"key"
+
+doPut ::
+     Client
+  -> Proto.PutRequest
+  -> IO (Result Proto.PutResponse)
+doPut client request =
+  Client.exchange
+    client
+    (RequestPut request)
+    (\case
+      ResponsePut response -> Just response
+      _ -> Nothing)
 
 makePutRequest ::
      Key
@@ -270,7 +295,12 @@ delete ::
 delete client content = liftIO $
   (fmap.fmap)
     (const ())
-    (Interface.delete (iface client) request)
+    (Client.exchange
+      client
+      (RequestDelete request)
+      (\case
+        ResponseDelete response -> Just response
+        _ -> Nothing))
 
   where
     request :: Proto.DeleteRequest

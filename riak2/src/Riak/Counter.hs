@@ -4,15 +4,13 @@ module Riak.Counter
   , update
   ) where
 
-import Riak.Interface        (Result(..))
-import Riak.Internal.Client  (Client(..))
+import Riak.Internal.Client  (Client, Result(..))
 import Riak.Internal.Prelude
-import Riak.Key              (Key)
 import Riak.Key              (Key(..))
 import Riak.Proto
 
-import qualified Riak.Interface  as Interface
-import qualified Riak.Proto.Lens as L
+import qualified Riak.Internal.Client as Client
+import qualified Riak.Proto.Lens      as L
 
 import qualified Data.ByteString as ByteString
 
@@ -33,7 +31,7 @@ get ::
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getCrdt (iface client) request)
+    (Client.getCrdt client request)
 
   where
     request :: GetCrdtRequest
@@ -78,7 +76,7 @@ update ::
 update client (Counter { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.updateCrdt (iface client) request)
+    (Client.updateCrdt client request)
 
   where
     request :: UpdateCrdtRequest
