@@ -1,23 +1,25 @@
 module Main where
 
-import Data.Default.Class         (def)
-import Data.List.Split            (splitOn)
-import Options.Applicative
 import Riak.Interface             (Interface)
 import Riak.Interface.Impl.Socket (EventHandlers(..))
-import Socket.Impl.Network        (HostName, PortNumber, Socket)
-import Text.Read                  (readMaybe)
--- import Data.Function              ((&))
--- import Control.Lens               ((.~))
--- import Data.Generics.Product      (field)
+import Riak.Socket                (HostName, PortNumber, Socket)
 
-import qualified Data.ByteString.Char8      as Latin1
 import qualified Riak.Client
 import qualified Riak.Client                as Riak (Client)
 import qualified Riak.Interface.Impl.Socket as Riak.Interface
 import qualified Riak.Key                   as Riak (Key(..))
 import qualified Riak.Object
-import qualified Socket.Impl.Network        as Socket
+import qualified Riak.Socket                as Socket
+
+import Data.Default.Class  (def)
+import Data.List.Split     (splitOn)
+import Options.Applicative
+import Text.Read           (readMaybe)
+-- import Data.Function              ((&))
+-- import Control.Lens               ((.~))
+-- import Data.Generics.Product      (field)
+
+import qualified Data.ByteString.Char8 as Latin1
 
 main :: IO ()
 main = do

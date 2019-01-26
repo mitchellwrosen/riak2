@@ -10,10 +10,8 @@ import Control.Exception (Exception)
 import Data.Bifunctor    (bimap)
 import Data.Bits         (shiftL, (.|.))
 import Data.ByteString   (ByteString)
-import Data.Int          (Int32)
 import Data.Word         (Word8)
 
-import qualified Data.Attoparsec.ByteString as Atto
 import qualified Data.ByteString            as ByteString
 import qualified Data.ProtoLens             as Proto
 
@@ -60,35 +58,9 @@ data DecodeError
   deriving stock (Show)
   deriving anyclass (Exception)
 
-parse :: ByteString -> Atto.IResult ByteString (Either DecodeError Response)
-parse =
-  Atto.parse parser
-
-parser :: Atto.Parser (Either DecodeError Response)
-parser = do
-  len <- int32be
-  code <- Atto.anyWord8
-
-  bytes <-
-    if len > 1
-      then Atto.take (fromIntegral (len-1))
-      else pure ByteString.empty
-
-  pure (decode code bytes)
-
-  where
-    -- | Attoparsec parser for a 32-bit big-endian integer.
-    int32be :: Atto.Parser Int32
-    int32be = do
-      w0 <- Atto.anyWord8
-      w1 <- Atto.anyWord8
-      w2 <- Atto.anyWord8
-      w3 <- Atto.anyWord8
-      pure $
-        shiftL (fromIntegral w0) 24 .|.
-        shiftL (fromIntegral w1) 16 .|.
-        shiftL (fromIntegral w2)  8 .|.
-                fromIntegral w3
+parse :: ByteString -> Either DecodeError Response
+parse bytes =
+  decode (ByteString.head bytes) (ByteString.tail bytes)
 
 decode :: Word8 -> ByteString -> Either DecodeError Response
 decode code bytes =

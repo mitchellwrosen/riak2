@@ -9,9 +9,9 @@ extra-source-files:
 
 custom-setup
   setup-depends:
-      base
-    , Cabal ^>= 2.2.0 || ^>= 2.4.0
-    , proto-lens-setup == 0.4.0.1
+    base,
+    Cabal ^>= 2.2.0 || ^>= 2.4.0,
+    proto-lens-setup == 0.4.0.1
 
 library
   autogen-modules:
@@ -19,11 +19,10 @@ library
     Proto.Riak_Fields
 
   build-depends:
-      attoparsec ^>= 0.13.2
-    , base
-    , bytestring
-    , proto-lens ^>= 0.4.0
-    , proto-lens-runtime ^>= 0.4.0
+    base,
+    bytestring,
+    proto-lens ^>= 0.4.0,
+    proto-lens-runtime ^>= 0.4.0
 
   default-extensions:
     DefaultSignatures

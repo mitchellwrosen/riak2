@@ -1,26 +1,28 @@
 cabal-version: 2.4
 
-name: socket-impl-network
+name: riak2-socket
 version: 0.1.0
 build-type: Simple
 
 library
   build-depends:
+    attoparsec,
     base,
     bytestring,
-    network
+    network,
+    riak2-proto
 
   default-extensions:
+    LambdaCase
     ScopedTypeVariables
 
   default-language:
     Haskell2010
 
   exposed-modules:
-    Socket.Impl.Network
+    Riak.Socket
+    Socket
 
   hs-source-dirs:
     src
 
-  reexported-modules:
-    Socket.Impl.Network as Socket.Signature

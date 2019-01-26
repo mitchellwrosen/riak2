@@ -9,40 +9,42 @@ module Riak.Interface.Impl.Socket.Concurrent
   ) where
 
 import Control.Concurrent.MVar
-import Data.Coerce                (coerce)
-import Riak.Interface.Impl.Socket (EventHandlers(..))
-import Riak.Request               (Request)
-import Riak.Response              (Response)
-import Socket.Signature           (Socket)
-import UnliftIO.Exception         (finally)
+import Data.Coerce             (coerce)
+import Riak.Request            (Request)
+import Riak.Response           (Response)
+import Riak.Socket             (Socket)
+import UnliftIO.Exception      (finally)
 
-import qualified Riak.Interface.Impl.Socket as Inner
+import qualified Riak.Socket as Socket
 
 
 data Interface
   = Interface
-  { inner :: !Inner.Interface
+  { socket :: !Socket
   , sync :: !Synchronized
   , relay :: !Relay
   }
+
+data EventHandlers
+  = EventHandlers
 
 new ::
      Socket
   -> EventHandlers
   -> IO Interface
-new socket handlers =
+new socket _ =
   Interface
-    <$> Inner.new socket handlers
+    <$> pure socket
     <*> newSynchronized
     <*> newRelay
 
 connect :: Interface -> IO ()
 connect iface =
-  Inner.connect (inner iface)
+  Socket.connect (socket iface)
 
 disconnect :: Interface -> IO ()
 disconnect =
-  Inner.disconnect . inner
+  Socket.disconnect . socket
 
 exchange ::
      Interface
@@ -51,11 +53,11 @@ exchange ::
 exchange iface request = do
   baton :: Baton <-
     synchronized (sync iface) $ do
-      Inner.send (inner iface) request
+      Socket.send (socket iface) request
       enterRelay (relay iface)
 
   withBaton baton
-    (Inner.receive (inner iface))
+    (Socket.receive (socket iface))
 
 stream ::
      Interface
@@ -70,8 +72,8 @@ stream iface request callback =
   -- So, hold a lock for the entirety of the request-response exchange, not just
   -- during sending the request.
   synchronized (sync iface) $ do
-    Inner.send (inner iface) request
-    callback (Inner.receive (inner iface))
+    Socket.send (socket iface) request
+    callback (Socket.receive (socket iface))
 
 
 newtype Synchronized

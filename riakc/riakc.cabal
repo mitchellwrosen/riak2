@@ -14,7 +14,7 @@ executable riakc-new
     , optparse-applicative
     , riak2
     , riak2-iface-socket
-    , socket-impl-network
+    , riak2-socket
     , split
 
   default-extensions:

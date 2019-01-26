@@ -5,6 +5,5 @@ packages:
   riak2-iface-managed,
   riak2-iface-socket,
   riak2-proto,
-  riakc,
-  socket-impl-network,
-  socket-sig
+  riak2-socket,
+  riakc

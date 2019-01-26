@@ -8,9 +8,8 @@ library
   build-depends:
       base
     , bytestring
-    , riak2-iface-socket
     , riak2-proto
-    , socket-sig
+    , riak2-socket
     , unliftio
 
   default-extensions:
