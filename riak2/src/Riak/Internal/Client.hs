@@ -4,13 +4,13 @@ module Riak.Internal.Client
   , Result(..)
   ) where
 
-import Riak.Interface        (Interface, Result(..))
+import Riak.Interface.Signature (Interface)
 import Riak.Internal.Prelude
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
+import Riak.Request             (Request(..))
+import Riak.Response            (Response(..))
 
 import qualified Riak.Interface.Signature as Interface
-import qualified Riak.Proto as Proto
+import qualified Riak.Proto               as Proto
 
 import Control.Foldl (FoldM(..))
 
@@ -18,6 +18,12 @@ import Control.Foldl (FoldM(..))
 -- TODO rename Interface to Client
 type Client
   = Interface
+
+data Result a
+  = Success a
+  | Failure Proto.ErrorResponse
+  | ConnectionClosed
+  deriving stock (Functor, Show)
 
 data UnexpectedResponse
   = UnexpectedResponse !Request !Response

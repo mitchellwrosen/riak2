@@ -32,6 +32,14 @@ data EventHandlers
   , onReceive :: Maybe Response -> IO ()
   }
 
+instance Monoid EventHandlers where
+  mempty = EventHandlers mempty mempty mempty mempty
+  mappend = (<>)
+
+instance Semigroup EventHandlers where
+  EventHandlers a1 b1 c1 d1 <> EventHandlers a2 b2 c2 d2 =
+    EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2)
+
 new ::
      Socket -- ^
   -> EventHandlers -- ^

@@ -4,23 +4,15 @@ name: riak2-core
 version: 0.1.0
 build-type: Simple
 
-extra-source-files:
-  proto/riak.proto
-  generate-proto.sh
-
 library
   build-depends:
-    attoparsec,
     base,
     bytestring,
     foldl,
     lens,
-    network,
     proto-lens ^>= 0.4.0,
     riak2-core-internal,
-    riak2-interface,
-    stm,
-    unliftio
+    riak2-proto,
 
   default-extensions:
     DefaultSignatures
@@ -38,13 +30,6 @@ library
   default-language:
     Haskell2010
 
-  exposed-modules:
-    Riak.Interface
-    Riak.Interface.Impl.Managed
-    Riak.Interface.Impl.Socket
-    Riak.Interface.Impl.Socket.Concurrent
-    Riak.Socket
-
   ghc-options:
     -Wall
     -fno-warn-name-shadowing
@@ -52,10 +37,9 @@ library
   hs-source-dirs:
     src
 
-  other-modules:
-    Socket
-
   reexported-modules:
+    Riak.Interface.Impl.Socket,
+    Riak.Interface.Impl.Socket.Concurrent,
     Riak.Proto,
     Riak.Proto.Lens,
     Riak.Request,
@@ -63,64 +47,89 @@ library
 
 library riak2-core-internal
   build-depends:
+    attoparsec,
     base,
     bytestring,
-    proto-lens ^>= 0.4.0,
-    proto-lens-runtime ^>= 0.4.0
+    network,
+    riak2-proto,
+    unliftio
+
+  hs-source-dirs:
+    riak2-core-internal
 
   default-extensions:
-    DeriveAnyClass
-    DerivingStrategies
-    InstanceSigs
     LambdaCase
+    ScopedTypeVariables
 
   default-language:
     Haskell2010
 
   exposed-modules:
-    Riak.Proto
-    Riak.Proto.Lens
-    Riak.Request
-    Riak.Response
-
-  hs-source-dirs:
-    riak2-core-internal
+    Riak.Interface.Impl.Socket
+    Riak.Interface.Impl.Socket.Concurrent
+    Riak.Socket
 
   other-modules:
-    Proto.Proto.Riak
-    Proto.Proto.Riak_Fields
+    Socket
 
-library riak2-interface
+library riak2-interface-impl-managed
   build-depends:
     base,
-    riak2-core-internal
+    stm,
+    riak2-interface,
+    riak2-proto,
+    unliftio
+
+  exposed-modules:
+    Riak.Interface.Impl.Managed
+
+  default-extensions:
+    LambdaCase
+    ScopedTypeVariables
 
   default-language:
     Haskell2010
 
   hs-source-dirs:
-    riak2-interface
+    riak2-interface-impl-managed
 
-  signatures:
-    Riak.Interface.Signature
+  -- visibility:
+  --   public
 
--- test-suite tests
---   build-depends:
---     base
+test-suite tests
+  build-depends:
+    base,
+    network,
+    riak2-core,
+    riak2-core-internal,
+    riak2-interface-impl-managed
 
---   default-language:
---     Haskell2010
+  default-extensions:
+    LambdaCase
+    OverloadedStrings
+    ScopedTypeVariables
 
---   ghc-options:
---     -threaded
---     -with-rtsopts=-N
---     -Wall
+  default-language:
+    Haskell2010
 
---   hs-source-dirs:
---     test
+  ghc-options:
+    -threaded
+    -with-rtsopts=-N
+    -Wall
 
---   main-is:
---     Main.hs
+  hs-source-dirs:
+    test
 
---   type:
---     exitcode-stdio-1.0
+  main-is:
+    Main.hs
+
+  type:
+    exitcode-stdio-1.0
+
+  mixins:
+    riak2-interface-impl-managed
+               (Riak.Interface.Impl.Managed as Riak.Interface.Impl.Managed.Socket)
+      requires (Riak.Interface.Signature as Riak.Interface.Impl.Socket),
+    riak2-interface-impl-managed
+               (Riak.Interface.Impl.Managed as Riak.Interface.Impl.Managed.Concurrent)
+      requires (Riak.Interface.Signature as Riak.Interface.Impl.Socket.Concurrent),

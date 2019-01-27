@@ -7,8 +7,7 @@ module Riak.BucketType
   ) where
 
 import Riak.Bucket           (Bucket(..))
-import Riak.Interface        (Result)
-import Riak.Internal.Client  (Client)
+import Riak.Internal.Client  (Client, Result)
 import Riak.Internal.Prelude
 import Riak.Proto
 import Riak.Request          (Request(..))

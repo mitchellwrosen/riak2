@@ -7,8 +7,7 @@ module Riak.Bucket
   , streamKeys
   ) where
 
-import Riak.Interface        (Result)
-import Riak.Internal.Client  (Client)
+import Riak.Internal.Client  (Client, Result)
 import Riak.Internal.Key     (Key(..))
 import Riak.Internal.Prelude
 import Riak.Request          (Request(..))

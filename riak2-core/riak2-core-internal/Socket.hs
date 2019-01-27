@@ -1,13 +1,13 @@
 module Socket
-  ( Socket
-  , new
+  ( Socket(..)
+    -- TODO better new1/new2/new3 names
+  , new1
+  , new2
+  , new3
   , connect
   , disconnect
   , send
   , receive
-    -- * Re-exports
-  , Network.HostName
-  , Network.PortNumber
   ) where
 
 import Data.Bits         (shiftL, (.|.))
@@ -23,11 +23,11 @@ import qualified Network.Socket.ByteString  as Network (recv, sendAll)
 data Socket
   = Socket Network.Socket Network.SockAddr (IORef ByteString)
 
-new ::
-     Network.HostName -- ^
-  -> Network.PortNumber -- ^
+new1 ::
+     Network.HostName
+  -> Network.PortNumber
   -> IO Socket
-new host port = do
+new1 host port = do
   info : _ <-
     let
       hints =
@@ -35,16 +35,28 @@ new host port = do
     in
       Network.getAddrInfo (Just hints) (Just host) (Just (show port))
 
+  new2 info
+
+new2 ::
+     Network.AddrInfo -- ^
+  -> IO Socket
+new2 info = do
   socket :: Network.Socket <-
     Network.socket
       (Network.addrFamily info)
       (Network.addrSocketType info)
       (Network.addrProtocol info)
 
+  new3 socket (Network.addrAddress info)
+
+new3 ::
+     Network.Socket -- ^
+  -> Network.SockAddr -- ^
+  -> IO Socket
+new3 socket addr = do
   bufferRef :: IORef ByteString <-
     newIORef ByteString.empty
-
-  pure (Socket socket (Network.addrAddress info) bufferRef)
+  pure (Socket socket addr bufferRef)
 
 connect :: Socket -> IO ()
 connect (Socket socket addr _) =

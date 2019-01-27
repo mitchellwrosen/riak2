@@ -1,19 +1,19 @@
 module Riak.Socket
-  ( Socket
-  , Socket.new
+  ( Socket(..)
+  , Socket.new1
+  , Socket.new2
+  , Socket.new3
   , Socket.connect
   , Socket.disconnect
   , send
   , receive
-  , Socket.HostName
-  , Socket.PortNumber
   ) where
 
-import Socket (Socket)
-import Riak.Request (Request)
+import Riak.Request  (Request)
 import Riak.Response (Response)
+import Socket        (Socket)
 
-import qualified Riak.Request as Request
+import qualified Riak.Request  as Request
 import qualified Riak.Response as Response
 import qualified Socket
 

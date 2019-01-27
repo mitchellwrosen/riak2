@@ -1,6 +1,6 @@
 #!/bin/sh
 
-OUTDIR=riak2-core-internal
+OUTDIR=src
 
 echo "Generating $OUTDIR/Proto/Proto/Riak.hs"
 echo "Generating $OUTDIR/Proto/Proto/Riak_Fields.hs"
