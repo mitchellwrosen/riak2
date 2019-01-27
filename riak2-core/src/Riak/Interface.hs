@@ -21,13 +21,10 @@ import Riak.Response            (Response(..))
 
 import qualified Riak.Interface.Signature as Interface
 import qualified Riak.Proto.Lens          as L
-import qualified Riak.Request             as Request
-import qualified Riak.Response            as Response
 
 import Control.Exception      (Exception, throwIO)
 import Control.Foldl          (FoldM(..))
-import Control.Lens           (view, (^.))
-import Data.ProtoLens.Message (defMessage)
+import Control.Lens           (view)
 
 
 data Result a

@@ -144,7 +144,7 @@ acquireRiakConnection host port which lock wheel inactive connVar =
             -- we definitely want to write it to the array of connections before
             -- returning from this action. Otherwise, we might die from an async
             -- exception and leave the connection open.
-            mask $ \unmask -> do
+            mask $ \_unmask -> do
               conn :: Interface <-
                 undefined -- unmask (Interface.connect host port)
 

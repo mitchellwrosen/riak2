@@ -1,9 +1,9 @@
 module ZZZ.Riak.Internal.Exception where
 
-import Data.Typeable (cast)
+-- import Data.Typeable (cast)
 
-import Riak.Internal.Prelude
-import ZZZ.Riak.Internal.Types
+-- import Riak.Internal.Prelude
+-- import ZZZ.Riak.Internal.Types
 
 
 -- data RiakException where

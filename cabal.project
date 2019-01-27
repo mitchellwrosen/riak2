@@ -1,9 +1,4 @@
 packages:
   riak2,
-  riak2-iface,
-  riak2-iface-concurrent-socket,
-  riak2-iface-managed,
-  riak2-iface-socket,
-  riak2-proto,
-  riak2-socket,
-  riakc
+  riak2-core
+  -- riakc

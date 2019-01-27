@@ -13,8 +13,7 @@ executable riakc-new
     , lens
     , optparse-applicative
     , riak2
-    , riak2-iface-socket
-    , riak2-socket
+    , riak2-core
     , split
 
   default-extensions:
@@ -35,3 +34,7 @@ executable riakc-new
 
   main-is:
     Main.hs
+
+  mixins:
+    riak2-core requires
+      (Riak.Interface.Signature as Riak.Interface.Impl.Socket)

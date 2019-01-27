@@ -10,7 +10,6 @@ module Socket
   , Network.PortNumber
   ) where
 
-import Control.Exception (throwIO)
 import Data.Bits         (shiftL, (.|.))
 import Data.ByteString   (ByteString)
 import Data.Int          (Int32)
@@ -23,12 +22,6 @@ import qualified Network.Socket.ByteString  as Network (recv, sendAll)
 
 data Socket
   = Socket Network.Socket Network.SockAddr (IORef ByteString)
-
-type Request
-  = ByteString
-
-type Response
-  = ByteString
 
 new ::
      Network.HostName -- ^

@@ -5,16 +5,16 @@
 
 module ZZZ.Riak.Internal.Types where
 
-import Data.Default.Class
-import Data.Text.Encoding (decodeUtf8, decodeUtf8')
--- import Lens.Labels
+-- import Data.Default.Class
+-- import Data.Text.Encoding (decodeUtf8, decodeUtf8')
+-- -- import Lens.Labels
 
-import qualified Data.ByteString.Base64 as Base64
-import qualified Data.ByteString.Char8  as Latin1
-import qualified Data.Text              as Text
+-- import qualified Data.ByteString.Base64 as Base64
+-- import qualified Data.ByteString.Char8  as Latin1
+-- import qualified Data.Text              as Text
 
-import Riak.Internal.Prelude
-import Riak.Proto
+-- import Riak.Internal.Prelude
+-- import Riak.Proto
 
 
 --data Modified a

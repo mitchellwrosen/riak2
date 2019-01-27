@@ -11,14 +11,14 @@ module ZZZ.Riak.Internal.MapReduce where
   -- ) where
 
 
-import Riak.Internal.Prelude
--- import Riak.Proto            (RpbMapRedReq)
-import ZZZ.Erlang
-import ZZZ.Riak.Internal.Types
+-- import Riak.Internal.Prelude
+-- -- import Riak.Proto            (RpbMapRedReq)
+-- import ZZZ.Erlang
+-- import ZZZ.Riak.Internal.Types
 
-import qualified Data.ByteString.Char8 as Latin1
-import qualified Data.Vector           as Vector
-import qualified Lens.Labels           as L
+-- import qualified Data.ByteString.Char8 as Latin1
+-- import qualified Data.Vector           as Vector
+-- import qualified Lens.Labels           as L
 
 
 -- data RiakMapReduceInputs where

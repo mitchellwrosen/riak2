@@ -8,7 +8,6 @@ import Riak.Proto
 
 import Control.Exception (Exception)
 import Data.Bifunctor    (bimap)
-import Data.Bits         (shiftL, (.|.))
 import Data.ByteString   (ByteString)
 import Data.Word         (Word8)
 

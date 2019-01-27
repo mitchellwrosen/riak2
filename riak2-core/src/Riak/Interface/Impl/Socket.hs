@@ -9,20 +9,12 @@ module Riak.Interface.Impl.Socket
   ) where
 
 import Riak.Request  (Request)
-import Riak.Response (DecodeError, Response)
+import Riak.Response (Response)
 import Riak.Socket   (Socket)
 
-import qualified Riak.Request  as Request
-import qualified Riak.Response as Response
 import qualified Riak.Socket   as Socket
 
 import Control.Concurrent.MVar
-import Control.Exception       (throwIO)
-import Data.ByteString         (ByteString)
-import Data.IORef
-
-import qualified Data.Attoparsec.ByteString as Atto
-import qualified Data.ByteString            as ByteString
 
 
 data Interface
