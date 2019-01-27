@@ -1,4 +1,6 @@
 packages:
   riak2,
-  riak2-core
+  riak2-core,
+  riak2-interface,
+  riak2-proto
   -- riakc

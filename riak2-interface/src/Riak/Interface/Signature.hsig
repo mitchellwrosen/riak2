@@ -5,15 +5,17 @@ import Riak.Response (Response)
 
 data Interface
 
+-- | Connect to Riak.
 connect ::
      Interface
   -> IO ()
 
+-- | Disconnect from Riak.
 disconnect ::
      Interface
   -> IO ()
 
--- | Send a request and receive the response.
+-- | Send a request and receive the response (a single message).
 --
 -- /Throws/: 'Riak.Response.DecodeError' if the response fails to decode.
 exchange ::
@@ -21,7 +23,7 @@ exchange ::
   -> Request
   -> IO (Maybe Response)
 
--- | Send a request and stream the response.
+-- | Send a request and stream the response (one or more messages).
 --
 -- /Throws/: 'Riak.Response.DecodeError' if the response fails to decode.
 stream ::

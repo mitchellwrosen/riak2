@@ -43,7 +43,8 @@ library
     Riak.Proto,
     Riak.Proto.Lens,
     Riak.Request,
-    Riak.Response
+    Riak.Response,
+    Riak.Socket
 
 library riak2-core-internal
   build-depends:
