@@ -79,6 +79,7 @@ library
 
   exposed-modules:
     Riak.Bucket
+    Riak.BucketProperties
     Riak.BucketType
     Riak.Client
     Riak.Content
@@ -101,7 +102,6 @@ library
     ZZZ.Erlang
     ZZZ.Riak
     ZZZ.Riak.Internal.Cache
-    ZZZ.Riak.Internal.Crdts
     ZZZ.Riak.Internal.Debug
     ZZZ.Riak.Internal.Exception
     ZZZ.Riak.Internal.Manager
