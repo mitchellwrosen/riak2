@@ -107,7 +107,7 @@ update client (Set { context, key, value }) = liftIO $
               else Just k)
         & L.update .~
             (defMessage
-              & L.set .~ updatesToSetUpdate value)
+              & L.setUpdate .~ updatesToSetUpdate value)
         & L.returnBody .~ True
         & L.type' .~ type'
 

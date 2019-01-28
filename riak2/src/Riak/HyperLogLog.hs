@@ -98,7 +98,7 @@ update client (HyperLogLog { key, value }) = liftIO $
               else Just k)
         & L.update .~
             (defMessage
-              & L.hll .~
+              & L.hllUpdate .~
                   (defMessage
                     & L.adds .~ value))
         & L.returnBody .~ True

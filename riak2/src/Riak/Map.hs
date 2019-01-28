@@ -149,7 +149,7 @@ update client (Map { context, key, value }) = liftIO $
               else Just k)
         & L.update .~
             (defMessage
-              & L.map .~ updatesToMapUpdate value)
+              & L.mapUpdate .~ updatesToMapUpdate value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -183,19 +183,19 @@ mapValueToMaps :: Proto.MapValue -> Maps
 mapValueToMaps entry =
   case entry ^. L.field . L.type' of
     Proto.MapKey'COUNTER ->
-      mempty { counters = HashMap.singleton name (entry ^. L.counterValue) }
+      mempty { counters = HashMap.singleton name (entry ^. L.counter) }
 
     Proto.MapKey'FLAG ->
-      mempty { flags = HashMap.singleton name (entry ^. L.flagValue) }
+      mempty { flags = HashMap.singleton name (entry ^. L.flag) }
 
     Proto.MapKey'MAP ->
-      mempty { maps = HashMap.singleton name (mapValuesToMaps (entry ^. L.mapValue)) }
+      mempty { maps = HashMap.singleton name (mapValuesToMaps (entry ^. L.map)) }
 
     Proto.MapKey'REGISTER ->
-      mempty { registers = HashMap.singleton name (entry ^. L.registerValue) }
+      mempty { registers = HashMap.singleton name (entry ^. L.register) }
 
     Proto.MapKey'SET ->
-      mempty { sets = HashMap.singleton name (HashSet.fromList (entry ^. L.setValue)) }
+      mempty { sets = HashMap.singleton name (HashSet.fromList (entry ^. L.set)) }
 
   where
     name :: ByteString
@@ -225,54 +225,54 @@ updateToEndoMapUpdate = \case
 
   UpdateCounter name value ->
     let
-      update :: Proto.MapFieldUpdate
+      update :: Proto.MapValueUpdate
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'COUNTER
-          & L.counter .~ (defMessage & L.increment .~ value)
+          & L.counterUpdate .~ (defMessage & L.increment .~ value)
     in
       L.updates %~ (update :)
 
   UpdateFlag name value ->
     let
-      update :: Proto.MapFieldUpdate
+      update :: Proto.MapValueUpdate
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'FLAG
-          & L.flag .~
+          & L.flagUpdate .~
               case value of
-                False -> Proto.MapFieldUpdate'DISABLE
-                True  -> Proto.MapFieldUpdate'ENABLE
+                False -> Proto.MapValueUpdate'DISABLE
+                True  -> Proto.MapValueUpdate'ENABLE
     in
       L.updates %~ (update :)
 
   UpdateMap name value ->
     let
-      update :: Proto.MapFieldUpdate
+      update :: Proto.MapValueUpdate
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'MAP
-          & L.map .~ updatesToMapUpdate value
+          & L.mapUpdate .~ updatesToMapUpdate value
     in
       L.updates %~ (update :)
 
   UpdateRegister name value ->
     let
-      update :: Proto.MapFieldUpdate
+      update :: Proto.MapValueUpdate
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'REGISTER
-          & L.register .~ value
+          & L.registerUpdate .~ value
     in
       L.updates %~ (update :)
 
   UpdateSet name value ->
     let
-      update :: Proto.MapFieldUpdate
+      update :: Proto.MapValueUpdate
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'SET
-          & L.set .~ Set.updatesToSetUpdate value
+          & L.setUpdate .~ Set.updatesToSetUpdate value
     in
       L.updates %~ (update :)
 

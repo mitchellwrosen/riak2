@@ -9,9 +9,10 @@ import Riak.Proto
 
 import qualified Utils
 
-import Data.Bifunctor    (bimap)
-import Data.ByteString   (ByteString)
-import Data.Word         (Word8)
+import Data.Bifunctor  (bimap)
+import Data.ByteString (ByteString)
+import Data.Word       (Word8)
+import Debug.Trace     (trace)
 
 import qualified Data.ByteString as ByteString
 import qualified Data.ProtoLens  as Proto
@@ -40,28 +41,34 @@ data Response
 -- stripped.
 parse :: ByteString -> Either DecodeError Response
 parse bytes =
-  decode (ByteString.head bytes) (ByteString.tail bytes)
+  decode (ByteString.head bytes) (ByteString.drop 1 bytes)
 
 decode :: Word8 -> ByteString -> Either DecodeError Response
 decode code bytes =
+  -- Not totally sure which responses might be empty, so just debug-log them
+  -- for now.
+  (if ByteString.null bytes
+    then trace ("Code " ++ show code ++ " contained empty reply")
+    else id) $
+
   case code of
-    0  -> go ResponseError
-    2  -> go ResponsePing
-    -- 4  -> go ResponseGetClientId
-    -- 6  -> go ResponseSetClientId
-    8  -> go ResponseGetServerInfo
-    10 -> go ResponseGet
-    12 -> go ResponsePut
-    14 -> go ResponseDelete
-    16 -> go ResponseListBuckets
-    18 -> go ResponseListKeys
-    20 -> go ResponseGetBucketProperties
-    22 -> go ResponseSetBucketProperties
-    24 -> go ResponseMapReduce
-    26 -> go ResponseIndex
-    30 -> go ResponseResetBucketProperties
-    81 -> go ResponseGetCrdt
-    83 -> go ResponseUpdateCrdt
+    0    -> decode' ResponseError
+    2    -> Right (ResponsePing Proto.defMessage)
+    -- 4  -> decode' ResponseGetClientId
+    -- 6  -> decode' ResponseSetClientId
+    8    -> decode' ResponseGetServerInfo
+    10   -> decode' ResponseGet
+    12   -> decode' ResponsePut -- TODO Might put response be empty?
+    14   -> Right (ResponseDelete Proto.defMessage)
+    16   -> decode' ResponseListBuckets
+    18   -> decode' ResponseListKeys
+    20   -> decode' ResponseGetBucketProperties
+    22   -> Right (ResponseSetBucketProperties Proto.defMessage)
+    24   -> decode' ResponseMapReduce
+    26   -> decode' ResponseIndex
+    30   -> Right (ResponseResetBucketProperties Proto.defMessage)
+    81   -> decode' ResponseGetCrdt
+    83   -> decodeMaybeEmpty ResponseUpdateCrdt
 
 -- instance Response RpbSearchQueryResp       where code = 28
 -- instance Response RpbYokozunaIndexGetResp  where code = 55
@@ -70,12 +77,21 @@ decode code bytes =
     code -> Left (UnknownMessageCode code bytes)
 
   where
-    go ::
+    decode' ::
          Proto.Message a
       => (a -> Response)
       -> Either DecodeError Response
-    go f =
+    decode' f =
       bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
+
+    decodeMaybeEmpty ::
+         Proto.Message a
+      => (a -> Response)
+      -> Either DecodeError Response
+    decodeMaybeEmpty f =
+      if ByteString.null bytes
+        then Right (f Proto.defMessage)
+        else decode' f
 
 -- | Encode a response, including the length prefix.
 encode :: Response -> ByteString

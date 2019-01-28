@@ -9,19 +9,19 @@ module Proto.Proto.Riak
        (AuthenticationRequest(), BucketProperties(),
         BucketProperties'RpbReplMode(..), BucketProperties'RpbReplMode(),
         CommitHook(), Content(), CounterUpdate(), Crdt(), CrdtUpdate(),
-        DeleteRequest(), DeleteResponse(), EmptyPutResponse(),
-        ErrorResponse(), GSetOp(), GetBucketPropertiesRequest(),
-        GetBucketPropertiesResponse(), GetBucketTypePropertiesRequest(),
-        GetCrdtRequest(), GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
+        DeleteRequest(), DeleteResponse(), ErrorResponse(), GSetUpdate(),
+        GetBucketPropertiesRequest(), GetBucketPropertiesResponse(),
+        GetBucketTypePropertiesRequest(), GetCrdtRequest(),
+        GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
         GetCrdtResponse'CrdtType(), GetRequest(), GetResponse(),
-        GetServerInfoRequest(), GetServerInfoResponse(), HllOp(),
+        GetServerInfoRequest(), GetServerInfoResponse(), HllUpdate(),
         IndexRequest(), IndexRequest'IndexQueryType(..),
         IndexRequest'IndexQueryType(), IndexResponse(), Link(),
         ListBucketsRequest(), ListBucketsResponse(), ListKeysRequest(),
-        ListKeysResponse(), MapFieldUpdate(),
-        MapFieldUpdate'FlagUpdate(..), MapFieldUpdate'FlagUpdate(),
-        MapKey(), MapKey'MapKeyType(..), MapKey'MapKeyType(),
-        MapReduceRequest(), MapReduceResponse(), MapUpdate(), MapValue(),
+        ListKeysResponse(), MapKey(), MapKey'MapKeyType(..),
+        MapKey'MapKeyType(), MapReduceRequest(), MapReduceResponse(),
+        MapUpdate(), MapValue(), MapValueUpdate(),
+        MapValueUpdate'FlagUpdate(..), MapValueUpdate'FlagUpdate(),
         ModuleFunction(), Pair(), PingRequest(), PingResponse(),
         PutRequest(), PutResponse(), ResetBucketPropertiesRequest(),
         ResetBucketPropertiesResponse(), SetBucketPropertiesRequest(),
@@ -1779,23 +1779,23 @@ instance Control.DeepSeq.NFData Crdt where
                             (Control.DeepSeq.deepseq (_Crdt'gset x__) (()))))))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.counter' @:: Lens' CrdtUpdate CounterUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'counter' @:: Lens' CrdtUpdate (Prelude.Maybe CounterUpdate)@
-    * 'Proto.Proto.Riak_Fields.set' @:: Lens' CrdtUpdate SetUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'set' @:: Lens' CrdtUpdate (Prelude.Maybe SetUpdate)@
-    * 'Proto.Proto.Riak_Fields.map' @:: Lens' CrdtUpdate MapUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'map' @:: Lens' CrdtUpdate (Prelude.Maybe MapUpdate)@
-    * 'Proto.Proto.Riak_Fields.hll' @:: Lens' CrdtUpdate HllOp@
-    * 'Proto.Proto.Riak_Fields.maybe'hll' @:: Lens' CrdtUpdate (Prelude.Maybe HllOp)@
-    * 'Proto.Proto.Riak_Fields.gset' @:: Lens' CrdtUpdate GSetOp@
-    * 'Proto.Proto.Riak_Fields.maybe'gset' @:: Lens' CrdtUpdate (Prelude.Maybe GSetOp)@
+    * 'Proto.Proto.Riak_Fields.counterUpdate' @:: Lens' CrdtUpdate CounterUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'counterUpdate' @:: Lens' CrdtUpdate (Prelude.Maybe CounterUpdate)@
+    * 'Proto.Proto.Riak_Fields.setUpdate' @:: Lens' CrdtUpdate SetUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'setUpdate' @:: Lens' CrdtUpdate (Prelude.Maybe SetUpdate)@
+    * 'Proto.Proto.Riak_Fields.mapUpdate' @:: Lens' CrdtUpdate MapUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'mapUpdate' @:: Lens' CrdtUpdate (Prelude.Maybe MapUpdate)@
+    * 'Proto.Proto.Riak_Fields.hllUpdate' @:: Lens' CrdtUpdate HllUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'hllUpdate' @:: Lens' CrdtUpdate (Prelude.Maybe HllUpdate)@
+    * 'Proto.Proto.Riak_Fields.gsetUpdate' @:: Lens' CrdtUpdate GSetUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'gsetUpdate' @:: Lens' CrdtUpdate (Prelude.Maybe GSetUpdate)@
  -}
-data CrdtUpdate = CrdtUpdate{_CrdtUpdate'counter ::
+data CrdtUpdate = CrdtUpdate{_CrdtUpdate'counterUpdate ::
                              !(Prelude.Maybe CounterUpdate),
-                             _CrdtUpdate'set :: !(Prelude.Maybe SetUpdate),
-                             _CrdtUpdate'map :: !(Prelude.Maybe MapUpdate),
-                             _CrdtUpdate'hll :: !(Prelude.Maybe HllOp),
-                             _CrdtUpdate'gset :: !(Prelude.Maybe GSetOp),
+                             _CrdtUpdate'setUpdate :: !(Prelude.Maybe SetUpdate),
+                             _CrdtUpdate'mapUpdate :: !(Prelude.Maybe MapUpdate),
+                             _CrdtUpdate'hllUpdate :: !(Prelude.Maybe HllUpdate),
+                             _CrdtUpdate'gsetUpdate :: !(Prelude.Maybe GSetUpdate),
                              _CrdtUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
                     deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show CrdtUpdate where
@@ -1803,154 +1803,160 @@ instance Prelude.Show CrdtUpdate where
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' CrdtUpdate "counter" (CounterUpdate)
+instance Lens.Labels.HasLens' CrdtUpdate "counterUpdate"
+           (CounterUpdate)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'counter
-                 (\ x__ y__ -> x__{_CrdtUpdate'counter = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'counterUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'counterUpdate = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' CrdtUpdate "maybe'counter"
+instance Lens.Labels.HasLens' CrdtUpdate "maybe'counterUpdate"
            (Prelude.Maybe CounterUpdate)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'counter
-                 (\ x__ y__ -> x__{_CrdtUpdate'counter = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'counterUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'counterUpdate = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' CrdtUpdate "set" (SetUpdate) where
+instance Lens.Labels.HasLens' CrdtUpdate "setUpdate" (SetUpdate)
+         where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'set
-                 (\ x__ y__ -> x__{_CrdtUpdate'set = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'setUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'setUpdate = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' CrdtUpdate "maybe'set"
+instance Lens.Labels.HasLens' CrdtUpdate "maybe'setUpdate"
            (Prelude.Maybe SetUpdate)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'set
-                 (\ x__ y__ -> x__{_CrdtUpdate'set = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'setUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'setUpdate = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' CrdtUpdate "map" (MapUpdate) where
+instance Lens.Labels.HasLens' CrdtUpdate "mapUpdate" (MapUpdate)
+         where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'map
-                 (\ x__ y__ -> x__{_CrdtUpdate'map = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'mapUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'mapUpdate = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' CrdtUpdate "maybe'map"
+instance Lens.Labels.HasLens' CrdtUpdate "maybe'mapUpdate"
            (Prelude.Maybe MapUpdate)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'map
-                 (\ x__ y__ -> x__{_CrdtUpdate'map = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'mapUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'mapUpdate = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' CrdtUpdate "hll" (HllOp) where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'hll
-                 (\ x__ y__ -> x__{_CrdtUpdate'hll = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' CrdtUpdate "maybe'hll"
-           (Prelude.Maybe HllOp)
+instance Lens.Labels.HasLens' CrdtUpdate "hllUpdate" (HllUpdate)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'hll
-                 (\ x__ y__ -> x__{_CrdtUpdate'hll = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' CrdtUpdate "gset" (GSetOp) where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'gset
-                 (\ x__ y__ -> x__{_CrdtUpdate'gset = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'hllUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'hllUpdate = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' CrdtUpdate "maybe'gset"
-           (Prelude.Maybe GSetOp)
+instance Lens.Labels.HasLens' CrdtUpdate "maybe'hllUpdate"
+           (Prelude.Maybe HllUpdate)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _CrdtUpdate'gset
-                 (\ x__ y__ -> x__{_CrdtUpdate'gset = y__}))
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'hllUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'hllUpdate = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' CrdtUpdate "gsetUpdate" (GSetUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'gsetUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'gsetUpdate = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Lens.Labels.HasLens' CrdtUpdate "maybe'gsetUpdate"
+           (Prelude.Maybe GSetUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _CrdtUpdate'gsetUpdate
+                 (\ x__ y__ -> x__{_CrdtUpdate'gsetUpdate = y__}))
               Prelude.id
 instance Data.ProtoLens.Message CrdtUpdate where
         messageName _ = Data.Text.pack "CrdtUpdate"
         fieldsByTag
-          = let counter__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "counter"
+          = let counterUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "counter_update"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
                          Data.ProtoLens.FieldTypeDescriptor CounterUpdate)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'counter")))
+                            ((Lens.Labels.proxy#) ::
+                               (Lens.Labels.Proxy#) "maybe'counterUpdate")))
                       :: Data.ProtoLens.FieldDescriptor CrdtUpdate
-                set__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "set"
+                setUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "set_update"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
                          Data.ProtoLens.FieldTypeDescriptor SetUpdate)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'set")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'setUpdate")))
                       :: Data.ProtoLens.FieldDescriptor CrdtUpdate
-                map__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "map"
+                mapUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "map_update"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
                          Data.ProtoLens.FieldTypeDescriptor MapUpdate)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'map")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'mapUpdate")))
                       :: Data.ProtoLens.FieldDescriptor CrdtUpdate
-                hll__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "hll"
+                hllUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "hll_update"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor HllOp)
+                         Data.ProtoLens.FieldTypeDescriptor HllUpdate)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'hll")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'hllUpdate")))
                       :: Data.ProtoLens.FieldDescriptor CrdtUpdate
-                gset__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "gset"
+                gsetUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "gset_update"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor GSetOp)
+                         Data.ProtoLens.FieldTypeDescriptor GSetUpdate)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'gset")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'gsetUpdate")))
                       :: Data.ProtoLens.FieldDescriptor CrdtUpdate
               in
               Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, counter__field_descriptor),
-                 (Data.ProtoLens.Tag 2, set__field_descriptor),
-                 (Data.ProtoLens.Tag 3, map__field_descriptor),
-                 (Data.ProtoLens.Tag 4, hll__field_descriptor),
-                 (Data.ProtoLens.Tag 5, gset__field_descriptor)]
+                [(Data.ProtoLens.Tag 1, counterUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 2, setUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 3, mapUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 4, hllUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 5, gsetUpdate__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _CrdtUpdate'_unknownFields
               (\ x__ y__ -> x__{_CrdtUpdate'_unknownFields = y__})
         defMessage
-          = CrdtUpdate{_CrdtUpdate'counter = Prelude.Nothing,
-                       _CrdtUpdate'set = Prelude.Nothing,
-                       _CrdtUpdate'map = Prelude.Nothing,
-                       _CrdtUpdate'hll = Prelude.Nothing,
-                       _CrdtUpdate'gset = Prelude.Nothing,
+          = CrdtUpdate{_CrdtUpdate'counterUpdate = Prelude.Nothing,
+                       _CrdtUpdate'setUpdate = Prelude.Nothing,
+                       _CrdtUpdate'mapUpdate = Prelude.Nothing,
+                       _CrdtUpdate'hllUpdate = Prelude.Nothing,
+                       _CrdtUpdate'gsetUpdate = Prelude.Nothing,
                        _CrdtUpdate'_unknownFields = ([])}
 instance Control.DeepSeq.NFData CrdtUpdate where
         rnf
           = \ x__ ->
               Control.DeepSeq.deepseq (_CrdtUpdate'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_CrdtUpdate'counter x__)
-                   (Control.DeepSeq.deepseq (_CrdtUpdate'set x__)
-                      (Control.DeepSeq.deepseq (_CrdtUpdate'map x__)
-                         (Control.DeepSeq.deepseq (_CrdtUpdate'hll x__)
-                            (Control.DeepSeq.deepseq (_CrdtUpdate'gset x__) (()))))))
+                (Control.DeepSeq.deepseq (_CrdtUpdate'counterUpdate x__)
+                   (Control.DeepSeq.deepseq (_CrdtUpdate'setUpdate x__)
+                      (Control.DeepSeq.deepseq (_CrdtUpdate'mapUpdate x__)
+                         (Control.DeepSeq.deepseq (_CrdtUpdate'hllUpdate x__)
+                            (Control.DeepSeq.deepseq (_CrdtUpdate'gsetUpdate x__) (()))))))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' DeleteRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.key' @:: Lens' DeleteRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.rw' @:: Lens' DeleteRequest Data.Word.Word32@
     * 'Proto.Proto.Riak_Fields.maybe'rw' @:: Lens' DeleteRequest (Prelude.Maybe Data.Word.Word32)@
-    * 'Proto.Proto.Riak_Fields.vclock' @:: Lens' DeleteRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'vclock' @:: Lens' DeleteRequest (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.context' @:: Lens' DeleteRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'context' @:: Lens' DeleteRequest (Prelude.Maybe Data.ByteString.ByteString)@
     * 'Proto.Proto.Riak_Fields.r' @:: Lens' DeleteRequest Data.Word.Word32@
     * 'Proto.Proto.Riak_Fields.maybe'r' @:: Lens' DeleteRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.w' @:: Lens' DeleteRequest Data.Word.Word32@
@@ -1974,7 +1980,7 @@ data DeleteRequest = DeleteRequest{_DeleteRequest'bucket ::
                                    !Data.ByteString.ByteString,
                                    _DeleteRequest'key :: !Data.ByteString.ByteString,
                                    _DeleteRequest'rw :: !(Prelude.Maybe Data.Word.Word32),
-                                   _DeleteRequest'vclock ::
+                                   _DeleteRequest'context ::
                                    !(Prelude.Maybe Data.ByteString.ByteString),
                                    _DeleteRequest'r :: !(Prelude.Maybe Data.Word.Word32),
                                    _DeleteRequest'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -2024,21 +2030,21 @@ instance Lens.Labels.HasLens' DeleteRequest "maybe'rw"
               (Lens.Family2.Unchecked.lens _DeleteRequest'rw
                  (\ x__ y__ -> x__{_DeleteRequest'rw = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' DeleteRequest "vclock"
+instance Lens.Labels.HasLens' DeleteRequest "context"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _DeleteRequest'vclock
-                 (\ x__ y__ -> x__{_DeleteRequest'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _DeleteRequest'context
+                 (\ x__ y__ -> x__{_DeleteRequest'context = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' DeleteRequest "maybe'vclock"
+instance Lens.Labels.HasLens' DeleteRequest "maybe'context"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _DeleteRequest'vclock
-                 (\ x__ y__ -> x__{_DeleteRequest'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _DeleteRequest'context
+                 (\ x__ y__ -> x__{_DeleteRequest'context = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' DeleteRequest "r" (Data.Word.Word32)
          where
@@ -2205,13 +2211,13 @@ instance Data.ProtoLens.Message DeleteRequest where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'rw")))
                       :: Data.ProtoLens.FieldDescriptor DeleteRequest
-                vclock__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "vclock"
+                context__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "context"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'vclock")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'context")))
                       :: Data.ProtoLens.FieldDescriptor DeleteRequest
                 r__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "r"
@@ -2291,7 +2297,7 @@ instance Data.ProtoLens.Message DeleteRequest where
                 [(Data.ProtoLens.Tag 1, bucket__field_descriptor),
                  (Data.ProtoLens.Tag 2, key__field_descriptor),
                  (Data.ProtoLens.Tag 3, rw__field_descriptor),
-                 (Data.ProtoLens.Tag 4, vclock__field_descriptor),
+                 (Data.ProtoLens.Tag 4, context__field_descriptor),
                  (Data.ProtoLens.Tag 5, r__field_descriptor),
                  (Data.ProtoLens.Tag 6, w__field_descriptor),
                  (Data.ProtoLens.Tag 7, pr__field_descriptor),
@@ -2309,7 +2315,7 @@ instance Data.ProtoLens.Message DeleteRequest where
                             Data.ProtoLens.fieldDefault,
                           _DeleteRequest'key = Data.ProtoLens.fieldDefault,
                           _DeleteRequest'rw = Prelude.Nothing,
-                          _DeleteRequest'vclock = Prelude.Nothing,
+                          _DeleteRequest'context = Prelude.Nothing,
                           _DeleteRequest'r = Prelude.Nothing,
                           _DeleteRequest'w = Prelude.Nothing,
                           _DeleteRequest'pr = Prelude.Nothing,
@@ -2327,7 +2333,7 @@ instance Control.DeepSeq.NFData DeleteRequest where
                 (Control.DeepSeq.deepseq (_DeleteRequest'bucket x__)
                    (Control.DeepSeq.deepseq (_DeleteRequest'key x__)
                       (Control.DeepSeq.deepseq (_DeleteRequest'rw x__)
-                         (Control.DeepSeq.deepseq (_DeleteRequest'vclock x__)
+                         (Control.DeepSeq.deepseq (_DeleteRequest'context x__)
                             (Control.DeepSeq.deepseq (_DeleteRequest'r x__)
                                (Control.DeepSeq.deepseq (_DeleteRequest'w x__)
                                   (Control.DeepSeq.deepseq (_DeleteRequest'pr x__)
@@ -2362,29 +2368,6 @@ instance Control.DeepSeq.NFData DeleteResponse where
         rnf
           = \ x__ ->
               Control.DeepSeq.deepseq (_DeleteResponse'_unknownFields x__) (())
-{- | Fields :
-
- -}
-data EmptyPutResponse = EmptyPutResponse{_EmptyPutResponse'_unknownFields
-                                         :: !Data.ProtoLens.FieldSet}
-                          deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show EmptyPutResponse where
-        showsPrec _ __x __s
-          = Prelude.showChar '{'
-              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
-                 (Prelude.showChar '}' __s))
-instance Data.ProtoLens.Message EmptyPutResponse where
-        messageName _ = Data.Text.pack "EmptyPutResponse"
-        fieldsByTag = let in Data.Map.fromList []
-        unknownFields
-          = Lens.Family2.Unchecked.lens _EmptyPutResponse'_unknownFields
-              (\ x__ y__ -> x__{_EmptyPutResponse'_unknownFields = y__})
-        defMessage
-          = EmptyPutResponse{_EmptyPutResponse'_unknownFields = ([])}
-instance Control.DeepSeq.NFData EmptyPutResponse where
-        rnf
-          = \ x__ ->
-              Control.DeepSeq.deepseq (_EmptyPutResponse'_unknownFields x__) (())
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.errmsg' @:: Lens' ErrorResponse Data.ByteString.ByteString@
@@ -2455,26 +2438,27 @@ instance Control.DeepSeq.NFData ErrorResponse where
                    (Control.DeepSeq.deepseq (_ErrorResponse'code x__) (())))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.adds' @:: Lens' GSetOp [Data.ByteString.ByteString]@
+    * 'Proto.Proto.Riak_Fields.adds' @:: Lens' GSetUpdate [Data.ByteString.ByteString]@
  -}
-data GSetOp = GSetOp{_GSetOp'adds :: ![Data.ByteString.ByteString],
-                     _GSetOp'_unknownFields :: !Data.ProtoLens.FieldSet}
-                deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show GSetOp where
+data GSetUpdate = GSetUpdate{_GSetUpdate'adds ::
+                             ![Data.ByteString.ByteString],
+                             _GSetUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
+                    deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GSetUpdate where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' GSetOp "adds"
+instance Lens.Labels.HasLens' GSetUpdate "adds"
            ([Data.ByteString.ByteString])
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GSetOp'adds
-                 (\ x__ y__ -> x__{_GSetOp'adds = y__}))
+              (Lens.Family2.Unchecked.lens _GSetUpdate'adds
+                 (\ x__ y__ -> x__{_GSetUpdate'adds = y__}))
               Prelude.id
-instance Data.ProtoLens.Message GSetOp where
-        messageName _ = Data.Text.pack "GSetOp"
+instance Data.ProtoLens.Message GSetUpdate where
+        messageName _ = Data.Text.pack "GSetUpdate"
         fieldsByTag
           = let adds__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "adds"
@@ -2483,19 +2467,20 @@ instance Data.ProtoLens.Message GSetOp where
                       (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "adds")))
-                      :: Data.ProtoLens.FieldDescriptor GSetOp
+                      :: Data.ProtoLens.FieldDescriptor GSetUpdate
               in
               Data.Map.fromList [(Data.ProtoLens.Tag 1, adds__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens _GSetOp'_unknownFields
-              (\ x__ y__ -> x__{_GSetOp'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _GSetUpdate'_unknownFields
+              (\ x__ y__ -> x__{_GSetUpdate'_unknownFields = y__})
         defMessage
-          = GSetOp{_GSetOp'adds = [], _GSetOp'_unknownFields = ([])}
-instance Control.DeepSeq.NFData GSetOp where
+          = GSetUpdate{_GSetUpdate'adds = [],
+                       _GSetUpdate'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GSetUpdate where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq (_GSetOp'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_GSetOp'adds x__) (()))
+              Control.DeepSeq.deepseq (_GSetUpdate'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GSetUpdate'adds x__) (()))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' GetBucketPropertiesRequest Data.ByteString.ByteString@
@@ -3205,8 +3190,8 @@ instance Control.DeepSeq.NFData GetCrdtResponse'CrdtType where
     * 'Proto.Proto.Riak_Fields.maybe'ifModified' @:: Lens' GetRequest (Prelude.Maybe Data.ByteString.ByteString)@
     * 'Proto.Proto.Riak_Fields.head' @:: Lens' GetRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'head' @:: Lens' GetRequest (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.deletedvclock' @:: Lens' GetRequest Prelude.Bool@
-    * 'Proto.Proto.Riak_Fields.maybe'deletedvclock' @:: Lens' GetRequest (Prelude.Maybe Prelude.Bool)@
+    * 'Proto.Proto.Riak_Fields.deletedContext' @:: Lens' GetRequest Prelude.Bool@
+    * 'Proto.Proto.Riak_Fields.maybe'deletedContext' @:: Lens' GetRequest (Prelude.Maybe Prelude.Bool)@
     * 'Proto.Proto.Riak_Fields.timeout' @:: Lens' GetRequest Data.Word.Word32@
     * 'Proto.Proto.Riak_Fields.maybe'timeout' @:: Lens' GetRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.sloppyQuorum' @:: Lens' GetRequest Prelude.Bool@
@@ -3226,7 +3211,7 @@ data GetRequest = GetRequest{_GetRequest'bucket ::
                              _GetRequest'ifModified ::
                              !(Prelude.Maybe Data.ByteString.ByteString),
                              _GetRequest'head :: !(Prelude.Maybe Prelude.Bool),
-                             _GetRequest'deletedvclock :: !(Prelude.Maybe Prelude.Bool),
+                             _GetRequest'deletedContext :: !(Prelude.Maybe Prelude.Bool),
                              _GetRequest'timeout :: !(Prelude.Maybe Data.Word.Word32),
                              _GetRequest'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
                              _GetRequest'n :: !(Prelude.Maybe Data.Word.Word32),
@@ -3347,21 +3332,21 @@ instance Lens.Labels.HasLens' GetRequest "maybe'head"
               (Lens.Family2.Unchecked.lens _GetRequest'head
                  (\ x__ y__ -> x__{_GetRequest'head = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' GetRequest "deletedvclock"
+instance Lens.Labels.HasLens' GetRequest "deletedContext"
            (Prelude.Bool)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetRequest'deletedvclock
-                 (\ x__ y__ -> x__{_GetRequest'deletedvclock = y__}))
+              (Lens.Family2.Unchecked.lens _GetRequest'deletedContext
+                 (\ x__ y__ -> x__{_GetRequest'deletedContext = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' GetRequest "maybe'deletedvclock"
+instance Lens.Labels.HasLens' GetRequest "maybe'deletedContext"
            (Prelude.Maybe Prelude.Bool)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetRequest'deletedvclock
-                 (\ x__ y__ -> x__{_GetRequest'deletedvclock = y__}))
+              (Lens.Family2.Unchecked.lens _GetRequest'deletedContext
+                 (\ x__ y__ -> x__{_GetRequest'deletedContext = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' GetRequest "timeout"
            (Data.Word.Word32)
@@ -3494,14 +3479,14 @@ instance Data.ProtoLens.Message GetRequest where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'head")))
                       :: Data.ProtoLens.FieldDescriptor GetRequest
-                deletedvclock__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "deletedvclock"
+                deletedContext__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "deleted_context"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
                          Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) ::
-                               (Lens.Labels.Proxy#) "maybe'deletedvclock")))
+                               (Lens.Labels.Proxy#) "maybe'deletedContext")))
                       :: Data.ProtoLens.FieldDescriptor GetRequest
                 timeout__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "timeout"
@@ -3546,7 +3531,7 @@ instance Data.ProtoLens.Message GetRequest where
                  (Data.ProtoLens.Tag 6, notfoundOk__field_descriptor),
                  (Data.ProtoLens.Tag 7, ifModified__field_descriptor),
                  (Data.ProtoLens.Tag 8, head__field_descriptor),
-                 (Data.ProtoLens.Tag 9, deletedvclock__field_descriptor),
+                 (Data.ProtoLens.Tag 9, deletedContext__field_descriptor),
                  (Data.ProtoLens.Tag 10, timeout__field_descriptor),
                  (Data.ProtoLens.Tag 11, sloppyQuorum__field_descriptor),
                  (Data.ProtoLens.Tag 12, n__field_descriptor),
@@ -3562,7 +3547,7 @@ instance Data.ProtoLens.Message GetRequest where
                        _GetRequest'notfoundOk = Prelude.Nothing,
                        _GetRequest'ifModified = Prelude.Nothing,
                        _GetRequest'head = Prelude.Nothing,
-                       _GetRequest'deletedvclock = Prelude.Nothing,
+                       _GetRequest'deletedContext = Prelude.Nothing,
                        _GetRequest'timeout = Prelude.Nothing,
                        _GetRequest'sloppyQuorum = Prelude.Nothing,
                        _GetRequest'n = Prelude.Nothing,
@@ -3580,7 +3565,7 @@ instance Control.DeepSeq.NFData GetRequest where
                                (Control.DeepSeq.deepseq (_GetRequest'notfoundOk x__)
                                   (Control.DeepSeq.deepseq (_GetRequest'ifModified x__)
                                      (Control.DeepSeq.deepseq (_GetRequest'head x__)
-                                        (Control.DeepSeq.deepseq (_GetRequest'deletedvclock x__)
+                                        (Control.DeepSeq.deepseq (_GetRequest'deletedContext x__)
                                            (Control.DeepSeq.deepseq (_GetRequest'timeout x__)
                                               (Control.DeepSeq.deepseq
                                                  (_GetRequest'sloppyQuorum x__)
@@ -3590,13 +3575,14 @@ instance Control.DeepSeq.NFData GetRequest where
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.content' @:: Lens' GetResponse [Content]@
-    * 'Proto.Proto.Riak_Fields.vclock' @:: Lens' GetResponse Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'vclock' @:: Lens' GetResponse (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.context' @:: Lens' GetResponse Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'context' @:: Lens' GetResponse (Prelude.Maybe Data.ByteString.ByteString)@
     * 'Proto.Proto.Riak_Fields.unchanged' @:: Lens' GetResponse Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'unchanged' @:: Lens' GetResponse (Prelude.Maybe Prelude.Bool)@
  -}
 data GetResponse = GetResponse{_GetResponse'content :: ![Content],
-                               _GetResponse'vclock :: !(Prelude.Maybe Data.ByteString.ByteString),
+                               _GetResponse'context ::
+                               !(Prelude.Maybe Data.ByteString.ByteString),
                                _GetResponse'unchanged :: !(Prelude.Maybe Prelude.Bool),
                                _GetResponse'_unknownFields :: !Data.ProtoLens.FieldSet}
                      deriving (Prelude.Eq, Prelude.Ord)
@@ -3612,21 +3598,21 @@ instance Lens.Labels.HasLens' GetResponse "content" ([Content])
               (Lens.Family2.Unchecked.lens _GetResponse'content
                  (\ x__ y__ -> x__{_GetResponse'content = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' GetResponse "vclock"
+instance Lens.Labels.HasLens' GetResponse "context"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetResponse'vclock
-                 (\ x__ y__ -> x__{_GetResponse'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _GetResponse'context
+                 (\ x__ y__ -> x__{_GetResponse'context = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' GetResponse "maybe'vclock"
+instance Lens.Labels.HasLens' GetResponse "maybe'context"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetResponse'vclock
-                 (\ x__ y__ -> x__{_GetResponse'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _GetResponse'context
+                 (\ x__ y__ -> x__{_GetResponse'context = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' GetResponse "unchanged"
            (Prelude.Bool)
@@ -3655,13 +3641,13 @@ instance Data.ProtoLens.Message GetResponse where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "content")))
                       :: Data.ProtoLens.FieldDescriptor GetResponse
-                vclock__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "vclock"
+                context__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "context"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'vclock")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'context")))
                       :: Data.ProtoLens.FieldDescriptor GetResponse
                 unchanged__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "unchanged"
@@ -3674,14 +3660,14 @@ instance Data.ProtoLens.Message GetResponse where
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, content__field_descriptor),
-                 (Data.ProtoLens.Tag 2, vclock__field_descriptor),
+                 (Data.ProtoLens.Tag 2, context__field_descriptor),
                  (Data.ProtoLens.Tag 3, unchanged__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _GetResponse'_unknownFields
               (\ x__ y__ -> x__{_GetResponse'_unknownFields = y__})
         defMessage
           = GetResponse{_GetResponse'content = [],
-                        _GetResponse'vclock = Prelude.Nothing,
+                        _GetResponse'context = Prelude.Nothing,
                         _GetResponse'unchanged = Prelude.Nothing,
                         _GetResponse'_unknownFields = ([])}
 instance Control.DeepSeq.NFData GetResponse where
@@ -3689,7 +3675,7 @@ instance Control.DeepSeq.NFData GetResponse where
           = \ x__ ->
               Control.DeepSeq.deepseq (_GetResponse'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_GetResponse'content x__)
-                   (Control.DeepSeq.deepseq (_GetResponse'vclock x__)
+                   (Control.DeepSeq.deepseq (_GetResponse'context x__)
                       (Control.DeepSeq.deepseq (_GetResponse'unchanged x__) (()))))
 {- | Fields :
 
@@ -3808,26 +3794,27 @@ instance Control.DeepSeq.NFData GetServerInfoResponse where
                       (())))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.adds' @:: Lens' HllOp [Data.ByteString.ByteString]@
+    * 'Proto.Proto.Riak_Fields.adds' @:: Lens' HllUpdate [Data.ByteString.ByteString]@
  -}
-data HllOp = HllOp{_HllOp'adds :: ![Data.ByteString.ByteString],
-                   _HllOp'_unknownFields :: !Data.ProtoLens.FieldSet}
-               deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show HllOp where
+data HllUpdate = HllUpdate{_HllUpdate'adds ::
+                           ![Data.ByteString.ByteString],
+                           _HllUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
+                   deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show HllUpdate where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' HllOp "adds"
+instance Lens.Labels.HasLens' HllUpdate "adds"
            ([Data.ByteString.ByteString])
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _HllOp'adds
-                 (\ x__ y__ -> x__{_HllOp'adds = y__}))
+              (Lens.Family2.Unchecked.lens _HllUpdate'adds
+                 (\ x__ y__ -> x__{_HllUpdate'adds = y__}))
               Prelude.id
-instance Data.ProtoLens.Message HllOp where
-        messageName _ = Data.Text.pack "HllOp"
+instance Data.ProtoLens.Message HllUpdate where
+        messageName _ = Data.Text.pack "HllUpdate"
         fieldsByTag
           = let adds__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "adds"
@@ -3836,18 +3823,19 @@ instance Data.ProtoLens.Message HllOp where
                       (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "adds")))
-                      :: Data.ProtoLens.FieldDescriptor HllOp
+                      :: Data.ProtoLens.FieldDescriptor HllUpdate
               in
               Data.Map.fromList [(Data.ProtoLens.Tag 1, adds__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens _HllOp'_unknownFields
-              (\ x__ y__ -> x__{_HllOp'_unknownFields = y__})
-        defMessage = HllOp{_HllOp'adds = [], _HllOp'_unknownFields = ([])}
-instance Control.DeepSeq.NFData HllOp where
+          = Lens.Family2.Unchecked.lens _HllUpdate'_unknownFields
+              (\ x__ y__ -> x__{_HllUpdate'_unknownFields = y__})
+        defMessage
+          = HllUpdate{_HllUpdate'adds = [], _HllUpdate'_unknownFields = ([])}
+instance Control.DeepSeq.NFData HllUpdate where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq (_HllOp'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_HllOp'adds x__) (()))
+              Control.DeepSeq.deepseq (_HllUpdate'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_HllUpdate'adds x__) (()))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' IndexRequest Data.ByteString.ByteString@
@@ -5008,244 +4996,6 @@ instance Control.DeepSeq.NFData ListKeysResponse where
                    (Control.DeepSeq.deepseq (_ListKeysResponse'done x__) (())))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.field' @:: Lens' MapFieldUpdate MapKey@
-    * 'Proto.Proto.Riak_Fields.counter' @:: Lens' MapFieldUpdate CounterUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'counter' @:: Lens' MapFieldUpdate (Prelude.Maybe CounterUpdate)@
-    * 'Proto.Proto.Riak_Fields.set' @:: Lens' MapFieldUpdate SetUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'set' @:: Lens' MapFieldUpdate (Prelude.Maybe SetUpdate)@
-    * 'Proto.Proto.Riak_Fields.register' @:: Lens' MapFieldUpdate Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'register' @:: Lens' MapFieldUpdate (Prelude.Maybe Data.ByteString.ByteString)@
-    * 'Proto.Proto.Riak_Fields.flag' @:: Lens' MapFieldUpdate MapFieldUpdate'FlagUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'flag' @:: Lens' MapFieldUpdate (Prelude.Maybe MapFieldUpdate'FlagUpdate)@
-    * 'Proto.Proto.Riak_Fields.map' @:: Lens' MapFieldUpdate MapUpdate@
-    * 'Proto.Proto.Riak_Fields.maybe'map' @:: Lens' MapFieldUpdate (Prelude.Maybe MapUpdate)@
- -}
-data MapFieldUpdate = MapFieldUpdate{_MapFieldUpdate'field ::
-                                     !MapKey,
-                                     _MapFieldUpdate'counter :: !(Prelude.Maybe CounterUpdate),
-                                     _MapFieldUpdate'set :: !(Prelude.Maybe SetUpdate),
-                                     _MapFieldUpdate'register ::
-                                     !(Prelude.Maybe Data.ByteString.ByteString),
-                                     _MapFieldUpdate'flag ::
-                                     !(Prelude.Maybe MapFieldUpdate'FlagUpdate),
-                                     _MapFieldUpdate'map :: !(Prelude.Maybe MapUpdate),
-                                     _MapFieldUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
-                        deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show MapFieldUpdate where
-        showsPrec _ __x __s
-          = Prelude.showChar '{'
-              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
-                 (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' MapFieldUpdate "field" (MapKey) where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'field
-                 (\ x__ y__ -> x__{_MapFieldUpdate'field = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapFieldUpdate "counter"
-           (CounterUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'counter
-                 (\ x__ y__ -> x__{_MapFieldUpdate'counter = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' MapFieldUpdate "maybe'counter"
-           (Prelude.Maybe CounterUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'counter
-                 (\ x__ y__ -> x__{_MapFieldUpdate'counter = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapFieldUpdate "set" (SetUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'set
-                 (\ x__ y__ -> x__{_MapFieldUpdate'set = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' MapFieldUpdate "maybe'set"
-           (Prelude.Maybe SetUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'set
-                 (\ x__ y__ -> x__{_MapFieldUpdate'set = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapFieldUpdate "register"
-           (Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'register
-                 (\ x__ y__ -> x__{_MapFieldUpdate'register = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapFieldUpdate "maybe'register"
-           (Prelude.Maybe Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'register
-                 (\ x__ y__ -> x__{_MapFieldUpdate'register = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapFieldUpdate "flag"
-           (MapFieldUpdate'FlagUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'flag
-                 (\ x__ y__ -> x__{_MapFieldUpdate'flag = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapFieldUpdate "maybe'flag"
-           (Prelude.Maybe MapFieldUpdate'FlagUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'flag
-                 (\ x__ y__ -> x__{_MapFieldUpdate'flag = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapFieldUpdate "map" (MapUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'map
-                 (\ x__ y__ -> x__{_MapFieldUpdate'map = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
-instance Lens.Labels.HasLens' MapFieldUpdate "maybe'map"
-           (Prelude.Maybe MapUpdate)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapFieldUpdate'map
-                 (\ x__ y__ -> x__{_MapFieldUpdate'map = y__}))
-              Prelude.id
-instance Data.ProtoLens.Message MapFieldUpdate where
-        messageName _ = Data.Text.pack "MapFieldUpdate"
-        fieldsByTag
-          = let field__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "field"
-                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor MapKey)
-                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "field")))
-                      :: Data.ProtoLens.FieldDescriptor MapFieldUpdate
-                counter__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "counter"
-                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor CounterUpdate)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'counter")))
-                      :: Data.ProtoLens.FieldDescriptor MapFieldUpdate
-                set__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "set"
-                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor SetUpdate)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'set")))
-                      :: Data.ProtoLens.FieldDescriptor MapFieldUpdate
-                register__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "register"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'register")))
-                      :: Data.ProtoLens.FieldDescriptor MapFieldUpdate
-                flag__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "flag"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
-                         Data.ProtoLens.FieldTypeDescriptor MapFieldUpdate'FlagUpdate)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'flag")))
-                      :: Data.ProtoLens.FieldDescriptor MapFieldUpdate
-                map__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "map"
-                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor MapUpdate)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'map")))
-                      :: Data.ProtoLens.FieldDescriptor MapFieldUpdate
-              in
-              Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, field__field_descriptor),
-                 (Data.ProtoLens.Tag 2, counter__field_descriptor),
-                 (Data.ProtoLens.Tag 3, set__field_descriptor),
-                 (Data.ProtoLens.Tag 4, register__field_descriptor),
-                 (Data.ProtoLens.Tag 5, flag__field_descriptor),
-                 (Data.ProtoLens.Tag 6, map__field_descriptor)]
-        unknownFields
-          = Lens.Family2.Unchecked.lens _MapFieldUpdate'_unknownFields
-              (\ x__ y__ -> x__{_MapFieldUpdate'_unknownFields = y__})
-        defMessage
-          = MapFieldUpdate{_MapFieldUpdate'field = Data.ProtoLens.defMessage,
-                           _MapFieldUpdate'counter = Prelude.Nothing,
-                           _MapFieldUpdate'set = Prelude.Nothing,
-                           _MapFieldUpdate'register = Prelude.Nothing,
-                           _MapFieldUpdate'flag = Prelude.Nothing,
-                           _MapFieldUpdate'map = Prelude.Nothing,
-                           _MapFieldUpdate'_unknownFields = ([])}
-instance Control.DeepSeq.NFData MapFieldUpdate where
-        rnf
-          = \ x__ ->
-              Control.DeepSeq.deepseq (_MapFieldUpdate'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_MapFieldUpdate'field x__)
-                   (Control.DeepSeq.deepseq (_MapFieldUpdate'counter x__)
-                      (Control.DeepSeq.deepseq (_MapFieldUpdate'set x__)
-                         (Control.DeepSeq.deepseq (_MapFieldUpdate'register x__)
-                            (Control.DeepSeq.deepseq (_MapFieldUpdate'flag x__)
-                               (Control.DeepSeq.deepseq (_MapFieldUpdate'map x__) (())))))))
-data MapFieldUpdate'FlagUpdate = MapFieldUpdate'ENABLE
-                               | MapFieldUpdate'DISABLE
-                                   deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
-instance Data.ProtoLens.MessageEnum MapFieldUpdate'FlagUpdate where
-        maybeToEnum 1 = Prelude.Just MapFieldUpdate'ENABLE
-        maybeToEnum 2 = Prelude.Just MapFieldUpdate'DISABLE
-        maybeToEnum _ = Prelude.Nothing
-        showEnum MapFieldUpdate'ENABLE = "ENABLE"
-        showEnum MapFieldUpdate'DISABLE = "DISABLE"
-        readEnum k
-          | (Prelude.==) k "ENABLE" = Prelude.Just MapFieldUpdate'ENABLE
-          | (Prelude.==) k "DISABLE" = Prelude.Just MapFieldUpdate'DISABLE
-        readEnum k
-          = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
-instance Prelude.Bounded MapFieldUpdate'FlagUpdate where
-        minBound = MapFieldUpdate'ENABLE
-        maxBound = MapFieldUpdate'DISABLE
-instance Prelude.Enum MapFieldUpdate'FlagUpdate where
-        toEnum k__
-          = Prelude.maybe
-              (Prelude.error
-                 ((Prelude.++) "toEnum: unknown value for enum FlagUpdate: "
-                    (Prelude.show k__)))
-              Prelude.id
-              (Data.ProtoLens.maybeToEnum k__)
-        fromEnum MapFieldUpdate'ENABLE = 1
-        fromEnum MapFieldUpdate'DISABLE = 2
-        succ MapFieldUpdate'DISABLE
-          = Prelude.error
-              "MapFieldUpdate'FlagUpdate.succ: bad argument MapFieldUpdate'DISABLE. This value would be out of bounds."
-        succ MapFieldUpdate'ENABLE = MapFieldUpdate'DISABLE
-        pred MapFieldUpdate'ENABLE
-          = Prelude.error
-              "MapFieldUpdate'FlagUpdate.pred: bad argument MapFieldUpdate'ENABLE. This value would be out of bounds."
-        pred MapFieldUpdate'DISABLE = MapFieldUpdate'ENABLE
-        enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
-        enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
-        enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
-        enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
-instance Data.ProtoLens.FieldDefault MapFieldUpdate'FlagUpdate
-         where
-        fieldDefault = MapFieldUpdate'ENABLE
-instance Control.DeepSeq.NFData MapFieldUpdate'FlagUpdate where
-        rnf x__ = Prelude.seq x__ (())
-{- | Fields :
-
     * 'Proto.Proto.Riak_Fields.name' @:: Lens' MapKey Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.type'' @:: Lens' MapKey MapKey'MapKeyType@
  -}
@@ -5563,10 +5313,10 @@ instance Control.DeepSeq.NFData MapReduceResponse where
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.removes' @:: Lens' MapUpdate [MapKey]@
-    * 'Proto.Proto.Riak_Fields.updates' @:: Lens' MapUpdate [MapFieldUpdate]@
+    * 'Proto.Proto.Riak_Fields.updates' @:: Lens' MapUpdate [MapValueUpdate]@
  -}
 data MapUpdate = MapUpdate{_MapUpdate'removes :: ![MapKey],
-                           _MapUpdate'updates :: ![MapFieldUpdate],
+                           _MapUpdate'updates :: ![MapValueUpdate],
                            _MapUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
                    deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show MapUpdate where
@@ -5581,7 +5331,7 @@ instance Lens.Labels.HasLens' MapUpdate "removes" ([MapKey]) where
                  (\ x__ y__ -> x__{_MapUpdate'removes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' MapUpdate "updates"
-           ([MapFieldUpdate])
+           ([MapValueUpdate])
          where
         lensOf' _
           = (Prelude..)
@@ -5602,7 +5352,7 @@ instance Data.ProtoLens.Message MapUpdate where
                 updates__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "updates"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
-                         Data.ProtoLens.FieldTypeDescriptor MapFieldUpdate)
+                         Data.ProtoLens.FieldTypeDescriptor MapValueUpdate)
                       (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "updates")))
@@ -5626,22 +5376,21 @@ instance Control.DeepSeq.NFData MapUpdate where
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.field' @:: Lens' MapValue MapKey@
-    * 'Proto.Proto.Riak_Fields.counterValue' @:: Lens' MapValue Data.Int.Int64@
-    * 'Proto.Proto.Riak_Fields.maybe'counterValue' @:: Lens' MapValue (Prelude.Maybe Data.Int.Int64)@
-    * 'Proto.Proto.Riak_Fields.setValue' @:: Lens' MapValue [Data.ByteString.ByteString]@
-    * 'Proto.Proto.Riak_Fields.registerValue' @:: Lens' MapValue Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'registerValue' @:: Lens' MapValue (Prelude.Maybe Data.ByteString.ByteString)@
-    * 'Proto.Proto.Riak_Fields.flagValue' @:: Lens' MapValue Prelude.Bool@
-    * 'Proto.Proto.Riak_Fields.maybe'flagValue' @:: Lens' MapValue (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.mapValue' @:: Lens' MapValue [MapValue]@
+    * 'Proto.Proto.Riak_Fields.counter' @:: Lens' MapValue Data.Int.Int64@
+    * 'Proto.Proto.Riak_Fields.maybe'counter' @:: Lens' MapValue (Prelude.Maybe Data.Int.Int64)@
+    * 'Proto.Proto.Riak_Fields.set' @:: Lens' MapValue [Data.ByteString.ByteString]@
+    * 'Proto.Proto.Riak_Fields.register' @:: Lens' MapValue Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'register' @:: Lens' MapValue (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.flag' @:: Lens' MapValue Prelude.Bool@
+    * 'Proto.Proto.Riak_Fields.maybe'flag' @:: Lens' MapValue (Prelude.Maybe Prelude.Bool)@
+    * 'Proto.Proto.Riak_Fields.map' @:: Lens' MapValue [MapValue]@
  -}
 data MapValue = MapValue{_MapValue'field :: !MapKey,
-                         _MapValue'counterValue :: !(Prelude.Maybe Data.Int.Int64),
-                         _MapValue'setValue :: ![Data.ByteString.ByteString],
-                         _MapValue'registerValue ::
-                         !(Prelude.Maybe Data.ByteString.ByteString),
-                         _MapValue'flagValue :: !(Prelude.Maybe Prelude.Bool),
-                         _MapValue'mapValue :: ![MapValue],
+                         _MapValue'counter :: !(Prelude.Maybe Data.Int.Int64),
+                         _MapValue'set :: ![Data.ByteString.ByteString],
+                         _MapValue'register :: !(Prelude.Maybe Data.ByteString.ByteString),
+                         _MapValue'flag :: !(Prelude.Maybe Prelude.Bool),
+                         _MapValue'map :: ![MapValue],
                          _MapValue'_unknownFields :: !Data.ProtoLens.FieldSet}
                   deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show MapValue where
@@ -5655,67 +5404,64 @@ instance Lens.Labels.HasLens' MapValue "field" (MapKey) where
               (Lens.Family2.Unchecked.lens _MapValue'field
                  (\ x__ y__ -> x__{_MapValue'field = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' MapValue "counterValue"
-           (Data.Int.Int64)
+instance Lens.Labels.HasLens' MapValue "counter" (Data.Int.Int64)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'counterValue
-                 (\ x__ y__ -> x__{_MapValue'counterValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'counter
+                 (\ x__ y__ -> x__{_MapValue'counter = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapValue "maybe'counterValue"
+instance Lens.Labels.HasLens' MapValue "maybe'counter"
            (Prelude.Maybe Data.Int.Int64)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'counterValue
-                 (\ x__ y__ -> x__{_MapValue'counterValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'counter
+                 (\ x__ y__ -> x__{_MapValue'counter = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' MapValue "setValue"
+instance Lens.Labels.HasLens' MapValue "set"
            ([Data.ByteString.ByteString])
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'setValue
-                 (\ x__ y__ -> x__{_MapValue'setValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'set
+                 (\ x__ y__ -> x__{_MapValue'set = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' MapValue "registerValue"
+instance Lens.Labels.HasLens' MapValue "register"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'registerValue
-                 (\ x__ y__ -> x__{_MapValue'registerValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'register
+                 (\ x__ y__ -> x__{_MapValue'register = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapValue "maybe'registerValue"
+instance Lens.Labels.HasLens' MapValue "maybe'register"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'registerValue
-                 (\ x__ y__ -> x__{_MapValue'registerValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'register
+                 (\ x__ y__ -> x__{_MapValue'register = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' MapValue "flagValue" (Prelude.Bool)
-         where
+instance Lens.Labels.HasLens' MapValue "flag" (Prelude.Bool) where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'flagValue
-                 (\ x__ y__ -> x__{_MapValue'flagValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'flag
+                 (\ x__ y__ -> x__{_MapValue'flag = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapValue "maybe'flagValue"
+instance Lens.Labels.HasLens' MapValue "maybe'flag"
            (Prelude.Maybe Prelude.Bool)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'flagValue
-                 (\ x__ y__ -> x__{_MapValue'flagValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'flag
+                 (\ x__ y__ -> x__{_MapValue'flag = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' MapValue "mapValue" ([MapValue])
-         where
+instance Lens.Labels.HasLens' MapValue "map" ([MapValue]) where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapValue'mapValue
-                 (\ x__ y__ -> x__{_MapValue'mapValue = y__}))
+              (Lens.Family2.Unchecked.lens _MapValue'map
+                 (\ x__ y__ -> x__{_MapValue'map = y__}))
               Prelude.id
 instance Data.ProtoLens.Message MapValue where
         messageName _ = Data.Text.pack "MapValue"
@@ -5728,75 +5474,316 @@ instance Data.ProtoLens.Message MapValue where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "field")))
                       :: Data.ProtoLens.FieldDescriptor MapValue
-                counterValue__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "counter_value"
+                counter__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "counter"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.SInt64Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Int.Int64)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) ::
-                               (Lens.Labels.Proxy#) "maybe'counterValue")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'counter")))
                       :: Data.ProtoLens.FieldDescriptor MapValue
-                setValue__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "set_value"
+                set__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "set"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
                       (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "setValue")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "set")))
                       :: Data.ProtoLens.FieldDescriptor MapValue
-                registerValue__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "register_value"
+                register__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "register"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) ::
-                               (Lens.Labels.Proxy#) "maybe'registerValue")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'register")))
                       :: Data.ProtoLens.FieldDescriptor MapValue
-                flagValue__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "flag_value"
+                flag__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "flag"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
                          Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'flagValue")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'flag")))
                       :: Data.ProtoLens.FieldDescriptor MapValue
-                mapValue__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "map_value"
+                map__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "map"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
                          Data.ProtoLens.FieldTypeDescriptor MapValue)
                       (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "mapValue")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "map")))
                       :: Data.ProtoLens.FieldDescriptor MapValue
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, field__field_descriptor),
-                 (Data.ProtoLens.Tag 2, counterValue__field_descriptor),
-                 (Data.ProtoLens.Tag 3, setValue__field_descriptor),
-                 (Data.ProtoLens.Tag 4, registerValue__field_descriptor),
-                 (Data.ProtoLens.Tag 5, flagValue__field_descriptor),
-                 (Data.ProtoLens.Tag 6, mapValue__field_descriptor)]
+                 (Data.ProtoLens.Tag 2, counter__field_descriptor),
+                 (Data.ProtoLens.Tag 3, set__field_descriptor),
+                 (Data.ProtoLens.Tag 4, register__field_descriptor),
+                 (Data.ProtoLens.Tag 5, flag__field_descriptor),
+                 (Data.ProtoLens.Tag 6, map__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _MapValue'_unknownFields
               (\ x__ y__ -> x__{_MapValue'_unknownFields = y__})
         defMessage
           = MapValue{_MapValue'field = Data.ProtoLens.defMessage,
-                     _MapValue'counterValue = Prelude.Nothing, _MapValue'setValue = [],
-                     _MapValue'registerValue = Prelude.Nothing,
-                     _MapValue'flagValue = Prelude.Nothing, _MapValue'mapValue = [],
+                     _MapValue'counter = Prelude.Nothing, _MapValue'set = [],
+                     _MapValue'register = Prelude.Nothing,
+                     _MapValue'flag = Prelude.Nothing, _MapValue'map = [],
                      _MapValue'_unknownFields = ([])}
 instance Control.DeepSeq.NFData MapValue where
         rnf
           = \ x__ ->
               Control.DeepSeq.deepseq (_MapValue'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_MapValue'field x__)
-                   (Control.DeepSeq.deepseq (_MapValue'counterValue x__)
-                      (Control.DeepSeq.deepseq (_MapValue'setValue x__)
-                         (Control.DeepSeq.deepseq (_MapValue'registerValue x__)
-                            (Control.DeepSeq.deepseq (_MapValue'flagValue x__)
-                               (Control.DeepSeq.deepseq (_MapValue'mapValue x__) (())))))))
+                   (Control.DeepSeq.deepseq (_MapValue'counter x__)
+                      (Control.DeepSeq.deepseq (_MapValue'set x__)
+                         (Control.DeepSeq.deepseq (_MapValue'register x__)
+                            (Control.DeepSeq.deepseq (_MapValue'flag x__)
+                               (Control.DeepSeq.deepseq (_MapValue'map x__) (())))))))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.field' @:: Lens' MapValueUpdate MapKey@
+    * 'Proto.Proto.Riak_Fields.counterUpdate' @:: Lens' MapValueUpdate CounterUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'counterUpdate' @:: Lens' MapValueUpdate (Prelude.Maybe CounterUpdate)@
+    * 'Proto.Proto.Riak_Fields.setUpdate' @:: Lens' MapValueUpdate SetUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'setUpdate' @:: Lens' MapValueUpdate (Prelude.Maybe SetUpdate)@
+    * 'Proto.Proto.Riak_Fields.registerUpdate' @:: Lens' MapValueUpdate Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'registerUpdate' @:: Lens' MapValueUpdate (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.flagUpdate' @:: Lens' MapValueUpdate MapValueUpdate'FlagUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'flagUpdate' @:: Lens' MapValueUpdate (Prelude.Maybe MapValueUpdate'FlagUpdate)@
+    * 'Proto.Proto.Riak_Fields.mapUpdate' @:: Lens' MapValueUpdate MapUpdate@
+    * 'Proto.Proto.Riak_Fields.maybe'mapUpdate' @:: Lens' MapValueUpdate (Prelude.Maybe MapUpdate)@
+ -}
+data MapValueUpdate = MapValueUpdate{_MapValueUpdate'field ::
+                                     !MapKey,
+                                     _MapValueUpdate'counterUpdate ::
+                                     !(Prelude.Maybe CounterUpdate),
+                                     _MapValueUpdate'setUpdate :: !(Prelude.Maybe SetUpdate),
+                                     _MapValueUpdate'registerUpdate ::
+                                     !(Prelude.Maybe Data.ByteString.ByteString),
+                                     _MapValueUpdate'flagUpdate ::
+                                     !(Prelude.Maybe MapValueUpdate'FlagUpdate),
+                                     _MapValueUpdate'mapUpdate :: !(Prelude.Maybe MapUpdate),
+                                     _MapValueUpdate'_unknownFields :: !Data.ProtoLens.FieldSet}
+                        deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show MapValueUpdate where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' MapValueUpdate "field" (MapKey) where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'field
+                 (\ x__ y__ -> x__{_MapValueUpdate'field = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' MapValueUpdate "counterUpdate"
+           (CounterUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'counterUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'counterUpdate = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Lens.Labels.HasLens' MapValueUpdate "maybe'counterUpdate"
+           (Prelude.Maybe CounterUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'counterUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'counterUpdate = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' MapValueUpdate "setUpdate"
+           (SetUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'setUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'setUpdate = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Lens.Labels.HasLens' MapValueUpdate "maybe'setUpdate"
+           (Prelude.Maybe SetUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'setUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'setUpdate = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' MapValueUpdate "registerUpdate"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'registerUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'registerUpdate = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' MapValueUpdate "maybe'registerUpdate"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'registerUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'registerUpdate = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' MapValueUpdate "flagUpdate"
+           (MapValueUpdate'FlagUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'flagUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'flagUpdate = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' MapValueUpdate "maybe'flagUpdate"
+           (Prelude.Maybe MapValueUpdate'FlagUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'flagUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'flagUpdate = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' MapValueUpdate "mapUpdate"
+           (MapUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'mapUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'mapUpdate = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.defMessage)
+instance Lens.Labels.HasLens' MapValueUpdate "maybe'mapUpdate"
+           (Prelude.Maybe MapUpdate)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _MapValueUpdate'mapUpdate
+                 (\ x__ y__ -> x__{_MapValueUpdate'mapUpdate = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message MapValueUpdate where
+        messageName _ = Data.Text.pack "MapValueUpdate"
+        fieldsByTag
+          = let field__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "field"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor MapKey)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "field")))
+                      :: Data.ProtoLens.FieldDescriptor MapValueUpdate
+                counterUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "counter_update"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor CounterUpdate)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) ::
+                               (Lens.Labels.Proxy#) "maybe'counterUpdate")))
+                      :: Data.ProtoLens.FieldDescriptor MapValueUpdate
+                setUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "set_update"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor SetUpdate)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'setUpdate")))
+                      :: Data.ProtoLens.FieldDescriptor MapValueUpdate
+                registerUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "register_update"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) ::
+                               (Lens.Labels.Proxy#) "maybe'registerUpdate")))
+                      :: Data.ProtoLens.FieldDescriptor MapValueUpdate
+                flagUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "flag_update"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.EnumField ::
+                         Data.ProtoLens.FieldTypeDescriptor MapValueUpdate'FlagUpdate)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'flagUpdate")))
+                      :: Data.ProtoLens.FieldDescriptor MapValueUpdate
+                mapUpdate__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "map_update"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor MapUpdate)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'mapUpdate")))
+                      :: Data.ProtoLens.FieldDescriptor MapValueUpdate
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, field__field_descriptor),
+                 (Data.ProtoLens.Tag 2, counterUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 3, setUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 4, registerUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 5, flagUpdate__field_descriptor),
+                 (Data.ProtoLens.Tag 6, mapUpdate__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _MapValueUpdate'_unknownFields
+              (\ x__ y__ -> x__{_MapValueUpdate'_unknownFields = y__})
+        defMessage
+          = MapValueUpdate{_MapValueUpdate'field = Data.ProtoLens.defMessage,
+                           _MapValueUpdate'counterUpdate = Prelude.Nothing,
+                           _MapValueUpdate'setUpdate = Prelude.Nothing,
+                           _MapValueUpdate'registerUpdate = Prelude.Nothing,
+                           _MapValueUpdate'flagUpdate = Prelude.Nothing,
+                           _MapValueUpdate'mapUpdate = Prelude.Nothing,
+                           _MapValueUpdate'_unknownFields = ([])}
+instance Control.DeepSeq.NFData MapValueUpdate where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_MapValueUpdate'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_MapValueUpdate'field x__)
+                   (Control.DeepSeq.deepseq (_MapValueUpdate'counterUpdate x__)
+                      (Control.DeepSeq.deepseq (_MapValueUpdate'setUpdate x__)
+                         (Control.DeepSeq.deepseq (_MapValueUpdate'registerUpdate x__)
+                            (Control.DeepSeq.deepseq (_MapValueUpdate'flagUpdate x__)
+                               (Control.DeepSeq.deepseq (_MapValueUpdate'mapUpdate x__) (())))))))
+data MapValueUpdate'FlagUpdate = MapValueUpdate'ENABLE
+                               | MapValueUpdate'DISABLE
+                                   deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
+instance Data.ProtoLens.MessageEnum MapValueUpdate'FlagUpdate where
+        maybeToEnum 1 = Prelude.Just MapValueUpdate'ENABLE
+        maybeToEnum 2 = Prelude.Just MapValueUpdate'DISABLE
+        maybeToEnum _ = Prelude.Nothing
+        showEnum MapValueUpdate'ENABLE = "ENABLE"
+        showEnum MapValueUpdate'DISABLE = "DISABLE"
+        readEnum k
+          | (Prelude.==) k "ENABLE" = Prelude.Just MapValueUpdate'ENABLE
+          | (Prelude.==) k "DISABLE" = Prelude.Just MapValueUpdate'DISABLE
+        readEnum k
+          = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
+instance Prelude.Bounded MapValueUpdate'FlagUpdate where
+        minBound = MapValueUpdate'ENABLE
+        maxBound = MapValueUpdate'DISABLE
+instance Prelude.Enum MapValueUpdate'FlagUpdate where
+        toEnum k__
+          = Prelude.maybe
+              (Prelude.error
+                 ((Prelude.++) "toEnum: unknown value for enum FlagUpdate: "
+                    (Prelude.show k__)))
+              Prelude.id
+              (Data.ProtoLens.maybeToEnum k__)
+        fromEnum MapValueUpdate'ENABLE = 1
+        fromEnum MapValueUpdate'DISABLE = 2
+        succ MapValueUpdate'DISABLE
+          = Prelude.error
+              "MapValueUpdate'FlagUpdate.succ: bad argument MapValueUpdate'DISABLE. This value would be out of bounds."
+        succ MapValueUpdate'ENABLE = MapValueUpdate'DISABLE
+        pred MapValueUpdate'ENABLE
+          = Prelude.error
+              "MapValueUpdate'FlagUpdate.pred: bad argument MapValueUpdate'ENABLE. This value would be out of bounds."
+        pred MapValueUpdate'DISABLE = MapValueUpdate'ENABLE
+        enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
+        enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
+        enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
+        enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
+instance Data.ProtoLens.FieldDefault MapValueUpdate'FlagUpdate
+         where
+        fieldDefault = MapValueUpdate'ENABLE
+instance Control.DeepSeq.NFData MapValueUpdate'FlagUpdate where
+        rnf x__ = Prelude.seq x__ (())
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.module'' @:: Lens' ModuleFunction Data.ByteString.ByteString@
@@ -5988,8 +5975,8 @@ instance Control.DeepSeq.NFData PingResponse where
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' PutRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.key' @:: Lens' PutRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'key' @:: Lens' PutRequest (Prelude.Maybe Data.ByteString.ByteString)@
-    * 'Proto.Proto.Riak_Fields.vclock' @:: Lens' PutRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'vclock' @:: Lens' PutRequest (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.context' @:: Lens' PutRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'context' @:: Lens' PutRequest (Prelude.Maybe Data.ByteString.ByteString)@
     * 'Proto.Proto.Riak_Fields.content' @:: Lens' PutRequest Content@
     * 'Proto.Proto.Riak_Fields.w' @:: Lens' PutRequest Data.Word.Word32@
     * 'Proto.Proto.Riak_Fields.maybe'w' @:: Lens' PutRequest (Prelude.Maybe Data.Word.Word32)@
@@ -6019,7 +6006,7 @@ instance Control.DeepSeq.NFData PingResponse where
 data PutRequest = PutRequest{_PutRequest'bucket ::
                              !Data.ByteString.ByteString,
                              _PutRequest'key :: !(Prelude.Maybe Data.ByteString.ByteString),
-                             _PutRequest'vclock :: !(Prelude.Maybe Data.ByteString.ByteString),
+                             _PutRequest'context :: !(Prelude.Maybe Data.ByteString.ByteString),
                              _PutRequest'content :: !Content,
                              _PutRequest'w :: !(Prelude.Maybe Data.Word.Word32),
                              _PutRequest'dw :: !(Prelude.Maybe Data.Word.Word32),
@@ -6064,21 +6051,21 @@ instance Lens.Labels.HasLens' PutRequest "maybe'key"
               (Lens.Family2.Unchecked.lens _PutRequest'key
                  (\ x__ y__ -> x__{_PutRequest'key = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' PutRequest "vclock"
+instance Lens.Labels.HasLens' PutRequest "context"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _PutRequest'vclock
-                 (\ x__ y__ -> x__{_PutRequest'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _PutRequest'context
+                 (\ x__ y__ -> x__{_PutRequest'context = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' PutRequest "maybe'vclock"
+instance Lens.Labels.HasLens' PutRequest "maybe'context"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _PutRequest'vclock
-                 (\ x__ y__ -> x__{_PutRequest'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _PutRequest'context
+                 (\ x__ y__ -> x__{_PutRequest'context = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' PutRequest "content" (Content) where
         lensOf' _
@@ -6292,13 +6279,13 @@ instance Data.ProtoLens.Message PutRequest where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'key")))
                       :: Data.ProtoLens.FieldDescriptor PutRequest
-                vclock__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "vclock"
+                context__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "context"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'vclock")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'context")))
                       :: Data.ProtoLens.FieldDescriptor PutRequest
                 content__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "content"
@@ -6411,7 +6398,7 @@ instance Data.ProtoLens.Message PutRequest where
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, bucket__field_descriptor),
                  (Data.ProtoLens.Tag 2, key__field_descriptor),
-                 (Data.ProtoLens.Tag 3, vclock__field_descriptor),
+                 (Data.ProtoLens.Tag 3, context__field_descriptor),
                  (Data.ProtoLens.Tag 4, content__field_descriptor),
                  (Data.ProtoLens.Tag 5, w__field_descriptor),
                  (Data.ProtoLens.Tag 6, dw__field_descriptor),
@@ -6431,7 +6418,7 @@ instance Data.ProtoLens.Message PutRequest where
         defMessage
           = PutRequest{_PutRequest'bucket = Data.ProtoLens.fieldDefault,
                        _PutRequest'key = Prelude.Nothing,
-                       _PutRequest'vclock = Prelude.Nothing,
+                       _PutRequest'context = Prelude.Nothing,
                        _PutRequest'content = Data.ProtoLens.defMessage,
                        _PutRequest'w = Prelude.Nothing, _PutRequest'dw = Prelude.Nothing,
                        _PutRequest'returnBody = Prelude.Nothing,
@@ -6451,7 +6438,7 @@ instance Control.DeepSeq.NFData PutRequest where
               Control.DeepSeq.deepseq (_PutRequest'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_PutRequest'bucket x__)
                    (Control.DeepSeq.deepseq (_PutRequest'key x__)
-                      (Control.DeepSeq.deepseq (_PutRequest'vclock x__)
+                      (Control.DeepSeq.deepseq (_PutRequest'context x__)
                          (Control.DeepSeq.deepseq (_PutRequest'content x__)
                             (Control.DeepSeq.deepseq (_PutRequest'w x__)
                                (Control.DeepSeq.deepseq (_PutRequest'dw x__)
@@ -6472,13 +6459,14 @@ instance Control.DeepSeq.NFData PutRequest where
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.content' @:: Lens' PutResponse [Content]@
-    * 'Proto.Proto.Riak_Fields.vclock' @:: Lens' PutResponse Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'vclock' @:: Lens' PutResponse (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.context' @:: Lens' PutResponse Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'context' @:: Lens' PutResponse (Prelude.Maybe Data.ByteString.ByteString)@
     * 'Proto.Proto.Riak_Fields.key' @:: Lens' PutResponse Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'key' @:: Lens' PutResponse (Prelude.Maybe Data.ByteString.ByteString)@
  -}
 data PutResponse = PutResponse{_PutResponse'content :: ![Content],
-                               _PutResponse'vclock :: !(Prelude.Maybe Data.ByteString.ByteString),
+                               _PutResponse'context ::
+                               !(Prelude.Maybe Data.ByteString.ByteString),
                                _PutResponse'key :: !(Prelude.Maybe Data.ByteString.ByteString),
                                _PutResponse'_unknownFields :: !Data.ProtoLens.FieldSet}
                      deriving (Prelude.Eq, Prelude.Ord)
@@ -6494,21 +6482,21 @@ instance Lens.Labels.HasLens' PutResponse "content" ([Content])
               (Lens.Family2.Unchecked.lens _PutResponse'content
                  (\ x__ y__ -> x__{_PutResponse'content = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' PutResponse "vclock"
+instance Lens.Labels.HasLens' PutResponse "context"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _PutResponse'vclock
-                 (\ x__ y__ -> x__{_PutResponse'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _PutResponse'context
+                 (\ x__ y__ -> x__{_PutResponse'context = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' PutResponse "maybe'vclock"
+instance Lens.Labels.HasLens' PutResponse "maybe'context"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _PutResponse'vclock
-                 (\ x__ y__ -> x__{_PutResponse'vclock = y__}))
+              (Lens.Family2.Unchecked.lens _PutResponse'context
+                 (\ x__ y__ -> x__{_PutResponse'context = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' PutResponse "key"
            (Data.ByteString.ByteString)
@@ -6537,13 +6525,13 @@ instance Data.ProtoLens.Message PutResponse where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "content")))
                       :: Data.ProtoLens.FieldDescriptor PutResponse
-                vclock__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "vclock"
+                context__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "context"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
                          Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'vclock")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'context")))
                       :: Data.ProtoLens.FieldDescriptor PutResponse
                 key__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "key"
@@ -6556,14 +6544,14 @@ instance Data.ProtoLens.Message PutResponse where
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, content__field_descriptor),
-                 (Data.ProtoLens.Tag 2, vclock__field_descriptor),
+                 (Data.ProtoLens.Tag 2, context__field_descriptor),
                  (Data.ProtoLens.Tag 3, key__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _PutResponse'_unknownFields
               (\ x__ y__ -> x__{_PutResponse'_unknownFields = y__})
         defMessage
           = PutResponse{_PutResponse'content = [],
-                        _PutResponse'vclock = Prelude.Nothing,
+                        _PutResponse'context = Prelude.Nothing,
                         _PutResponse'key = Prelude.Nothing,
                         _PutResponse'_unknownFields = ([])}
 instance Control.DeepSeq.NFData PutResponse where
@@ -6571,7 +6559,7 @@ instance Control.DeepSeq.NFData PutResponse where
           = \ x__ ->
               Control.DeepSeq.deepseq (_PutResponse'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_PutResponse'content x__)
-                   (Control.DeepSeq.deepseq (_PutResponse'vclock x__)
+                   (Control.DeepSeq.deepseq (_PutResponse'context x__)
                       (Control.DeepSeq.deepseq (_PutResponse'key x__) (()))))
 {- | Fields :
 

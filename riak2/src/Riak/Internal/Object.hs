@@ -53,7 +53,7 @@ fromProtoContent key context proto =
 
 fromGetResponse :: Key -> Proto.GetResponse -> [Object ByteString]
 fromGetResponse key response =
-  fromProtoContent key (response ^. L.vclock) <$>
+  fromProtoContent key (response ^. L.context) <$>
     response ^. L.content
 
 -- | Parse an object from a put response.
@@ -62,7 +62,7 @@ fromGetResponse key response =
 fromPutResponse :: Key -> Proto.PutResponse -> NonEmpty (Object ByteString)
 fromPutResponse k@(Key type' bucket key) response =
   List1.fromList
-    (fromProtoContent key' (response ^. L.vclock) <$>
+    (fromProtoContent key' (response ^. L.context) <$>
       response ^. L.content)
   where
     key' :: Key

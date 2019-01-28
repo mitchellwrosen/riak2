@@ -159,7 +159,7 @@ makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest key opts =
   defMessage
     & L.bucket .~ (key ^. field @"bucket")
-    & L.deletedvclock .~ True
+    & L.deletedContext .~ True
     & L.head .~ True
     & L.key .~ (key ^. field @"key")
     & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
@@ -295,7 +295,7 @@ makePutRequest (Key type' bucket key) content opts =
           else Just key)
     & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
     & L.maybe'pw .~ Quorum.toWord32 (pw opts)
-    & L.maybe'vclock .~
+    & L.maybe'context .~
         (let
           context :: ByteString
           context =
@@ -341,7 +341,7 @@ delete client content = liftIO $
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
         & L.type' .~ type'
-        & L.vclock .~ unContext (content ^. field @"context")
+        & L.context .~ unContext (content ^. field @"context")
 
     Key type' bucket key =
       content ^. field @"key"

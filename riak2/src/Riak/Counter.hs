@@ -98,7 +98,7 @@ update client (Counter { key, value }) = liftIO $
 
               _ ->
                 defMessage
-                  & L.counter .~
+                  & L.counterUpdate .~
                       (defMessage
                         & L.increment .~ value)
         & L.returnBody .~ True
