@@ -117,7 +117,7 @@ mockServer = do
                 RequestIndex{}                   -> respond ResponseIndex
                 RequestListBuckets{}             -> respond ResponseListBuckets
                 RequestListKeys{}                -> respond ResponseListKeys
-                RequestMapReduce{}               -> respond ResponseMapReduce
+                -- RequestMapReduce{}               -> respond ResponseMapReduce
                 RequestPing{}                    -> respond ResponsePing
                 RequestPut{}                     -> respond ResponsePut
                 RequestResetBucketProperties{}   -> respond ResponseResetBucketProperties
@@ -166,10 +166,10 @@ expectedResponse request response =
       case response of
         ResponseListKeys{} -> True
         _ -> False
-    RequestMapReduce{} ->
-      case response of
-        ResponseMapReduce{} -> True
-        _ -> False
+    -- RequestMapReduce{} ->
+    --   case response of
+    --     ResponseMapReduce{} -> True
+    --     _ -> False
     RequestPing{} ->
       case response of
         ResponsePing{} -> True

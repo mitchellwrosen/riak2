@@ -70,7 +70,7 @@ exactQuery client query@(ExactQuery { value }) keyFold =
         & L.bucket .~ bucket
         & L.index .~ ExactQuery.name query
         & L.key .~ IndexValue.encode value
-        & L.qtype .~ Proto.IndexRequest'eq
+        & L.qtype .~ Proto.IndexRequest'exact
         & L.stream .~ True
         & L.type' .~ type'
 

@@ -26,7 +26,7 @@ data Request
   | RequestIndex IndexRequest
   | RequestListBuckets ListBucketsRequest
   | RequestListKeys ListKeysRequest
-  | RequestMapReduce MapReduceRequest
+  -- | RequestMapReduce MapReduceRequest
   | RequestPing PingRequest
   | RequestPut PutRequest
   | RequestResetBucketProperties ResetBucketPropertiesRequest
@@ -56,7 +56,7 @@ decode code bytes =
     17   -> go RequestListKeys
     19   -> go RequestGetBucketProperties
     21   -> go RequestSetBucketProperties
-    23   -> go RequestMapReduce
+    -- 23   -> go RequestMapReduce
     25   -> go RequestIndex
     -- 27   -> go RequestSearchQuery
     29   -> go RequestResetBucketProperties
@@ -91,7 +91,7 @@ encode = \case
   RequestGetCrdt                 request -> Utils.wire 80 request
   RequestGetServerInfo           request -> Utils.wire  7 request
   RequestIndex                   request -> Utils.wire 25 request
-  RequestMapReduce               request -> Utils.wire 23 request
+  -- RequestMapReduce               request -> Utils.wire 23 request
   RequestPing                    request -> Utils.wire  1 request
   RequestPut                     request -> Utils.wire 11 request
   RequestResetBucketProperties   request -> Utils.wire 29 request

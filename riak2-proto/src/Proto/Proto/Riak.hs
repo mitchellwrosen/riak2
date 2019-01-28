@@ -6,10 +6,10 @@
 {-# OPTIONS_GHC -fno-warn-unused-imports#-}
 {-# OPTIONS_GHC -fno-warn-duplicate-exports#-}
 module Proto.Proto.Riak
-       (AuthenticationRequest(), BucketProperties(),
-        BucketProperties'RpbReplMode(..), BucketProperties'RpbReplMode(),
-        CommitHook(), Content(), CounterUpdate(), Crdt(), CrdtUpdate(),
-        DeleteRequest(), DeleteResponse(), ErrorResponse(), GSetUpdate(),
+       (BucketProperties(), BucketProperties'RpbReplMode(..),
+        BucketProperties'RpbReplMode(), CommitHook(), Content(),
+        CounterUpdate(), Crdt(), CrdtUpdate(), DeleteRequest(),
+        DeleteResponse(), ErrorResponse(), GSetUpdate(),
         GetBucketPropertiesRequest(), GetBucketPropertiesResponse(),
         GetBucketTypePropertiesRequest(), GetCrdtRequest(),
         GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
@@ -19,8 +19,7 @@ module Proto.Proto.Riak
         IndexRequest'IndexQueryType(), IndexResponse(), Link(),
         ListBucketsRequest(), ListBucketsResponse(), ListKeysRequest(),
         ListKeysResponse(), MapKey(), MapKey'MapKeyType(..),
-        MapKey'MapKeyType(), MapReduceRequest(), MapReduceResponse(),
-        MapUpdate(), MapValue(), MapValueUpdate(),
+        MapKey'MapKeyType(), MapUpdate(), MapValue(), MapValueUpdate(),
         MapValueUpdate'FlagUpdate(..), MapValueUpdate'FlagUpdate(),
         ModuleFunction(), Pair(), PingRequest(), PingResponse(),
         PutRequest(), PutResponse(), ResetBucketPropertiesRequest(),
@@ -56,77 +55,6 @@ import qualified Data.ProtoLens.Runtime.Data.ByteString.Char8
 import qualified Data.ProtoLens.Runtime.Lens.Labels as Lens.Labels
 import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 
-{- | Fields :
-
-    * 'Proto.Proto.Riak_Fields.user' @:: Lens' AuthenticationRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.password' @:: Lens' AuthenticationRequest Data.ByteString.ByteString@
- -}
-data AuthenticationRequest = AuthenticationRequest{_AuthenticationRequest'user
-                                                   :: !Data.ByteString.ByteString,
-                                                   _AuthenticationRequest'password ::
-                                                   !Data.ByteString.ByteString,
-                                                   _AuthenticationRequest'_unknownFields ::
-                                                   !Data.ProtoLens.FieldSet}
-                               deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show AuthenticationRequest where
-        showsPrec _ __x __s
-          = Prelude.showChar '{'
-              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
-                 (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' AuthenticationRequest "user"
-           (Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _AuthenticationRequest'user
-                 (\ x__ y__ -> x__{_AuthenticationRequest'user = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' AuthenticationRequest "password"
-           (Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _AuthenticationRequest'password
-                 (\ x__ y__ -> x__{_AuthenticationRequest'password = y__}))
-              Prelude.id
-instance Data.ProtoLens.Message AuthenticationRequest where
-        messageName _ = Data.Text.pack "AuthenticationRequest"
-        fieldsByTag
-          = let user__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "user"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
-                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "user")))
-                      :: Data.ProtoLens.FieldDescriptor AuthenticationRequest
-                password__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "password"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
-                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "password")))
-                      :: Data.ProtoLens.FieldDescriptor AuthenticationRequest
-              in
-              Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, user__field_descriptor),
-                 (Data.ProtoLens.Tag 2, password__field_descriptor)]
-        unknownFields
-          = Lens.Family2.Unchecked.lens _AuthenticationRequest'_unknownFields
-              (\ x__ y__ -> x__{_AuthenticationRequest'_unknownFields = y__})
-        defMessage
-          = AuthenticationRequest{_AuthenticationRequest'user =
-                                    Data.ProtoLens.fieldDefault,
-                                  _AuthenticationRequest'password = Data.ProtoLens.fieldDefault,
-                                  _AuthenticationRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData AuthenticationRequest where
-        rnf
-          = \ x__ ->
-              Control.DeepSeq.deepseq (_AuthenticationRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_AuthenticationRequest'user x__)
-                   (Control.DeepSeq.deepseq (_AuthenticationRequest'password x__)
-                      (())))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.n' @:: Lens' BucketProperties Data.Word.Word32@
@@ -4327,23 +4255,23 @@ instance Control.DeepSeq.NFData IndexRequest where
                                                              (Control.DeepSeq.deepseq
                                                                 (_IndexRequest'returnBody x__)
                                                                 (())))))))))))))))))
-data IndexRequest'IndexQueryType = IndexRequest'eq
+data IndexRequest'IndexQueryType = IndexRequest'exact
                                  | IndexRequest'range
                                      deriving (Prelude.Show, Prelude.Eq, Prelude.Ord)
 instance Data.ProtoLens.MessageEnum IndexRequest'IndexQueryType
          where
-        maybeToEnum 0 = Prelude.Just IndexRequest'eq
+        maybeToEnum 0 = Prelude.Just IndexRequest'exact
         maybeToEnum 1 = Prelude.Just IndexRequest'range
         maybeToEnum _ = Prelude.Nothing
-        showEnum IndexRequest'eq = "eq"
+        showEnum IndexRequest'exact = "exact"
         showEnum IndexRequest'range = "range"
         readEnum k
-          | (Prelude.==) k "eq" = Prelude.Just IndexRequest'eq
+          | (Prelude.==) k "exact" = Prelude.Just IndexRequest'exact
           | (Prelude.==) k "range" = Prelude.Just IndexRequest'range
         readEnum k
           = (Prelude.>>=) (Text.Read.readMaybe k) Data.ProtoLens.maybeToEnum
 instance Prelude.Bounded IndexRequest'IndexQueryType where
-        minBound = IndexRequest'eq
+        minBound = IndexRequest'exact
         maxBound = IndexRequest'range
 instance Prelude.Enum IndexRequest'IndexQueryType where
         toEnum k__
@@ -4353,23 +4281,23 @@ instance Prelude.Enum IndexRequest'IndexQueryType where
                     (Prelude.show k__)))
               Prelude.id
               (Data.ProtoLens.maybeToEnum k__)
-        fromEnum IndexRequest'eq = 0
+        fromEnum IndexRequest'exact = 0
         fromEnum IndexRequest'range = 1
         succ IndexRequest'range
           = Prelude.error
               "IndexRequest'IndexQueryType.succ: bad argument IndexRequest'range. This value would be out of bounds."
-        succ IndexRequest'eq = IndexRequest'range
-        pred IndexRequest'eq
+        succ IndexRequest'exact = IndexRequest'range
+        pred IndexRequest'exact
           = Prelude.error
-              "IndexRequest'IndexQueryType.pred: bad argument IndexRequest'eq. This value would be out of bounds."
-        pred IndexRequest'range = IndexRequest'eq
+              "IndexRequest'IndexQueryType.pred: bad argument IndexRequest'exact. This value would be out of bounds."
+        pred IndexRequest'range = IndexRequest'exact
         enumFrom = Data.ProtoLens.Message.Enum.messageEnumFrom
         enumFromTo = Data.ProtoLens.Message.Enum.messageEnumFromTo
         enumFromThen = Data.ProtoLens.Message.Enum.messageEnumFromThen
         enumFromThenTo = Data.ProtoLens.Message.Enum.messageEnumFromThenTo
 instance Data.ProtoLens.FieldDefault IndexRequest'IndexQueryType
          where
-        fieldDefault = IndexRequest'eq
+        fieldDefault = IndexRequest'exact
 instance Control.DeepSeq.NFData IndexRequest'IndexQueryType where
         rnf x__ = Prelude.seq x__ (())
 {- | Fields :
@@ -5123,193 +5051,6 @@ instance Data.ProtoLens.FieldDefault MapKey'MapKeyType where
         fieldDefault = MapKey'COUNTER
 instance Control.DeepSeq.NFData MapKey'MapKeyType where
         rnf x__ = Prelude.seq x__ (())
-{- | Fields :
-
-    * 'Proto.Proto.Riak_Fields.request' @:: Lens' MapReduceRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.contentType' @:: Lens' MapReduceRequest Data.ByteString.ByteString@
- -}
-data MapReduceRequest = MapReduceRequest{_MapReduceRequest'request
-                                         :: !Data.ByteString.ByteString,
-                                         _MapReduceRequest'contentType ::
-                                         !Data.ByteString.ByteString,
-                                         _MapReduceRequest'_unknownFields ::
-                                         !Data.ProtoLens.FieldSet}
-                          deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show MapReduceRequest where
-        showsPrec _ __x __s
-          = Prelude.showChar '{'
-              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
-                 (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' MapReduceRequest "request"
-           (Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceRequest'request
-                 (\ x__ y__ -> x__{_MapReduceRequest'request = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapReduceRequest "contentType"
-           (Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceRequest'contentType
-                 (\ x__ y__ -> x__{_MapReduceRequest'contentType = y__}))
-              Prelude.id
-instance Data.ProtoLens.Message MapReduceRequest where
-        messageName _ = Data.Text.pack "MapReduceRequest"
-        fieldsByTag
-          = let request__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "request"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
-                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "request")))
-                      :: Data.ProtoLens.FieldDescriptor MapReduceRequest
-                contentType__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "content_type"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
-                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "contentType")))
-                      :: Data.ProtoLens.FieldDescriptor MapReduceRequest
-              in
-              Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, request__field_descriptor),
-                 (Data.ProtoLens.Tag 2, contentType__field_descriptor)]
-        unknownFields
-          = Lens.Family2.Unchecked.lens _MapReduceRequest'_unknownFields
-              (\ x__ y__ -> x__{_MapReduceRequest'_unknownFields = y__})
-        defMessage
-          = MapReduceRequest{_MapReduceRequest'request =
-                               Data.ProtoLens.fieldDefault,
-                             _MapReduceRequest'contentType = Data.ProtoLens.fieldDefault,
-                             _MapReduceRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData MapReduceRequest where
-        rnf
-          = \ x__ ->
-              Control.DeepSeq.deepseq (_MapReduceRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_MapReduceRequest'request x__)
-                   (Control.DeepSeq.deepseq (_MapReduceRequest'contentType x__) (())))
-{- | Fields :
-
-    * 'Proto.Proto.Riak_Fields.phase' @:: Lens' MapReduceResponse Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'phase' @:: Lens' MapReduceResponse (Prelude.Maybe Data.Word.Word32)@
-    * 'Proto.Proto.Riak_Fields.response' @:: Lens' MapReduceResponse Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'response' @:: Lens' MapReduceResponse (Prelude.Maybe Data.ByteString.ByteString)@
-    * 'Proto.Proto.Riak_Fields.done' @:: Lens' MapReduceResponse Prelude.Bool@
-    * 'Proto.Proto.Riak_Fields.maybe'done' @:: Lens' MapReduceResponse (Prelude.Maybe Prelude.Bool)@
- -}
-data MapReduceResponse = MapReduceResponse{_MapReduceResponse'phase
-                                           :: !(Prelude.Maybe Data.Word.Word32),
-                                           _MapReduceResponse'response ::
-                                           !(Prelude.Maybe Data.ByteString.ByteString),
-                                           _MapReduceResponse'done :: !(Prelude.Maybe Prelude.Bool),
-                                           _MapReduceResponse'_unknownFields ::
-                                           !Data.ProtoLens.FieldSet}
-                           deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show MapReduceResponse where
-        showsPrec _ __x __s
-          = Prelude.showChar '{'
-              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
-                 (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' MapReduceResponse "phase"
-           (Data.Word.Word32)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceResponse'phase
-                 (\ x__ y__ -> x__{_MapReduceResponse'phase = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapReduceResponse "maybe'phase"
-           (Prelude.Maybe Data.Word.Word32)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceResponse'phase
-                 (\ x__ y__ -> x__{_MapReduceResponse'phase = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapReduceResponse "response"
-           (Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceResponse'response
-                 (\ x__ y__ -> x__{_MapReduceResponse'response = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapReduceResponse "maybe'response"
-           (Prelude.Maybe Data.ByteString.ByteString)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceResponse'response
-                 (\ x__ y__ -> x__{_MapReduceResponse'response = y__}))
-              Prelude.id
-instance Lens.Labels.HasLens' MapReduceResponse "done"
-           (Prelude.Bool)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceResponse'done
-                 (\ x__ y__ -> x__{_MapReduceResponse'done = y__}))
-              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' MapReduceResponse "maybe'done"
-           (Prelude.Maybe Prelude.Bool)
-         where
-        lensOf' _
-          = (Prelude..)
-              (Lens.Family2.Unchecked.lens _MapReduceResponse'done
-                 (\ x__ y__ -> x__{_MapReduceResponse'done = y__}))
-              Prelude.id
-instance Data.ProtoLens.Message MapReduceResponse where
-        messageName _ = Data.Text.pack "MapReduceResponse"
-        fieldsByTag
-          = let phase__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "phase"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'phase")))
-                      :: Data.ProtoLens.FieldDescriptor MapReduceResponse
-                response__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "response"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
-                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'response")))
-                      :: Data.ProtoLens.FieldDescriptor MapReduceResponse
-                done__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "done"
-                      (Data.ProtoLens.ScalarField Data.ProtoLens.BoolField ::
-                         Data.ProtoLens.FieldTypeDescriptor Prelude.Bool)
-                      (Data.ProtoLens.OptionalField
-                         (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'done")))
-                      :: Data.ProtoLens.FieldDescriptor MapReduceResponse
-              in
-              Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, phase__field_descriptor),
-                 (Data.ProtoLens.Tag 2, response__field_descriptor),
-                 (Data.ProtoLens.Tag 3, done__field_descriptor)]
-        unknownFields
-          = Lens.Family2.Unchecked.lens _MapReduceResponse'_unknownFields
-              (\ x__ y__ -> x__{_MapReduceResponse'_unknownFields = y__})
-        defMessage
-          = MapReduceResponse{_MapReduceResponse'phase = Prelude.Nothing,
-                              _MapReduceResponse'response = Prelude.Nothing,
-                              _MapReduceResponse'done = Prelude.Nothing,
-                              _MapReduceResponse'_unknownFields = ([])}
-instance Control.DeepSeq.NFData MapReduceResponse where
-        rnf
-          = \ x__ ->
-              Control.DeepSeq.deepseq (_MapReduceResponse'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_MapReduceResponse'phase x__)
-                   (Control.DeepSeq.deepseq (_MapReduceResponse'response x__)
-                      (Control.DeepSeq.deepseq (_MapReduceResponse'done x__) (()))))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.removes' @:: Lens' MapUpdate [MapKey]@

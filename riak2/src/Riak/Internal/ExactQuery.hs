@@ -21,8 +21,8 @@ name (ExactQuery { index, value }) =
     IndexValue.Binary{}  -> index <> "_bin"
     IndexValue.Integer{} -> index <> "_int"
 
--- | Build a query on the built-in index @\"\$bucket\"@, which indexes each key
--- by the bucket it's in.
+-- | Build a query on the built-in index @\"\$bucket\"@, which indexes each
+-- object by its bucket.
 inBucket ::
      Bucket -- ^
   -> ExactQuery

@@ -22,3 +22,16 @@ name (RangeQuery { index, min }) =
   case min of
     IndexValue.Binary{}  -> index <> "_bin"
     IndexValue.Integer{} -> index <> "_int"
+
+-- | Build a query on the built-in index @\"\$key\"@, which indexes each object
+-- by its key.
+keysBetween ::
+     Bucket
+  -> IndexValue ByteString
+  -> IndexValue ByteString
+  -> RangeQuery ByteString
+keysBetween bucket min max =
+  RangeQuery
+    { index = "$key"
+    , ..
+    }

@@ -65,6 +65,7 @@ library
     OverloadedStrings
     PatternSynonyms
     RankNTypes
+    RecordWildCards
     ScopedTypeVariables
     StandaloneDeriving
     TupleSections
