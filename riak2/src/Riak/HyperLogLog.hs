@@ -42,7 +42,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Result (HyperLogLog Word64))
+  -> m (Result (Maybe (HyperLogLog Word64)))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -65,11 +65,13 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> HyperLogLog Word64
-    fromResponse response =
-      HyperLogLog
+    fromResponse :: Proto.GetCrdtResponse -> Maybe (HyperLogLog Word64)
+    fromResponse response = do
+      crdt :: Proto.Crdt <-
+        response ^. L.maybe'value
+      pure HyperLogLog
         { key = k
-        , value = response ^. L.value . L.hll
+        , value = crdt ^. L.hll
         }
 
 -- | Update a HyperLogLog.

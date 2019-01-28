@@ -76,7 +76,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Result (Map Maps))
+  -> m (Result (Maybe (Map Maps)))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -99,12 +99,14 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Map Maps
-    fromResponse response =
-      Map
+    fromResponse :: Proto.GetCrdtResponse -> Maybe (Map Maps)
+    fromResponse response = do
+      crdt :: Proto.Crdt <-
+        response ^. L.maybe'value
+      pure Map
         { context = Context (response ^. L.context)
         , key = k
-        , value = mapEntriesToMaps (response ^. L.value . L.map)
+        , value = mapValuesToMaps (crdt ^. L.map)
         }
 
 -- | Update a map.
@@ -170,29 +172,29 @@ update client (Map { context, key, value }) = liftIO $
             if ByteString.null k
               then key { key = response ^. L.key }
               else key
-        , value = mapEntriesToMaps (response ^. L.map)
+        , value = mapValuesToMaps (response ^. L.map)
         }
 
-mapEntriesToMaps :: [Proto.MapEntry] -> Maps
-mapEntriesToMaps =
-  foldMap mapEntryToMaps
+mapValuesToMaps :: [Proto.MapValue] -> Maps
+mapValuesToMaps =
+  foldMap mapValueToMaps
 
-mapEntryToMaps :: Proto.MapEntry -> Maps
-mapEntryToMaps entry =
+mapValueToMaps :: Proto.MapValue -> Maps
+mapValueToMaps entry =
   case entry ^. L.field . L.type' of
-    Proto.MapField'COUNTER ->
+    Proto.MapKey'COUNTER ->
       mempty { counters = HashMap.singleton name (entry ^. L.counterValue) }
 
-    Proto.MapField'FLAG ->
+    Proto.MapKey'FLAG ->
       mempty { flags = HashMap.singleton name (entry ^. L.flagValue) }
 
-    Proto.MapField'MAP ->
-      mempty { maps = HashMap.singleton name (mapEntriesToMaps (entry ^. L.mapValue)) }
+    Proto.MapKey'MAP ->
+      mempty { maps = HashMap.singleton name (mapValuesToMaps (entry ^. L.mapValue)) }
 
-    Proto.MapField'REGISTER ->
+    Proto.MapKey'REGISTER ->
       mempty { registers = HashMap.singleton name (entry ^. L.registerValue) }
 
-    Proto.MapField'SET ->
+    Proto.MapKey'SET ->
       mempty { sets = HashMap.singleton name (HashSet.fromList (entry ^. L.setValue)) }
 
   where
@@ -207,26 +209,26 @@ updatesToMapUpdate =
 updateToEndoMapUpdate :: Update -> Proto.MapUpdate -> Proto.MapUpdate
 updateToEndoMapUpdate = \case
   RemoveCounter name ->
-    L.removes %~ (mapfield name Proto.MapField'COUNTER :)
+    L.removes %~ (mapkey name Proto.MapKey'COUNTER :)
 
   RemoveFlag name ->
-    L.removes %~ (mapfield name Proto.MapField'FLAG :)
+    L.removes %~ (mapkey name Proto.MapKey'FLAG :)
 
   RemoveMap name ->
-    L.removes %~ (mapfield name Proto.MapField'MAP :)
+    L.removes %~ (mapkey name Proto.MapKey'MAP :)
 
   RemoveRegister name ->
-    L.removes %~ (mapfield name Proto.MapField'REGISTER :)
+    L.removes %~ (mapkey name Proto.MapKey'REGISTER :)
 
   RemoveSet name ->
-    L.removes %~ (mapfield name Proto.MapField'SET :)
+    L.removes %~ (mapkey name Proto.MapKey'SET :)
 
   UpdateCounter name value ->
     let
       update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name Proto.MapField'COUNTER
+          & L.field .~ mapkey name Proto.MapKey'COUNTER
           & L.counter .~ (defMessage & L.increment .~ value)
     in
       L.updates %~ (update :)
@@ -236,7 +238,7 @@ updateToEndoMapUpdate = \case
       update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name Proto.MapField'FLAG
+          & L.field .~ mapkey name Proto.MapKey'FLAG
           & L.flag .~
               case value of
                 False -> Proto.MapFieldUpdate'DISABLE
@@ -249,7 +251,7 @@ updateToEndoMapUpdate = \case
       update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name Proto.MapField'MAP
+          & L.field .~ mapkey name Proto.MapKey'MAP
           & L.map .~ updatesToMapUpdate value
     in
       L.updates %~ (update :)
@@ -259,7 +261,7 @@ updateToEndoMapUpdate = \case
       update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name Proto.MapField'REGISTER
+          & L.field .~ mapkey name Proto.MapKey'REGISTER
           & L.register .~ value
     in
       L.updates %~ (update :)
@@ -269,14 +271,14 @@ updateToEndoMapUpdate = \case
       update :: Proto.MapFieldUpdate
       update =
         defMessage
-          & L.field .~ mapfield name Proto.MapField'SET
+          & L.field .~ mapkey name Proto.MapKey'SET
           & L.set .~ Set.updatesToSetUpdate value
     in
       L.updates %~ (update :)
 
   where
-    mapfield :: ByteString -> Proto.MapField'MapFieldType -> Proto.MapField
-    mapfield name type' =
+    mapkey :: ByteString -> Proto.MapKey'MapKeyType -> Proto.MapKey
+    mapkey name type' =
       defMessage
         & L.name .~ name
         & L.type' .~ type'

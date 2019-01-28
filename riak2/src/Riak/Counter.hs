@@ -33,7 +33,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Result Counter)
+  -> m (Result (Maybe Counter))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -56,11 +56,13 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Counter
-    fromResponse response =
-      Counter
+    fromResponse :: Proto.GetCrdtResponse -> Maybe Counter
+    fromResponse response = do
+      crdt :: Proto.Crdt <-
+        response ^. L.maybe'value
+      pure Counter
         { key = k
-        , value = response ^. L.value . L.counter
+        , value = crdt ^. L.counter
         }
 
 -- | Update a counter.

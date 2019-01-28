@@ -34,7 +34,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Result (Set (HashSet ByteString)))
+  -> m (Result (Maybe (Set (HashSet ByteString))))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -57,12 +57,14 @@ get client k@(Key type' bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Set (HashSet ByteString)
-    fromResponse response =
-      Set
+    fromResponse :: Proto.GetCrdtResponse -> Maybe (Set (HashSet ByteString))
+    fromResponse response = do
+      crdt :: Proto.Crdt <-
+        response ^. L.maybe'value
+      pure Set
         { context = Context (response ^. L.context)
         , key = k
-        , value = HashSet.fromList (response ^. L.value . L.set)
+        , value = HashSet.fromList (crdt ^. L.set)
         }
 
 -- | Update a set.

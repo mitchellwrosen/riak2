@@ -1,80 +1,59 @@
 syntax = "proto2";
 
-// Error response - may be generated for any Req
 message ErrorResponse {
     required bytes errmsg = 1;
     required uint32 code = 2;
 }
 
-// Get server info request - no message defined, just send RpbGetServerInfoReq message code
 message GetServerInfoResponse {
     optional bytes node = 1;
     optional bytes version = 2;
 }
 
-// Key/value pair - used for user metadata, indexes, search doc fields
 message Pair {
     required bytes key = 1;
     optional bytes value = 2;
 }
 
-
-// Get bucket properties request
 message GetBucketPropertiesRequest {
     required bytes bucket = 1;
     optional bytes type = 2;
 }
-
-// Get bucket properties response
 message GetBucketPropertiesResponse {
     required BucketProperties props = 1;
 }
 
-// Set bucket properties request
 message SetBucketPropertiesRequest {
     required bytes bucket = 1;
     required BucketProperties props = 2;
     optional bytes type = 3;
 }
 
-// Set bucket properties response - no message defined, just send
-// RpbSetBucketResp
-
-// Reset bucket properties request
 message ResetBucketPropertiesRequest {
     required bytes bucket = 1;
     optional bytes type = 2;
 }
 
-// Get bucket properties request
 message GetBucketTypePropertiesRequest {
     required bytes type = 1;
 }
 
-// Set bucket properties request
 message SetBucketTypePropertiesRequest {
     required bytes type = 1;
     required BucketProperties props = 2;
 }
 
-// Set bucket properties response - no message defined, just send
-// RpbSetBucketResp
-
-// Module-Function pairs for commit hooks and other bucket properties
-// that take functions
 message ModuleFunction {
     required bytes module = 1;
     required bytes function = 2;
 }
 
-// A commit hook, which may either be a modfun or a JavaScript named
-// function
+// May either be a modfun or a JavaScript named function
 message CommitHook {
     optional ModuleFunction modfun = 1;
     optional bytes name = 2;
 }
 
-// Bucket properties
 message BucketProperties {
     // Declared in riak_core_app
     optional uint32 n = 1;
@@ -135,23 +114,13 @@ message BucketProperties {
     optional uint32 ttl = 30;
 }
 
-// Authentication request
 message AuthenticationRequest {
     required bytes user = 1;
     required bytes password = 2;
 }
 
-/*
- * Field names in maps are composed of a binary identifier and a type.
- * This is so that two clients can create fields with the same name
- * but different types, and they converge independently.
- */
-message MapField {
-    /*
-     * The types that can be stored in a map are limited to counters,
-     * sets, registers, flags, and maps.
-     */
-    enum MapFieldType {
+message MapKey {
+    enum MapKeyType {
         COUNTER  = 1;
         SET      = 2;
         REGISTER = 3;
@@ -159,33 +128,23 @@ message MapField {
         MAP      = 5;
     }
 
-    required bytes        name = 1;
-    required MapFieldType type = 2;
+    required bytes      name = 1;
+    required MapKeyType type = 2;
 }
 
+message MapValue {
+    required MapKey field = 1;
 
-/*
- * An entry in a map is a pair of a field-name and value. The type
- * defined in the field determines which value type is expected.
- */
-message MapEntry {
-    required MapField field = 1;
+    // At most one of these exists, and if it does, it is the one that the above
+    // type indicates. But all may be missing, e.g. a missing counter update
+    // means "increment by 1".
     optional sint64   counter_value  = 2;
     repeated bytes    set_value      = 3;
     optional bytes    register_value = 4;
     optional bool     flag_value     = 5;
-    repeated MapEntry map_value      = 6;
+    repeated MapValue map_value      = 6;
 }
 
-/*
- * =============== FETCH =================
- */
-
-/*
- * The equivalent of KV's "RpbGetReq", results in a DtFetchResp. The
- * request-time options are limited to ones that are relevant to
- * structured data-types.
- */
 message GetCrdtRequest {
     // The identifier: bucket, key and bucket-type
     required bytes bucket = 1;
@@ -214,7 +173,7 @@ message GetCrdtRequest {
 message Crdt {
     optional sint64   counter = 1;
     repeated bytes    set     = 2;
-    repeated MapEntry map     = 3;
+    repeated MapValue map     = 3;
     /* We return an estimated cardinality of the Hyperloglog set
      * on fetch.
      */
@@ -223,15 +182,6 @@ message Crdt {
 }
 
 
-/*
- * The response to a "Fetch" request. If the `include_context` option
- * is specified, an opaque "context" value will be returned along with
- * the user-friendly data. When sending an "Update" request, the
- * client should send this context as well, similar to how one would
- * send a vclock for KV updates. The `type` field indicates which
- * value type to expect. When the `value` field is missing from the
- * message, the client should interpret it as a "not found".
- */
 message GetCrdtResponse {
     enum CrdtType {
         COUNTER = 1;
@@ -241,9 +191,9 @@ message GetCrdtResponse {
         GSET    = 5;
     }
 
-    optional bytes    context = 1;
-    required CrdtType type    = 2;
-    optional Crdt     value   = 3;
+    optional bytes    context = 1; // Returned if `include_context` was set
+    required CrdtType type    = 2; // The type of the value, if it exists
+    optional Crdt     value   = 3; // If missing, "not found"
 }
 
 /*
@@ -301,7 +251,7 @@ message MapFieldUpdate {
         DISABLE = 2;
     }
 
-    required MapField  field        = 1;
+    required MapKey  field        = 1;
 
     optional CounterUpdate counter  = 2;
     optional SetUpdate     set      = 3;
@@ -326,7 +276,7 @@ message MapUpdate {
      * UPDATE applies type-specific
      * operations to the values stored in the Map.
      */
-    repeated MapField       removes = 1;
+    repeated MapKey       removes = 1;
     repeated MapFieldUpdate updates = 2;
 }
 
@@ -388,7 +338,7 @@ message UpdateCrdtResponse {
     optional bytes    context = 2;
     optional sint64   counter = 3;
     repeated bytes    set     = 4;
-    repeated MapEntry map     = 5;
+    repeated MapValue map     = 5;
     optional uint64   hll     = 6;
     repeated bytes    gset    = 7;
 }
