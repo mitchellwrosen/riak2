@@ -467,7 +467,7 @@ message DeleteRequest {
 // Delete response - not defined, will return a RpbDelResp on success or ErrorResponse on failure
 
 // List buckets request
-message StreamBucketsRequest {
+message ListBucketsRequest {
     optional uint32 timeout = 1;
     optional bool stream = 2;
     optional bytes type = 3;         // Bucket type, if not set we assume the 'default' type
@@ -475,14 +475,14 @@ message StreamBucketsRequest {
 
 // List buckets response - one or more of these packets will be sent
 // the last one will have done set true (and may not have any buckets in it)
-message StreamBucketsResponse {
+message ListBucketsResponse {
     repeated bytes buckets = 1;
     optional bool done = 2;
 }
 
 
 // List keys in bucket request
-message StreamKeysRequest {
+message ListKeysRequest {
     required bytes bucket = 1;
     optional uint32 timeout = 2;
     optional bytes type = 3;         // Bucket type, if not set we assume the 'default' type
@@ -490,7 +490,7 @@ message StreamKeysRequest {
 
 // List keys in bucket response - one or more of these packets will be sent
 // the last one will have done set true (and may not have any keys in it)
-message StreamKeysResponse {
+message ListKeysResponse {
     repeated bytes keys = 1;
     optional bool done = 2;
 }

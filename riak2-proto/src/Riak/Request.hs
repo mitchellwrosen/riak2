@@ -1,5 +1,6 @@
 module Riak.Request
   ( Request(..)
+  , parse
   , encode
   ) where
 
@@ -7,7 +8,12 @@ import Riak.Proto
 
 import qualified Utils
 
+import Data.Bifunctor  (bimap)
 import Data.ByteString (ByteString)
+import Data.Word       (Word8)
+
+import qualified Data.ByteString as ByteString
+import qualified Data.ProtoLens  as Proto
 
 
 data Request
@@ -18,16 +24,63 @@ data Request
   | RequestGetCrdt GetCrdtRequest
   | RequestGetServerInfo GetServerInfoRequest
   | RequestIndex IndexRequest
+  | RequestListBuckets ListBucketsRequest
+  | RequestListKeys ListKeysRequest
   | RequestMapReduce MapReduceRequest
   | RequestPing PingRequest
   | RequestPut PutRequest
   | RequestResetBucketProperties ResetBucketPropertiesRequest
   | RequestSetBucketProperties SetBucketPropertiesRequest
   | RequestSetBucketTypeProperties SetBucketTypePropertiesRequest
-  | RequestStreamBuckets StreamBucketsRequest
-  | RequestStreamKeys StreamKeysRequest
   | RequestUpdateCrdt UpdateCrdtRequest
   deriving stock (Show)
+
+-- | Parse a request, which consists of a 1-byte message code and a payload.
+-- This function assumes the 4-byte, big-endian length prefix has already been
+-- stripped.
+parse :: ByteString -> Either DecodeError Request
+parse bytes =
+  decode (ByteString.head bytes) (ByteString.tail bytes)
+
+decode :: Word8 -> ByteString -> Either DecodeError Request
+decode code bytes =
+  case code of
+    1    -> go RequestPing
+    -- 3    -> go RequestGetClientId
+    -- 5    -> go RequestSetClientId
+    7    -> go RequestGetServerInfo
+    9    -> go RequestGet
+    11   -> go RequestPut
+    13   -> go RequestDelete
+    15   -> go RequestListBuckets
+    17   -> go RequestListKeys
+    19   -> go RequestGetBucketProperties
+    21   -> go RequestSetBucketProperties
+    23   -> go RequestMapReduce
+    25   -> go RequestIndex
+    -- 27   -> go RequestSearchQuery
+    29   -> go RequestResetBucketProperties
+    31   -> go RequestGetBucketTypeProperties
+    32   -> go RequestSetBucketTypeProperties
+    -- 33   -> go RequestGetBucketKeyPreflist
+    -- 54   -> go RequestGetYokozunaIndex
+    -- 56   -> go RequestPutYokozunaIndex
+    -- 57   -> go RequestDeleteYokozunaIndex
+    -- 58   -> go RequestGetYokozunaSchema
+    -- 60   -> go RequestPutYokozunaSchema
+    -- 70   -> go RequestCoverage
+    80   -> go RequestGetCrdt
+    82   -> go RequestUpdateCrdt
+
+    code -> Left (UnknownMessageCode code bytes)
+
+  where
+    go ::
+         Proto.Message a
+      => (a -> Request)
+      -> Either DecodeError Request
+    go f =
+      bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
 
 encode :: Request -> ByteString
 encode = \case
@@ -43,9 +96,9 @@ encode = \case
   RequestPut                     request -> Utils.wire 11 request
   RequestResetBucketProperties   request -> Utils.wire 29 request
   RequestSetBucketProperties     request -> Utils.wire 21 request
-  RequestSetBucketTypeProperties request -> Utils.wire 31 request
-  RequestStreamBuckets           request -> Utils.wire 15 request
-  RequestStreamKeys              request -> Utils.wire 17 request
+  RequestSetBucketTypeProperties request -> Utils.wire 32 request
+  RequestListBuckets             request -> Utils.wire 15 request
+  RequestListKeys                request -> Utils.wire 17 request
   RequestUpdateCrdt              request -> Utils.wire 82 request
 
 -- instance Request RpbSearchQueryReq         where code = 27

@@ -114,15 +114,15 @@ streamKeys
 streamKeys client (Bucket type' bucket) keyFold =
   Client.stream
     client
-    (RequestStreamKeys request)
+    (RequestListKeys request)
     (\case
-      ResponseStreamKeys response -> Just response
+      ResponseListKeys response -> Just response
       _ -> Nothing)
     (view L.done)
     (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
 
   where
-    request :: Proto.StreamKeysRequest
+    request :: Proto.ListKeysRequest
     request =
       defMessage
         & L.type' .~ type'

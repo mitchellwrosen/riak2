@@ -96,15 +96,15 @@ streamBuckets
 streamBuckets client (BucketType type') bucketFold =
   Client.stream
     client
-    (RequestStreamBuckets request)
+    (RequestListBuckets request)
     (\case
-      ResponseStreamBuckets response -> Just response
+      ResponseListBuckets response -> Just response
       _ -> Nothing)
     (view L.done)
     (makeResponseFold type' bucketFold)
 
   where
-    request :: Proto.StreamBucketsRequest
+    request :: Proto.ListBucketsRequest
     request =
       defMessage
         & L.type' .~ type'
@@ -132,6 +132,6 @@ makeResponseFold ::
      Monad m
   => ByteString
   -> FoldM m Bucket r
-  -> FoldM m Proto.StreamBucketsResponse r
+  -> FoldM m Proto.ListBucketsResponse r
 makeResponseFold type' =
   Foldl.handlesM (L.buckets . folded . to (Bucket type'))

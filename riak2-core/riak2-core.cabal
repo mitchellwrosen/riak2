@@ -69,8 +69,6 @@ library riak2-core-internal
     Riak.Interface.Impl.Socket
     Riak.Interface.Impl.Socket.Concurrent
     Riak.Socket
-
-  other-modules:
     Socket
 
 library riak2-interface-impl-managed
@@ -101,9 +99,12 @@ test-suite tests
   build-depends:
     base,
     network,
+    proto-lens,
+    random,
     riak2-core,
     riak2-core-internal,
-    riak2-interface-impl-managed
+    riak2-interface-impl-managed,
+    stm
 
   default-extensions:
     LambdaCase
