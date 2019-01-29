@@ -2,7 +2,7 @@ module Riak.Set
   ( Set(..)
   , get
   , update
-  , Update(..)
+  , SetUpdate(..)
   ) where
 
 import Riak.Internal.Set

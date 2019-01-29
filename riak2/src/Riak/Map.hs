@@ -3,13 +3,14 @@ module Riak.Map
   , Maps(..)
   , get
   , update
-  , Update(..)
+  , MapUpdate(..)
   ) where
 
 import Riak.Context          (Context)
 import Riak.Internal.Client  (Client, Result)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
+import Riak.Internal.Set     (SetUpdate)
 import Riak.Key              (Key(..))
 
 import qualified Riak.Internal.Client as Client
@@ -58,7 +59,7 @@ instance Semigroup Maps where
     Maps (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2)
 
 -- | A map update.
-data Update
+data MapUpdate
   = RemoveCounter ByteString
   | RemoveFlag ByteString
   | RemoveMap ByteString
@@ -66,9 +67,9 @@ data Update
   | RemoveSet ByteString
   | UpdateCounter ByteString Int64
   | UpdateFlag ByteString Bool
-  | UpdateMap ByteString [Update]
+  | UpdateMap ByteString [MapUpdate]
   | UpdateRegister ByteString ByteString
-  | UpdateSet ByteString [Set.Update]
+  | UpdateSet ByteString [SetUpdate]
   deriving stock (Eq, Show)
 
 -- | Get a map.
@@ -115,7 +116,7 @@ get client k@(Key type' bucket key) = liftIO $
 update ::
      MonadIO m
   => Client -- ^
-  -> Map [Update] -- ^
+  -> Map [MapUpdate] -- ^
   -> m (Result (Map Maps))
 update client (Map { context, key, value }) = liftIO $
   (fmap.fmap)
@@ -137,7 +138,7 @@ update client (Map { context, key, value }) = liftIO $
               else Just k)
         & L.update .~
             (defMessage
-              & L.mapUpdate .~ updatesToMapUpdate value)
+              & L.mapUpdate .~ updatesToProto value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -190,12 +191,12 @@ mapValueToMaps entry =
     name =
       entry ^. L.field . L.name
 
-updatesToMapUpdate :: [Update] -> Proto.MapUpdate
-updatesToMapUpdate =
-  ($ defMessage) . appEndo . foldMap (coerce updateToEndoMapUpdate)
+updatesToProto :: [MapUpdate] -> Proto.MapUpdate
+updatesToProto =
+  ($ defMessage) . appEndo . foldMap (coerce updateToEndoProto)
 
-updateToEndoMapUpdate :: Update -> Proto.MapUpdate -> Proto.MapUpdate
-updateToEndoMapUpdate = \case
+updateToEndoProto :: MapUpdate -> Proto.MapUpdate -> Proto.MapUpdate
+updateToEndoProto = \case
   RemoveCounter name ->
     L.removes %~ (mapkey name Proto.MapKey'COUNTER :)
 
@@ -240,7 +241,7 @@ updateToEndoMapUpdate = \case
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'MAP
-          & L.mapUpdate .~ updatesToMapUpdate value
+          & L.mapUpdate .~ updatesToProto value
     in
       L.updates %~ (update :)
 
@@ -260,7 +261,7 @@ updateToEndoMapUpdate = \case
       update =
         defMessage
           & L.field .~ mapkey name Proto.MapKey'SET
-          & L.setUpdate .~ Set.updatesToSetUpdate value
+          & L.setUpdate .~ Set.updatesToProto value
     in
       L.updates %~ (update :)
 

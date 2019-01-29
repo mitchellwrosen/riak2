@@ -24,7 +24,7 @@ data Set a
   } deriving stock (Functor, Generic, Show)
 
 -- | A set update.
-data Update
+data SetUpdate
   = Add ByteString
   | Remove ByteString
   deriving stock (Eq, Show)
@@ -73,7 +73,7 @@ get client k@(Key type' bucket key) = liftIO $
 update ::
      MonadIO m
   => Client -- ^
-  -> Set [Update] -- ^
+  -> Set [SetUpdate] -- ^
   -> m (Result (Set (HashSet ByteString)))
 update client (Set { context, key, value }) = liftIO $
   (fmap.fmap)
@@ -95,7 +95,7 @@ update client (Set { context, key, value }) = liftIO $
               else Just k)
         & L.update .~
             (defMessage
-              & L.setUpdate .~ updatesToSetUpdate value)
+              & L.setUpdate .~ updatesToProto value)
         & L.returnBody .~ True
         & L.type' .~ type'
 
@@ -121,8 +121,8 @@ update client (Set { context, key, value }) = liftIO $
         , value = HashSet.fromList (response ^. L.set)
         }
 
-updatesToSetUpdate :: [Update] -> Proto.SetUpdate
-updatesToSetUpdate updates =
+updatesToProto :: [SetUpdate] -> Proto.SetUpdate
+updatesToProto updates =
   defMessage
     & L.adds .~ adds
     & L.removes .~ removes

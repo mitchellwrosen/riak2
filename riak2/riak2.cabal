@@ -14,7 +14,23 @@ description:
   For example, to /list the keys in a bucket/, the primary input type is the
   /bucket/, so this function is exported by the the "Riak.Bucket" module.
   .
+  Modules are designed for qualified imports, but all types are re-exported by
+  the top-level "Riak" module.
+  .
+  Your imports may therefore look like this:
+  .
+  @
+  import qualified Riak (Bucket(..), BucketType(..), Key(..))
+  import qualified Riak.Bucket
+  import qualified Riak.BucketType
+  import qualified Riak.Key
+  @
+  .
   __Module guide__
+  .
+  Top-level re-export of all types
+  .
+  * "Riak"
   .
   Connection establishment and basic server information:
   .
@@ -129,6 +145,7 @@ library
     Haskell2010
 
   exposed-modules:
+    Riak
     Riak.Bucket
     Riak.BucketProperties
     Riak.BucketType
