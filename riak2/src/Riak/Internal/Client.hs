@@ -11,8 +11,10 @@ import Riak.Response            (Response(..))
 
 import qualified Riak.Interface.Signature as Interface
 import qualified Riak.Proto               as Proto
+import qualified Riak.Proto.Lens          as L
 
-import Control.Foldl (FoldM(..))
+import Control.Foldl      (FoldM(..))
+import Data.Text.Encoding (decodeUtf8)
 
 
 -- TODO rename Interface to Client
@@ -21,7 +23,7 @@ type Client
 
 data Result a
   = Success a
-  | Failure Proto.ErrorResponse
+  | Failure Text
   | ConnectionClosed
   deriving stock (Functor, Show)
 
@@ -45,7 +47,7 @@ exchange client request f =
       pure ConnectionClosed
 
     Just (ResponseError response) ->
-      pure (Failure response)
+      pure (Failure (decodeUtf8 (response ^. L.errmsg)))
 
     Just response ->
       case f response of
@@ -78,7 +80,7 @@ stream client request f done (FoldM step initial extract) =
               pure ConnectionClosed
 
             Just (ResponseError response) ->
-              pure (Failure response)
+              pure (Failure (decodeUtf8 (response ^. L.errmsg)))
 
             Just response ->
               case f response of
