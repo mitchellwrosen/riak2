@@ -7,6 +7,8 @@ import Riak.Internal.Prelude
 import qualified Riak.Internal.IndexValue as IndexValue
 
 -- | A range query on a secondary index.
+--
+-- /See also/: @'Riak.Bucket.rangeQuery'@, @'Riak.ExactQuery.ExactQuery'@,
 data RangeQuery a
   = RangeQuery
   { bucket :: !Bucket
@@ -26,9 +28,9 @@ name (RangeQuery { index, min }) =
 -- | Build a query on the built-in index @\"\$key\"@, which indexes each object
 -- by its key.
 keysBetween ::
-     Bucket
-  -> IndexValue ByteString
-  -> IndexValue ByteString
+     Bucket -- ^
+  -> IndexValue ByteString -- ^
+  -> IndexValue ByteString -- ^
   -> RangeQuery ByteString
 keysBetween bucket min max =
   RangeQuery

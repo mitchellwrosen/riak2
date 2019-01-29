@@ -70,7 +70,7 @@ get client k@(Key type' bucket key) = liftIO $
 -- /Note/: Counters, unlike other data types, represent their own update
 -- operation.
 --
--- /See also/: Riak.Key.'Riak.Key.none'
+-- /See also/: @Riak.Key.'Riak.Key.none'@
 update ::
      MonadIO m
   => Client -- ^

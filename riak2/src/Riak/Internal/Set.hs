@@ -69,19 +69,7 @@ get client k@(Key type' bucket key) = liftIO $
 
 -- | Update a set.
 --
--- To update a set for the first time, use an empty causal context:
---
--- @
--- 'Set'
---   { context = Riak.Context.'Riak.Context.none'
---   , key = ...
---   , value = ...
---   }
--- @
---
--- Otherwise, you must 'get' a set before you 'update' it.
---
--- /See also/: Riak.Key.'Riak.Key.none'
+-- /See also/: @Riak.Context.'Riak.Context.none'@, @Riak.Key.'Riak.Key.none'@
 update ::
      MonadIO m
   => Client -- ^

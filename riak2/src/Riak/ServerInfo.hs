@@ -12,14 +12,16 @@ import qualified Riak.Internal.Client as Client
 import qualified Riak.Proto           as Proto
 import qualified Riak.Proto.Lens      as L
 
+import Data.Text.Encoding (decodeUtf8)
 
--- TODO Text, Text
+
 data ServerInfo
   = ServerInfo
-  { name :: ByteString
-  , version :: ByteString
+  { name :: !Text
+  , version :: !Text
   } deriving stock (Show)
 
+-- | Get server info.
 get ::
      MonadIO m
   => Client -- ^
@@ -38,6 +40,6 @@ get client = liftIO $
     fromResponse :: Proto.GetServerInfoResponse -> ServerInfo
     fromResponse response =
       ServerInfo
-        { name = response ^. L.node
-        , version = response ^. L.version
+        { name = decodeUtf8 (response ^. L.node)
+        , version = decodeUtf8 (response ^. L.version)
         }

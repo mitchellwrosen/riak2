@@ -1,14 +1,16 @@
 module Riak.Bucket
   ( -- * Bucket
     Bucket(..)
+    -- ** Properties
   , get
   , set
   , reset
-  , keys
-  , streamKeys
     -- ** Search
   , exactQuery
   , rangeQuery
+    -- ** Full traversals
+  , keys
+  , streamKeys
   ) where
 
 import Riak.Internal.Bucket     (Bucket(..))

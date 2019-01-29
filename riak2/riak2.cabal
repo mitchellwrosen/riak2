@@ -4,6 +4,56 @@ name: riak2
 version: 0.1.0
 build-type: Simple
 
+description:
+  __Library organization__
+  .
+  This library's modules are organized around types. A module will typically
+  export one type and its API, which consists of the functions whose "primary"
+  input type is the type in question.
+  .
+  For example, to /list the keys in a bucket/, the primary input type is the
+  /bucket/, so this function is exported by the the "Riak.Bucket" module.
+  .
+  __Module guide__
+  .
+  Connection establishment and basic server information:
+  .
+  * "Riak.Client"
+  * "Riak.ServerInfo"
+  .
+  Key/value store types and operations:
+  .
+  * "Riak.Object"
+  * "Riak.Content"
+  * "Riak.Metadata"
+  .
+  CRDT types and operations:
+  .
+  * "Riak.Counter"
+  * "Riak.HyperLogLog"
+  * "Riak.Map"
+  * "Riak.Set"
+  .
+  Namespace types and operations:
+  .
+  * "Riak.BucketType"
+  * "Riak.Bucket"
+  * "Riak.Key"
+  * "Riak.BucketProperties"
+  .
+  Secondary index types:
+  .
+  * "Riak.Index"
+  * "Riak.IndexValue"
+  * "Riak.ExactQuery"
+  * "Riak.RangeQuery"
+  .
+  Miscellaneous types:
+  .
+  * "Riak.Context"
+  * "Riak.Opts"
+  * "Riak.Quorum"
+
 library
   build-depends:
     aeson ^>= 1.4.0,
