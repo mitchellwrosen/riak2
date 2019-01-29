@@ -64,7 +64,9 @@ get client (Bucket type' bucket) = liftIO $
       view L.props
 
 -- | Set bucket properties.
+--
 -- TODO better set bucket properties type
+-- TODO don't allow setting n
 set
   :: Client -- ^
   -> Proto.SetBucketPropertiesRequest -- ^

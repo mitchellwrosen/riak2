@@ -70,6 +70,7 @@ get client (BucketType type') = liftIO $
 -- /Note/: You may not increase the @hllPrecision@ property.
 --
 -- TODO better set bucket type properties type
+-- TODO don't allow setting n
 set
   :: Client -- ^
   -> Proto.SetBucketTypePropertiesRequest -- ^
