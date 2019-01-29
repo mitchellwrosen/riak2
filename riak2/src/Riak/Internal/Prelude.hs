@@ -27,6 +27,7 @@ import Data.IORef                 as X
 import Data.Kind                  as X (Type)
 import Data.List.NonEmpty         as X (NonEmpty)
 import Data.Maybe                 as X (fromMaybe, mapMaybe)
+import Data.Profunctor            as X (lmap)
 import Data.ProtoLens.Message     as X (defMessage)
 import Data.Proxy                 as X (Proxy(Proxy))
 import Data.Set                   as X (Set)

@@ -423,30 +423,6 @@ message IndexResponse {
 /*     optional bool done = 3; */
 /* } */
 
-// added solely for riak_cs currently
-// for folding over a bucket and returning
-// objects.
-/* message RpbCSBucketReq { */
-/*     required bytes bucket = 1; */
-/*     required bytes start_key = 2; */
-/*     optional bytes end_key = 3; */
-/*     optional bool start_incl = 4 [default = true]; */
-/*     optional bool end_incl = 5 [default = false]; */
-/*     optional bytes continuation = 6; */
-/*     optional uint32 max_results = 7; */
-/*     optional uint32 timeout = 8; */
-/*     optional bytes type = 9;         // Bucket type, if not set we assume the 'default' type */
-/*     // parallel extraction extension */
-/*     optional bytes cover_context = 10; // chopped up coverage plan per-req */
-/* } */
-
-// return for CS bucket fold
-/* message RpbCSBucketResp { */
-/*     repeated RpbIndexObject objects = 1; */
-/*     optional bytes continuation = 2; */
-/*     optional bool done = 3; */
-/* } */
-
 /* message RpbIndexObject { */
 /*     required bytes key = 1; */
 /*     required GetResponse object = 2; */

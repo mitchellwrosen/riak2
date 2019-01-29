@@ -1,6 +1,6 @@
 module Riak.Internal.RangeQuery where
 
-import Riak.Bucket              (Bucket)
+import Riak.Internal.Bucket     (Bucket)
 import Riak.Internal.IndexValue (IndexValue)
 import Riak.Internal.Prelude
 

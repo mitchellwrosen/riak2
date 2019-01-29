@@ -1,7 +1,7 @@
 module Riak.Internal.ExactQuery where
 
-import Riak.Bucket           (Bucket(..))
 import Riak.IndexValue       (IndexValue)
+import Riak.Internal.Bucket  (Bucket(..))
 import Riak.Internal.Prelude
 
 import qualified Riak.IndexValue as IndexValue
