@@ -5,16 +5,21 @@ module Riak.Interface.Impl.Socket.Concurrent
   , withInterface
   , exchange
   , stream
+  , Exception(..)
+  , isRemoteShutdownException
   ) where
+
+import Riak.Request  (Request)
+import Riak.Response (Response)
+import Riak.Socket   (Socket)
+
+import qualified Riak.Socket as Socket
 
 import Control.Concurrent.MVar
 import Data.Coerce             (coerce)
-import Riak.Request            (Request)
-import Riak.Response           (Response)
-import Riak.Socket             (Socket)
-import UnliftIO.Exception      (bracket_, finally)
+import UnliftIO.Exception      (bracket_, finally, throwIO)
 
-import qualified Riak.Socket as Socket
+import qualified Control.Exception as Exception
 
 
 data Interface
@@ -34,7 +39,7 @@ data Config
 data EventHandlers
   = EventHandlers
   { onSend :: Request -> IO ()
-  , onReceive :: Maybe Response -> IO ()
+  , onReceive :: Response -> IO ()
   }
 
 instance Monoid EventHandlers where
@@ -67,10 +72,13 @@ withInterface Config { socket, handlers } k = do
       , handlers = handlers
       })
 
+-- | Send a request and receive the response (a single message).
+--
+-- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 exchange ::
      Interface
   -> Request
-  -> IO (Maybe Response)
+  -> IO Response
 exchange Interface { socket, sync, relay, handlers } request = do
   baton :: Baton <-
     synchronized sync $ do
@@ -78,17 +86,21 @@ exchange Interface { socket, sync, relay, handlers } request = do
       Socket.send socket request
       enterRelay relay
 
-  response :: Maybe Response <-
-    withBaton baton (Socket.receive socket)
+  withBaton baton (Socket.receive socket) >>= \case
+    Nothing ->
+      throwIO RemoteShutdown
 
-  onReceive handlers response
+    Just response -> do
+      onReceive handlers response
+      pure response
 
-  pure response
-
+-- | Send a request and stream the response (one or more messages).
+--
+-- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 stream ::
      Interface
   -> Request
-  -> (IO (Maybe Response) -> IO r)
+  -> (IO Response -> IO r)
   -> IO r
 stream Interface { socket, sync, relay, handlers } request callback =
   -- Riak request handling state machine is odd. Streaming responses are
@@ -101,11 +113,14 @@ stream Interface { socket, sync, relay, handlers } request callback =
     onSend handlers request
     Socket.send socket request
 
-    callback $ do
-      response :: Maybe Response <-
-        Socket.receive socket
-      onReceive handlers response
-      pure response
+    callback $
+      Socket.receive socket >>= \case
+        Nothing ->
+          undefined
+
+        Just response -> do
+          onReceive handlers response
+          pure response
 
 
 newtype Synchronized
@@ -141,3 +156,13 @@ withBaton :: Baton -> IO a -> IO a
 withBaton (Baton before after) action = do
   takeMVar before
   action `finally` putMVar after ()
+
+
+data Exception
+  = RemoteShutdown
+  deriving stock (Show)
+  deriving anyclass (Exception.Exception)
+
+isRemoteShutdownException :: Exception -> Bool
+isRemoteShutdownException _ =
+  True

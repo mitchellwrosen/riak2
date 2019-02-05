@@ -6,7 +6,7 @@ module Riak.Index
   , delete
   ) where
 
-import Riak.Internal.Client  (Client, Error(..))
+import Riak.Internal.Client  (Client)
 import Riak.Internal.Panic   (impurePanic)
 import Riak.Internal.Prelude
 import Riak.Request          (Request(..))
@@ -32,7 +32,7 @@ get ::
      MonadIO m
   => Client
   -> Text
-  -> m (Either Error (Maybe Index))
+  -> m (Either Text (Maybe Index))
 get client name = liftIO $
   fromResponse <$>
     Client.exchange
@@ -49,11 +49,11 @@ get client name = liftIO $
         & L.name .~ encodeUtf8 name
 
     fromResponse ::
-         Either Error Proto.GetIndexResponse
-      -> Either Error (Maybe Index)
+         Either Text Proto.GetIndexResponse
+      -> Either Text (Maybe Index)
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
-      -- Left (Error "notfound") ->
+      -- Left "notfound" ->
       --   Right Nothing
 
       Left err ->
@@ -78,17 +78,17 @@ get client name = liftIO $
 getAll ::
      MonadIO m
   => Client
-  -> m (Either Error [Index])
+  -> m (Either Text [Index])
 getAll client = liftIO $
   fromResponse <$> doGet client Nothing
 
   where
     fromResponse ::
-         Either Error Proto.GetIndexResponse
-      -> Either Error [Index]
+         Either Text Proto.GetIndexResponse
+      -> Either Text [Index]
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
-      -- Left (Error "notfound") ->
+      -- Left "notfound" ->
       --   Right []
       Left err ->
         Left err
@@ -99,7 +99,7 @@ getAll client = liftIO $
 doGet ::
      Client
   -> Maybe Text
-  -> IO (Either Error Proto.GetIndexResponse)
+  -> IO (Either Text Proto.GetIndexResponse)
 doGet client name =
   Client.exchange
     client
@@ -118,7 +118,7 @@ put ::
      MonadIO m
   => Client
   -> Index
-  -> m (Either Error ())
+  -> m (Either Text ())
 put client index = liftIO $
   Client.exchange
     client
@@ -139,7 +139,7 @@ delete ::
      MonadIO m
   => Client
   -> Text
-  -> m (Either Error ())
+  -> m (Either Text ())
 delete client name = liftIO $
   Client.exchange
     client

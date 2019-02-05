@@ -8,7 +8,7 @@ module Riak.HyperLogLog
   , update
   ) where
 
-import Riak.Internal.Client  (Client, Error)
+import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
@@ -42,7 +42,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either Error (Maybe (HyperLogLog Word64)))
+  -> m (Either Text (Maybe (HyperLogLog Word64)))
 get client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -81,7 +81,7 @@ update ::
      MonadIO m
   => Client -- ^
   -> HyperLogLog [ByteString] -- ^
-  -> m (Either Error (HyperLogLog Word64))
+  -> m (Either Text (HyperLogLog Word64))
 update client (HyperLogLog { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

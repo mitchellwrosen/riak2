@@ -7,7 +7,7 @@ module Riak.Map
   ) where
 
 import Riak.Context          (Context)
-import Riak.Internal.Client  (Client, Error)
+import Riak.Internal.Client  (Client)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Internal.Set     (SetUpdate)
@@ -77,7 +77,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either Error (Maybe (Map Maps)))
+  -> m (Either Text (Maybe (Map Maps)))
 get client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -117,7 +117,7 @@ update ::
      MonadIO m
   => Client -- ^
   -> Map [MapUpdate] -- ^
-  -> m (Either Error (Map Maps))
+  -> m (Either Text (Map Maps))
 update client (Map { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

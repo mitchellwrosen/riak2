@@ -1,6 +1,5 @@
 module Riak.Internal.Client
   ( module Riak.Internal.Client
-  , Error(..)
   , UnexpectedResponse(..)
   ) where
 
@@ -20,11 +19,6 @@ import Control.Foldl (FoldM(..))
 type Client
   = Interface
 
-data Error
-  = Error Text
-  | RemoteShutdown
-  deriving stock (Show)
-
 data UnexpectedResponse
   = UnexpectedResponse !Request !Response
   deriving stock (Show)
@@ -38,16 +32,13 @@ exchange ::
      Client
   -> Request
   -> (Response -> Maybe a)
-  -> IO (Either Error a)
+  -> IO (Either Text a)
 exchange client request f =
   Interface.exchange client request >>= \case
-    Nothing ->
-      pure (Left RemoteShutdown)
+    ResponseError response ->
+      pure (Left (decodeUtf8 (response ^. L.errmsg)))
 
-    Just (ResponseError response) ->
-      pure (Left (Error (decodeUtf8 (response ^. L.errmsg))))
-
-    Just response ->
+    response ->
       case f response of
         Nothing ->
           throwIO (UnexpectedResponse request response)
@@ -62,25 +53,22 @@ stream ::
   -> (Response -> Maybe a) -- ^ Correct response?
   -> (a -> Bool) -- ^ Done?
   -> FoldM IO a r -- ^ Fold responses
-  -> IO (Either Error r)
+  -> IO (Either Text r)
 stream client request f done (FoldM step initial extract) =
   Interface.stream client request callback
 
   where
-    callback :: IO (Maybe Response) -> IO (Either Error r)
+    callback :: IO Response -> IO (Either Text r)
     callback recv =
       loop =<< initial
 
       where
         loop value =
           recv >>= \case
-            Nothing ->
-              pure (Left RemoteShutdown)
+            ResponseError response ->
+              pure (Left (decodeUtf8 (response ^. L.errmsg)))
 
-            Just (ResponseError response) ->
-              pure (Left (Error (decodeUtf8 (response ^. L.errmsg))))
-
-            Just response ->
+            response ->
               case f response of
                 Nothing ->
                   throwIO (UnexpectedResponse request response)
@@ -98,7 +86,7 @@ stream client request f done (FoldM step initial extract) =
 getCrdt
   :: Client
   -> Proto.GetCrdtRequest
-  -> IO (Either Error Proto.GetCrdtResponse)
+  -> IO (Either Text Proto.GetCrdtResponse)
 getCrdt client request =
   exchange
     client
@@ -110,7 +98,7 @@ getCrdt client request =
 updateCrdt
   :: Client -- ^
   -> Proto.UpdateCrdtRequest -- ^
-  -> IO (Either Error Proto.UpdateCrdtResponse)
+  -> IO (Either Text Proto.UpdateCrdtResponse)
 updateCrdt client request =
   exchange
     client

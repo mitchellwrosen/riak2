@@ -5,16 +5,20 @@ module Riak.Interface.Impl.Socket
   , withInterface
   , exchange
   , stream
+  , Exception(..)
+  , isRemoteShutdownException
   ) where
 
 import Riak.Request  (Request)
 import Riak.Response (Response)
 import Riak.Socket   (Socket)
 
-import qualified Riak.Socket   as Socket
+import qualified Riak.Socket as Socket
 
 import Control.Concurrent.MVar
-import UnliftIO.Exception (bracket_)
+import UnliftIO.Exception      (bracket_, throwIO)
+
+import qualified Control.Exception as Exception
 
 
 data Interface
@@ -33,7 +37,7 @@ data Config
 data EventHandlers
   = EventHandlers
   { onSend :: Request -> IO ()
-  , onReceive :: Maybe Response -> IO ()
+  , onReceive :: Response -> IO ()
   }
 
 instance Monoid EventHandlers where
@@ -67,28 +71,47 @@ send Interface { socket, handlers } request = do
 
 receive ::
      Interface -- ^
-  -> IO (Maybe Response)
-receive Interface { socket, handlers } = do
-  response :: Maybe Response <-
-    Socket.receive socket
-  onReceive handlers response
-  pure response
+  -> IO Response
+receive Interface { socket, handlers } =
+  Socket.receive socket >>= \case
+    Nothing ->
+      throwIO RemoteShutdown
 
+    Just response -> do
+      onReceive handlers response
+      pure response
+
+-- | Send a request and receive the response (a single message).
+--
+-- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 exchange ::
      Interface -- ^
   -> Request -- ^
-  -> IO (Maybe Response)
+  -> IO Response
 exchange iface request =
   withMVar (lock iface) $ \_ -> do
     send iface request
     receive iface
 
+-- | Send a request and stream the response (one or more messages).
+--
+-- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 stream ::
      Interface -- ^
   -> Request -- ^
-  -> (IO (Maybe Response) -> IO r) -- ^
+  -> (IO Response -> IO r) -- ^
   -> IO r
 stream iface request callback =
   withMVar (lock iface) $ \_ -> do
     send iface request
     callback (receive iface)
+
+
+data Exception
+  = RemoteShutdown
+  deriving stock (Show)
+  deriving anyclass (Exception.Exception)
+
+isRemoteShutdownException :: Exception -> Bool
+isRemoteShutdownException _ =
+  True

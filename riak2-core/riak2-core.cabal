@@ -59,6 +59,8 @@ library riak2-core-internal
     riak2-core-internal
 
   default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
     DuplicateRecordFields
     LambdaCase
     NamedFieldPuns
@@ -85,6 +87,9 @@ library riak2-interface-impl-managed
     Riak.Interface.Impl.Managed
 
   default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    EmptyDataDeriving
     LambdaCase
     NamedFieldPuns
     ScopedTypeVariables

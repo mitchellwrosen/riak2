@@ -57,15 +57,12 @@ socketmain = do
             , RequestDelete Proto.defMessage
             ]
 
-        Iface.Socket.exchange iface request >>= \case
-          Nothing ->
-            putStrLn "Riak disappeared?"
+        response <- Iface.Socket.exchange iface request
 
-          Just response ->
-            unless (expectedResponse request response) $ do
-              putStrLn "ERROR"
-              putStrLn (">>> " ++ show request)
-              putStrLn ("<<< " ++ show response)
+        unless (expectedResponse request response) $ do
+          putStrLn "ERROR"
+          putStrLn (">>> " ++ show request)
+          putStrLn ("<<< " ++ show response)
 
       putMVar doneVar ()
 

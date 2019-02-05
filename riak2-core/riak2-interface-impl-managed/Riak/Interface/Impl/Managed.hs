@@ -9,6 +9,8 @@ module Riak.Interface.Impl.Managed
   , withInterface
   , exchange
   , stream
+  , Exception
+  , isRemoteShutdownException
   ) where
 
 import Riak.Request  (Request)
@@ -19,7 +21,9 @@ import qualified Riak.Interface.Signature as Interface
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Monad          (forever, void, when)
-import UnliftIO.Exception
+import UnliftIO.Exception     (bracket, tryAny)
+
+import qualified Control.Exception as Exception
 
 
 newtype Interface
@@ -70,15 +74,16 @@ manager config ifaceVar =
             True -> pure ()
             False -> retry
 
+-- | Send a request and receive the response (a single message).
 exchange ::
      Interface
   -> Request
-  -> IO (Maybe Response)
+  -> IO Response
 exchange Interface { ifaceVar } request =
   loop
 
   where
-    loop :: IO (Maybe Response)
+    loop :: IO Response
     loop = do
       iface :: Interface.Interface <-
         atomically (readTMVar ifaceVar)
@@ -91,11 +96,12 @@ exchange Interface { ifaceVar } request =
         Right response ->
           pure response
 
+-- | Send a request and stream the response (one or more messages).
 stream ::
      forall r.
      Interface
   -> Request
-  -> (IO (Maybe Response) -> IO r)
+  -> (IO Response -> IO r)
   -> IO r
 stream Interface { ifaceVar } request callback =
   loop
@@ -113,3 +119,12 @@ stream Interface { ifaceVar } request callback =
 
         Right response ->
           pure response
+
+
+data Exception
+  deriving stock (Show)
+  deriving anyclass (Exception.Exception)
+
+isRemoteShutdownException :: Exception -> Bool
+isRemoteShutdownException _ =
+  False

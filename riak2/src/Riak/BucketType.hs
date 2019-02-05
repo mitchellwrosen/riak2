@@ -7,7 +7,7 @@ module Riak.BucketType
   ) where
 
 import Riak.Bucket           (Bucket(..))
-import Riak.Internal.Client  (Client, Error)
+import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
 import Riak.Proto
 import Riak.Request          (Request(..))
@@ -44,7 +44,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> BucketType -- ^
-  -> m (Either Error BucketProperties)
+  -> m (Either Text BucketProperties)
 get client (BucketType bucketType) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -74,7 +74,7 @@ get client (BucketType bucketType) = liftIO $
 set
   :: Client -- ^
   -> Proto.SetBucketTypePropertiesRequest -- ^
-  -> IO (Either Error Proto.SetBucketPropertiesResponse)
+  -> IO (Either Text Proto.SetBucketPropertiesResponse)
 set client request =
   Client.exchange
     client
@@ -93,7 +93,7 @@ streamBuckets
   :: Client -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
-  -> IO (Either Error r)
+  -> IO (Either Text r)
 streamBuckets client (BucketType bucketType) bucketFold =
   Client.stream
     client
@@ -125,7 +125,7 @@ buckets
   :: MonadIO m
   => Client -- ^
   -> BucketType -- ^
-  -> m (Either Error [Bucket])
+  -> m (Either Text [Bucket])
 buckets client bucketType =
   liftIO (streamBuckets client bucketType (Foldl.generalize Foldl.list))
 

@@ -3,9 +3,23 @@ signature Riak.Interface.Signature where
 import Riak.Request (Request)
 import Riak.Response (Response)
 
+import qualified Control.Exception as Exception
+
+
+-- | Interface handle.
+data Interface
+
+-- | Interface configuration.
 data Config
 
-data Interface
+-- | Interface exception. Refer to the specific interface documentation for
+-- information about which functions may throw which exceptions.
+data Exception
+
+instance Exception.Exception Exception
+
+-- | Is this exception due to a graceful remote shutdown?
+isRemoteShutdownException :: Exception -> Bool
 
 withInterface ::
      Config
@@ -13,18 +27,14 @@ withInterface ::
   -> IO a
 
 -- | Send a request and receive the response (a single message).
---
--- Returns 'Nothing' if Riak initiated a graceful shutdown.
 exchange ::
      Interface
   -> Request
-  -> IO (Maybe Response)
+  -> IO Response
 
 -- | Send a request and stream the response (one or more messages).
---
--- Returns 'Nothing' if Riak initiated a graceful shutdown.
 stream ::
      Interface
   -> Request
-  -> (IO (Maybe Response) -> IO r)
+  -> (IO Response -> IO r)
   -> IO r
