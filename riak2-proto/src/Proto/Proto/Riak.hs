@@ -14,22 +14,22 @@ module Proto.Proto.Riak
         GetBucketTypePropertiesRequest(), GetCrdtRequest(),
         GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
         GetCrdtResponse'CrdtType(), GetIndexRequest(), GetIndexResponse(),
-        GetRequest(), GetResponse(), GetServerInfoRequest(),
+        GetRequest(), GetResponse(), GetSchemaRequest(),
+        GetSchemaResponse(), GetServerInfoRequest(),
         GetServerInfoResponse(), HllUpdate(), Index(), Link(),
         ListBucketsRequest(), ListBucketsResponse(), ListKeysRequest(),
         ListKeysResponse(), MapKey(), MapKey'MapKeyType(..),
         MapKey'MapKeyType(), MapUpdate(), MapValue(), MapValueUpdate(),
         MapValueUpdate'FlagUpdate(..), MapValueUpdate'FlagUpdate(),
         ModuleFunction(), Pair(), PingRequest(), PingResponse(),
-        PutIndexRequest(), PutRequest(), PutResponse(),
+        PutIndexRequest(), PutRequest(), PutResponse(), PutSchemaRequest(),
         ResetBucketPropertiesRequest(), ResetBucketPropertiesResponse(),
-        SecondaryIndexRequest(),
+        Schema(), SecondaryIndexRequest(),
         SecondaryIndexRequest'SecondaryIndexQueryType(..),
         SecondaryIndexRequest'SecondaryIndexQueryType(),
         SecondaryIndexResponse(), SetBucketPropertiesRequest(),
         SetBucketPropertiesResponse(), SetBucketTypePropertiesRequest(),
-        SetBucketTypePropertiesResponse(), SetUpdate(),
-        UpdateCrdtRequest(), UpdateCrdtResponse())
+        SetUpdate(), UpdateCrdtRequest(), UpdateCrdtResponse())
        where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq
        as Control.DeepSeq
@@ -3764,6 +3764,100 @@ instance Control.DeepSeq.NFData GetResponse where
                       (Control.DeepSeq.deepseq (_GetResponse'unchanged x__) (()))))
 {- | Fields :
 
+    * 'Proto.Proto.Riak_Fields.name' @:: Lens' GetSchemaRequest Data.ByteString.ByteString@
+ -}
+data GetSchemaRequest = GetSchemaRequest{_GetSchemaRequest'name ::
+                                         !Data.ByteString.ByteString,
+                                         _GetSchemaRequest'_unknownFields ::
+                                         !Data.ProtoLens.FieldSet}
+                          deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetSchemaRequest where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' GetSchemaRequest "name"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _GetSchemaRequest'name
+                 (\ x__ y__ -> x__{_GetSchemaRequest'name = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message GetSchemaRequest where
+        messageName _ = Data.Text.pack "GetSchemaRequest"
+        fieldsByTag
+          = let name__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "name"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "name")))
+                      :: Data.ProtoLens.FieldDescriptor GetSchemaRequest
+              in
+              Data.Map.fromList [(Data.ProtoLens.Tag 1, name__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _GetSchemaRequest'_unknownFields
+              (\ x__ y__ -> x__{_GetSchemaRequest'_unknownFields = y__})
+        defMessage
+          = GetSchemaRequest{_GetSchemaRequest'name =
+                               Data.ProtoLens.fieldDefault,
+                             _GetSchemaRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetSchemaRequest where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_GetSchemaRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetSchemaRequest'name x__) (()))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.schema' @:: Lens' GetSchemaResponse Schema@
+ -}
+data GetSchemaResponse = GetSchemaResponse{_GetSchemaResponse'schema
+                                           :: !Schema,
+                                           _GetSchemaResponse'_unknownFields ::
+                                           !Data.ProtoLens.FieldSet}
+                           deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetSchemaResponse where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' GetSchemaResponse "schema" (Schema)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _GetSchemaResponse'schema
+                 (\ x__ y__ -> x__{_GetSchemaResponse'schema = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message GetSchemaResponse where
+        messageName _ = Data.Text.pack "GetSchemaResponse"
+        fieldsByTag
+          = let schema__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "schema"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor Schema)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "schema")))
+                      :: Data.ProtoLens.FieldDescriptor GetSchemaResponse
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, schema__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _GetSchemaResponse'_unknownFields
+              (\ x__ y__ -> x__{_GetSchemaResponse'_unknownFields = y__})
+        defMessage
+          = GetSchemaResponse{_GetSchemaResponse'schema =
+                                Data.ProtoLens.defMessage,
+                              _GetSchemaResponse'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetSchemaResponse where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_GetSchemaResponse'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetSchemaResponse'schema x__) (()))
+{- | Fields :
+
  -}
 data GetServerInfoRequest = GetServerInfoRequest{_GetServerInfoRequest'_unknownFields
                                                  :: !Data.ProtoLens.FieldSet}
@@ -5978,6 +6072,53 @@ instance Control.DeepSeq.NFData PutResponse where
                       (Control.DeepSeq.deepseq (_PutResponse'key x__) (()))))
 {- | Fields :
 
+    * 'Proto.Proto.Riak_Fields.schema' @:: Lens' PutSchemaRequest Schema@
+ -}
+data PutSchemaRequest = PutSchemaRequest{_PutSchemaRequest'schema
+                                         :: !Schema,
+                                         _PutSchemaRequest'_unknownFields ::
+                                         !Data.ProtoLens.FieldSet}
+                          deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show PutSchemaRequest where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' PutSchemaRequest "schema" (Schema)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _PutSchemaRequest'schema
+                 (\ x__ y__ -> x__{_PutSchemaRequest'schema = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message PutSchemaRequest where
+        messageName _ = Data.Text.pack "PutSchemaRequest"
+        fieldsByTag
+          = let schema__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "schema"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor Schema)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "schema")))
+                      :: Data.ProtoLens.FieldDescriptor PutSchemaRequest
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, schema__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _PutSchemaRequest'_unknownFields
+              (\ x__ y__ -> x__{_PutSchemaRequest'_unknownFields = y__})
+        defMessage
+          = PutSchemaRequest{_PutSchemaRequest'schema =
+                               Data.ProtoLens.defMessage,
+                             _PutSchemaRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData PutSchemaRequest where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_PutSchemaRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_PutSchemaRequest'schema x__) (()))
+{- | Fields :
+
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' ResetBucketPropertiesRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' ResetBucketPropertiesRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' ResetBucketPropertiesRequest
@@ -6095,6 +6236,80 @@ instance Control.DeepSeq.NFData ResetBucketPropertiesResponse where
               Control.DeepSeq.deepseq
                 (_ResetBucketPropertiesResponse'_unknownFields x__)
                 (())
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.name' @:: Lens' Schema Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.content' @:: Lens' Schema Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'content' @:: Lens' Schema (Prelude.Maybe Data.ByteString.ByteString)@
+ -}
+data Schema = Schema{_Schema'name :: !Data.ByteString.ByteString,
+                     _Schema'content :: !(Prelude.Maybe Data.ByteString.ByteString),
+                     _Schema'_unknownFields :: !Data.ProtoLens.FieldSet}
+                deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show Schema where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' Schema "name"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Schema'name
+                 (\ x__ y__ -> x__{_Schema'name = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' Schema "content"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Schema'content
+                 (\ x__ y__ -> x__{_Schema'content = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' Schema "maybe'content"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Schema'content
+                 (\ x__ y__ -> x__{_Schema'content = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message Schema where
+        messageName _ = Data.Text.pack "Schema"
+        fieldsByTag
+          = let name__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "name"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "name")))
+                      :: Data.ProtoLens.FieldDescriptor Schema
+                content__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "content"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'content")))
+                      :: Data.ProtoLens.FieldDescriptor Schema
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, name__field_descriptor),
+                 (Data.ProtoLens.Tag 2, content__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _Schema'_unknownFields
+              (\ x__ y__ -> x__{_Schema'_unknownFields = y__})
+        defMessage
+          = Schema{_Schema'name = Data.ProtoLens.fieldDefault,
+                   _Schema'content = Prelude.Nothing, _Schema'_unknownFields = ([])}
+instance Control.DeepSeq.NFData Schema where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_Schema'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_Schema'name x__)
+                   (Control.DeepSeq.deepseq (_Schema'content x__) (())))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' SecondaryIndexRequest Data.ByteString.ByteString@
@@ -7039,36 +7254,6 @@ instance Control.DeepSeq.NFData SetBucketTypePropertiesRequest
                    (Control.DeepSeq.deepseq
                       (_SetBucketTypePropertiesRequest'props x__)
                       (())))
-{- | Fields :
-
- -}
-data SetBucketTypePropertiesResponse = SetBucketTypePropertiesResponse{_SetBucketTypePropertiesResponse'_unknownFields
-                                                                       :: !Data.ProtoLens.FieldSet}
-                                         deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show SetBucketTypePropertiesResponse where
-        showsPrec _ __x __s
-          = Prelude.showChar '{'
-              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
-                 (Prelude.showChar '}' __s))
-instance Data.ProtoLens.Message SetBucketTypePropertiesResponse
-         where
-        messageName _ = Data.Text.pack "SetBucketTypePropertiesResponse"
-        fieldsByTag = let in Data.Map.fromList []
-        unknownFields
-          = Lens.Family2.Unchecked.lens
-              _SetBucketTypePropertiesResponse'_unknownFields
-              (\ x__ y__ ->
-                 x__{_SetBucketTypePropertiesResponse'_unknownFields = y__})
-        defMessage
-          = SetBucketTypePropertiesResponse{_SetBucketTypePropertiesResponse'_unknownFields
-                                              = ([])}
-instance Control.DeepSeq.NFData SetBucketTypePropertiesResponse
-         where
-        rnf
-          = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_SetBucketTypePropertiesResponse'_unknownFields x__)
-                (())
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.adds' @:: Lens' SetUpdate [Data.ByteString.ByteString]@

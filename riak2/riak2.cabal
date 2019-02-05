@@ -65,6 +65,7 @@ description:
   .
   Solr types and operations:
   .
+  * "Riak.Schema"
   * "Riak.Index"
   .
   Miscellaneous types:
@@ -161,6 +162,7 @@ library
     Riak.Index
     Riak.SecondaryIndex
     Riak.SecondaryIndexValue
+    Riak.Schema
     Riak.Key
     Riak.Map
     Riak.Object

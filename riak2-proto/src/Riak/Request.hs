@@ -25,6 +25,7 @@ data Request
   | RequestGetCrdt GetCrdtRequest
   | RequestGetIndex GetIndexRequest
   | RequestGetServerInfo GetServerInfoRequest
+  | RequestGetSchema GetSchemaRequest
   | RequestListBuckets ListBucketsRequest
   | RequestListKeys ListKeysRequest
   -- | RequestMapReduce MapReduceRequest
@@ -69,7 +70,7 @@ decode code bytes =
     54   -> go RequestGetIndex
     56   -> go RequestPutIndex
     57   -> go RequestDeleteIndex
-    -- 58   -> go RequestGetYokozunaSchema
+    58   -> go RequestGetSchema
     -- 60   -> go RequestPutYokozunaSchema
     -- 70   -> go RequestCoverage
     80   -> go RequestGetCrdt
@@ -95,6 +96,7 @@ encode = \case
   RequestGetCrdt                 request -> Utils.wire 80 request
   RequestGetIndex                request -> Utils.wire 54 request
   RequestGetServerInfo           request -> Utils.wire  7 request
+  RequestGetSchema               request -> Utils.wire 58 request
   -- RequestMapReduce               request -> Utils.wire 23 request
   RequestPing                    request -> Utils.wire  1 request
   RequestPut                     request -> Utils.wire 11 request

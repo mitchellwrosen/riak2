@@ -539,26 +539,22 @@ message DeleteIndexRequest {
     required bytes name = 1;
 }
 
-// Schema queries
+message Schema {
+    required bytes name    = 1;
+    optional bytes content = 2; // Schema data
+}
 
-/* message RpbYokozunaSchema { */
-/*     required bytes name    =  1;  // Index name */
-/*     optional bytes content =  2;  // Schema data */
-/* } */
+message PutSchemaRequest {
+    required Schema schema = 1;
+}
 
-// PUT request - create or potentially update a new schema
-/* message RpbYokozunaSchemaPutReq { */
-/*     required RpbYokozunaSchema schema =  1; */
-/* } */
+message GetSchemaRequest {
+    required bytes name = 1;
+}
 
-// GET request - Return matching schema by name
-/* message RpbYokozunaSchemaGetReq { */
-/*     required bytes name  =  1;  // Schema name */
-/* } */
-
-/* message RpbYokozunaSchemaGetResp { */
-/*   required RpbYokozunaSchema schema =  1; */
-/* } */
+message GetSchemaResponse {
+  required Schema schema = 1;
+}
 
 message GetServerInfoRequest {}
 message PingRequest {}
@@ -566,4 +562,3 @@ message DeleteResponse {}
 message PingResponse {}
 message ResetBucketPropertiesResponse {}
 message SetBucketPropertiesResponse {}
-message SetBucketTypePropertiesResponse {}

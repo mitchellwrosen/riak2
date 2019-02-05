@@ -493,6 +493,13 @@ maybe'consistent ::
 maybe'consistent
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'consistent")
+maybe'content ::
+              forall f s a .
+                (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'content" a) =>
+                Lens.Family2.LensLike' f s a
+maybe'content
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'content")
 maybe'contentEncoding ::
                       forall f s a .
                         (Prelude.Functor f,
