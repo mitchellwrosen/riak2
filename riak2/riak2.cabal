@@ -41,7 +41,6 @@ description:
   .
   * "Riak.Object"
   * "Riak.Content"
-  * "Riak.Metadata"
   .
   CRDT types and operations:
   .
@@ -159,7 +158,6 @@ library
     Riak.IndexValue
     Riak.Key
     Riak.Map
-    Riak.Metadata
     Riak.Object
     Riak.Opts
     Riak.Quorum

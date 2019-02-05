@@ -8,7 +8,6 @@ import Riak.Content          (Content(..))
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
-import Riak.Metadata         (Metadata(..))
 
 import qualified Riak.Internal.Index         as Index
 import qualified Riak.Internal.Proto.Content as Proto.Content
@@ -22,7 +21,9 @@ import qualified Data.List.NonEmpty as List1
 data Object a
   = Object
   { content :: Content a
-  , metadata :: Metadata
+  , deleted :: Bool
+  , lastModified :: UTCTime
+  , ttl :: Maybe Word32 -- TODO NominalDiffTime
   } deriving stock (Functor, Generic, Show)
 
 fromProtoContent ::
@@ -43,14 +44,12 @@ fromProtoContent key context proto =
           , type' = proto ^. L.maybe'contentType
           , value = proto ^. L.value
           }
-    , metadata =
-        Metadata
-          { deleted = proto ^. L.deleted
-          , lastModified = Proto.Content.lastModified proto
-          , ttl = proto ^. L.maybe'ttl
-          }
+    , deleted = proto ^. L.deleted
+    , lastModified = Proto.Content.lastModified proto
+    , ttl = proto ^. L.maybe'ttl
     }
 
+-- | Parse a list of objects from a get response.
 fromGetResponse :: Key -> Proto.GetResponse -> [Object ByteString]
 fromGetResponse key response =
   fromProtoContent key (response ^. L.context) <$>
