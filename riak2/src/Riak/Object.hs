@@ -344,9 +344,9 @@ makePutRequest (Key type' bucket key) content opts =
 delete ::
      MonadIO m
   => Client -- ^
-  -> Content a -- ^
+  -> Object a -- ^
   -> m (Either Error ())
-delete client content = liftIO $
+delete client object = liftIO $
   (fmap.fmap)
     (const ())
     (Client.exchange
@@ -373,10 +373,10 @@ delete client content = liftIO $
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
         & L.type' .~ type'
-        & L.context .~ unContext (content ^. field @"context")
+        & L.context .~ unContext (object ^. field @"content" . field @"context")
 
     Key type' bucket key =
-      content ^. field @"key"
+      object ^. field @"content" . field @"key"
 
 defFalse :: Bool -> Maybe Bool
 defFalse = \case
