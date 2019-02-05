@@ -33,6 +33,8 @@ import qualified Riak.Internal.Quorum     as Quorum
 import qualified Riak.Proto               as Proto
 import qualified Riak.Proto.Lens          as L
 
+import Data.Generics.Product.Typed (HasType(..))
+
 import qualified Data.ByteString as ByteString
 
 
@@ -176,12 +178,22 @@ makeGetRequest key opts =
 --
 -- /See also/: Riak.Key.'Riak.Key.none'
 put ::
-     MonadIO m
+     ( HasType (Content ByteString) content
+     , MonadIO m
+     )
   => Client -- ^
-  -> Content ByteString -- ^
+  -> content -- ^
   -> PutOpts -- ^
   -> m (Either Error Key)
-put client content opts = liftIO $
+put client content opts =
+  liftIO (put_ client (content ^. typed) opts)
+
+put_ ::
+     Client
+  -> Content ByteString
+  -> PutOpts
+  -> IO (Either Error Key)
+put_ client content opts =
   (fmap.fmap)
     fromResponse
     (doPut client request)
@@ -209,12 +221,22 @@ put client content opts = liftIO $
 --
 -- /See also/: Riak.Key.'Riak.Key.none'
 putGet ::
-     MonadIO m
+     ( HasType (Content ByteString) content
+     , MonadIO m
+     )
   => Client -- ^
-  -> Content ByteString -- ^
+  -> content -- ^
   -> PutOpts -- ^
   -> m (Either Error (NonEmpty (Object ByteString)))
-putGet client content opts = liftIO $
+putGet client content opts =
+  liftIO (putGet_ client (content ^. typed) opts)
+
+putGet_ ::
+     Client -- ^
+  -> Content ByteString -- ^
+  -> PutOpts -- ^
+  -> IO (Either Error (NonEmpty (Object ByteString)))
+putGet_ client content opts =
   (fmap.fmap)
     (Object.fromPutResponse key)
     (doPut client request)
@@ -239,12 +261,22 @@ putGet client content opts = liftIO $
 --
 -- /See also/: Riak.Key.'Riak.Key.none'
 putGetHead ::
-     MonadIO m
+     ( HasType (Content ByteString) content
+     , MonadIO m
+     )
   => Client -- ^
-  -> Content ByteString -- ^
+  -> content -- ^
   -> PutOpts -- ^
   -> m (Either Error (NonEmpty (Object ())))
-putGetHead client content opts = liftIO $
+putGetHead client content opts =
+  liftIO (putGetHead_ client (content ^. typed) opts)
+
+putGetHead_ ::
+     Client
+  -> Content ByteString
+  -> PutOpts
+  -> IO (Either Error (NonEmpty (Object ())))
+putGetHead_ client content opts =
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResponse key)
     (doPut client request)

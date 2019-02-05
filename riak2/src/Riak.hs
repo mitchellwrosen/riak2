@@ -17,7 +17,6 @@ module Riak
   , Map(..)
   , MapUpdate(..)
   , Maps(..)
-  , Metadata(..)
   , NotfoundBehavior(..)
   , Object(..)
   , PutOpts(..)
@@ -41,7 +40,6 @@ import Riak.Index
 import Riak.IndexValue
 import Riak.Key
 import Riak.Map
-import Riak.Metadata
 import Riak.Object
 import Riak.Opts
 import Riak.Quorum
