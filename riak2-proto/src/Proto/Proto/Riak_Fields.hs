@@ -883,6 +883,13 @@ maybe'rw ::
 maybe'rw
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'rw")
+maybe'schema ::
+             forall f s a .
+               (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'schema" a) =>
+               Lens.Family2.LensLike' f s a
+maybe'schema
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'schema")
 maybe'search ::
              forall f s a .
                (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'search" a) =>
@@ -1177,6 +1184,13 @@ rw ::
 rw
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "rw")
+schema ::
+       forall f s a .
+         (Prelude.Functor f, Lens.Labels.HasLens' s "schema" a) =>
+         Lens.Family2.LensLike' f s a
+schema
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "schema")
 search ::
        forall f s a .
          (Prelude.Functor f, Lens.Labels.HasLens' s "search" a) =>

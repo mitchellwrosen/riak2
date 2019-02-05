@@ -13,16 +13,16 @@ module Proto.Proto.Riak
         GetBucketPropertiesRequest(), GetBucketPropertiesResponse(),
         GetBucketTypePropertiesRequest(), GetCrdtRequest(),
         GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
-        GetCrdtResponse'CrdtType(), GetRequest(), GetResponse(),
-        GetServerInfoRequest(), GetServerInfoResponse(), HllUpdate(),
-        Link(), ListBucketsRequest(), ListBucketsResponse(),
-        ListKeysRequest(), ListKeysResponse(), MapKey(),
-        MapKey'MapKeyType(..), MapKey'MapKeyType(), MapUpdate(),
-        MapValue(), MapValueUpdate(), MapValueUpdate'FlagUpdate(..),
-        MapValueUpdate'FlagUpdate(), ModuleFunction(), Pair(),
-        PingRequest(), PingResponse(), PutRequest(), PutResponse(),
-        ResetBucketPropertiesRequest(), ResetBucketPropertiesResponse(),
-        SecondaryIndexRequest(),
+        GetCrdtResponse'CrdtType(), GetIndexRequest(), GetIndexResponse(),
+        GetRequest(), GetResponse(), GetServerInfoRequest(),
+        GetServerInfoResponse(), HllUpdate(), Index(), Link(),
+        ListBucketsRequest(), ListBucketsResponse(), ListKeysRequest(),
+        ListKeysResponse(), MapKey(), MapKey'MapKeyType(..),
+        MapKey'MapKeyType(), MapUpdate(), MapValue(), MapValueUpdate(),
+        MapValueUpdate'FlagUpdate(..), MapValueUpdate'FlagUpdate(),
+        ModuleFunction(), Pair(), PingRequest(), PingResponse(),
+        PutRequest(), PutResponse(), ResetBucketPropertiesRequest(),
+        ResetBucketPropertiesResponse(), SecondaryIndexRequest(),
         SecondaryIndexRequest'SecondaryIndexQueryType(..),
         SecondaryIndexRequest'SecondaryIndexQueryType(),
         SecondaryIndexResponse(), SetBucketPropertiesRequest(),
@@ -3112,6 +3112,105 @@ instance Control.DeepSeq.NFData GetCrdtResponse'CrdtType where
         rnf x__ = Prelude.seq x__ (())
 {- | Fields :
 
+    * 'Proto.Proto.Riak_Fields.name' @:: Lens' GetIndexRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'name' @:: Lens' GetIndexRequest (Prelude.Maybe Data.ByteString.ByteString)@
+ -}
+data GetIndexRequest = GetIndexRequest{_GetIndexRequest'name ::
+                                       !(Prelude.Maybe Data.ByteString.ByteString),
+                                       _GetIndexRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
+                         deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetIndexRequest where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' GetIndexRequest "name"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _GetIndexRequest'name
+                 (\ x__ y__ -> x__{_GetIndexRequest'name = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' GetIndexRequest "maybe'name"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _GetIndexRequest'name
+                 (\ x__ y__ -> x__{_GetIndexRequest'name = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message GetIndexRequest where
+        messageName _ = Data.Text.pack "GetIndexRequest"
+        fieldsByTag
+          = let name__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "name"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'name")))
+                      :: Data.ProtoLens.FieldDescriptor GetIndexRequest
+              in
+              Data.Map.fromList [(Data.ProtoLens.Tag 1, name__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _GetIndexRequest'_unknownFields
+              (\ x__ y__ -> x__{_GetIndexRequest'_unknownFields = y__})
+        defMessage
+          = GetIndexRequest{_GetIndexRequest'name = Prelude.Nothing,
+                            _GetIndexRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetIndexRequest where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_GetIndexRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetIndexRequest'name x__) (()))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.index' @:: Lens' GetIndexResponse [Index]@
+ -}
+data GetIndexResponse = GetIndexResponse{_GetIndexResponse'index ::
+                                         ![Index],
+                                         _GetIndexResponse'_unknownFields ::
+                                         !Data.ProtoLens.FieldSet}
+                          deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetIndexResponse where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' GetIndexResponse "index" ([Index])
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _GetIndexResponse'index
+                 (\ x__ y__ -> x__{_GetIndexResponse'index = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message GetIndexResponse where
+        messageName _ = Data.Text.pack "GetIndexResponse"
+        fieldsByTag
+          = let index__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "index"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor Index)
+                      (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "index")))
+                      :: Data.ProtoLens.FieldDescriptor GetIndexResponse
+              in
+              Data.Map.fromList [(Data.ProtoLens.Tag 1, index__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _GetIndexResponse'_unknownFields
+              (\ x__ y__ -> x__{_GetIndexResponse'_unknownFields = y__})
+        defMessage
+          = GetIndexResponse{_GetIndexResponse'index = [],
+                             _GetIndexResponse'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetIndexResponse where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_GetIndexResponse'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetIndexResponse'index x__) (()))
+{- | Fields :
+
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' GetRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.key' @:: Lens' GetRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.r' @:: Lens' GetRequest Data.Word.Word32@
@@ -3774,6 +3873,108 @@ instance Control.DeepSeq.NFData HllUpdate where
           = \ x__ ->
               Control.DeepSeq.deepseq (_HllUpdate'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_HllUpdate'adds x__) (()))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.name' @:: Lens' Index Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.schema' @:: Lens' Index Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'schema' @:: Lens' Index (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.n' @:: Lens' Index Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'n' @:: Lens' Index (Prelude.Maybe Data.Word.Word32)@
+ -}
+data Index = Index{_Index'name :: !Data.ByteString.ByteString,
+                   _Index'schema :: !(Prelude.Maybe Data.ByteString.ByteString),
+                   _Index'n :: !(Prelude.Maybe Data.Word.Word32),
+                   _Index'_unknownFields :: !Data.ProtoLens.FieldSet}
+               deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show Index where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' Index "name"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Index'name
+                 (\ x__ y__ -> x__{_Index'name = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' Index "schema"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Index'schema
+                 (\ x__ y__ -> x__{_Index'schema = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' Index "maybe'schema"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Index'schema
+                 (\ x__ y__ -> x__{_Index'schema = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' Index "n" (Data.Word.Word32) where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Index'n
+                 (\ x__ y__ -> x__{_Index'n = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' Index "maybe'n"
+           (Prelude.Maybe Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Index'n
+                 (\ x__ y__ -> x__{_Index'n = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message Index where
+        messageName _ = Data.Text.pack "Index"
+        fieldsByTag
+          = let name__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "name"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "name")))
+                      :: Data.ProtoLens.FieldDescriptor Index
+                schema__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "schema"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'schema")))
+                      :: Data.ProtoLens.FieldDescriptor Index
+                n__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "n"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'n")))
+                      :: Data.ProtoLens.FieldDescriptor Index
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, name__field_descriptor),
+                 (Data.ProtoLens.Tag 2, schema__field_descriptor),
+                 (Data.ProtoLens.Tag 3, n__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _Index'_unknownFields
+              (\ x__ y__ -> x__{_Index'_unknownFields = y__})
+        defMessage
+          = Index{_Index'name = Data.ProtoLens.fieldDefault,
+                  _Index'schema = Prelude.Nothing, _Index'n = Prelude.Nothing,
+                  _Index'_unknownFields = ([])}
+instance Control.DeepSeq.NFData Index where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_Index'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_Index'name x__)
+                   (Control.DeepSeq.deepseq (_Index'schema x__)
+                      (Control.DeepSeq.deepseq (_Index'n x__) (()))))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' Link Data.ByteString.ByteString@

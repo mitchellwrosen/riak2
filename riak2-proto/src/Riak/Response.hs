@@ -24,6 +24,7 @@ data Response
   | ResponseGet GetResponse
   | ResponseGetBucketProperties GetBucketPropertiesResponse
   | ResponseGetCrdt GetCrdtResponse
+  | ResponseGetIndex GetIndexResponse
   | ResponseGetServerInfo GetServerInfoResponse
   | ResponseListBuckets ListBucketsResponse
   | ResponseListKeys ListKeysResponse
@@ -67,6 +68,7 @@ decode code bytes =
     -- 24   -> decode' ResponseMapReduce
     26   -> decode' ResponseSecondaryIndex
     30   -> Right (ResponseResetBucketProperties Proto.defMessage)
+    55   -> decode' ResponseGetIndex
     81   -> decode' ResponseGetCrdt
     83   -> decodeMaybeEmpty ResponseUpdateCrdt
 
@@ -101,6 +103,7 @@ encode = \case
   ResponseGet                   response -> Utils.wire 10 response
   ResponseGetBucketProperties   response -> Utils.wire 20 response
   ResponseGetCrdt               response -> Utils.wire 81 response
+  ResponseGetIndex              response -> Utils.wire 55 response
   ResponseGetServerInfo         response -> Utils.wire 8  response
   ResponseListBuckets           response -> Utils.wire 16 response
   ResponseListKeys              response -> Utils.wire 18 response

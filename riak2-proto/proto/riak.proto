@@ -515,20 +515,20 @@ message Link {
 /*   optional uint32       num_found = 3; // Number of results */
 /* } */
 
-/* message Index { */
-/*     required bytes name   =  1;  // Index name */
-/*     optional bytes schema =  2;  // Schema name */
-/*     optional uint32 n =  3;  // N value */
-/* } */
+message Index {
+    required bytes name = 1; // Index name
+    optional bytes schema = 2; // Schema name
+    optional uint32 n = 3; // N value
+}
 
 // GET request - If a name is given, return matching index, else return all
-/* message RpbYokozunaIndexGetReq { */
-/*     optional bytes name  =  1;  // Index name */
-/* } */
+message GetIndexRequest {
+    optional bytes name = 1;
+}
 
-/* message RpbYokozunaIndexGetResp { */
-/*     repeated Index index  =  1; */
-/* } */
+message GetIndexResponse {
+    repeated Index index = 1;
+}
 
 // PUT request - Create a new index
 /* message RpbYokozunaIndexPutReq { */

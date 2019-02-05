@@ -22,6 +22,7 @@ data Request
   | RequestGetBucketProperties GetBucketPropertiesRequest
   | RequestGetBucketTypeProperties GetBucketTypePropertiesRequest
   | RequestGetCrdt GetCrdtRequest
+  | RequestGetIndex GetIndexRequest
   | RequestGetServerInfo GetServerInfoRequest
   | RequestListBuckets ListBucketsRequest
   | RequestListKeys ListKeysRequest
@@ -63,7 +64,7 @@ decode code bytes =
     31   -> go RequestGetBucketTypeProperties
     32   -> go RequestSetBucketTypeProperties
     -- 33   -> go RequestGetBucketKeyPreflist
-    -- 54   -> go RequestGetYokozunaIndex
+    54   -> go RequestGetIndex
     -- 56   -> go RequestPutYokozunaIndex
     -- 57   -> go RequestDeleteYokozunaIndex
     -- 58   -> go RequestGetYokozunaSchema
@@ -89,6 +90,7 @@ encode = \case
   RequestGetBucketProperties     request -> Utils.wire 19 request
   RequestGetBucketTypeProperties request -> Utils.wire 31 request
   RequestGetCrdt                 request -> Utils.wire 80 request
+  RequestGetIndex                request -> Utils.wire 54 request
   RequestGetServerInfo           request -> Utils.wire  7 request
   -- RequestMapReduce               request -> Utils.wire 23 request
   RequestPing                    request -> Utils.wire  1 request
@@ -103,7 +105,6 @@ encode = \case
 
 -- instance Request RpbSearchQueryReq         where code = 27
 -- instance Request RpbYokozunaIndexDeleteReq where code = 57
--- instance Request RpbYokozunaIndexGetReq    where code = 54
 -- instance Request RpbYokozunaIndexPutReq    where code = 56
 -- instance Request RpbYokozunaSchemaGetReq   where code = 58
 -- instance Request RpbYokozunaSchemaPutReq   where code = 60

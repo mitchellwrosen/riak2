@@ -12,8 +12,6 @@ import qualified Riak.Internal.Client as Client
 import qualified Riak.Proto           as Proto
 import qualified Riak.Proto.Lens      as L
 
-import Data.Text.Encoding (decodeUtf8)
-
 
 data ServerInfo
   = ServerInfo

@@ -10,6 +10,7 @@ module Riak
   , ExactQuery(..)
   , GetOpts(..)
   , HyperLogLog(..)
+  , Index(..)
   , Key(..)
   , Map(..)
   , MapUpdate(..)
@@ -35,6 +36,7 @@ import Riak.Context
 import Riak.Counter
 import Riak.ExactQuery
 import Riak.HyperLogLog
+import Riak.Index
 import Riak.SecondaryIndex
 import Riak.SecondaryIndexValue
 import Riak.Key

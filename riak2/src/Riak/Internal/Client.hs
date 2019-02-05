@@ -13,8 +13,7 @@ import qualified Riak.Interface.Signature as Interface
 import qualified Riak.Proto               as Proto
 import qualified Riak.Proto.Lens          as L
 
-import Control.Foldl      (FoldM(..))
-import Data.Text.Encoding (decodeUtf8)
+import Control.Foldl (FoldM(..))
 
 
 -- TODO rename Interface to Client

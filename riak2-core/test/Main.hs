@@ -112,6 +112,7 @@ mockServer = do
                 RequestGetBucketProperties{}     -> respond ResponseGetBucketProperties
                 RequestGetBucketTypeProperties{} -> respond ResponseGetBucketProperties
                 RequestGetCrdt{}                 -> respond ResponseGetCrdt
+                RequestGetIndex{}                -> respond ResponseGetIndex
                 RequestGetServerInfo{}           -> respond ResponseGetServerInfo
                 RequestGet{}                     -> respond ResponseGet
                 RequestListBuckets{}             -> respond ResponseListBuckets
@@ -145,6 +146,10 @@ expectedResponse request response =
     RequestGetCrdt{} ->
       case response of
         ResponseGetCrdt{} -> True
+        _ -> False
+    RequestGetIndex{} ->
+      case response of
+        ResponseGetIndex{} -> True
         _ -> False
     RequestGetServerInfo{} ->
       case response of
