@@ -24,13 +24,13 @@ import Riak.Opts             (GetOpts(..), PutOpts(..))
 import Riak.Request          (Request(..))
 import Riak.Response         (Response(..))
 
-import qualified Riak.Internal.Client     as Client
-import qualified Riak.Internal.Index      as Index
-import qualified Riak.Internal.Object     as Object
-import qualified Riak.Internal.Proto.Pair as Proto.Pair
-import qualified Riak.Internal.Quorum     as Quorum
-import qualified Riak.Proto               as Proto
-import qualified Riak.Proto.Lens          as L
+import qualified Riak.Internal.Client         as Client
+import qualified Riak.Internal.Object         as Object
+import qualified Riak.Internal.Proto.Pair     as Proto.Pair
+import qualified Riak.Internal.Quorum         as Quorum
+import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
+import qualified Riak.Proto                   as Proto
+import qualified Riak.Proto.Lens              as L
 
 import Data.Generics.Product.Typed (HasType(..))
 
@@ -308,7 +308,7 @@ makePutRequest (Key type' bucket key) content opts =
     & L.bucket .~ bucket
     & L.content .~
         (defMessage
-          & L.indexes .~ map Index.toPair (content ^. field @"indexes")
+          & L.indexes .~ map SecondaryIndex.toPair (content ^. field @"indexes")
           & L.maybe'charset .~ (content ^. field @"charset")
           & L.maybe'contentEncoding .~ (content ^. field @"encoding")
           & L.maybe'contentType .~ (content ^. field @"type'")
@@ -341,7 +341,7 @@ delete ::
   => Client -- ^
   -> Object a -- ^
   -> m (Either Error ())
-delete client object = liftIO $
+delete client (view (field @"content") -> content) = liftIO $
   (fmap.fmap)
     (const ())
     (Client.exchange
@@ -368,10 +368,10 @@ delete client object = liftIO $
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
         & L.type' .~ type'
-        & L.context .~ unContext (object ^. field @"content" . field @"context")
+        & L.context .~ unContext (content ^. field @"context")
 
     Key type' bucket key =
-      object ^. field @"content" . field @"key"
+      content ^. field @"key"
 
 defFalse :: Bool -> Maybe Bool
 defFalse = \case

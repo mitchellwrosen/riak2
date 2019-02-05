@@ -10,8 +10,6 @@ module Riak
   , ExactQuery(..)
   , GetOpts(..)
   , HyperLogLog(..)
-  , Index(..)
-  , IndexValue(..)
   , Key(..)
   , Map(..)
   , MapUpdate(..)
@@ -21,6 +19,8 @@ module Riak
   , PutOpts(..)
   , Quorum(..)
   , RangeQuery(..)
+  , SecondaryIndex(..)
+  , SecondaryIndexValue(..)
   , ServerInfo(..)
   , Set(..)
   , SetUpdate(..)
@@ -35,8 +35,8 @@ import Riak.Context
 import Riak.Counter
 import Riak.ExactQuery
 import Riak.HyperLogLog
-import Riak.Index
-import Riak.IndexValue
+import Riak.SecondaryIndex
+import Riak.SecondaryIndexValue
 import Riak.Key
 import Riak.Map
 import Riak.Object

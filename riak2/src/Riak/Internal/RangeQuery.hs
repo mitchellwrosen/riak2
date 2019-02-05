@@ -1,10 +1,10 @@
 module Riak.Internal.RangeQuery where
 
-import Riak.Internal.Bucket     (Bucket)
-import Riak.Internal.IndexValue (IndexValue)
+import Riak.Internal.Bucket              (Bucket)
 import Riak.Internal.Prelude
+import Riak.Internal.SecondaryIndexValue (SecondaryIndexValue)
 
-import qualified Riak.Internal.IndexValue as IndexValue
+import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 
 -- | A range query on a secondary index.
 --
@@ -13,8 +13,8 @@ data RangeQuery a
   = RangeQuery
   { bucket :: !Bucket
   , index :: !ByteString
-  , min :: !(IndexValue a)
-  , max :: !(IndexValue a)
+  , min :: !(SecondaryIndexValue a)
+  , max :: !(SecondaryIndexValue a)
   }
 
 deriving stock instance Show (RangeQuery a)
@@ -22,15 +22,15 @@ deriving stock instance Show (RangeQuery a)
 name :: RangeQuery a -> ByteString
 name (RangeQuery { index, min }) =
   case min of
-    IndexValue.Binary{}  -> index <> "_bin"
-    IndexValue.Integer{} -> index <> "_int"
+    SecondaryIndexValue.Binary{}  -> index <> "_bin"
+    SecondaryIndexValue.Integer{} -> index <> "_int"
 
 -- | Build a query on the built-in index @\"\$key\"@, which indexes each object
 -- by its key.
 keysBetween ::
      Bucket -- ^
-  -> IndexValue ByteString -- ^
-  -> IndexValue ByteString -- ^
+  -> SecondaryIndexValue ByteString -- ^
+  -> SecondaryIndexValue ByteString -- ^
   -> RangeQuery ByteString
 keysBetween bucket min max =
   RangeQuery

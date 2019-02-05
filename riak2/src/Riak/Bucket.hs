@@ -23,12 +23,12 @@ import Riak.Internal.Utils      (bs2int)
 import Riak.Request             (Request(..))
 import Riak.Response            (Response(..))
 
-import qualified Riak.Internal.Client     as Client
-import qualified Riak.Internal.ExactQuery as ExactQuery
-import qualified Riak.Internal.IndexValue as IndexValue
-import qualified Riak.Internal.RangeQuery as RangeQuery
-import qualified Riak.Proto               as Proto
-import qualified Riak.Proto.Lens          as L
+import qualified Riak.Internal.Client              as Client
+import qualified Riak.Internal.ExactQuery          as ExactQuery
+import qualified Riak.Internal.RangeQuery          as RangeQuery
+import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
+import qualified Riak.Proto                        as Proto
+import qualified Riak.Proto.Lens                   as L
 
 import Control.Foldl (FoldM(..))
 import Control.Lens  (folded, to)
@@ -177,7 +177,7 @@ exactQuery client query@(ExactQuery { value }) keyFold =
       defMessage
         & L.bucket .~ bucket
         & L.index .~ ExactQuery.name query
-        & L.key .~ IndexValue.encode value
+        & L.key .~ SecondaryIndexValue.encode value
         & L.maxResults .~ 50
         & L.qtype .~ Proto.IndexRequest'exact
         & L.stream .~ True
@@ -209,8 +209,8 @@ rangeQuery client query keyFold =
         & L.index .~ RangeQuery.name query
         & L.maxResults .~ 50 -- TODO configure page size
         & L.qtype .~ Proto.IndexRequest'range
-        & L.rangeMax .~ IndexValue.encode (RangeQuery.max query)
-        & L.rangeMax .~ IndexValue.encode (RangeQuery.min query)
+        & L.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.max query)
+        & L.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.min query)
         & L.returnTerms .~ True
         & L.stream .~ True
         & L.type' .~ type'
@@ -218,8 +218,8 @@ rangeQuery client query keyFold =
     fromResult :: Proto.Pair -> (a, Key)
     fromResult pair =
       ( case RangeQuery.min query of
-          IndexValue.Binary{}  -> pair ^. L.key
-          IndexValue.Integer{} -> bs2int (pair ^. L.key)
+          SecondaryIndexValue.Binary{}  -> pair ^. L.key
+          SecondaryIndexValue.Integer{} -> bs2int (pair ^. L.key)
       , Key type' bucket (pair ^. L.value)
       )
 

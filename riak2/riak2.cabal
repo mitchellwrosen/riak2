@@ -58,8 +58,8 @@ description:
   .
   Secondary index types:
   .
-  * "Riak.Index"
-  * "Riak.IndexValue"
+  * "Riak.SecondaryIndex"
+  * "Riak.SecondaryIndexValue"
   * "Riak.ExactQuery"
   * "Riak.RangeQuery"
   .
@@ -154,8 +154,8 @@ library
     Riak.Counter
     Riak.ExactQuery
     Riak.HyperLogLog
-    Riak.Index
-    Riak.IndexValue
+    Riak.SecondaryIndex
+    Riak.SecondaryIndexValue
     Riak.Key
     Riak.Map
     Riak.Object
@@ -196,8 +196,6 @@ library
     Riak.Internal.Context
     Riak.Internal.ExactQuery
     Riak.Internal.Key
-    Riak.Internal.Index
-    Riak.Internal.IndexValue
     Riak.Internal.Object
     Riak.Internal.Panic
     Riak.Internal.Prelude
@@ -205,6 +203,8 @@ library
     Riak.Internal.Proto.Pair
     Riak.Internal.Quorum
     Riak.Internal.RangeQuery
+    Riak.Internal.SecondaryIndex
+    Riak.Internal.SecondaryIndexValue
     Riak.Internal.Set
     Riak.Internal.Utils
 

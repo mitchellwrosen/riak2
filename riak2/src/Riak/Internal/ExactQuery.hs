@@ -1,10 +1,10 @@
 module Riak.Internal.ExactQuery where
 
-import Riak.IndexValue       (IndexValue)
-import Riak.Internal.Bucket  (Bucket(..))
+import Riak.Internal.Bucket     (Bucket(..))
 import Riak.Internal.Prelude
+import Riak.SecondaryIndexValue (SecondaryIndexValue)
 
-import qualified Riak.IndexValue as IndexValue
+import qualified Riak.SecondaryIndexValue as SecondaryIndexValue
 
 -- | An exact query on a secondary index.
 --
@@ -14,14 +14,14 @@ data ExactQuery
     ExactQuery
   { bucket :: !Bucket
   , index :: !ByteString
-  , value :: !(IndexValue a)
+  , value :: !(SecondaryIndexValue a)
   }
 
 name :: ExactQuery -> ByteString
 name (ExactQuery { index, value }) =
   case value of
-    IndexValue.Binary{}  -> index <> "_bin"
-    IndexValue.Integer{} -> index <> "_int"
+    SecondaryIndexValue.Binary{}  -> index <> "_bin"
+    SecondaryIndexValue.Integer{} -> index <> "_int"
 
 -- | Build a query on the built-in index @\"\$bucket\"@, which indexes each
 -- object by its bucket.
@@ -32,5 +32,5 @@ inBucket bucket@(Bucket _ b) =
   ExactQuery
     { bucket = bucket
     , index = "$bucket"
-    , value = IndexValue.Binary b
+    , value = SecondaryIndexValue.Binary b
     }

@@ -9,10 +9,10 @@ import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Internal.Index         as Index
-import qualified Riak.Internal.Proto.Content as Proto.Content
-import qualified Riak.Proto                  as Proto
-import qualified Riak.Proto.Lens             as L
+import qualified Riak.Internal.Proto.Content  as Proto.Content
+import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
+import qualified Riak.Proto                   as Proto
+import qualified Riak.Proto.Lens              as L
 
 import qualified Data.ByteString    as ByteString
 import qualified Data.List.NonEmpty as List1
@@ -38,7 +38,7 @@ fromProtoContent key context proto =
           { charset = proto ^. L.maybe'charset
           , context = Context context
           , encoding = proto ^. L.maybe'contentEncoding
-          , indexes = map Index.fromPair (proto ^. L.indexes)
+          , indexes = map SecondaryIndex.fromPair (proto ^. L.indexes)
           , key = key
           , metadata = Proto.Content.metadata proto
           , type' = proto ^. L.maybe'contentType
