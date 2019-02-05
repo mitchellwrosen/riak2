@@ -530,11 +530,10 @@ message GetIndexResponse {
     repeated Index index = 1;
 }
 
-// PUT request - Create a new index
-/* message RpbYokozunaIndexPutReq { */
-/*     required Index index  =  1; */
-/*     optional uint32 timeout          =  2; // Timeout value */
-/* } */
+message PutIndexRequest {
+    required Index index = 1;
+    optional uint32 timeout = 2; // Timeout value
+}
 
 // DELETE request - Remove an index
 /* message RpbYokozunaIndexDeleteReq { */

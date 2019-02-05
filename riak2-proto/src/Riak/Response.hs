@@ -59,7 +59,7 @@ decode code bytes =
     -- 6  -> decode' ResponseSetClientId
     8    -> decode' ResponseGetServerInfo
     10   -> decode' ResponseGet
-    12   -> decode' ResponsePut -- TODO Might put response be empty?
+    12   -> decode' ResponsePut
     14   -> Right (ResponseDelete Proto.defMessage)
     16   -> decode' ResponseListBuckets
     18   -> decode' ResponseListKeys
@@ -70,7 +70,7 @@ decode code bytes =
     30   -> Right (ResponseResetBucketProperties Proto.defMessage)
     55   -> decode' ResponseGetIndex
     81   -> decode' ResponseGetCrdt
-    83   -> decodeMaybeEmpty ResponseUpdateCrdt
+    83   -> decode' ResponseUpdateCrdt
 
 -- instance Response RpbSearchQueryResp       where code = 28
 -- instance Response RpbYokozunaIndexGetResp  where code = 55
@@ -85,15 +85,6 @@ decode code bytes =
       -> Either DecodeError Response
     decode' f =
       bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
-
-    decodeMaybeEmpty ::
-         Proto.Message a
-      => (a -> Response)
-      -> Either DecodeError Response
-    decodeMaybeEmpty f =
-      if ByteString.null bytes
-        then Right (f Proto.defMessage)
-        else decode' f
 
 -- | Encode a response, including the length prefix.
 encode :: Response -> ByteString

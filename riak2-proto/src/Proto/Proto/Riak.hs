@@ -21,8 +21,9 @@ module Proto.Proto.Riak
         MapKey'MapKeyType(), MapUpdate(), MapValue(), MapValueUpdate(),
         MapValueUpdate'FlagUpdate(..), MapValueUpdate'FlagUpdate(),
         ModuleFunction(), Pair(), PingRequest(), PingResponse(),
-        PutRequest(), PutResponse(), ResetBucketPropertiesRequest(),
-        ResetBucketPropertiesResponse(), SecondaryIndexRequest(),
+        PutIndexRequest(), PutRequest(), PutResponse(),
+        ResetBucketPropertiesRequest(), ResetBucketPropertiesResponse(),
+        SecondaryIndexRequest(),
         SecondaryIndexRequest'SecondaryIndexQueryType(..),
         SecondaryIndexRequest'SecondaryIndexQueryType(),
         SecondaryIndexResponse(), SetBucketPropertiesRequest(),
@@ -5260,6 +5261,82 @@ instance Control.DeepSeq.NFData PingResponse where
         rnf
           = \ x__ ->
               Control.DeepSeq.deepseq (_PingResponse'_unknownFields x__) (())
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.index' @:: Lens' PutIndexRequest Index@
+    * 'Proto.Proto.Riak_Fields.timeout' @:: Lens' PutIndexRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'timeout' @:: Lens' PutIndexRequest (Prelude.Maybe Data.Word.Word32)@
+ -}
+data PutIndexRequest = PutIndexRequest{_PutIndexRequest'index ::
+                                       !Index,
+                                       _PutIndexRequest'timeout ::
+                                       !(Prelude.Maybe Data.Word.Word32),
+                                       _PutIndexRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
+                         deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show PutIndexRequest where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' PutIndexRequest "index" (Index) where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _PutIndexRequest'index
+                 (\ x__ y__ -> x__{_PutIndexRequest'index = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' PutIndexRequest "timeout"
+           (Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _PutIndexRequest'timeout
+                 (\ x__ y__ -> x__{_PutIndexRequest'timeout = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' PutIndexRequest "maybe'timeout"
+           (Prelude.Maybe Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _PutIndexRequest'timeout
+                 (\ x__ y__ -> x__{_PutIndexRequest'timeout = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message PutIndexRequest where
+        messageName _ = Data.Text.pack "PutIndexRequest"
+        fieldsByTag
+          = let index__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "index"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor Index)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "index")))
+                      :: Data.ProtoLens.FieldDescriptor PutIndexRequest
+                timeout__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "timeout"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'timeout")))
+                      :: Data.ProtoLens.FieldDescriptor PutIndexRequest
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, index__field_descriptor),
+                 (Data.ProtoLens.Tag 2, timeout__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _PutIndexRequest'_unknownFields
+              (\ x__ y__ -> x__{_PutIndexRequest'_unknownFields = y__})
+        defMessage
+          = PutIndexRequest{_PutIndexRequest'index =
+                              Data.ProtoLens.defMessage,
+                            _PutIndexRequest'timeout = Prelude.Nothing,
+                            _PutIndexRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData PutIndexRequest where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_PutIndexRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_PutIndexRequest'index x__)
+                   (Control.DeepSeq.deepseq (_PutIndexRequest'timeout x__) (())))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' PutRequest Data.ByteString.ByteString@

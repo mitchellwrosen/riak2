@@ -120,6 +120,7 @@ mockServer = do
                 -- RequestMapReduce{}               -> respond ResponseMapReduce
                 RequestPing{}                    -> respond ResponsePing
                 RequestPut{}                     -> respond ResponsePut
+                RequestPutIndex{}                -> respond ResponsePut
                 RequestResetBucketProperties{}   -> respond ResponseResetBucketProperties
                 RequestSecondaryIndex{}          -> respond ResponseSecondaryIndex
                 RequestSetBucketProperties{}     -> respond ResponseSetBucketProperties
@@ -176,6 +177,10 @@ expectedResponse request response =
         ResponsePing{} -> True
         _ -> False
     RequestPut{} ->
+      case response of
+        ResponsePut{} -> True
+        _ -> False
+    RequestPutIndex{} ->
       case response of
         ResponsePut{} -> True
         _ -> False

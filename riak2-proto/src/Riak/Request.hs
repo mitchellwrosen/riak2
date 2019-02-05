@@ -29,6 +29,7 @@ data Request
   -- | RequestMapReduce MapReduceRequest
   | RequestPing PingRequest
   | RequestPut PutRequest
+  | RequestPutIndex PutIndexRequest
   | RequestResetBucketProperties ResetBucketPropertiesRequest
   | RequestSecondaryIndex SecondaryIndexRequest
   | RequestSetBucketProperties SetBucketPropertiesRequest
@@ -52,6 +53,7 @@ decode code bytes =
     7    -> go RequestGetServerInfo
     9    -> go RequestGet
     11   -> go RequestPut
+    56   -> go RequestPutIndex
     13   -> go RequestDelete
     15   -> go RequestListBuckets
     17   -> go RequestListKeys
@@ -95,6 +97,7 @@ encode = \case
   -- RequestMapReduce               request -> Utils.wire 23 request
   RequestPing                    request -> Utils.wire  1 request
   RequestPut                     request -> Utils.wire 11 request
+  RequestPutIndex                request -> Utils.wire 56 request
   RequestResetBucketProperties   request -> Utils.wire 29 request
   RequestSecondaryIndex          request -> Utils.wire 25 request
   RequestSetBucketProperties     request -> Utils.wire 21 request
@@ -105,6 +108,5 @@ encode = \case
 
 -- instance Request RpbSearchQueryReq         where code = 27
 -- instance Request RpbYokozunaIndexDeleteReq where code = 57
--- instance Request RpbYokozunaIndexPutReq    where code = 56
 -- instance Request RpbYokozunaSchemaGetReq   where code = 58
 -- instance Request RpbYokozunaSchemaPutReq   where code = 60

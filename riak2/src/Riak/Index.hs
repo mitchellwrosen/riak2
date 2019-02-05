@@ -2,6 +2,7 @@ module Riak.Index
   ( Index(..)
   , get
   , getAll
+  , put
   ) where
 
 import Riak.Internal.Client  (Client, Error(..))
@@ -112,6 +113,27 @@ doGet client name =
       defMessage
         & L.maybe'name .~ (encodeUtf8 <$> name)
 
+put ::
+     MonadIO m
+  => Client
+  -> Index
+  -> m (Either Error ())
+put client index = liftIO $
+  Client.exchange
+    client
+    (RequestPutIndex request)
+    (\case
+      ResponsePut{} -> Just ()
+      _ -> Nothing)
+
+  where
+    request :: Proto.PutIndexRequest
+    request =
+      defMessage
+        & L.index .~ toProto index
+        -- TODO put index timeout
+        -- & L.maybe'timeout .~ undefined
+
 fromProto :: Proto.Index -> Index
 fromProto index =
   Index
@@ -119,3 +141,10 @@ fromProto index =
     , schema = decodeUtf8 (index ^. L.schema)
     , n = index ^. L.maybe'n
     }
+
+toProto :: Index -> Proto.Index
+toProto Index { name, schema, n } =
+  defMessage
+    & L.name .~ encodeUtf8 name
+    & L.schema .~ encodeUtf8 schema
+    & L.maybe'n .~ n

@@ -27,23 +27,24 @@ module Riak
   , SetUpdate(..)
   ) where
 
-import Riak.Bucket
-import Riak.BucketProperties
-import Riak.BucketType
-import Riak.Client
-import Riak.Content
-import Riak.Context
-import Riak.Counter
-import Riak.ExactQuery
-import Riak.HyperLogLog
-import Riak.Index
-import Riak.SecondaryIndex
-import Riak.SecondaryIndexValue
-import Riak.Key
-import Riak.Map
-import Riak.Object
-import Riak.Opts
-import Riak.Quorum
-import Riak.RangeQuery
-import Riak.ServerInfo
-import Riak.Set
+import Riak.Bucket              (Bucket(..))
+import Riak.BucketProperties    (BucketProperties(..), ConflictResolution(..),
+                                 NotfoundBehavior(..))
+import Riak.BucketType          (BucketType(..))
+import Riak.Client              (Client)
+import Riak.Content             (Content(..))
+import Riak.Context             (Context)
+import Riak.Counter             (Counter(..))
+import Riak.ExactQuery          (ExactQuery(..))
+import Riak.HyperLogLog         (HyperLogLog(..))
+import Riak.Index               (Index(..))
+import Riak.Key                 (Key(..))
+import Riak.Map                 (Map(..), MapUpdate(..), Maps(..))
+import Riak.Object              (Object(..))
+import Riak.Opts                (GetOpts(..), PutOpts(..))
+import Riak.Quorum              (Quorum(..))
+import Riak.RangeQuery          (RangeQuery(..))
+import Riak.SecondaryIndex      (SecondaryIndex(..))
+import Riak.SecondaryIndexValue (SecondaryIndexValue(..))
+import Riak.ServerInfo          (ServerInfo(..))
+import Riak.Set                 (Set(..), SetUpdate(..))
