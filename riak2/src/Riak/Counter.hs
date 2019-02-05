@@ -4,7 +4,7 @@ module Riak.Counter
   , update
   ) where
 
-import Riak.Internal.Client  (Client, Result(..))
+import Riak.Internal.Client  (Client, Error)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
@@ -33,7 +33,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Result (Maybe Counter))
+  -> m (Either Error (Maybe Counter))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -75,7 +75,7 @@ update ::
      MonadIO m
   => Client -- ^
   -> Counter -- ^
-  -> m (Result Counter)
+  -> m (Either Error Counter)
 update client (Counter { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

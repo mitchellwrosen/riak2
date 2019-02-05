@@ -1,7 +1,7 @@
 module Riak.Internal.Client
   ( module Riak.Internal.Client
-  -- TODO move Result(..) here
-  , Result(..)
+  , Error(..)
+  , UnexpectedResponse(..)
   ) where
 
 import Riak.Interface.Signature (Interface)
@@ -21,11 +21,10 @@ import Data.Text.Encoding (decodeUtf8)
 type Client
   = Interface
 
-data Result a
-  = Success a
-  | Failure Text
-  | ConnectionClosed
-  deriving stock (Functor, Show)
+data Error
+  = Error Text
+  | RemoteShutdown
+  deriving stock (Show)
 
 data UnexpectedResponse
   = UnexpectedResponse !Request !Response
@@ -40,14 +39,14 @@ exchange ::
      Client
   -> Request
   -> (Response -> Maybe a)
-  -> IO (Result a)
+  -> IO (Either Error a)
 exchange client request f =
   Interface.exchange client request >>= \case
     Nothing ->
-      pure ConnectionClosed
+      pure (Left RemoteShutdown)
 
     Just (ResponseError response) ->
-      pure (Failure (decodeUtf8 (response ^. L.errmsg)))
+      pure (Left (Error (decodeUtf8 (response ^. L.errmsg))))
 
     Just response ->
       case f response of
@@ -55,7 +54,7 @@ exchange client request f =
           throwIO (UnexpectedResponse request response)
 
         Just response' ->
-          pure (Success response')
+          pure (Right response')
 
 stream ::
      forall a r.
@@ -64,12 +63,12 @@ stream ::
   -> (Response -> Maybe a) -- ^ Correct response?
   -> (a -> Bool) -- ^ Done?
   -> FoldM IO a r -- ^ Fold responses
-  -> IO (Result r)
+  -> IO (Either Error r)
 stream client request f done (FoldM step initial extract) =
   Interface.stream client request callback
 
   where
-    callback :: IO (Maybe Response) -> IO (Result r)
+    callback :: IO (Maybe Response) -> IO (Either Error r)
     callback recv =
       loop =<< initial
 
@@ -77,10 +76,10 @@ stream client request f done (FoldM step initial extract) =
         loop value =
           recv >>= \case
             Nothing ->
-              pure ConnectionClosed
+              pure (Left RemoteShutdown)
 
             Just (ResponseError response) ->
-              pure (Failure (decodeUtf8 (response ^. L.errmsg)))
+              pure (Left (Error (decodeUtf8 (response ^. L.errmsg))))
 
             Just response ->
               case f response of
@@ -93,14 +92,14 @@ stream client request f done (FoldM step initial extract) =
 
                   if done response'
                     then
-                      Success <$> extract value'
+                      Right <$> extract value'
                     else
                       loop value'
 
 getCrdt
   :: Client
   -> Proto.GetCrdtRequest
-  -> IO (Result Proto.GetCrdtResponse)
+  -> IO (Either Error Proto.GetCrdtResponse)
 getCrdt client request =
   exchange
     client
@@ -112,7 +111,7 @@ getCrdt client request =
 updateCrdt
   :: Client -- ^
   -> Proto.UpdateCrdtRequest -- ^
-  -> IO (Result Proto.UpdateCrdtResponse)
+  -> IO (Either Error Proto.UpdateCrdtResponse)
 updateCrdt client request =
   exchange
     client

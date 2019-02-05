@@ -2,6 +2,8 @@ module Riak.Client
   ( Client
   , new
   , ping
+  , Error(..)
+  , UnexpectedResponse(..)
   ) where
 
 import Riak.Internal.Client
@@ -13,7 +15,7 @@ import Riak.Response         (Response(..))
 ping ::
      MonadIO m
   => Client -- ^
-  -> m (Result ())
+  -> m (Either Error ())
 ping client = liftIO $
   exchange
     client

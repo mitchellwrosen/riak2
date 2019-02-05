@@ -14,7 +14,7 @@ module Riak.Bucket
   ) where
 
 import Riak.Internal.Bucket     (Bucket(..))
-import Riak.Internal.Client     (Client, Result(..))
+import Riak.Internal.Client     (Client, Error(..))
 import Riak.Internal.ExactQuery (ExactQuery(..))
 import Riak.Internal.Key        (Key(..))
 import Riak.Internal.Prelude
@@ -43,7 +43,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Bucket -- ^
-  -> m (Result Proto.BucketProperties)
+  -> m (Either Error Proto.BucketProperties)
 get client (Bucket type' bucket) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -72,7 +72,7 @@ get client (Bucket type' bucket) = liftIO $
 set
   :: Client -- ^
   -> Proto.SetBucketPropertiesRequest -- ^
-  -> IO (Result Proto.SetBucketPropertiesResponse)
+  -> IO (Either Error Proto.SetBucketPropertiesResponse)
 set client request =
   Client.exchange
     client
@@ -86,7 +86,7 @@ reset ::
      MonadIO m
   => Client
   -> Bucket
-  -> m (Result ())
+  -> m (Either Error ())
 reset client (Bucket type' bucket) = liftIO $
   Client.exchange
     client
@@ -118,7 +118,7 @@ keys ::
      MonadIO m
   => Client -- ^
   -> Bucket -- ^
-  -> m (Result [Key])
+  -> m (Either Error [Key])
 keys client bucket =
   liftIO (streamKeys client bucket (Foldl.generalize Foldl.list))
 
@@ -135,7 +135,7 @@ streamKeys
   :: Client -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Result r)
+  -> IO (Either Error r)
 streamKeys client (Bucket type' bucket) keyFold =
   Client.stream
     client
@@ -161,7 +161,7 @@ exactQuery
   :: Client -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Result r)
+  -> IO (Either Error r)
 exactQuery client query@(ExactQuery { value }) keyFold =
   doIndex
     client
@@ -191,7 +191,7 @@ rangeQuery
      Client -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Result r)
+  -> IO (Either Error r)
 rangeQuery client query keyFold =
   doIndex
     client
@@ -228,30 +228,30 @@ doIndex ::
      Client
   -> Proto.IndexRequest
   -> FoldM IO Proto.IndexResponse r
-  -> IO (Result r)
+  -> IO (Either Error r)
 doIndex client =
   loop
 
   where
-    loop :: Proto.IndexRequest -> FoldM IO Proto.IndexResponse r -> IO (Result r)
+    loop ::
+         Proto.IndexRequest
+      -> FoldM IO Proto.IndexResponse r
+      -> IO (Either Error r)
     loop request responseFold = do
-      result :: Result (FoldM IO Proto.IndexResponse r, Maybe ByteString) <-
+      result :: Either Error (FoldM IO Proto.IndexResponse r, Maybe ByteString) <-
         doIndexPage
           client
           request
           (Foldl.duplicateM responseFold)
 
       case result of
-        ConnectionClosed ->
-          pure ConnectionClosed
+        Left err ->
+          pure (Left err)
 
-        Failure err ->
-          pure (Failure err)
-
-        Success (nextResponseFold, continuation) ->
+        Right (nextResponseFold, continuation) ->
           case continuation of
             Nothing ->
-              Success <$> extractM nextResponseFold
+              Right <$> extractM nextResponseFold
 
             Just continuation ->
               loop
@@ -262,7 +262,7 @@ doIndexPage ::
      Client
   -> Proto.IndexRequest
   -> FoldM IO Proto.IndexResponse r
-  -> IO (Result (r, Maybe ByteString))
+  -> IO (Either Error (r, Maybe ByteString))
 doIndexPage client request fold =
   Client.stream
     client

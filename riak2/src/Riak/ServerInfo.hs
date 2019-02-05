@@ -3,7 +3,7 @@ module Riak.ServerInfo
   , get
   ) where
 
-import Riak.Internal.Client  (Client, Result)
+import Riak.Internal.Client  (Client, Error)
 import Riak.Internal.Prelude
 import Riak.Request          (Request(..))
 import Riak.Response         (Response(..))
@@ -25,7 +25,7 @@ data ServerInfo
 get ::
      MonadIO m
   => Client -- ^
-  -> m (Result ServerInfo)
+  -> m (Either Error ServerInfo)
 get client = liftIO $
   (fmap.fmap)
     fromResponse

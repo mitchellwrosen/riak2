@@ -16,7 +16,7 @@ module Riak.Object
   ) where
 
 import Riak.Content          (Content(..))
-import Riak.Internal.Client  (Client, Result(..))
+import Riak.Internal.Client  (Client, Error)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Object  (Object(..))
 import Riak.Internal.Prelude
@@ -52,7 +52,7 @@ get
   => Client -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Result [Object ByteString])
+  -> m (Either Error [Object ByteString])
 get client key opts = liftIO $
   (fmap.fmap)
     (Object.fromGetResponse key)
@@ -75,7 +75,7 @@ getHead
   => Client -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Result [Object ()])
+  -> m (Either Error [Object ()])
 getHead client key opts = liftIO $
   (fmap.fmap)
     (map (() <$) . Object.fromGetResponse key)
@@ -98,7 +98,7 @@ getIfModified
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
-  -> m (Result (IfModified [Object ByteString]))
+  -> m (Either Error (IfModified [Object ByteString]))
 getIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     (\response ->
@@ -125,7 +125,7 @@ getHeadIfModified
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
-  -> m (Result (IfModified [Object ()]))
+  -> m (Either Error (IfModified [Object ()]))
 getHeadIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     fromResponse
@@ -146,7 +146,7 @@ getHeadIfModified client (Content { key, context }) opts = liftIO $
 doGet ::
      Client
   -> Proto.GetRequest
-  -> IO (Result Proto.GetResponse)
+  -> IO (Either Error Proto.GetResponse)
 doGet client request =
   Client.exchange
     client
@@ -180,7 +180,7 @@ put ::
   => Client -- ^
   -> Content ByteString -- ^
   -> PutOpts -- ^
-  -> m (Result Key)
+  -> m (Either Error Key)
 put client content opts = liftIO $
   (fmap.fmap)
     fromResponse
@@ -213,7 +213,7 @@ putGet ::
   => Client -- ^
   -> Content ByteString -- ^
   -> PutOpts -- ^
-  -> m (Result (NonEmpty (Object ByteString)))
+  -> m (Either Error (NonEmpty (Object ByteString)))
 putGet client content opts = liftIO $
   (fmap.fmap)
     (Object.fromPutResponse key)
@@ -243,7 +243,7 @@ putGetHead ::
   => Client -- ^
   -> Content ByteString -- ^
   -> PutOpts -- ^
-  -> m (Result (NonEmpty (Object ())))
+  -> m (Either Error (NonEmpty (Object ())))
 putGetHead client content opts = liftIO $
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResponse key)
@@ -262,7 +262,7 @@ putGetHead client content opts = liftIO $
 doPut ::
      Client
   -> Proto.PutRequest
-  -> IO (Result Proto.PutResponse)
+  -> IO (Either Error Proto.PutResponse)
 doPut client request =
   Client.exchange
     client
@@ -313,7 +313,7 @@ delete ::
      MonadIO m
   => Client -- ^
   -> Content a -- ^
-  -> m (Result ())
+  -> m (Either Error ())
 delete client content = liftIO $
   (fmap.fmap)
     (const ())

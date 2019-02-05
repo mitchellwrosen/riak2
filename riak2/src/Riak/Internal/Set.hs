@@ -1,6 +1,6 @@
 module Riak.Internal.Set where
 
-import Riak.Internal.Client  (Client, Result)
+import Riak.Internal.Client  (Client, Error)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude hiding (Set)
 import Riak.Key              (Key(..))
@@ -34,7 +34,7 @@ get ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Result (Maybe (Set (HashSet ByteString))))
+  -> m (Either Error (Maybe (Set (HashSet ByteString))))
 get client k@(Key type' bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -74,7 +74,7 @@ update ::
      MonadIO m
   => Client -- ^
   -> Set [SetUpdate] -- ^
-  -> m (Result (Set (HashSet ByteString)))
+  -> m (Either Error (Set (HashSet ByteString)))
 update client (Set { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

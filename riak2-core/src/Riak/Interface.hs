@@ -68,10 +68,7 @@ stream ::
   -> FoldM IO a r -- ^ Fold responses
   -> IO (Result r)
 stream iface request f done (FoldM step initial extract) =
-  Interface.stream
-    iface
-    request
-    callback
+  Interface.stream iface request callback
 
   where
     callback :: IO (Maybe Response) -> IO (Result r)
