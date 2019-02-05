@@ -47,17 +47,9 @@ parse bytes =
 
 decode :: Word8 -> ByteString -> Either DecodeError Response
 decode code bytes =
-  -- Not totally sure which responses might be empty, so just debug-log them
-  -- for now.
-  (if ByteString.null bytes
-    then trace ("Code " ++ show code ++ " contained empty reply")
-    else id) $
-
   case code of
     0    -> decode' ResponseError
     2    -> Right (ResponsePing Proto.defMessage)
-    -- 4  -> decode' ResponseGetClientId
-    -- 6  -> decode' ResponseSetClientId
     8    -> decode' ResponseGetServerInfo
     10   -> decode' ResponseGet
     12   -> decode' ResponsePut
@@ -68,16 +60,12 @@ decode code bytes =
     22   -> Right (ResponseSetBucketProperties Proto.defMessage)
     -- 24   -> decode' ResponseMapReduce
     26   -> decode' ResponseSecondaryIndex
+    -- 28   -> decode' ResponseSearch
     30   -> Right (ResponseResetBucketProperties Proto.defMessage)
     55   -> decode' ResponseGetIndex
     59   -> decode' ResponseGetSchema
     81   -> decode' ResponseGetCrdt
     83   -> decode' ResponseUpdateCrdt
-
--- instance Response RpbSearchQueryResp       where code = 28
--- instance Response RpbYokozunaIndexGetResp  where code = 55
--- instance Response RpbYokozunaSchemaGetResp where code = 59
-
     _    -> Left (UnknownMessageCode code bytes)
 
   where

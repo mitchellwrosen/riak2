@@ -114,13 +114,15 @@ mockServer = do
                 RequestGetCrdt{}                 -> respond ResponseGetCrdt
                 RequestGetIndex{}                -> respond ResponseGetIndex
                 RequestGetServerInfo{}           -> respond ResponseGetServerInfo
+                RequestGetSchema{}               -> respond ResponseGetSchema
                 RequestGet{}                     -> respond ResponseGet
                 RequestListBuckets{}             -> respond ResponseListBuckets
                 RequestListKeys{}                -> respond ResponseListKeys
-                -- RequestMapReduce{}               -> respond ResponseMapReduce
+                -- RequestMapReduce{}            -> respond ResponseMapReduce
                 RequestPing{}                    -> respond ResponsePing
                 RequestPut{}                     -> respond ResponsePut
                 RequestPutIndex{}                -> respond ResponsePut
+                RequestPutSchema{}               -> respond ResponsePut
                 RequestResetBucketProperties{}   -> respond ResponseResetBucketProperties
                 RequestSecondaryIndex{}          -> respond ResponseSecondaryIndex
                 RequestSetBucketProperties{}     -> respond ResponseSetBucketProperties
@@ -160,6 +162,10 @@ expectedResponse request response =
       case response of
         ResponseGetServerInfo{} -> True
         _ -> False
+    RequestGetSchema{} ->
+      case response of
+        ResponseGetSchema{} -> True
+        _ -> False
     RequestGet{} ->
       case response of
         ResponseGet{} -> True
@@ -185,6 +191,10 @@ expectedResponse request response =
         ResponsePut{} -> True
         _ -> False
     RequestPutIndex{} ->
+      case response of
+        ResponsePut{} -> True
+        _ -> False
+    RequestPutSchema{} ->
       case response of
         ResponsePut{} -> True
         _ -> False

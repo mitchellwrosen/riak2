@@ -32,6 +32,7 @@ data Request
   | RequestPing PingRequest
   | RequestPut PutRequest
   | RequestPutIndex PutIndexRequest
+  | RequestPutSchema PutSchemaRequest
   | RequestResetBucketProperties ResetBucketPropertiesRequest
   | RequestSecondaryIndex SecondaryIndexRequest
   | RequestSetBucketProperties SetBucketPropertiesRequest
@@ -71,7 +72,7 @@ decode code bytes =
     56   -> go RequestPutIndex
     57   -> go RequestDeleteIndex
     58   -> go RequestGetSchema
-    -- 60   -> go RequestPutYokozunaSchema
+    60   -> go RequestPutSchema
     -- 70   -> go RequestCoverage
     80   -> go RequestGetCrdt
     82   -> go RequestUpdateCrdt
@@ -101,6 +102,7 @@ encode = \case
   RequestPing                    request -> Utils.wire  1 request
   RequestPut                     request -> Utils.wire 11 request
   RequestPutIndex                request -> Utils.wire 56 request
+  RequestPutSchema               request -> Utils.wire 60 request
   RequestResetBucketProperties   request -> Utils.wire 29 request
   RequestSecondaryIndex          request -> Utils.wire 25 request
   RequestSetBucketProperties     request -> Utils.wire 21 request
