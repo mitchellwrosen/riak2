@@ -156,6 +156,7 @@ makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest key opts =
   defMessage
     & L.bucket .~ (key ^. field @"bucket")
+    & L.bucketType .~ key ^. field @"bucketType"
     & L.deletedContext .~ True
     & L.head .~ True
     & L.key .~ (key ^. field @"key")
@@ -166,7 +167,6 @@ makeGetRequest key opts =
     & L.maybe'r .~ Quorum.toWord32 (r opts)
     & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
     & L.maybe'timeout .~ (opts ^. field @"timeout")
-    & L.type' .~ key ^. field @"type'"
 
 
 -- | Put an object and return its key.
@@ -303,9 +303,10 @@ makePutRequest ::
   -> Content ByteString
   -> PutOpts
   -> Proto.PutRequest
-makePutRequest (Key type' bucket key) content opts =
+makePutRequest (Key bucketType bucket key) content opts =
   defMessage
     & L.bucket .~ bucket
+    & L.bucketType .~ bucketType
     & L.content .~
         (defMessage
           & L.indexes .~ map SecondaryIndex.toPair (content ^. field @"indexes")
@@ -334,7 +335,6 @@ makePutRequest (Key type' bucket key) content opts =
     & L.maybe'w .~ Quorum.toWord32 (w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
     & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
-    & L.type' .~ type'
 
 delete ::
      MonadIO m
@@ -356,6 +356,7 @@ delete client (view (field @"content") -> content) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
         & L.key .~ key
         -- TODO delete opts
         -- & L.maybe'dw .~ undefined
@@ -367,10 +368,9 @@ delete client (view (field @"content") -> content) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
-        & L.type' .~ type'
         & L.context .~ unContext (content ^. field @"context")
 
-    Key type' bucket key =
+    Key bucketType bucket key =
       content ^. field @"key"
 
 defFalse :: Bool -> Maybe Bool

@@ -78,6 +78,13 @@ bucket ::
 bucket
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucket")
+bucketType ::
+           forall f s a .
+             (Prelude.Functor f, Lens.Labels.HasLens' s "bucketType" a) =>
+             Lens.Family2.LensLike' f s a
+bucketType
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucketType")
 buckets ::
         forall f s a .
           (Prelude.Functor f, Lens.Labels.HasLens' s "buckets" a) =>
@@ -457,6 +464,13 @@ maybe'bucket ::
 maybe'bucket
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'bucket")
+maybe'bucketType ::
+                 forall f s a .
+                   (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'bucketType" a) =>
+                   Lens.Family2.LensLike' f s a
+maybe'bucketType
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'bucketType")
 maybe'charset ::
               forall f s a .
                 (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'charset" a) =>
@@ -942,13 +956,6 @@ maybe'ttl ::
 maybe'ttl
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'ttl")
-maybe'type' ::
-            forall f s a .
-              (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'type'" a) =>
-              Lens.Family2.LensLike' f s a
-maybe'type'
-  = Lens.Labels.lensOf'
-      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'type'")
 maybe'unchanged ::
                 forall f s a .
                   (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'unchanged" a) =>
@@ -1088,13 +1095,6 @@ pw ::
 pw
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "pw")
-qtype ::
-      forall f s a .
-        (Prelude.Functor f, Lens.Labels.HasLens' s "qtype" a) =>
-        Lens.Family2.LensLike' f s a
-qtype
-  = Lens.Labels.lensOf'
-      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "qtype")
 r ::
   forall f s a . (Prelude.Functor f, Lens.Labels.HasLens' s "r" a) =>
     Lens.Family2.LensLike' f s a

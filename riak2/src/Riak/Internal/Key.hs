@@ -8,7 +8,7 @@ import Riak.Internal.Prelude
 -- /Note/: The bucket type must be UTF-8 encoded.
 data Key
   = Key
-  { type' :: !ByteString
+  { bucketType :: !ByteString
   , bucket :: !ByteString
   , key :: !ByteString
   } deriving stock (Eq, Generic, Show)

@@ -17,7 +17,7 @@ message Pair {
 
 message GetBucketPropertiesRequest {
     required bytes bucket = 1;
-    optional bytes type = 2;
+    optional bytes bucket_type = 2;
 }
 message GetBucketPropertiesResponse {
     required BucketProperties props = 1;
@@ -26,20 +26,20 @@ message GetBucketPropertiesResponse {
 message SetBucketPropertiesRequest {
     required bytes bucket = 1;
     required BucketProperties props = 2;
-    optional bytes type = 3;
+    optional bytes bucket_type = 3;
 }
 
 message ResetBucketPropertiesRequest {
     required bytes bucket = 1;
-    optional bytes type = 2;
+    optional bytes bucket_type = 2;
 }
 
 message GetBucketTypePropertiesRequest {
-    required bytes type = 1;
+    required bytes bucket_type = 1;
 }
 
 message SetBucketTypePropertiesRequest {
-    required bytes type = 1;
+    required bytes bucket_type = 1;
     required BucketProperties props = 2;
 }
 
@@ -146,10 +146,9 @@ message MapValue {
 }
 
 message GetCrdtRequest {
-    // The identifier: bucket, key and bucket-type
-    required bytes bucket = 1;
-    required bytes key    = 2;
-    required bytes type   = 3;
+    required bytes bucket      = 1;
+    required bytes key         = 2;
+    required bytes bucket_type = 3;
 
     // Request options
     optional uint32 r             =  4;
@@ -242,9 +241,9 @@ message CrdtUpdate {
 }
 
 message UpdateCrdtRequest {
-    required bytes bucket = 1;
-    optional bytes key    = 2; // missing key results in server-assigned key, like KV
-    required bytes type   = 3; // bucket type, not data-type (but the data-type is constrained per bucket-type)
+    required bytes bucket      = 1;
+    optional bytes key         = 2; // missing key results in server-assigned key, like KV
+    required bytes bucket_type = 3;
 
     optional bytes context = 4;
 
@@ -289,7 +288,7 @@ message GetRequest {
     optional uint32 timeout       = 10;
     optional bool sloppy_quorum   = 11;   // Experimental, may change/disappear
     optional uint32 n             = 12;   // Experimental, may change/disappear
-    optional bytes type           = 13;   // Bucket type, if not set we assume the 'default' type
+    optional bytes bucket_type    = 13;
 }
 
 message GetResponse {
@@ -317,7 +316,7 @@ message PutRequest {
     optional bool asis            = 13;
     optional bool sloppy_quorum   = 14; // Experimental, may change/disappear
     optional uint32 n             = 15; // Experimental, may change/disappear
-    optional bytes type           = 16; // Bucket type, if not set we assume the 'default' type
+    optional bytes bucket_type    = 16;
 }
 
 message PutResponse {
@@ -329,25 +328,25 @@ message PutResponse {
 
 // Delete request
 message DeleteRequest {
-    required bytes bucket = 1;
-    required bytes key = 2;
-    optional uint32 rw = 3;
-    optional bytes context = 4;
-    optional uint32 r = 5;
-    optional uint32 w = 6;
-    optional uint32 pr = 7;
-    optional uint32 pw = 8;
-    optional uint32 dw = 9;
-    optional uint32 timeout = 10;
+    required bytes bucket       = 1;
+    required bytes key          = 2;
+    optional uint32 rw          = 3;
+    optional bytes context      = 4;
+    optional uint32 r           = 5;
+    optional uint32 w           = 6;
+    optional uint32 pr          = 7;
+    optional uint32 pw          = 8;
+    optional uint32 dw          = 9;
+    optional uint32 timeout     = 10;
     optional bool sloppy_quorum = 11; // Experimental, may change/disappear
-    optional uint32 n = 12;       // Experimental, may change/disappear
-    optional bytes type = 13;         // Bucket type, if not set we assume the 'default' type
+    optional uint32 n           = 12; // Experimental, may change/disappear
+    optional bytes bucket_type  = 13;
 }
 
 message ListBucketsRequest {
-    optional uint32 timeout = 1;
-    optional bool stream = 2;
-    optional bytes type = 3; // Bucket type, if not set we assume the 'default' type
+    optional uint32 timeout    = 1;
+    optional bool stream       = 2;
+    optional bytes bucket_type = 3;
 }
 
 message ListBucketsResponse {
@@ -357,9 +356,9 @@ message ListBucketsResponse {
 
 
 message ListKeysRequest {
-    required bytes bucket = 1;
-    optional uint32 timeout = 2;
-    optional bytes type = 3; // Bucket type, if not set we assume the 'default' type
+    required bytes bucket      = 1;
+    optional uint32 timeout    = 2;
+    optional bytes bucket_type = 3;
 }
 
 message ListKeysResponse {
@@ -380,36 +379,35 @@ message ListKeysResponse {
 /*     optional bool done = 3; // False for every response but the last */
 /* } */
 
-// Secondary Index query request
-message IndexRequest {
-    enum IndexQueryType {
+message SecondaryIndexRequest {
+    enum SecondaryIndexQueryType {
         exact = 0;
         range = 1;
     }
 
-    required bytes bucket = 1;
-    required bytes index = 2;
-    required IndexQueryType qtype = 3;
-    optional bytes key = 4; // key here means equals value for index?
-    optional bytes range_min = 5;
-    optional bytes range_max = 6;
-    optional bool return_terms = 7;
-    optional bool stream = 8;
-    optional uint32 max_results = 9;
-    optional bytes continuation = 10;
-    optional uint32 timeout = 11;
-    optional bytes type = 12;         // Bucket type, if not set we assume the 'default' type
-    optional bytes term_regex = 13;
+    required bytes bucket                 = 1;
+    required bytes index                  = 2;
+    required SecondaryIndexQueryType type = 3;
+    optional bytes key                    = 4; // key here means equals value for index?
+    optional bytes range_min              = 5;
+    optional bytes range_max              = 6;
+    optional bool return_terms            = 7;
+    optional bool stream                  = 8;
+    optional uint32 max_results           = 9;
+    optional bytes continuation           = 10;
+    optional uint32 timeout               = 11;
+    optional bytes bucket_type            = 12;
+    optional bytes term_regex             = 13;
     // Whether to use pagination sort for non-paginated queries
-    optional bool pagination_sort = 14;
+    optional bool pagination_sort         = 14;
     // parallel extraction extension
-    optional bytes cover_context = 15; // chopped up coverage plan per-req
-    optional bool return_body = 16; // Return values with keys, only works with $bucket/$key index queries
+    optional bytes cover_context          = 15; // chopped up coverage plan per-req
+    optional bool return_body             = 16; // Return values with keys, only works with $bucket/$key index queries
 
 }
 
 // Secondary Index query response
-message IndexResponse {
+message SecondaryIndexResponse {
     repeated bytes keys = 1;
     repeated Pair results = 2;
     optional bytes continuation = 3;
@@ -456,7 +454,7 @@ message Link {
 /* message RpbGetBucketKeyPreflistReq { */
 /*     required bytes bucket = 1; */
 /*     required bytes key = 2; */
-/*     optional bytes type = 3; */
+/*     optional bytes bucket_type = 3; */
 /* } */
 
 // Get bucket-key preflist response
@@ -474,7 +472,7 @@ message Link {
 
 // Request a segmented coverage plan for the specified bucket
 /* message RpbCoverageReq { */
-/*     optional bytes type = 1;              // Bucket type, if not set we assume the 'default' type */
+/*     optional bytes bucket_type = 1; */
 /*     required bytes bucket = 2; */
 /*     optional uint32 min_partitions = 3;   // If undefined, we build a normal coverage plan. If <ring_size, we build a coverage plan with exactly ring_size entries, anything larger will have a power of 2 entries covering keyspaces smaller than a partition */
 /*     optional bytes replace_cover = 4;     // For failure recovery */
@@ -517,7 +515,7 @@ message Link {
 /*   optional uint32       num_found = 3; // Number of results */
 /* } */
 
-/* message RpbYokozunaIndex { */
+/* message Index { */
 /*     required bytes name   =  1;  // Index name */
 /*     optional bytes schema =  2;  // Schema name */
 /*     optional uint32 n =  3;  // N value */
@@ -529,12 +527,12 @@ message Link {
 /* } */
 
 /* message RpbYokozunaIndexGetResp { */
-/*     repeated RpbYokozunaIndex index  =  1; */
+/*     repeated Index index  =  1; */
 /* } */
 
 // PUT request - Create a new index
 /* message RpbYokozunaIndexPutReq { */
-/*     required RpbYokozunaIndex index  =  1; */
+/*     required Index index  =  1; */
 /*     optional uint32 timeout          =  2; // Timeout value */
 /* } */
 

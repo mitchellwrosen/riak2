@@ -25,13 +25,13 @@ data Response
   | ResponseGetBucketProperties GetBucketPropertiesResponse
   | ResponseGetCrdt GetCrdtResponse
   | ResponseGetServerInfo GetServerInfoResponse
-  | ResponseIndex IndexResponse
   | ResponseListBuckets ListBucketsResponse
   | ResponseListKeys ListKeysResponse
   -- | ResponseMapReduce MapReduceResponse
   | ResponsePing PingResponse
   | ResponsePut PutResponse
   | ResponseResetBucketProperties ResetBucketPropertiesResponse
+  | ResponseSecondaryIndex SecondaryIndexResponse
   | ResponseSetBucketProperties SetBucketPropertiesResponse
   | ResponseUpdateCrdt UpdateCrdtResponse
   deriving stock (Show)
@@ -65,7 +65,7 @@ decode code bytes =
     20   -> decode' ResponseGetBucketProperties
     22   -> Right (ResponseSetBucketProperties Proto.defMessage)
     -- 24   -> decode' ResponseMapReduce
-    26   -> decode' ResponseIndex
+    26   -> decode' ResponseSecondaryIndex
     30   -> Right (ResponseResetBucketProperties Proto.defMessage)
     81   -> decode' ResponseGetCrdt
     83   -> decodeMaybeEmpty ResponseUpdateCrdt
@@ -74,7 +74,7 @@ decode code bytes =
 -- instance Response RpbYokozunaIndexGetResp  where code = 55
 -- instance Response RpbYokozunaSchemaGetResp where code = 59
 
-    code -> Left (UnknownMessageCode code bytes)
+    _    -> Left (UnknownMessageCode code bytes)
 
   where
     decode' ::
@@ -102,12 +102,12 @@ encode = \case
   ResponseGetBucketProperties   response -> Utils.wire 20 response
   ResponseGetCrdt               response -> Utils.wire 81 response
   ResponseGetServerInfo         response -> Utils.wire 8  response
-  ResponseIndex                 response -> Utils.wire 26 response
   ResponseListBuckets           response -> Utils.wire 16 response
   ResponseListKeys              response -> Utils.wire 18 response
   -- ResponseMapReduce             response -> Utils.wire 24 response
   ResponsePing                  response -> Utils.wire 2  response
   ResponsePut                   response -> Utils.wire 12 response
   ResponseResetBucketProperties response -> Utils.wire 30 response
+  ResponseSecondaryIndex        response -> Utils.wire 26 response
   ResponseSetBucketProperties   response -> Utils.wire 22 response
   ResponseUpdateCrdt            response -> Utils.wire 83 response

@@ -23,13 +23,13 @@ data Request
   | RequestGetBucketTypeProperties GetBucketTypePropertiesRequest
   | RequestGetCrdt GetCrdtRequest
   | RequestGetServerInfo GetServerInfoRequest
-  | RequestIndex IndexRequest
   | RequestListBuckets ListBucketsRequest
   | RequestListKeys ListKeysRequest
   -- | RequestMapReduce MapReduceRequest
   | RequestPing PingRequest
   | RequestPut PutRequest
   | RequestResetBucketProperties ResetBucketPropertiesRequest
+  | RequestSecondaryIndex SecondaryIndexRequest
   | RequestSetBucketProperties SetBucketPropertiesRequest
   | RequestSetBucketTypeProperties SetBucketTypePropertiesRequest
   | RequestUpdateCrdt UpdateCrdtRequest
@@ -57,7 +57,7 @@ decode code bytes =
     19   -> go RequestGetBucketProperties
     21   -> go RequestSetBucketProperties
     -- 23   -> go RequestMapReduce
-    25   -> go RequestIndex
+    25   -> go RequestSecondaryIndex
     -- 27   -> go RequestSearchQuery
     29   -> go RequestResetBucketProperties
     31   -> go RequestGetBucketTypeProperties
@@ -72,7 +72,7 @@ decode code bytes =
     80   -> go RequestGetCrdt
     82   -> go RequestUpdateCrdt
 
-    code -> Left (UnknownMessageCode code bytes)
+    _    -> Left (UnknownMessageCode code bytes)
 
   where
     go ::
@@ -90,11 +90,11 @@ encode = \case
   RequestGetBucketTypeProperties request -> Utils.wire 31 request
   RequestGetCrdt                 request -> Utils.wire 80 request
   RequestGetServerInfo           request -> Utils.wire  7 request
-  RequestIndex                   request -> Utils.wire 25 request
   -- RequestMapReduce               request -> Utils.wire 23 request
   RequestPing                    request -> Utils.wire  1 request
   RequestPut                     request -> Utils.wire 11 request
   RequestResetBucketProperties   request -> Utils.wire 29 request
+  RequestSecondaryIndex          request -> Utils.wire 25 request
   RequestSetBucketProperties     request -> Utils.wire 21 request
   RequestSetBucketTypeProperties request -> Utils.wire 32 request
   RequestListBuckets             request -> Utils.wire 15 request

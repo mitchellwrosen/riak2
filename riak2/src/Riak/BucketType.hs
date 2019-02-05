@@ -28,7 +28,7 @@ import qualified Control.Foldl as Foldl
 -- /Note/: Must be UTF-8 encoded.
 newtype BucketType
   = BucketType
-  { type' :: ByteString
+  { bucketType :: ByteString
   } deriving stock (Eq, Show)
     deriving newtype (Hashable)
 
@@ -45,7 +45,7 @@ get ::
   => Client -- ^
   -> BucketType -- ^
   -> m (Either Error BucketProperties)
-get client (BucketType type') = liftIO $
+get client (BucketType bucketType) = liftIO $
   (fmap.fmap)
     fromResponse
     (Client.exchange
@@ -59,7 +59,7 @@ get client (BucketType type') = liftIO $
     request :: GetBucketTypePropertiesRequest
     request =
       defMessage
-        & L.type' .~ type'
+        & L.bucketType .~ bucketType
 
     fromResponse :: GetBucketPropertiesResponse -> BucketProperties
     fromResponse =
@@ -94,7 +94,7 @@ streamBuckets
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> IO (Either Error r)
-streamBuckets client (BucketType type') bucketFold =
+streamBuckets client (BucketType bucketType) bucketFold =
   Client.stream
     client
     (RequestListBuckets request)
@@ -102,13 +102,13 @@ streamBuckets client (BucketType type') bucketFold =
       ResponseListBuckets response -> Just response
       _ -> Nothing)
     (view L.done)
-    (makeResponseFold type' bucketFold)
+    (makeResponseFold bucketType bucketFold)
 
   where
     request :: Proto.ListBucketsRequest
     request =
       defMessage
-        & L.type' .~ type'
+        & L.bucketType .~ bucketType
         & L.stream .~ True
         -- TODO stream buckets timeout
 
@@ -126,13 +126,13 @@ buckets
   => Client -- ^
   -> BucketType -- ^
   -> m (Either Error [Bucket])
-buckets client type' =
-  liftIO (streamBuckets client type' (Foldl.generalize Foldl.list))
+buckets client bucketType =
+  liftIO (streamBuckets client bucketType (Foldl.generalize Foldl.list))
 
 makeResponseFold ::
      Monad m
   => ByteString
   -> FoldM m Bucket r
   -> FoldM m Proto.ListBucketsResponse r
-makeResponseFold type' =
-  Foldl.handlesM (L.buckets . folded . to (Bucket type'))
+makeResponseFold bucketType =
+  Foldl.handlesM (L.buckets . folded . to (Bucket bucketType))

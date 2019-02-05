@@ -44,7 +44,7 @@ get ::
   => Client -- ^
   -> Bucket -- ^
   -> m (Either Error Proto.BucketProperties)
-get client (Bucket type' bucket) = liftIO $
+get client (Bucket bucketType bucket) = liftIO $
   (fmap.fmap)
     fromResponse
     (Client.exchange
@@ -59,7 +59,7 @@ get client (Bucket type' bucket) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
-        & L.type' .~ type'
+        & L.bucketType .~ bucketType
 
     fromResponse :: Proto.GetBucketPropertiesResponse -> Proto.BucketProperties
     fromResponse =
@@ -87,7 +87,7 @@ reset ::
   => Client
   -> Bucket
   -> m (Either Error ())
-reset client (Bucket type' bucket) = liftIO $
+reset client (Bucket bucketType bucket) = liftIO $
   Client.exchange
     client
     (RequestResetBucketProperties request)
@@ -100,7 +100,7 @@ reset client (Bucket type' bucket) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
-        & L.type' .~ type'
+        & L.bucketType .~ bucketType
 
 -- | List all of the keys in a bucket.
 --
@@ -136,7 +136,7 @@ streamKeys
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> IO (Either Error r)
-streamKeys client (Bucket type' bucket) keyFold =
+streamKeys client (Bucket bucketType bucket) keyFold =
   Client.stream
     client
     (RequestListKeys request)
@@ -144,14 +144,14 @@ streamKeys client (Bucket type' bucket) keyFold =
       ResponseListKeys response -> Just response
       _ -> Nothing)
     (view L.done)
-    (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
+    (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
 
   where
     request :: Proto.ListKeysRequest
     request =
       defMessage
-        & L.type' .~ type'
         & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
         -- TODO stream keys timeout
 
 -- | Perform an exact query on a secondary index.
@@ -166,22 +166,22 @@ exactQuery client query@(ExactQuery { value }) keyFold =
   doIndex
     client
     request
-    (Foldl.handlesM (L.keys . folded . to (Key type' bucket)) keyFold)
+    (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
 
   where
-    Bucket type' bucket =
+    Bucket bucketType bucket =
       ExactQuery.bucket query
 
-    request :: Proto.IndexRequest
+    request :: Proto.SecondaryIndexRequest
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
         & L.index .~ ExactQuery.name query
         & L.key .~ SecondaryIndexValue.encode value
         & L.maxResults .~ 50
-        & L.qtype .~ Proto.IndexRequest'exact
         & L.stream .~ True
-        & L.type' .~ type'
+        & L.type' .~ Proto.SecondaryIndexRequest'exact
 
 -- | Perform a range query on a secondary index.
 --
@@ -199,46 +199,46 @@ rangeQuery client query keyFold =
     (Foldl.handlesM (L.results . folded . to fromResult) keyFold)
 
   where
-    Bucket type' bucket =
+    Bucket bucketType bucket =
       RangeQuery.bucket query
 
-    request :: Proto.IndexRequest
+    request :: Proto.SecondaryIndexRequest
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
         & L.index .~ RangeQuery.name query
         & L.maxResults .~ 50 -- TODO configure page size
-        & L.qtype .~ Proto.IndexRequest'range
         & L.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.max query)
         & L.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.min query)
         & L.returnTerms .~ True
         & L.stream .~ True
-        & L.type' .~ type'
+        & L.type' .~ Proto.SecondaryIndexRequest'range
 
     fromResult :: Proto.Pair -> (a, Key)
     fromResult pair =
       ( case RangeQuery.min query of
           SecondaryIndexValue.Binary{}  -> pair ^. L.key
           SecondaryIndexValue.Integer{} -> bs2int (pair ^. L.key)
-      , Key type' bucket (pair ^. L.value)
+      , Key bucketType bucket (pair ^. L.value)
       )
 
 doIndex ::
      forall r.
      Client
-  -> Proto.IndexRequest
-  -> FoldM IO Proto.IndexResponse r
+  -> Proto.SecondaryIndexRequest
+  -> FoldM IO Proto.SecondaryIndexResponse r
   -> IO (Either Error r)
 doIndex client =
   loop
 
   where
     loop ::
-         Proto.IndexRequest
-      -> FoldM IO Proto.IndexResponse r
+         Proto.SecondaryIndexRequest
+      -> FoldM IO Proto.SecondaryIndexResponse r
       -> IO (Either Error r)
     loop request responseFold = do
-      result :: Either Error (FoldM IO Proto.IndexResponse r, Maybe ByteString) <-
+      result :: Either Error (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
         doIndexPage
           client
           request
@@ -260,15 +260,15 @@ doIndex client =
 
 doIndexPage ::
      Client
-  -> Proto.IndexRequest
-  -> FoldM IO Proto.IndexResponse r
+  -> Proto.SecondaryIndexRequest
+  -> FoldM IO Proto.SecondaryIndexResponse r
   -> IO (Either Error (r, Maybe ByteString))
 doIndexPage client request fold =
   Client.stream
     client
-    (RequestIndex request)
+    (RequestSecondaryIndex request)
     (\case
-      ResponseIndex response -> Just response
+      ResponseSecondaryIndex response -> Just response
       _ -> Nothing)
     (view L.done)
     ((,)
@@ -276,7 +276,7 @@ doIndexPage client request fold =
       <*> continuation)
 
   where
-    continuation :: FoldM IO Proto.IndexResponse (Maybe ByteString)
+    continuation :: FoldM IO Proto.SecondaryIndexResponse (Maybe ByteString)
     continuation =
       Foldl.last
         & lmap (view L.maybe'continuation)

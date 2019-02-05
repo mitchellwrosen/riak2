@@ -78,7 +78,7 @@ get ::
   => Client -- ^
   -> Key -- ^
   -> m (Either Error (Maybe (Map Maps)))
-get client k@(Key type' bucket key) = liftIO $
+get client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
     (Client.getCrdt client request)
@@ -88,8 +88,8 @@ get client k@(Key type' bucket key) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
         & L.key .~ key
-        & L.type' .~ type'
 
         -- TODO get map opts
         -- & L.maybe'basicQuorum .~ undefined
@@ -128,6 +128,7 @@ update client (Map { context, key, value }) = liftIO $
     request =
       defMessage
         & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
         & L.maybe'context .~
             (if ByteString.null (unContext context)
               then Nothing
@@ -140,7 +141,6 @@ update client (Map { context, key, value }) = liftIO $
             (defMessage
               & L.mapUpdate .~ updatesToProto value)
         & L.returnBody .~ True
-        & L.type' .~ type'
 
 -- TODO map update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -150,7 +150,7 @@ update client (Map { context, key, value }) = liftIO $
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
-    Key type' bucket k =
+    Key bucketType bucket k =
       key
 
     fromResponse :: Proto.UpdateCrdtResponse -> Map Maps
