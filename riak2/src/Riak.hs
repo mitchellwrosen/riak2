@@ -10,7 +10,6 @@ module Riak
   , ExactQuery(..)
   , GetOpts(..)
   , HyperLogLog(..)
-  , IfModified(..)
   , Index(..)
   , IndexValue(..)
   , Key(..)

@@ -6,7 +6,6 @@ module Riak.Object
   , getHead
   , getIfModified
   , getHeadIfModified
-  , IfModified(..)
     -- ** Put object
   , put
   , putGet
@@ -37,10 +36,6 @@ import Data.Generics.Product.Typed (HasType(..))
 
 import qualified Data.ByteString as ByteString
 
-
-data IfModified a
-  = Modified a
-  | Unmodified
 
 -- | Get an object.
 --
@@ -100,13 +95,13 @@ getIfModified
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
-  -> m (Either Error (IfModified [Object ByteString]))
+  -> m (Either Error (Maybe [Object ByteString]))
 getIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     (\response ->
       if response ^. L.unchanged
-        then Unmodified
-        else Modified (Object.fromGetResponse key response))
+        then Nothing
+        else Just (Object.fromGetResponse key response))
     (doGet client request)
 
   where
@@ -127,7 +122,7 @@ getHeadIfModified
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
-  -> m (Either Error (IfModified [Object ()]))
+  -> m (Either Error (Maybe [Object ()]))
 getHeadIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     fromResponse
@@ -139,11 +134,11 @@ getHeadIfModified client (Content { key, context }) opts = liftIO $
         & L.head .~ True
         & L.ifModified .~ unContext context
 
-    fromResponse :: Proto.GetResponse -> IfModified [Object ()]
+    fromResponse :: Proto.GetResponse -> Maybe [Object ()]
     fromResponse response =
       if response ^. L.unchanged
-        then Unmodified
-        else Modified ((() <$) <$> Object.fromGetResponse key response)
+        then Nothing
+        else Just ((() <$) <$> Object.fromGetResponse key response)
 
 doGet ::
      Client
