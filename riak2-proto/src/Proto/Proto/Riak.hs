@@ -8,8 +8,8 @@
 module Proto.Proto.Riak
        (BucketProperties(), BucketProperties'RpbReplMode(..),
         BucketProperties'RpbReplMode(), CommitHook(), Content(),
-        CounterUpdate(), Crdt(), CrdtUpdate(), DeleteRequest(),
-        DeleteResponse(), ErrorResponse(), GSetUpdate(),
+        CounterUpdate(), Crdt(), CrdtUpdate(), DeleteIndexRequest(),
+        DeleteRequest(), DeleteResponse(), ErrorResponse(), GSetUpdate(),
         GetBucketPropertiesRequest(), GetBucketPropertiesResponse(),
         GetBucketTypePropertiesRequest(), GetCrdtRequest(),
         GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
@@ -1880,6 +1880,53 @@ instance Control.DeepSeq.NFData CrdtUpdate where
                       (Control.DeepSeq.deepseq (_CrdtUpdate'mapUpdate x__)
                          (Control.DeepSeq.deepseq (_CrdtUpdate'hllUpdate x__)
                             (Control.DeepSeq.deepseq (_CrdtUpdate'gsetUpdate x__) (()))))))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.name' @:: Lens' DeleteIndexRequest Data.ByteString.ByteString@
+ -}
+data DeleteIndexRequest = DeleteIndexRequest{_DeleteIndexRequest'name
+                                             :: !Data.ByteString.ByteString,
+                                             _DeleteIndexRequest'_unknownFields ::
+                                             !Data.ProtoLens.FieldSet}
+                            deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show DeleteIndexRequest where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' DeleteIndexRequest "name"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _DeleteIndexRequest'name
+                 (\ x__ y__ -> x__{_DeleteIndexRequest'name = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message DeleteIndexRequest where
+        messageName _ = Data.Text.pack "DeleteIndexRequest"
+        fieldsByTag
+          = let name__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "name"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "name")))
+                      :: Data.ProtoLens.FieldDescriptor DeleteIndexRequest
+              in
+              Data.Map.fromList [(Data.ProtoLens.Tag 1, name__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _DeleteIndexRequest'_unknownFields
+              (\ x__ y__ -> x__{_DeleteIndexRequest'_unknownFields = y__})
+        defMessage
+          = DeleteIndexRequest{_DeleteIndexRequest'name =
+                                 Data.ProtoLens.fieldDefault,
+                               _DeleteIndexRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData DeleteIndexRequest where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_DeleteIndexRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_DeleteIndexRequest'name x__) (()))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' DeleteRequest Data.ByteString.ByteString@

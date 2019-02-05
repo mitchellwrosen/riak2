@@ -109,6 +109,7 @@ mockServer = do
             Right request ->
               case request of
                 RequestDelete{}                  -> respond ResponseDelete
+                RequestDeleteIndex{}             -> respond ResponseDelete
                 RequestGetBucketProperties{}     -> respond ResponseGetBucketProperties
                 RequestGetBucketTypeProperties{} -> respond ResponseGetBucketProperties
                 RequestGetCrdt{}                 -> respond ResponseGetCrdt
@@ -133,6 +134,10 @@ expectedResponse :: Request -> Response -> Bool
 expectedResponse request response =
   case request of
     RequestDelete{} ->
+      case response of
+        ResponseDelete{} -> True
+        _ -> False
+    RequestDeleteIndex{} ->
       case response of
         ResponseDelete{} -> True
         _ -> False

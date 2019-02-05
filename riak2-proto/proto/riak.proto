@@ -532,13 +532,12 @@ message GetIndexResponse {
 
 message PutIndexRequest {
     required Index index = 1;
-    optional uint32 timeout = 2; // Timeout value
+    optional uint32 timeout = 2;
 }
 
-// DELETE request - Remove an index
-/* message RpbYokozunaIndexDeleteReq { */
-/*     required bytes name  =  1;  // Index name */
-/* } */
+message DeleteIndexRequest {
+    required bytes name = 1;
+}
 
 // Schema queries
 

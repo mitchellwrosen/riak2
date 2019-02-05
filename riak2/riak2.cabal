@@ -8,7 +8,7 @@ description:
   __Library organization__
   .
   This library's modules are organized around types. A module will typically
-  export one type and its API, which consists of the functions whose "primary"
+  export one type and its API, which consists of the functions whose primary
   input type is the type in question.
   .
   For example, to /list the keys in a bucket/, the primary input type is the

@@ -18,6 +18,7 @@ import qualified Data.ProtoLens  as Proto
 
 data Request
   = RequestDelete DeleteRequest
+  | RequestDeleteIndex DeleteIndexRequest
   | RequestGet GetRequest
   | RequestGetBucketProperties GetBucketPropertiesRequest
   | RequestGetBucketTypeProperties GetBucketTypePropertiesRequest
@@ -53,7 +54,6 @@ decode code bytes =
     7    -> go RequestGetServerInfo
     9    -> go RequestGet
     11   -> go RequestPut
-    56   -> go RequestPutIndex
     13   -> go RequestDelete
     15   -> go RequestListBuckets
     17   -> go RequestListKeys
@@ -67,8 +67,8 @@ decode code bytes =
     32   -> go RequestSetBucketTypeProperties
     -- 33   -> go RequestGetBucketKeyPreflist
     54   -> go RequestGetIndex
-    -- 56   -> go RequestPutYokozunaIndex
-    -- 57   -> go RequestDeleteYokozunaIndex
+    56   -> go RequestPutIndex
+    57   -> go RequestDeleteIndex
     -- 58   -> go RequestGetYokozunaSchema
     -- 60   -> go RequestPutYokozunaSchema
     -- 70   -> go RequestCoverage
@@ -88,6 +88,7 @@ decode code bytes =
 encode :: Request -> ByteString
 encode = \case
   RequestDelete                  request -> Utils.wire 13 request
+  RequestDeleteIndex             request -> Utils.wire 57 request
   RequestGet                     request -> Utils.wire  9 request
   RequestGetBucketProperties     request -> Utils.wire 19 request
   RequestGetBucketTypeProperties request -> Utils.wire 31 request
@@ -105,8 +106,3 @@ encode = \case
   RequestListBuckets             request -> Utils.wire 15 request
   RequestListKeys                request -> Utils.wire 17 request
   RequestUpdateCrdt              request -> Utils.wire 82 request
-
--- instance Request RpbSearchQueryReq         where code = 27
--- instance Request RpbYokozunaIndexDeleteReq where code = 57
--- instance Request RpbYokozunaSchemaGetReq   where code = 58
--- instance Request RpbYokozunaSchemaPutReq   where code = 60

@@ -342,14 +342,12 @@ delete ::
   -> Object a -- ^
   -> m (Either Error ())
 delete client (view (field @"content") -> content) = liftIO $
-  (fmap.fmap)
-    (const ())
-    (Client.exchange
-      client
-      (RequestDelete request)
-      (\case
-        ResponseDelete response -> Just response
-        _ -> Nothing))
+  Client.exchange
+    client
+    (RequestDelete request)
+    (\case
+      ResponseDelete{} -> Just ()
+      _ -> Nothing)
 
   where
     request :: Proto.DeleteRequest

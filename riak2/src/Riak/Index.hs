@@ -3,6 +3,7 @@ module Riak.Index
   , get
   , getAll
   , put
+  , delete
   ) where
 
 import Riak.Internal.Client  (Client, Error(..))
@@ -133,6 +134,25 @@ put client index = liftIO $
         & L.index .~ toProto index
         -- TODO put index timeout
         -- & L.maybe'timeout .~ undefined
+
+delete ::
+     MonadIO m
+  => Client
+  -> Text
+  -> m (Either Error ())
+delete client name = liftIO $
+  Client.exchange
+    client
+    (RequestDeleteIndex request)
+    (\case
+      ResponseDelete{} -> Just ()
+      _ -> Nothing)
+
+  where
+    request :: Proto.DeleteIndexRequest
+    request =
+      defMessage
+        & L.name .~ encodeUtf8 name
 
 fromProto :: Proto.Index -> Index
 fromProto index =
