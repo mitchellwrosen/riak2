@@ -29,47 +29,49 @@ socketmain :: IO ()
 socketmain = do
   client <- mockServer
 
-  iface :: Iface.Socket.Interface <-
-    Iface.Socket.new
-      client
-      mempty
-        -- { Iface.Socket.onSend = \request -> putStrLn (">>> " ++ show request)
-        -- , Iface.Socket.onReceive = \response -> putStrLn ("<<< " ++ show response)
-        -- }
+  let
+    config :: Iface.Socket.Config
+    config =
+      Iface.Socket.Config
+        { Iface.Socket.socket = client
+        , Iface.Socket.handlers = mempty
+        }
 
-  let workers = 10
-  let requests = 1000
+  Iface.Socket.withInterface config $ \iface -> do
 
-  readyVar <- newTVarIO False
-  doneVar <- newEmptyMVar
+    let workers = 10
+    let requests = 1000
 
-  replicateM_ workers . forkIO $ do
-    atomically (readTVar readyVar >>= flip unless retry)
+    readyVar <- newTVarIO False
+    doneVar <- newEmptyMVar
 
-    replicateM_ requests $ do
-      request <-
-        randomOneOf
-          [ RequestPing Proto.defMessage
-          , RequestGet Proto.defMessage
-          , RequestPut Proto.defMessage
-          , RequestDelete Proto.defMessage
-          ]
+    replicateM_ workers . forkIO $ do
+      atomically (readTVar readyVar >>= flip unless retry)
 
-      Iface.Socket.exchange iface request >>= \case
-        Nothing ->
-          putStrLn "Riak disappeared?"
+      replicateM_ requests $ do
+        request <-
+          randomOneOf
+            [ RequestPing Proto.defMessage
+            , RequestGet Proto.defMessage
+            , RequestPut Proto.defMessage
+            , RequestDelete Proto.defMessage
+            ]
 
-        Just response ->
-          unless (expectedResponse request response) $ do
-            putStrLn "ERROR"
-            putStrLn (">>> " ++ show request)
-            putStrLn ("<<< " ++ show response)
+        Iface.Socket.exchange iface request >>= \case
+          Nothing ->
+            putStrLn "Riak disappeared?"
 
-    putMVar doneVar ()
+          Just response ->
+            unless (expectedResponse request response) $ do
+              putStrLn "ERROR"
+              putStrLn (">>> " ++ show request)
+              putStrLn ("<<< " ++ show response)
 
-  atomically (writeTVar readyVar True)
+      putMVar doneVar ()
 
-  replicateM_ workers (takeMVar doneVar)
+    atomically (writeTVar readyVar True)
+
+    replicateM_ workers (takeMVar doneVar)
 
 socketPair :: IO (Socket, Socket)
 socketPair = do

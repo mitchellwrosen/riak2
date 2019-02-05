@@ -3,21 +3,18 @@ signature Riak.Interface.Signature where
 import Riak.Request (Request)
 import Riak.Response (Response)
 
+data Config
+
 data Interface
 
--- | Connect to Riak.
-connect ::
-     Interface
-  -> IO ()
-
--- | Disconnect from Riak.
-disconnect ::
-     Interface
-  -> IO ()
+withInterface ::
+     Config
+  -> (Interface -> IO a)
+  -> IO a
 
 -- | Send a request and receive the response (a single message).
 --
--- /Throws/: 'Riak.Response.DecodeError' if the response fails to decode.
+-- Returns 'Nothing' if Riak initiated a graceful shutdown.
 exchange ::
      Interface
   -> Request
@@ -25,7 +22,7 @@ exchange ::
 
 -- | Send a request and stream the response (one or more messages).
 --
--- /Throws/: 'Riak.Response.DecodeError' if the response fails to decode.
+-- Returns 'Nothing' if Riak initiated a graceful shutdown.
 stream ::
      Interface
   -> Request

@@ -59,7 +59,9 @@ library riak2-core-internal
     riak2-core-internal
 
   default-extensions:
+    DuplicateRecordFields
     LambdaCase
+    NamedFieldPuns
     ScopedTypeVariables
 
   default-language:
@@ -84,6 +86,7 @@ library riak2-interface-impl-managed
 
   default-extensions:
     LambdaCase
+    NamedFieldPuns
     ScopedTypeVariables
 
   default-language:

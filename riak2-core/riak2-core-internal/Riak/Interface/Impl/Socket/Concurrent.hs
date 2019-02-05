@@ -1,9 +1,8 @@
 module Riak.Interface.Impl.Socket.Concurrent
   ( Interface
+  , Config
   , EventHandlers(..)
-  , new
-  , connect
-  , disconnect
+  , withInterface
   , exchange
   , stream
   ) where
@@ -13,7 +12,7 @@ import Data.Coerce             (coerce)
 import Riak.Request            (Request)
 import Riak.Response           (Response)
 import Riak.Socket             (Socket)
-import UnliftIO.Exception      (finally)
+import UnliftIO.Exception      (bracket_, finally)
 
 import qualified Riak.Socket as Socket
 
@@ -23,57 +22,90 @@ data Interface
   { socket :: !Socket
   , sync :: !Synchronized
   , relay :: !Relay
+  , handlers :: !EventHandlers
+  }
+
+data Config
+  = Config
+  { socket :: !Socket
+  , handlers :: !EventHandlers
   }
 
 data EventHandlers
   = EventHandlers
+  { onSend :: Request -> IO ()
+  , onReceive :: Maybe Response -> IO ()
+  }
 
-new ::
-     Socket
-  -> EventHandlers
-  -> IO Interface
-new socket _ =
-  Interface
-    <$> pure socket
-    <*> newSynchronized
-    <*> newRelay
+instance Monoid EventHandlers where
+  mempty = EventHandlers mempty mempty
+  mappend = (<>)
 
-connect :: Interface -> IO ()
-connect iface =
-  Socket.connect (socket iface)
+instance Semigroup EventHandlers where
+  EventHandlers a1 b1 <> EventHandlers a2 b2 =
+    EventHandlers (a1 <> a2) (b1 <> b2)
 
-disconnect :: Interface -> IO ()
-disconnect =
-  Socket.disconnect . socket
+
+withInterface ::
+     Config -- ^
+  -> (Interface -> IO a) -- ^
+  -> IO a
+withInterface Config { socket, handlers } k = do
+  sync :: Synchronized <-
+    newSynchronized
+
+  relay :: Relay <-
+    newRelay
+
+  bracket_
+    (Socket.connect socket)
+    (Socket.disconnect socket)
+    (k Interface
+      { socket = socket
+      , sync = sync
+      , relay = relay
+      , handlers = handlers
+      })
 
 exchange ::
      Interface
   -> Request
   -> IO (Maybe Response)
-exchange iface request = do
+exchange Interface { socket, sync, relay, handlers } request = do
   baton :: Baton <-
-    synchronized (sync iface) $ do
-      Socket.send (socket iface) request
-      enterRelay (relay iface)
+    synchronized sync $ do
+      onSend handlers request
+      Socket.send socket request
+      enterRelay relay
 
-  withBaton baton
-    (Socket.receive (socket iface))
+  response :: Maybe Response <-
+    withBaton baton (Socket.receive socket)
+
+  onReceive handlers response
+
+  pure response
 
 stream ::
      Interface
   -> Request
   -> (IO (Maybe Response) -> IO r)
   -> IO r
-stream iface request callback =
+stream Interface { socket, sync, relay, handlers } request callback =
   -- Riak request handling state machine is odd. Streaming responses are
   -- special; when one is active, no other requests can be serviced on this
   -- socket. I learned this the hard way by reading Riak source code.
   --
   -- So, hold a lock for the entirety of the request-response exchange, not just
   -- during sending the request.
-  synchronized (sync iface) $ do
-    Socket.send (socket iface) request
-    callback (Socket.receive (socket iface))
+  synchronized sync $ do
+    onSend handlers request
+    Socket.send socket request
+
+    callback $ do
+      response :: Maybe Response <-
+        Socket.receive socket
+      onReceive handlers response
+      pure response
 
 
 newtype Synchronized

@@ -1,9 +1,8 @@
 module Riak.Interface.Impl.Socket
   ( Interface
+  , Config(..)
   , EventHandlers(..)
-  , new
-  , connect
-  , disconnect
+  , withInterface
   , exchange
   , stream
   ) where
@@ -15,6 +14,7 @@ import Riak.Socket   (Socket)
 import qualified Riak.Socket   as Socket
 
 import Control.Concurrent.MVar
+import UnliftIO.Exception (bracket_)
 
 
 data Interface
@@ -24,64 +24,54 @@ data Interface
   , handlers :: !EventHandlers
   }
 
+data Config
+  = Config
+  { socket :: !Socket
+  , handlers :: !EventHandlers
+  }
+
 data EventHandlers
   = EventHandlers
-  { onConnect :: IO ()
-  , onDisconnect :: IO ()
-  , onSend :: Request -> IO ()
+  { onSend :: Request -> IO ()
   , onReceive :: Maybe Response -> IO ()
   }
 
 instance Monoid EventHandlers where
-  mempty = EventHandlers mempty mempty mempty mempty
+  mempty = EventHandlers mempty mempty
   mappend = (<>)
 
 instance Semigroup EventHandlers where
-  EventHandlers a1 b1 c1 d1 <> EventHandlers a2 b2 c2 d2 =
-    EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2)
+  EventHandlers a1 b1 <> EventHandlers a2 b2 =
+    EventHandlers (a1 <> a2) (b1 <> b2)
 
-new ::
-     Socket -- ^
-  -> EventHandlers -- ^
-  -> IO Interface
-new socket handlers = do
+withInterface :: Config -> (Interface -> IO a) -> IO a
+withInterface Config { socket, handlers } k = do
   lock <- newMVar ()
 
-  pure Interface
-    { socket = socket
-    , lock = lock
-    , handlers = handlers
-    }
-
-connect ::
-     Interface -- ^
-  -> IO ()
-connect iface = do
-  onConnect (handlers iface)
-  Socket.connect (socket iface)
-
-disconnect ::
-     Interface -- ^
-  -> IO ()
-disconnect iface = do
-  onDisconnect (handlers iface)
-  Socket.disconnect (socket iface)
+  bracket_
+    (Socket.connect socket)
+    (Socket.disconnect socket)
+    (k Interface
+      { socket = socket
+      , lock = lock
+      , handlers = handlers
+      })
 
 send ::
      Interface
   -> Request
   -> IO ()
-send iface request = do
-  onSend (handlers iface) request
-  Socket.send (socket iface) request
+send Interface { socket, handlers } request = do
+  onSend handlers request
+  Socket.send socket request
 
 receive ::
      Interface -- ^
   -> IO (Maybe Response)
-receive iface = do
+receive Interface { socket, handlers } = do
   response :: Maybe Response <-
-    Socket.receive (socket iface)
-  onReceive (handlers iface) response
+    Socket.receive socket
+  onReceive handlers response
   pure response
 
 exchange ::
