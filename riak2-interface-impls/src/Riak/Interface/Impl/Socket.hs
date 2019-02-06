@@ -7,11 +7,14 @@ module Riak.Interface.Impl.Socket
   , stream
   , Exception(..)
   , isRemoteShutdownException
+    -- ** Re-exports
+  , Socket.Socket(..)
+  , Socket.new1
   ) where
 
 import Riak.Request  (Request)
 import Riak.Response (Response)
-import Riak.Socket   (Socket)
+import Riak.Socket (Socket)
 
 import qualified Riak.Socket as Socket
 

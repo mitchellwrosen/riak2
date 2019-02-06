@@ -20,7 +20,7 @@ import qualified Riak.Interface.Signature as Interface
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Monad          (forever, void, when)
+import Control.Monad          (forever, void)
 import UnliftIO.Exception     (bracket, tryAny)
 
 import qualified Control.Exception as Exception

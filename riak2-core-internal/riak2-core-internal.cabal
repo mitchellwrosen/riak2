@@ -1,6 +1,6 @@
 cabal-version: 2.4
 
-name: riak2-proto
+name: riak2-core-internal
 version: 0.1.0
 build-type: Simple
 
@@ -10,16 +10,29 @@ extra-source-files:
 
 library
   build-depends:
+    attoparsec,
     base,
     bytestring,
+    foldl,
+    lens,
+    network,
     proto-lens ^>= 0.4.0,
-    proto-lens-runtime ^>= 0.4.0
+    proto-lens-runtime ^>= 0.4.0,
+    unliftio
 
   default-extensions:
+    DefaultSignatures
     DeriveAnyClass
+    DeriveFunctor
     DerivingStrategies
+    DuplicateRecordFields
+    GeneralizedNewtypeDeriving
     InstanceSigs
     LambdaCase
+    OverloadedLabels
+    ScopedTypeVariables
+    TupleSections
+    TypeApplications
     ViewPatterns
 
   default-language:
@@ -30,9 +43,11 @@ library
     Riak.Proto.Lens
     Riak.Request
     Riak.Response
+    Riak.Socket
 
   ghc-options:
     -Wall
+    -fno-warn-name-shadowing
 
   hs-source-dirs:
     src
@@ -40,4 +55,5 @@ library
   other-modules:
     Proto.Proto.Riak
     Proto.Proto.Riak_Fields
+    Socket
     Utils

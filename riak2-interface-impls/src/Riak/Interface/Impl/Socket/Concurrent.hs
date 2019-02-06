@@ -102,7 +102,7 @@ stream ::
   -> Request
   -> (IO Response -> IO r)
   -> IO r
-stream Interface { socket, sync, relay, handlers } request callback =
+stream Interface { socket, sync, handlers } request callback =
   -- Riak request handling state machine is odd. Streaming responses are
   -- special; when one is active, no other requests can be serviced on this
   -- socket. I learned this the hard way by reading Riak source code.

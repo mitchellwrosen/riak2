@@ -1,9 +1,10 @@
 module Main where
 
-import Riak        (Bucket(..), Content(..), GetOpts(..), Key(..), PutOpts(..),
-                    Quorum(..), ServerInfo(..))
-import Riak.Client (Client)
-import Riak.Socket (Socket)
+import Riak                       (Bucket(..), Content(..), GetOpts(..),
+                                   Key(..), PutOpts(..), Quorum(..),
+                                   ServerInfo(..))
+import Riak.Client                (Client)
+import Riak.Interface.Impl.Socket (Socket)
 
 import qualified Riak.Client                as Client
 import qualified Riak.Context               as Context
@@ -11,7 +12,6 @@ import qualified Riak.Interface.Impl.Socket as Client
 import qualified Riak.Key                   as Key
 import qualified Riak.Object                as Object
 import qualified Riak.ServerInfo            as ServerInfo
-import qualified Riak.Socket                as Socket
 
 import Data.ByteString     (ByteString)
 import Data.Foldable       (for_)
@@ -40,7 +40,7 @@ main = do
         (progDesc "Riak command-line client")))
 
   socket :: Socket <-
-    Socket.new1 host port
+    Client.new1 host port
 
   let
     config :: Client.Config

@@ -7,6 +7,9 @@ module Riak.Socket
   , Socket.disconnect
   , send
   , receive
+    -- ** For mocking/testing
+  , sendResponse
+  , receiveRequest
   ) where
 
 import Riak.Request  (Request)
@@ -36,3 +39,21 @@ receive socket =
 
         Right response ->
           pure (Just response)
+
+sendResponse :: Socket -> Response -> IO ()
+sendResponse socket response =
+  Socket.send socket (Response.encode response)
+
+receiveRequest :: Socket -> IO (Maybe Request)
+receiveRequest socket =
+  Socket.receive socket >>= \case
+    Nothing ->
+      pure Nothing
+
+    Just bytes ->
+      case Request.parse bytes of
+        Left err ->
+          throwIO err
+
+        Right request ->
+          pure (Just request)

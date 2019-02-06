@@ -98,7 +98,6 @@ library
     profunctors ^>= 5.3,
     proto-lens ^>= 0.4.0,
     riak2-core,
-    riak2-interface,
     stm ^>= 2.4.5 || ^>= 2.5.0,
     stm-containers ^>= 1.0.1,
     streaming,

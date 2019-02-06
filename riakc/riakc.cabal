@@ -14,7 +14,7 @@ executable riakc-new
     , optparse-applicative
     , network
     , riak2
-    , riak2-core
+    , riak2-interface-impls
     , split
     , text
 

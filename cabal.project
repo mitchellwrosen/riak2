@@ -3,8 +3,8 @@ jobs: $ncpus
 packages:
   riak2,
   riak2-core,
-  riak2-interface,
-  riak2-proto,
+  riak2-core-internal,
+  riak2-interface-impls,
   riakc
 
 source-repository-package
