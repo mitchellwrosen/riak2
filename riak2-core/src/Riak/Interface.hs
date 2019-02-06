@@ -1,12 +1,11 @@
--- TODO Remove this module, move it all back to Riak.Interface
-
-module Riak.Internal.Client
-  ( module Riak.Internal.Client
-  , UnexpectedResponse(..)
+module Riak.Interface
+  ( UnexpectedResponse(..)
+  , delete
+  , get
+  , put
   ) where
 
 import Riak.Interface.Signature (Interface)
-import Riak.Internal.Prelude
 import Riak.Request             (Request(..))
 import Riak.Response            (Response(..))
 
@@ -14,31 +13,62 @@ import qualified Riak.Interface.Signature as Interface
 import qualified Riak.Proto               as Proto
 import qualified Riak.Proto.Lens          as L
 
-import Control.Foldl (FoldM(..))
+import Control.Exception (Exception, throwIO)
+import Control.Foldl     (FoldM(..))
+import Control.Lens      ((^.))
+import Data.ByteString   (ByteString)
 
-
--- TODO rename Interface to Client
-type Client
-  = Interface
 
 data UnexpectedResponse
   = UnexpectedResponse !Request !Response
   deriving stock (Show)
   deriving anyclass (Exception)
 
-new :: Interface -> Client
-new =
-  id
+delete ::
+     Interface
+  -> Proto.DeleteRequest
+  -> IO (Either ByteString ())
+delete iface request =
+  exchange
+    iface
+    (RequestDelete request)
+    (\case
+      ResponseDelete{} -> Just ()
+      _ -> Nothing)
+
+get ::
+     Interface
+  -> Proto.GetRequest
+  -> IO (Either ByteString Proto.GetResponse)
+get iface request =
+  exchange
+    iface
+    (RequestGet request)
+    (\case
+      ResponseGet response -> Just response
+      _ -> Nothing)
+
+put ::
+     Interface
+  -> Proto.PutRequest
+  -> IO (Either ByteString Proto.PutResponse)
+put iface request =
+  exchange
+    iface
+    (RequestPut request)
+    (\case
+      ResponsePut response -> Just response
+      _ -> Nothing)
 
 exchange ::
-     Client
+     Interface
   -> Request
   -> (Response -> Maybe a)
-  -> IO (Either Text a)
-exchange client request f =
-  Interface.exchange client request >>= \case
+  -> IO (Either ByteString a)
+exchange iface request f =
+  Interface.exchange iface request >>= \case
     ResponseError response ->
-      pure (Left (decodeUtf8 (response ^. L.errmsg)))
+      pure (Left (response ^. L.errmsg))
 
     response ->
       case f response of
@@ -50,17 +80,17 @@ exchange client request f =
 
 stream ::
      forall a r.
-     Client
+     Interface
   -> Request -- ^ Request
   -> (Response -> Maybe a) -- ^ Correct response?
   -> (a -> Bool) -- ^ Done?
   -> FoldM IO a r -- ^ Fold responses
-  -> IO (Either Text r)
-stream client request f done (FoldM step initial extract) =
-  Interface.stream client request callback
+  -> IO (Either ByteString r)
+stream iface request f done (FoldM step initial extract) =
+  Interface.stream iface request callback
 
   where
-    callback :: IO Response -> IO (Either Text r)
+    callback :: IO Response -> IO (Either ByteString r)
     callback recv =
       loop =<< initial
 
@@ -68,7 +98,7 @@ stream client request f done (FoldM step initial extract) =
         loop value =
           recv >>= \case
             ResponseError response ->
-              pure (Left (decodeUtf8 (response ^. L.errmsg)))
+              pure (Left (response ^. L.errmsg))
 
             response ->
               case f response of
@@ -86,24 +116,24 @@ stream client request f done (FoldM step initial extract) =
                       loop value'
 
 getCrdt
-  :: Client
+  :: Interface
   -> Proto.GetCrdtRequest
-  -> IO (Either Text Proto.GetCrdtResponse)
-getCrdt client request =
+  -> IO (Either ByteString Proto.GetCrdtResponse)
+getCrdt iface request =
   exchange
-    client
+    iface
     (RequestGetCrdt request)
     (\case
       ResponseGetCrdt response -> Just response
       _ -> Nothing)
 
 updateCrdt
-  :: Client -- ^
+  :: Interface -- ^
   -> Proto.UpdateCrdtRequest -- ^
-  -> IO (Either Text Proto.UpdateCrdtResponse)
-updateCrdt client request =
+  -> IO (Either ByteString Proto.UpdateCrdtResponse)
+updateCrdt iface request =
   exchange
-    client
+    iface
     (RequestUpdateCrdt request)
     (\case
       ResponseUpdateCrdt response -> Just response

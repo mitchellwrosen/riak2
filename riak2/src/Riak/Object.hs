@@ -15,17 +15,15 @@ module Riak.Object
   ) where
 
 import Riak.Content          (Content(..))
-import Riak.Internal.Error
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Context (Context(..))
+import Riak.Internal.Error
 import Riak.Internal.Object  (Object(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Opts             (GetOpts(..), PutOpts(..))
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
 
-import qualified Riak.Internal.Client         as Client
+import qualified Riak.Interface               as Interface
 import qualified Riak.Internal.Object         as Object
 import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
@@ -149,22 +147,16 @@ doGet ::
   -> IO (Either (Error 'GetOp) Proto.GetResponse)
 doGet client request =
   first parseGetError <$>
-    Client.exchange
-      client
-      (RequestGet request)
-      (\case
-        ResponseGet response -> Just response
-        _ -> Nothing)
-
+    Interface.get client request
   where
-    parseGetError :: Text -> Error 'GetOp
+    parseGetError :: ByteString -> Error 'GetOp
     parseGetError err
       | isBucketTypeDoesNotExist err =
           BucketTypeDoesNotExist (request ^. L.bucketType)
       | isInvalidN err =
           InvalidN (request ^. L.n)
       | otherwise =
-          UnknownError err
+          UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest (Key bucketType bucket key) opts =
@@ -303,23 +295,17 @@ doPut ::
   -> Proto.PutRequest
   -> IO (Either (Error 'PutOp) Proto.PutResponse)
 doPut client request =
-  first parsePutError <$>
-    Client.exchange
-      client
-      (RequestPut request)
-      (\case
-        ResponsePut response -> Just response
-        _ -> Nothing)
+  first parsePutError <$> Interface.put client request
 
   where
-    parsePutError :: Text -> Error 'PutOp
+    parsePutError :: ByteString -> Error 'PutOp
     parsePutError err
       | isBucketTypeDoesNotExist err =
           BucketTypeDoesNotExist (request ^. L.bucketType)
       | isInvalidN err =
           InvalidN (request ^. L.n)
       | otherwise =
-          UnknownError err
+          UnknownError (decodeUtf8 err)
 
 makePutRequest ::
      Key
@@ -362,14 +348,9 @@ delete ::
      MonadIO m
   => Client -- ^
   -> Object a -- ^
-  -> m (Either Text ())
+  -> m (Either (Error 'DeleteOp) ())
 delete client (view (field @"content") -> content) = liftIO $
-  Client.exchange
-    client
-    (RequestDelete request)
-    (\case
-      ResponseDelete{} -> Just ()
-      _ -> Nothing)
+  first parseDeleteError <$> Interface.delete client request
 
   where
     request :: Proto.DeleteRequest
@@ -391,6 +372,10 @@ delete client (view (field @"content") -> content) = liftIO $
 
     Key bucketType bucket key =
       content ^. field @"key"
+
+    parseDeleteError :: ByteString -> Error 'DeleteOp
+    parseDeleteError err =
+      UnknownError (decodeUtf8 err)
 
 defFalse :: Bool -> Maybe Bool
 defFalse = \case

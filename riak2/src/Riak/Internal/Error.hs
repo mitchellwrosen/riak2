@@ -2,7 +2,7 @@ module Riak.Internal.Error where
 
 import Riak.Internal.Prelude
 
-import qualified Data.Text as Text
+import qualified Data.ByteString as ByteString
 
 -- | Error responses that Riak may return.
 --
@@ -32,7 +32,8 @@ deriving stock instance Show (Error op)
 
 -- | Operations used to index the 'Error' type.
 data Op
-  = GetOp
+  = DeleteOp
+  | GetOp
   | PutOp
 
 -- | @no_type@
@@ -47,10 +48,10 @@ type family MayReturnInvalidN (op :: Op) :: Bool where
   MayReturnInvalidN 'PutOp = 'True
   MayReturnInvalidN _ = 'False
 
-isBucketTypeDoesNotExist :: Text -> Bool
+isBucketTypeDoesNotExist :: ByteString -> Bool
 isBucketTypeDoesNotExist =
   (== "no_type")
 
-isInvalidN :: Text -> Bool
+isInvalidN :: ByteString -> Bool
 isInvalidN =
-  Text.isPrefixOf "{n_val_violation"
+  ByteString.isPrefixOf "{n_val_violation"
