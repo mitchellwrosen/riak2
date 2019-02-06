@@ -52,7 +52,7 @@ get
   => Client -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either Text [Object ByteString])
+  -> m (Either (Error 'GetOp) [Object ByteString])
 get client key opts = liftIO $
   (fmap.fmap)
     (Object.fromGetResponse key)
@@ -75,7 +75,7 @@ getHead
   => Client -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either Text [Object ()])
+  -> m (Either (Error 'GetOp) [Object ()])
 getHead client key opts = liftIO $
   (fmap.fmap)
     (map (() <$) . Object.fromGetResponse key)
@@ -98,7 +98,7 @@ getIfModified
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
-  -> m (Either Text (Maybe [Object ByteString]))
+  -> m (Either (Error 'GetOp) (Maybe [Object ByteString]))
 getIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     (\response ->
@@ -125,7 +125,7 @@ getHeadIfModified
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
-  -> m (Either Text (Maybe [Object ()]))
+  -> m (Either (Error 'GetOp) (Maybe [Object ()]))
 getHeadIfModified client (Content { key, context }) opts = liftIO $
   (fmap.fmap)
     fromResponse
@@ -146,14 +146,25 @@ getHeadIfModified client (Content { key, context }) opts = liftIO $
 doGet ::
      Client
   -> Proto.GetRequest
-  -> IO (Either Text Proto.GetResponse)
+  -> IO (Either (Error 'GetOp) Proto.GetResponse)
 doGet client request =
-  Client.exchange
-    client
-    (RequestGet request)
-    (\case
-      ResponseGet response -> Just response
-      _ -> Nothing)
+  first parseGetError <$>
+    Client.exchange
+      client
+      (RequestGet request)
+      (\case
+        ResponseGet response -> Just response
+        _ -> Nothing)
+
+  where
+    parseGetError :: Text -> Error 'GetOp
+    parseGetError err
+      | isBucketTypeDoesNotExist err =
+          BucketTypeDoesNotExist (request ^. L.bucketType)
+      | isInvalidN err =
+          InvalidN (request ^. L.n)
+      | otherwise =
+          UnknownError err
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest (Key bucketType bucket key) opts =

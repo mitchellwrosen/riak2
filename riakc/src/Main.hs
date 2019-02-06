@@ -1,7 +1,7 @@
 module Main where
 
-import Riak        (Bucket(..), Content(..), Key(..), PutOpts(..), Quorum(..),
-                    ServerInfo(..))
+import Riak        (Bucket(..), Content(..), GetOpts(..), Key(..), PutOpts(..),
+                    Quorum(..), ServerInfo(..))
 import Riak.Client (Client)
 import Riak.Socket (Socket)
 
@@ -14,7 +14,6 @@ import qualified Riak.ServerInfo            as ServerInfo
 import qualified Riak.Socket                as Socket
 
 import Data.ByteString     (ByteString)
-import Data.Default.Class  (def)
 import Data.Foldable       (for_)
 import Data.List.Split     (splitOn)
 import Data.Text           (Text)
@@ -104,16 +103,38 @@ getParser :: Parser (Client -> IO ())
 getParser =
   doGet
     <$> argument (eitherReader parseKey) keyMod
+    <*> nOption
+    <*> rOption
+    <*> prOption
   where
-    doGet :: Key -> Client -> IO ()
-    doGet key client =
-      Object.get client key def >>= \case
+    doGet ::
+         Key
+      -> Maybe Quorum
+      -> Maybe Quorum
+      -> Maybe Quorum
+      -> Client
+      -> IO ()
+    doGet key n r pr client =
+      Object.get client key opts >>= \case
         Left err -> do
-          Text.putStrLn err
+          print err
           exitFailure
 
         Right siblings -> do
           for_ siblings print
+
+      where
+        opts :: GetOpts
+        opts =
+          GetOpts
+            { basicQuorum = False
+            , n = n
+            , notfoundOk = Nothing
+            , pr = pr
+            , r = r
+            , sloppyQuorum = True
+            , timeout = Nothing
+            }
 
 infoParser :: Parser (Client -> IO ())
 infoParser =
@@ -139,12 +160,6 @@ pingParser =
 
 putParser :: Parser (Client -> IO ())
 putParser =
-      -- { dw = Quorum.Default
-      -- , pw = Quorum.Default
-      -- , n = Quorum.Default
-      -- , sloppyQuorum = True
-      -- , timeout = Nothing
-      -- , w = Quorum.Default
   doPut
     <$> bucketOrKeyArgument
     <*> strArgument (help "Value" <> metavar "VALUE")
@@ -214,6 +229,10 @@ bucketOrKeyArgument =
     (Right <$> eitherReader parseKey <|> Left <$> eitherReader parseBucket)
     (help "Bucket (type/bucket) or key (type/bucket/key)" <> metavar "BUCKET/KEY")
 
+dwOption :: Parser (Maybe Quorum)
+dwOption =
+  optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
+
 keyArgument :: Parser Key
 keyArgument =
   argument (eitherReader parseKey) keyMod
@@ -222,17 +241,23 @@ nOption :: Parser (Maybe Quorum)
 nOption =
   optional (option (eitherReader parseQuorum) (long "n" <> help "N"))
 
-wOption :: Parser (Maybe Quorum)
-wOption =
-  optional (option (eitherReader parseQuorum) (long "w" <> help "W"))
-
-dwOption :: Parser (Maybe Quorum)
-dwOption =
-  optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
+prOption :: Parser (Maybe Quorum)
+prOption =
+  optional (option (eitherReader parseQuorum) (long "pr" <> help "PR"))
 
 pwOption :: Parser (Maybe Quorum)
 pwOption =
   optional (option (eitherReader parseQuorum) (long "pw" <> help "PW"))
+
+rOption :: Parser (Maybe Quorum)
+rOption =
+  optional (option (eitherReader parseQuorum) (long "r" <> help "R"))
+
+wOption :: Parser (Maybe Quorum)
+wOption =
+  optional (option (eitherReader parseQuorum) (long "w" <> help "W"))
+
+
 
 parseBucket :: String -> Either String Bucket
 parseBucket string =

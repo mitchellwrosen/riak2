@@ -32,7 +32,20 @@ deriving stock instance Show (Error op)
 
 -- | Operations used to index the 'Error' type.
 data Op
-  = PutOp
+  = GetOp
+  | PutOp
+
+-- | @no_type@
+type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
+  MayReturnBucketTypeDoesNotExist 'GetOp = 'True
+  MayReturnBucketTypeDoesNotExist 'PutOp = 'True
+  MayReturnBucketTypeDoesNotExist _ = 'False
+
+-- | @{n_val_violation,_}
+type family MayReturnInvalidN (op :: Op) :: Bool where
+  MayReturnInvalidN 'GetOp = 'True
+  MayReturnInvalidN 'PutOp = 'True
+  MayReturnInvalidN _ = 'False
 
 isBucketTypeDoesNotExist :: Text -> Bool
 isBucketTypeDoesNotExist =
@@ -41,13 +54,3 @@ isBucketTypeDoesNotExist =
 isInvalidN :: Text -> Bool
 isInvalidN =
   Text.isPrefixOf "{n_val_violation"
-
--- | @no_type@
-type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
-  MayReturnBucketTypeDoesNotExist 'PutOp = 'True
-  MayReturnBucketTypeDoesNotExist _ = 'False
-
--- | @{n_val_violation,_}
-type family MayReturnInvalidN (op :: Op) :: Bool where
-  MayReturnInvalidN 'PutOp = 'True
-  MayReturnInvalidN _ = 'False
