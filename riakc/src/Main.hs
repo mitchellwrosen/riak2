@@ -132,7 +132,6 @@ getParser =
             , notfoundOk = Nothing
             , pr = pr
             , r = r
-            , sloppyQuorum = True
             , timeout = Nothing
             }
 
@@ -213,7 +212,6 @@ putParser =
             { dw = dw
             , pw = pw
             , n = n
-            , sloppyQuorum = True
             , timeout = Nothing
             , w = w
             }

@@ -14,7 +14,6 @@ data GetOpts
   , notfoundOk :: !(Maybe Bool)
   , pr :: !(Maybe Quorum)
   , r :: !(Maybe Quorum)
-  , sloppyQuorum :: !Bool
   , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   } deriving stock (Generic, Show)
 
@@ -27,7 +26,6 @@ instance Default GetOpts where
       , notfoundOk = Nothing
       , pr = Nothing
       , r = Nothing
-      , sloppyQuorum = True
       , timeout = Nothing
       }
 
@@ -36,7 +34,6 @@ data PutOpts
   { dw :: !(Maybe Quorum)
   , pw :: !(Maybe Quorum)
   , n :: !(Maybe Quorum)
-  , sloppyQuorum :: !Bool
   , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   , w :: !(Maybe Quorum)
   } deriving stock (Generic, Show)
@@ -48,7 +45,6 @@ instance Default PutOpts where
       { dw = Nothing
       , pw = Nothing
       , n = Nothing
-      , sloppyQuorum = True
       , timeout = Nothing
       , w = Nothing
       }

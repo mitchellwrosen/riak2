@@ -178,7 +178,6 @@ makeGetRequest (Key bucketType bucket key) opts =
     & L.maybe'notfoundOk .~ notfoundOk opts
     & L.maybe'pr .~ (Quorum.toWord32 <$> pr opts)
     & L.maybe'r .~ (Quorum.toWord32 <$> r opts)
-    & L.maybe'sloppyQuorum .~ defTrue (opts ^. field @"sloppyQuorum")
     & L.maybe'timeout .~ (opts ^. field @"timeout")
 
 
@@ -358,7 +357,6 @@ makePutRequest (Key bucketType bucket key) content opts =
             else Just context)
     & L.maybe'w .~ (Quorum.toWord32 <$> w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
-    & L.maybe'sloppyQuorum .~ defTrue (opts ^. field @"sloppyQuorum")
 
 delete ::
      MonadIO m
@@ -387,7 +385,6 @@ delete client (view (field @"content") -> content) = liftIO $
         -- & L.maybe'pw .~ undefined
         -- & L.maybe'r .~ undefined
         -- & L.maybe'rw .~ undefined
-        -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
         & L.context .~ unContext (content ^. field @"context")
@@ -399,8 +396,3 @@ defFalse :: Bool -> Maybe Bool
 defFalse = \case
   False -> Nothing
   True -> Just True
-
-defTrue :: Bool -> Maybe Bool
-defTrue = \case
-  False -> Just False
-  True -> Nothing
