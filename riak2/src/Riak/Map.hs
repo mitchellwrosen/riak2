@@ -6,8 +6,8 @@ module Riak.Map
   , MapUpdate(..)
   ) where
 
+import Riak.Client           (Client)
 import Riak.Context          (Context)
-import Riak.Internal.Client  (Client)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Internal.Set     (SetUpdate)

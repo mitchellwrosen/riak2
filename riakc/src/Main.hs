@@ -151,7 +151,7 @@ pingParser =
   pure $ \client ->
     Client.ping client >>= \case
       Left err -> do
-        Text.putStrLn err
+        Latin1.putStrLn err
         exitFailure
 
       Right () ->

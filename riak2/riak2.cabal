@@ -196,7 +196,6 @@ library
 
   other-modules:
     Riak.Internal.Bucket
-    Riak.Internal.Client
     Riak.Internal.Content
     Riak.Internal.Context
     Riak.Internal.Error

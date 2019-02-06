@@ -1,3 +1,4 @@
+-- TODO export functions from Riak
 module Riak
   ( Bucket(..)
   , BucketProperties(..)

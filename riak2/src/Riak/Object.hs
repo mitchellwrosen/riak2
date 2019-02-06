@@ -14,8 +14,8 @@ module Riak.Object
   , delete
   ) where
 
+import Riak.Client           (Client)
 import Riak.Content          (Content(..))
-import Riak.Internal.Client  (Client)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Error
 import Riak.Internal.Object  (Object(..))

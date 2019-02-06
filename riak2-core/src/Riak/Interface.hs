@@ -1,5 +1,6 @@
 module Riak.Interface
-  ( UnexpectedResponse(..)
+  ( Interface
+  , UnexpectedResponse(..)
   , delete
   , deleteIndex
   , get
@@ -11,6 +12,7 @@ module Riak.Interface
   , getServerInfo
   , listBuckets
   , listKeys
+  , ping
   , put
   , putIndex
   , putSchema
@@ -198,6 +200,17 @@ listKeys iface request =
       ResponseListKeys response -> Just response
       _ -> Nothing)
     (view L.done)
+
+ping ::
+     Interface
+  -> IO (Either ByteString ())
+ping iface =
+  exchange
+    iface
+    (RequestPing defMessage)
+    (\case
+      ResponsePing _ -> Just ()
+      _ -> Nothing)
 
 put ::
      Interface

@@ -1,6 +1,6 @@
 module Riak.Internal.Set where
 
-import Riak.Internal.Client  (Client)
+import Riak.Client           (Client)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude hiding (Set)
 import Riak.Key              (Key(..))

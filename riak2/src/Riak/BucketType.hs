@@ -7,12 +7,12 @@ module Riak.BucketType
   ) where
 
 import Riak.Bucket           (Bucket(..))
-import Riak.Internal.Client  (Client)
+import Riak.Client           (Client)
 import Riak.Internal.Prelude
 
-import qualified Riak.Interface       as Interface
-import qualified Riak.Proto           as Proto
-import qualified Riak.Proto.Lens      as L
+import qualified Riak.Interface  as Interface
+import qualified Riak.Proto      as Proto
+import qualified Riak.Proto.Lens as L
 
 import Control.Foldl (FoldM(..))
 import Control.Lens  (folded, to)

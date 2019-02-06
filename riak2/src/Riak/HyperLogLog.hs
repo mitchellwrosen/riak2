@@ -8,13 +8,13 @@ module Riak.HyperLogLog
   , updateHyperLogLog
   ) where
 
-import Riak.Internal.Client  (Client)
+import Riak.Client           (Client)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Interface as Interface
-import qualified Riak.Proto           as Proto
-import qualified Riak.Proto.Lens      as L
+import qualified Riak.Interface  as Interface
+import qualified Riak.Proto      as Proto
+import qualified Riak.Proto.Lens as L
 
 import qualified Data.ByteString as ByteString
 

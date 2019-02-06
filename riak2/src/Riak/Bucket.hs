@@ -13,8 +13,8 @@ module Riak.Bucket
   , streamBucketKeys
   ) where
 
+import Riak.Client              (Client)
 import Riak.Internal.Bucket     (Bucket(..))
-import Riak.Internal.Client     (Client)
 import Riak.Internal.ExactQuery (ExactQuery(..))
 import Riak.Internal.Key        (Key(..))
 import Riak.Internal.Prelude

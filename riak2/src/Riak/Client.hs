@@ -5,20 +5,23 @@ module Riak.Client
   , UnexpectedResponse(..)
   ) where
 
-import Riak.Internal.Client
+import Riak.Interface        (Interface, UnexpectedResponse(..))
 import Riak.Internal.Prelude
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
+
+import qualified Riak.Interface as Interface
+
+-- TODO what is the point of Client? is it just Interface?
+type Client
+  = Interface
+
+new :: Interface -> Client
+new =
+  id
 
 -- | Ping the server.
 ping ::
      MonadIO m
   => Client -- ^
-  -> m (Either Text ())
-ping client = liftIO $
-  exchange
-    client
-    (RequestPing defMessage)
-    (\case
-      ResponsePing _ -> Just ()
-      _ -> Nothing)
+  -> m (Either ByteString ())
+ping client =
+  liftIO (Interface.ping client)

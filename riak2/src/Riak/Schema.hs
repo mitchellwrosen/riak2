@@ -4,7 +4,7 @@ module Riak.Schema
   , putSchema
   ) where
 
-import Riak.Internal.Client  (Client)
+import Riak.Client           (Client)
 import Riak.Internal.Prelude
 
 import qualified Riak.Interface  as Interface
