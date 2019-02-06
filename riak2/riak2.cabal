@@ -175,13 +175,10 @@ library
 
     ZZZ.Erlang
     ZZZ.Riak
-    ZZZ.Riak.Internal.Cache
     ZZZ.Riak.Internal.Debug
-    ZZZ.Riak.Internal.Exception
     ZZZ.Riak.Internal.Manager
     ZZZ.Riak.Internal.MapReduce
     ZZZ.Riak.Internal.Params
-    ZZZ.Riak.Internal.Types
 
   ghc-options:
     -Weverything
