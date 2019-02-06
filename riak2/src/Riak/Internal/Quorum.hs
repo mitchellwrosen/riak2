@@ -4,6 +4,7 @@ import Riak.Internal.Prelude
 
 
 -- | How many vnodes must respond before an operation is considered successful.
+-- TODO prefix constructors with Quorum
 data Quorum
   = Default
   | Quorum

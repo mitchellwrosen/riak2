@@ -15,7 +15,7 @@ module Riak.Object
   ) where
 
 import Riak.Content          (Content(..))
-import Riak.Error            (Error(..), Op(..))
+import Riak.Internal.Error
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Object  (Object(..))
@@ -300,14 +300,16 @@ doPut client request =
       (\case
         ResponsePut response -> Just response
         _ -> Nothing)
+
   where
     parsePutError :: Text -> Error 'PutOp
-    parsePutError = \case
-      "no_type" ->
-        BucketTypeDoesNotExist (request ^. L.bucketType)
-
-      err ->
-        UnknownError err
+    parsePutError err
+      | isBucketTypeDoesNotExist err =
+          BucketTypeDoesNotExist (request ^. L.bucketType)
+      | isInvalidN err =
+          InvalidN (request ^. L.n)
+      | otherwise =
+          UnknownError err
 
 makePutRequest ::
      Key

@@ -203,6 +203,7 @@ library
     Riak.Internal.Client
     Riak.Internal.Content
     Riak.Internal.Context
+    Riak.Internal.Error
     Riak.Internal.ExactQuery
     Riak.Internal.Key
     Riak.Internal.Object
