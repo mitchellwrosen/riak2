@@ -3,11 +3,14 @@ module Riak.Interface
   , delete
   , get
   , getBucket
+  , getBucketType
+  , listBuckets
   , listKeys
   , put
   , resetBucket
   , secondaryIndex
   , setBucket
+  , setBucketType
   ) where
 
 import Riak.Interface.Signature (Interface)
@@ -65,6 +68,32 @@ getBucket iface request =
       ResponseGetBucket response -> Just (response ^. L.props)
       _ -> Nothing)
 
+getBucketType ::
+     Interface
+  -> Proto.GetBucketTypeRequest
+  -> IO (Either ByteString Proto.BucketProperties)
+getBucketType iface request =
+  exchange
+    iface
+    (RequestGetBucketType request)
+    (\case
+      ResponseGetBucket response -> Just (response ^. L.props)
+      _ -> Nothing)
+
+listBuckets ::
+     Interface
+  -> Proto.ListBucketsRequest
+  -> FoldM IO Proto.ListBucketsResponse r
+  -> IO (Either ByteString r)
+listBuckets iface request =
+  stream
+    iface
+    (RequestListBuckets request)
+    (\case
+      ResponseListBuckets response -> Just response
+      _ -> Nothing)
+    (view L.done)
+
 listKeys ::
      Interface
   -> Proto.ListKeysRequest
@@ -111,6 +140,18 @@ setBucket iface request =
   exchange
     iface
     (RequestSetBucket request)
+    (\case
+      ResponseSetBucket{} -> Just ()
+      _ -> Nothing)
+
+setBucketType ::
+     Interface
+  -> Proto.SetBucketTypeRequest
+  -> IO (Either ByteString ())
+setBucketType iface request =
+  exchange
+    iface
+    (RequestSetBucketType request)
     (\case
       ResponseSetBucket{} -> Just ()
       _ -> Nothing)

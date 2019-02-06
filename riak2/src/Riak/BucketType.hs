@@ -1,8 +1,8 @@
 module Riak.BucketType
   ( BucketType(..)
-  , get
-  , set
-  , buckets
+  , getBucketType
+  , setBucketType
+  , listBuckets
   , streamBuckets
   ) where
 
@@ -10,10 +10,8 @@ import Riak.Bucket           (Bucket(..))
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
 import Riak.Proto
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
 
-import qualified Riak.Internal.Client as Client
+import qualified Riak.Interface       as Interface
 import qualified Riak.Proto           as Proto
 import qualified Riak.Proto.Lens      as L
 
@@ -37,22 +35,13 @@ instance Default BucketType where
     BucketType "default"
 
 -- | Get bucket type properties.
---
--- TODO BucketProps
-get ::
+getBucketType ::
      MonadIO m
   => Client -- ^
   -> BucketType -- ^
-  -> m (Either Text BucketProperties)
-get client (BucketType bucketType) = liftIO $
-  (fmap.fmap)
-    fromResponse
-    (Client.exchange
-      client
-      (RequestGetBucketType request)
-      (\case
-        ResponseGetBucket response -> Just response
-        _ -> Nothing))
+  -> m (Either ByteString BucketProperties)
+getBucketType client (BucketType bucketType) = liftIO $
+  Interface.getBucketType client request
 
   where
     request :: GetBucketTypeRequest
@@ -60,56 +49,18 @@ get client (BucketType bucketType) = liftIO $
       defMessage
         & L.bucketType .~ bucketType
 
-    fromResponse :: GetBucketResponse -> BucketProperties
-    fromResponse =
-      view L.props
-
 -- | Set bucket type properties.
 --
 -- /Note/: You may not increase the @hllPrecision@ property.
 --
 -- TODO better set bucket type properties type
 -- TODO don't allow setting n
-set
+setBucketType
   :: Client -- ^
   -> Proto.SetBucketTypeRequest -- ^
-  -> IO (Either Text Proto.SetBucketResponse)
-set client request =
-  Client.exchange
-    client
-    (RequestSetBucketType request)
-    (\case
-      ResponseSetBucket response -> Just response
-      _ -> Nothing)
-
--- | Stream all of the buckets in a bucket type.
---
--- /Note/: This is an extremely expensive operation, and should not be used on a
--- production cluster.
---
--- /See also/: 'buckets'
-streamBuckets
-  :: Client -- ^
-  -> BucketType -- ^
-  -> FoldM IO Bucket r -- ^
-  -> IO (Either Text r)
-streamBuckets client (BucketType bucketType) bucketFold =
-  Client.stream
-    client
-    (RequestListBuckets request)
-    (\case
-      ResponseListBuckets response -> Just response
-      _ -> Nothing)
-    (view L.done)
-    (makeResponseFold bucketType bucketFold)
-
-  where
-    request :: Proto.ListBucketsRequest
-    request =
-      defMessage
-        & L.bucketType .~ bucketType
-        & L.stream .~ True
-        -- TODO stream buckets timeout
+  -> IO (Either ByteString ())
+setBucketType client request =
+  Interface.setBucketType client request
 
 -- | List all of the buckets in a bucket type.
 --
@@ -120,13 +71,38 @@ streamBuckets client (BucketType bucketType) bucketFold =
 -- production cluster.
 --
 -- /See also/: 'streamBuckets'
-buckets
+listBuckets
   :: MonadIO m
   => Client -- ^
   -> BucketType -- ^
-  -> m (Either Text [Bucket])
-buckets client bucketType =
+  -> m (Either ByteString [Bucket])
+listBuckets client bucketType =
   liftIO (streamBuckets client bucketType (Foldl.generalize Foldl.list))
+
+-- | Stream all of the buckets in a bucket type.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
+--
+-- /See also/: 'listBuckets'
+streamBuckets
+  :: Client -- ^
+  -> BucketType -- ^
+  -> FoldM IO Bucket r -- ^
+  -> IO (Either ByteString r)
+streamBuckets client (BucketType bucketType) bucketFold =
+  Interface.listBuckets
+    client
+    request
+    (makeResponseFold bucketType bucketFold)
+
+  where
+    request :: Proto.ListBucketsRequest
+    request =
+      defMessage
+        & L.bucketType .~ bucketType
+        & L.stream .~ True
+        -- TODO stream buckets timeout
 
 makeResponseFold ::
      Monad m
