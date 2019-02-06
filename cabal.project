@@ -1,6 +1,13 @@
+jobs: $ncpus
+
 packages:
   riak2,
   riak2-core,
   riak2-interface,
-  riak2-proto
-  -- riakc
+  riak2-proto,
+  riakc
+
+source-repository-package
+  type: git
+  location: https://github.com/kcsongor/generic-lens.git
+  tag: cf20ae3a0f27d25edf97c79b6635f7c79c9bc941

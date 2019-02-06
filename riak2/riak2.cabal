@@ -1,4 +1,4 @@
-cabal-version: 2.2
+cabal-version: 2.4
 
 name: riak2
 version: 0.1.0
@@ -86,7 +86,7 @@ library
     data-default-class ^>= 0.1.2,
     dlist ^>= 0.8.0,
     foldl ^>= 1.4.4,
-    generic-lens ^>= 1.1.0,
+    generic-lens ^>= 1.2.0,
     ghc-prim ^>= 0.5.2,
     hashable ^>= 1.2.7,
     lens ^>= 4.17,

@@ -36,6 +36,8 @@ import Data.Generics.Product.Typed (HasType(..))
 
 import qualified Data.ByteString as ByteString
 
+-- TODO specialize HasType for Object,Content
+
 
 -- | Get an object.
 --
@@ -158,14 +160,13 @@ makeGetRequest key opts =
     & L.bucket .~ (key ^. field @"bucket")
     & L.bucketType .~ key ^. field @"bucketType"
     & L.deletedContext .~ True
-    & L.head .~ True
     & L.key .~ (key ^. field @"key")
     & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
     & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
     & L.maybe'notfoundOk .~ defTrue (notfoundOk opts)
     & L.maybe'pr .~ Quorum.toWord32 (pr opts)
     & L.maybe'r .~ Quorum.toWord32 (r opts)
-    & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
+    & L.maybe'sloppyQuorum .~ defTrue (opts ^. field @"sloppyQuorum")
     & L.maybe'timeout .~ (opts ^. field @"timeout")
 
 
@@ -334,7 +335,7 @@ makePutRequest (Key bucketType bucket key) content opts =
             else Just context)
     & L.maybe'w .~ Quorum.toWord32 (w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
-    & L.maybe'sloppyQuorum .~ defFalse (opts ^. field @"sloppyQuorum")
+    & L.maybe'sloppyQuorum .~ defTrue (opts ^. field @"sloppyQuorum")
 
 delete ::
      MonadIO m

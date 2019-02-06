@@ -1,9 +1,9 @@
 module Riak.Internal.Content where
 
-import Riak.Context                (Context)
-import Riak.Internal.SecondaryIndex (SecondaryIndex)
+import Riak.Internal.Context        (Context)
+import Riak.Internal.Key            (Key)
 import Riak.Internal.Prelude
-import Riak.Key                    (Key)
+import Riak.Internal.SecondaryIndex (SecondaryIndex)
 
 
 -- | Object content. This is data that is provided when reading and writing an

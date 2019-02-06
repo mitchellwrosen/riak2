@@ -29,7 +29,7 @@ instance Default GetOpts where
       , notfoundOk = True
       , pr = Quorum.Default
       , r = Quorum.Default
-      , sloppyQuorum = False
+      , sloppyQuorum = True
       , timeout = Nothing
       }
 
@@ -42,3 +42,15 @@ data PutOpts
   , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   , w :: !Quorum
   } deriving stock (Generic, Show)
+
+instance Default PutOpts where
+  def :: PutOpts
+  def =
+    PutOpts
+      { dw = Quorum.Default
+      , pw = Quorum.Default
+      , n = Quorum.Default
+      , sloppyQuorum = True
+      , timeout = Nothing
+      , w = Quorum.Default
+      }
