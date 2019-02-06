@@ -12,6 +12,7 @@ module Riak.Interface
   , getServerInfo
   , listBuckets
   , listKeys
+  , mapReduce
   , ping
   , put
   , putIndex
@@ -198,6 +199,20 @@ listKeys iface request =
     (RequestListKeys request)
     (\case
       ResponseListKeys response -> Just response
+      _ -> Nothing)
+    (view L.done)
+
+mapReduce ::
+     Interface
+  -> Proto.MapReduceRequest
+  -> FoldM IO Proto.MapReduceResponse r
+  -> IO (Either ByteString r)
+mapReduce iface request =
+  stream
+    iface
+    (RequestMapReduce request)
+    (\case
+      ResponseMapReduce response -> Just response
       _ -> Nothing)
     (view L.done)
 

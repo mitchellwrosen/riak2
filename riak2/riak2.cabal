@@ -68,6 +68,10 @@ description:
   * "Riak.Schema"
   * "Riak.Index"
   .
+  MapReduce types and operations:
+  .
+  * "Riak.MapReduce"
+  .
   Miscellaneous types:
   .
   * "Riak.Context"
@@ -166,6 +170,7 @@ library
     Riak.Schema
     Riak.Key
     Riak.Map
+    Riak.MapReduce
     Riak.Object
     Riak.Opts
     Riak.Quorum

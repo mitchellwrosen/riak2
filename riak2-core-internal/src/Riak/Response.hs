@@ -28,7 +28,7 @@ data Response
   | ResponseGetSchema GetSchemaResponse
   | ResponseListBuckets ListBucketsResponse
   | ResponseListKeys ListKeysResponse
-  -- | ResponseMapReduce MapReduceResponse
+  | ResponseMapReduce MapReduceResponse
   | ResponsePing PingResponse
   | ResponsePut PutResponse
   | ResponseResetBucket ResetBucketResponse
@@ -57,7 +57,7 @@ decode code bytes =
     18   -> decode' ResponseListKeys
     20   -> decode' ResponseGetBucket
     22   -> Right (ResponseSetBucket Proto.defMessage)
-    -- 24   -> decode' ResponseMapReduce
+    24   -> decode' ResponseMapReduce
     26   -> decode' ResponseSecondaryIndex
     -- 28   -> decode' ResponseSearch
     30   -> Right (ResponseResetBucket Proto.defMessage)
@@ -88,6 +88,7 @@ encode = \case
   ResponseGetSchema      response -> Utils.wire 59 response
   ResponseListBuckets    response -> Utils.wire 16 response
   ResponseListKeys       response -> Utils.wire 18 response
+  ResponseMapReduce      response -> Utils.wire 24 response
   ResponsePing           response -> Utils.wire 2  response
   ResponsePut            response -> Utils.wire 12 response
   ResponseResetBucket    response -> Utils.wire 30 response

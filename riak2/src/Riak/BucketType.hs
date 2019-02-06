@@ -14,8 +14,7 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import Control.Foldl (FoldM(..))
-import Control.Lens  (folded, to)
+import Control.Lens (folded, to)
 
 import qualified Control.Foldl as Foldl
 

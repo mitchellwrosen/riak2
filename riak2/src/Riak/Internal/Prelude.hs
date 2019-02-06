@@ -6,6 +6,7 @@ import Control.Applicative        as X
 import Control.Category           as X
 import Control.Concurrent         as X
 import Control.Concurrent.STM     as X
+import Control.Foldl              as X (FoldM(..))
 import Control.Lens               as X (view, (%~), (.~), (^.))
 import Control.Monad              as X hiding (return)
 import Control.Monad.IO.Unlift    as X
