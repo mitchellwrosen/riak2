@@ -112,7 +112,7 @@ getMap client k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a map.
 --
--- /See also/: @Riak.Context.'Riak.Context.none'@, @Riak.Key.'Riak.Key.generatedKey'@
+-- /See also/: @Riak.Context.'Riak.Context.newContext'@, @Riak.Key.'Riak.Key.generatedKey'@
 updateMap ::
      MonadIO m
   => Client -- ^

@@ -7,6 +7,7 @@ module Riak
   , ConflictResolution(..)
   , Content(..)
   , Context
+  , newContext
   , Counter(..)
   , ExactQuery(..)
   , GetOpts(..)
@@ -35,7 +36,7 @@ import Riak.BucketProperties    (BucketProperties(..), ConflictResolution(..),
 import Riak.BucketType          (BucketType(..))
 import Riak.Client              (Client)
 import Riak.Content             (Content(..))
-import Riak.Context             (Context)
+import Riak.Context
 import Riak.Counter             (Counter(..))
 import Riak.ExactQuery          (ExactQuery(..))
 import Riak.HyperLogLog         (HyperLogLog(..))

@@ -2,12 +2,11 @@ module Main where
 
 import Riak                       (Bucket(..), Content(..), GetOpts(..),
                                    Key(..), PutOpts(..), Quorum(..),
-                                   ServerInfo(..), generatedKey)
+                                   ServerInfo(..), generatedKey, newContext)
 import Riak.Client                (Client)
 import Riak.Interface.Impl.Socket (Socket)
 
 import qualified Riak.Client                as Client
-import qualified Riak.Context               as Context
 import qualified Riak.Interface.Impl.Socket as Client
 import qualified Riak.Object                as Object
 import qualified Riak.ServerInfo            as ServerInfo
@@ -191,7 +190,7 @@ putParser =
         content =
           Content
             { charset = Nothing
-            , context = Context.none
+            , context = newContext
             , encoding = Nothing
             , indexes = []
             , key =

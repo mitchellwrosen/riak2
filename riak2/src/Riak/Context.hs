@@ -1,6 +1,6 @@
 module Riak.Context
   ( Context
-  , none
+  , newContext
   ) where
 
 import Riak.Internal.Context

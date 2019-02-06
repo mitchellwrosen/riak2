@@ -16,7 +16,7 @@ instance Show Context where
   show =
     coerce (show . Base64.encode)
 
--- | The "none" context. Use this when writing an object or data type for the
+-- | The "new" context. Use this when writing an object or data type for the
 -- first time.
 --
 -- Note that it is possible for two clients to simultaneously believe they are
@@ -31,6 +31,6 @@ instance Show Context where
 -- into one. This might go wrong (for example, the "register" data type uses a
 -- simple last-write-wins conflict resolution strategy), but is unavoidable for
 -- the very first write, without some out-of-band locking mechanism.
-none :: Context
-none =
+newContext :: Context
+newContext =
   Context ByteString.empty

@@ -175,7 +175,7 @@ makeGetRequest (Key bucketType bucket key) opts =
 
 -- | Put an object and return its key.
 --
--- /See also/: Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 put ::
      ( HasType (Content ByteString) content
      , MonadIO m
@@ -218,7 +218,7 @@ put_ client content opts =
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Metadata.deleted'.
 --
--- /See also/: Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 putGet ::
      ( HasType (Content ByteString) content
      , MonadIO m
@@ -258,7 +258,7 @@ putGet_ client content opts =
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Metadata.deleted'.
 --
--- /See also/: Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 putGetHead ::
      ( HasType (Content ByteString) content
      , MonadIO m
@@ -344,6 +344,7 @@ makePutRequest (Key bucketType bucket key) content opts =
     & L.maybe'w .~ (Quorum.toWord32 <$> w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
 
+-- | Delete an object.
 delete ::
      MonadIO m
   => Client -- ^
