@@ -71,6 +71,7 @@ description:
   Miscellaneous types:
   .
   * "Riak.Context"
+  * "Riak.Error"
   * "Riak.Opts"
   * "Riak.Quorum"
 
@@ -157,6 +158,7 @@ library
     Riak.Content
     Riak.Context
     Riak.Counter
+    Riak.Error
     Riak.ExactQuery
     Riak.HyperLogLog
     Riak.Index

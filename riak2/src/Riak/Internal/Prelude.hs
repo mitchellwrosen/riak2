@@ -12,7 +12,7 @@ import Control.Monad.IO.Unlift    as X
 import Control.Monad.Trans.Class  as X
 import Control.Monad.Trans.Except as X (ExceptT(..), runExceptT, withExceptT)
 import Control.Monad.Trans.Maybe  as X
-import Data.Bifunctor             as X (bimap)
+import Data.Bifunctor             as X (bimap, first)
 import Data.ByteString            as X (ByteString)
 import Data.Coerce                as X (coerce)
 import Data.Default.Class         as X (Default(def))

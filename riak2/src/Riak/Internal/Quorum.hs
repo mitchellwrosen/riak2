@@ -14,9 +14,9 @@ data Quorum
 instance Default Quorum where
   def = Default
 
-toWord32 :: Quorum -> Maybe Word32
+toWord32 :: Quorum -> Word32
 toWord32 = \case
-  Default -> Nothing -- 4294967291
-  Quorum  -> Just 4294967293
-  All     -> Just 4294967292
-  Of n    -> Just (fromIntegral n)
+  Default -> 4294967291
+  Quorum  -> 4294967293
+  All     -> 4294967292
+  Of n    -> fromIntegral n

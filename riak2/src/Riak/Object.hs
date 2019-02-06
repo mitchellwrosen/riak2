@@ -15,6 +15,7 @@ module Riak.Object
   ) where
 
 import Riak.Content          (Content(..))
+import Riak.Error            (Error(..), Op(..))
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Object  (Object(..))
@@ -162,10 +163,10 @@ makeGetRequest (Key bucketType bucket key) opts =
     & L.deletedContext .~ True
     & L.key .~ key
     & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
-    & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
-    & L.maybe'notfoundOk .~ defTrue (notfoundOk opts)
-    & L.maybe'pr .~ Quorum.toWord32 (pr opts)
-    & L.maybe'r .~ Quorum.toWord32 (r opts)
+    & L.maybe'n .~ (Quorum.toWord32 <$> (opts ^. field @"n"))
+    & L.maybe'notfoundOk .~ notfoundOk opts
+    & L.maybe'pr .~ (Quorum.toWord32 <$> pr opts)
+    & L.maybe'r .~ (Quorum.toWord32 <$> r opts)
     & L.maybe'sloppyQuorum .~ defTrue (opts ^. field @"sloppyQuorum")
     & L.maybe'timeout .~ (opts ^. field @"timeout")
 
@@ -180,7 +181,7 @@ put ::
   => Client -- ^
   -> content -- ^
   -> PutOpts -- ^
-  -> m (Either Text Key)
+  -> m (Either (Error 'PutOp) Key)
 put client content opts =
   liftIO (put_ client (content ^. typed) opts)
 
@@ -188,7 +189,7 @@ put_ ::
      Client
   -> Content ByteString
   -> PutOpts
-  -> IO (Either Text Key)
+  -> IO (Either (Error 'PutOp) Key)
 put_ client content opts =
   (fmap.fmap)
     fromResponse
@@ -223,7 +224,7 @@ putGet ::
   => Client -- ^
   -> content -- ^
   -> PutOpts -- ^
-  -> m (Either Text (NonEmpty (Object ByteString)))
+  -> m (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
 putGet client content opts =
   liftIO (putGet_ client (content ^. typed) opts)
 
@@ -231,7 +232,7 @@ putGet_ ::
      Client -- ^
   -> Content ByteString -- ^
   -> PutOpts -- ^
-  -> IO (Either Text (NonEmpty (Object ByteString)))
+  -> IO (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
 putGet_ client content opts =
   (fmap.fmap)
     (Object.fromPutResponse key)
@@ -263,7 +264,7 @@ putGetHead ::
   => Client -- ^
   -> content -- ^
   -> PutOpts -- ^
-  -> m (Either Text (NonEmpty (Object ())))
+  -> m (Either (Error 'PutOp) (NonEmpty (Object ())))
 putGetHead client content opts =
   liftIO (putGetHead_ client (content ^. typed) opts)
 
@@ -271,7 +272,7 @@ putGetHead_ ::
      Client
   -> Content ByteString
   -> PutOpts
-  -> IO (Either Text (NonEmpty (Object ())))
+  -> IO (Either (Error 'PutOp) (NonEmpty (Object ())))
 putGetHead_ client content opts =
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResponse key)
@@ -290,14 +291,23 @@ putGetHead_ client content opts =
 doPut ::
      Client
   -> Proto.PutRequest
-  -> IO (Either Text Proto.PutResponse)
+  -> IO (Either (Error 'PutOp) Proto.PutResponse)
 doPut client request =
-  Client.exchange
-    client
-    (RequestPut request)
-    (\case
-      ResponsePut response -> Just response
-      _ -> Nothing)
+  first parsePutError <$>
+    Client.exchange
+      client
+      (RequestPut request)
+      (\case
+        ResponsePut response -> Just response
+        _ -> Nothing)
+  where
+    parsePutError :: Text -> Error 'PutOp
+    parsePutError = \case
+      "no_type" ->
+        BucketTypeDoesNotExist (request ^. L.bucketType)
+
+      err ->
+        UnknownError err
 
 makePutRequest ::
      Key
@@ -317,13 +327,13 @@ makePutRequest (Key bucketType bucket key) content opts =
           & L.usermeta .~ map Proto.Pair.fromTuple (content ^. field @"metadata")
           & L.value .~ (content ^. field @"value")
         )
-    & L.maybe'dw .~ Quorum.toWord32 (dw opts)
+    & L.maybe'dw .~ (Quorum.toWord32 <$> dw opts)
     & L.maybe'key .~
         (if ByteString.null key
           then Nothing
           else Just key)
-    & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
-    & L.maybe'pw .~ Quorum.toWord32 (pw opts)
+    & L.maybe'n .~ (Quorum.toWord32 <$> (opts ^. field @"n"))
+    & L.maybe'pw .~ (Quorum.toWord32 <$> pw opts)
     & L.maybe'context .~
         (let
           context :: ByteString
@@ -333,7 +343,7 @@ makePutRequest (Key bucketType bucket key) content opts =
           if ByteString.null context
             then Nothing
             else Just context)
-    & L.maybe'w .~ Quorum.toWord32 (w opts)
+    & L.maybe'w .~ (Quorum.toWord32 <$> w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
     & L.maybe'sloppyQuorum .~ defTrue (opts ^. field @"sloppyQuorum")
 
