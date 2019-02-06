@@ -100,27 +100,27 @@ mockServer = do
 
         Just request ->
           case request of
-            RequestDelete{}                  -> respond ResponseDelete
-            RequestDeleteIndex{}             -> respond ResponseDelete
-            RequestGetBucketProperties{}     -> respond ResponseGetBucketProperties
-            RequestGetBucketTypeProperties{} -> respond ResponseGetBucketProperties
-            RequestGetCrdt{}                 -> respond ResponseGetCrdt
-            RequestGetIndex{}                -> respond ResponseGetIndex
-            RequestGetServerInfo{}           -> respond ResponseGetServerInfo
-            RequestGetSchema{}               -> respond ResponseGetSchema
-            RequestGet{}                     -> respond ResponseGet
-            RequestListBuckets{}             -> respond ResponseListBuckets
-            RequestListKeys{}                -> respond ResponseListKeys
-            -- RequestMapReduce{}            -> respond ResponseMapReduce
-            RequestPing{}                    -> respond ResponsePing
-            RequestPut{}                     -> respond ResponsePut
-            RequestPutIndex{}                -> respond ResponsePut
-            RequestPutSchema{}               -> respond ResponsePut
-            RequestResetBucketProperties{}   -> respond ResponseResetBucketProperties
-            RequestSecondaryIndex{}          -> respond ResponseSecondaryIndex
-            RequestSetBucketProperties{}     -> respond ResponseSetBucketProperties
-            RequestSetBucketTypeProperties{} -> respond ResponseSetBucketProperties
-            RequestUpdateCrdt{}              -> respond ResponseUpdateCrdt
+            RequestDelete{}         -> respond ResponseDelete
+            RequestDeleteIndex{}    -> respond ResponseDelete
+            RequestGetBucket{}      -> respond ResponseGetBucket
+            RequestGetBucketType{}  -> respond ResponseGetBucket
+            RequestGetCrdt{}        -> respond ResponseGetCrdt
+            RequestGetIndex{}       -> respond ResponseGetIndex
+            RequestGetServerInfo{}  -> respond ResponseGetServerInfo
+            RequestGetSchema{}      -> respond ResponseGetSchema
+            RequestGet{}            -> respond ResponseGet
+            RequestListBuckets{}    -> respond ResponseListBuckets
+            RequestListKeys{}       -> respond ResponseListKeys
+            -- RequestMapReduce{}   -> respond ResponseMapReduce
+            RequestPing{}           -> respond ResponsePing
+            RequestPut{}            -> respond ResponsePut
+            RequestPutIndex{}       -> respond ResponsePut
+            RequestPutSchema{}      -> respond ResponsePut
+            RequestResetBucket{}    -> respond ResponseResetBucket
+            RequestSecondaryIndex{} -> respond ResponseSecondaryIndex
+            RequestSetBucket{}      -> respond ResponseSetBucket
+            RequestSetBucketType{}  -> respond ResponseSetBucket
+            RequestUpdateCrdt{}     -> respond ResponseUpdateCrdt
 
   pure client
 
@@ -130,47 +130,47 @@ expectedResponse request response =
     RequestDelete{} ->
       case response of
         ResponseDelete{} -> True
-        _                -> False
+        _ -> False
     RequestDeleteIndex{} ->
       case response of
         ResponseDelete{} -> True
-        _                -> False
-    RequestGetBucketProperties{} ->
+        _ -> False
+    RequestGetBucket{} ->
       case response of
-        ResponseGetBucketProperties{} -> True
-        _                             -> False
-    RequestGetBucketTypeProperties{} ->
+        ResponseGetBucket{} -> True
+        _ -> False
+    RequestGetBucketType{} ->
       case response of
-        ResponseGetBucketProperties{} -> True
-        _                             -> False
+        ResponseGetBucket{} -> True
+        _ -> False
     RequestGetCrdt{} ->
       case response of
         ResponseGetCrdt{} -> True
-        _                 -> False
+        _ -> False
     RequestGetIndex{} ->
       case response of
         ResponseGetIndex{} -> True
-        _                  -> False
+        _ -> False
     RequestGetServerInfo{} ->
       case response of
         ResponseGetServerInfo{} -> True
-        _                       -> False
+        _ -> False
     RequestGetSchema{} ->
       case response of
         ResponseGetSchema{} -> True
-        _                   -> False
+        _ -> False
     RequestGet{} ->
       case response of
         ResponseGet{} -> True
-        _             -> False
+        _ -> False
     RequestListBuckets{} ->
       case response of
         ResponseListBuckets{} -> True
-        _                     -> False
+        _ -> False
     RequestListKeys{} ->
       case response of
         ResponseListKeys{} -> True
-        _                  -> False
+        _ -> False
     -- RequestMapReduce{} ->
     --   case response of
     --     ResponseMapReduce{} -> True
@@ -178,39 +178,39 @@ expectedResponse request response =
     RequestPing{} ->
       case response of
         ResponsePing{} -> True
-        _              -> False
+        _ -> False
     RequestPut{} ->
       case response of
         ResponsePut{} -> True
-        _             -> False
+        _ -> False
     RequestPutIndex{} ->
       case response of
         ResponsePut{} -> True
-        _             -> False
+        _ -> False
     RequestPutSchema{} ->
       case response of
         ResponsePut{} -> True
-        _             -> False
-    RequestResetBucketProperties{} ->
+        _ -> False
+    RequestResetBucket{} ->
       case response of
-        ResponseResetBucketProperties{} -> True
-        _                               -> False
+        ResponseResetBucket{} -> True
+        _ -> False
     RequestSecondaryIndex{} ->
       case response of
         ResponseSecondaryIndex{} -> True
-        _                        -> False
-    RequestSetBucketProperties{} ->
+        _ -> False
+    RequestSetBucket{} ->
       case response of
-        ResponseSetBucketProperties{} -> True
-        _                             -> False
-    RequestSetBucketTypeProperties{} ->
+        ResponseSetBucket{} -> True
+        _ -> False
+    RequestSetBucketType{} ->
       case response of
-        ResponseSetBucketProperties{} -> True
-        _                             -> False
+        ResponseSetBucket{} -> True
+        _ -> False
     RequestUpdateCrdt{} ->
       case response of
         ResponseUpdateCrdt{} -> True
-        _                    -> False
+        _ -> False
 
 randomOneOf :: [a] -> IO a
 randomOneOf xs =

@@ -10,9 +10,8 @@ module Proto.Proto.Riak
         BucketProperties'RpbReplMode(), CommitHook(), Content(),
         CounterUpdate(), Crdt(), CrdtUpdate(), DeleteIndexRequest(),
         DeleteRequest(), DeleteResponse(), ErrorResponse(), GSetUpdate(),
-        GetBucketPropertiesRequest(), GetBucketPropertiesResponse(),
-        GetBucketTypePropertiesRequest(), GetCrdtRequest(),
-        GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
+        GetBucketRequest(), GetBucketResponse(), GetBucketTypeRequest(),
+        GetCrdtRequest(), GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
         GetCrdtResponse'CrdtType(), GetIndexRequest(), GetIndexResponse(),
         GetRequest(), GetResponse(), GetSchemaRequest(),
         GetSchemaResponse(), GetServerInfoRequest(),
@@ -23,13 +22,13 @@ module Proto.Proto.Riak
         MapValueUpdate'FlagUpdate(..), MapValueUpdate'FlagUpdate(),
         ModuleFunction(), Pair(), PingRequest(), PingResponse(),
         PutIndexRequest(), PutRequest(), PutResponse(), PutSchemaRequest(),
-        ResetBucketPropertiesRequest(), ResetBucketPropertiesResponse(),
-        Schema(), SecondaryIndexRequest(),
+        ResetBucketRequest(), ResetBucketResponse(), Schema(),
+        SecondaryIndexRequest(),
         SecondaryIndexRequest'SecondaryIndexQueryType(..),
         SecondaryIndexRequest'SecondaryIndexQueryType(),
-        SecondaryIndexResponse(), SetBucketPropertiesRequest(),
-        SetBucketPropertiesResponse(), SetBucketTypePropertiesRequest(),
-        SetUpdate(), UpdateCrdtRequest(), UpdateCrdtResponse())
+        SecondaryIndexResponse(), SetBucketRequest(), SetBucketResponse(),
+        SetBucketTypeRequest(), SetUpdate(), UpdateCrdtRequest(),
+        UpdateCrdtResponse())
        where
 import qualified Data.ProtoLens.Runtime.Control.DeepSeq
        as Control.DeepSeq
@@ -2461,53 +2460,48 @@ instance Control.DeepSeq.NFData GSetUpdate where
                 (Control.DeepSeq.deepseq (_GSetUpdate'adds x__) (()))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' GetBucketPropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' GetBucketPropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' GetBucketPropertiesRequest
-  (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' GetBucketRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' GetBucketRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' GetBucketRequest (Prelude.Maybe Data.ByteString.ByteString)@
  -}
-data GetBucketPropertiesRequest = GetBucketPropertiesRequest{_GetBucketPropertiesRequest'bucket
-                                                             :: !Data.ByteString.ByteString,
-                                                             _GetBucketPropertiesRequest'bucketType
-                                                             ::
-                                                             !(Prelude.Maybe
-                                                                 Data.ByteString.ByteString),
-                                                             _GetBucketPropertiesRequest'_unknownFields
-                                                             :: !Data.ProtoLens.FieldSet}
-                                    deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show GetBucketPropertiesRequest where
+data GetBucketRequest = GetBucketRequest{_GetBucketRequest'bucket
+                                         :: !Data.ByteString.ByteString,
+                                         _GetBucketRequest'bucketType ::
+                                         !(Prelude.Maybe Data.ByteString.ByteString),
+                                         _GetBucketRequest'_unknownFields ::
+                                         !Data.ProtoLens.FieldSet}
+                          deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetBucketRequest where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' GetBucketPropertiesRequest "bucket"
+instance Lens.Labels.HasLens' GetBucketRequest "bucket"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetBucketPropertiesRequest'bucket
-                 (\ x__ y__ -> x__{_GetBucketPropertiesRequest'bucket = y__}))
+              (Lens.Family2.Unchecked.lens _GetBucketRequest'bucket
+                 (\ x__ y__ -> x__{_GetBucketRequest'bucket = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' GetBucketPropertiesRequest
-           "bucketType"
+instance Lens.Labels.HasLens' GetBucketRequest "bucketType"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetBucketPropertiesRequest'bucketType
-                 (\ x__ y__ -> x__{_GetBucketPropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _GetBucketRequest'bucketType
+                 (\ x__ y__ -> x__{_GetBucketRequest'bucketType = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' GetBucketPropertiesRequest
-           "maybe'bucketType"
+instance Lens.Labels.HasLens' GetBucketRequest "maybe'bucketType"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetBucketPropertiesRequest'bucketType
-                 (\ x__ y__ -> x__{_GetBucketPropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _GetBucketRequest'bucketType
+                 (\ x__ y__ -> x__{_GetBucketRequest'bucketType = y__}))
               Prelude.id
-instance Data.ProtoLens.Message GetBucketPropertiesRequest where
-        messageName _ = Data.Text.pack "GetBucketPropertiesRequest"
+instance Data.ProtoLens.Message GetBucketRequest where
+        messageName _ = Data.Text.pack "GetBucketRequest"
         fieldsByTag
           = let bucket__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket"
@@ -2516,7 +2510,7 @@ instance Data.ProtoLens.Message GetBucketPropertiesRequest where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucket")))
-                      :: Data.ProtoLens.FieldDescriptor GetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor GetBucketRequest
                 bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
@@ -2524,54 +2518,49 @@ instance Data.ProtoLens.Message GetBucketPropertiesRequest where
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'bucketType")))
-                      :: Data.ProtoLens.FieldDescriptor GetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor GetBucketRequest
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, bucket__field_descriptor),
                  (Data.ProtoLens.Tag 2, bucketType__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _GetBucketPropertiesRequest'_unknownFields
-              (\ x__ y__ ->
-                 x__{_GetBucketPropertiesRequest'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _GetBucketRequest'_unknownFields
+              (\ x__ y__ -> x__{_GetBucketRequest'_unknownFields = y__})
         defMessage
-          = GetBucketPropertiesRequest{_GetBucketPropertiesRequest'bucket =
-                                         Data.ProtoLens.fieldDefault,
-                                       _GetBucketPropertiesRequest'bucketType = Prelude.Nothing,
-                                       _GetBucketPropertiesRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData GetBucketPropertiesRequest where
+          = GetBucketRequest{_GetBucketRequest'bucket =
+                               Data.ProtoLens.fieldDefault,
+                             _GetBucketRequest'bucketType = Prelude.Nothing,
+                             _GetBucketRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetBucketRequest where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_GetBucketPropertiesRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_GetBucketPropertiesRequest'bucket x__)
-                   (Control.DeepSeq.deepseq
-                      (_GetBucketPropertiesRequest'bucketType x__)
-                      (())))
+              Control.DeepSeq.deepseq (_GetBucketRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetBucketRequest'bucket x__)
+                   (Control.DeepSeq.deepseq (_GetBucketRequest'bucketType x__) (())))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.props' @:: Lens' GetBucketPropertiesResponse BucketProperties@
+    * 'Proto.Proto.Riak_Fields.props' @:: Lens' GetBucketResponse BucketProperties@
  -}
-data GetBucketPropertiesResponse = GetBucketPropertiesResponse{_GetBucketPropertiesResponse'props
-                                                               :: !BucketProperties,
-                                                               _GetBucketPropertiesResponse'_unknownFields
-                                                               :: !Data.ProtoLens.FieldSet}
-                                     deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show GetBucketPropertiesResponse where
+data GetBucketResponse = GetBucketResponse{_GetBucketResponse'props
+                                           :: !BucketProperties,
+                                           _GetBucketResponse'_unknownFields ::
+                                           !Data.ProtoLens.FieldSet}
+                           deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetBucketResponse where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' GetBucketPropertiesResponse "props"
+instance Lens.Labels.HasLens' GetBucketResponse "props"
            (BucketProperties)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetBucketPropertiesResponse'props
-                 (\ x__ y__ -> x__{_GetBucketPropertiesResponse'props = y__}))
+              (Lens.Family2.Unchecked.lens _GetBucketResponse'props
+                 (\ x__ y__ -> x__{_GetBucketResponse'props = y__}))
               Prelude.id
-instance Data.ProtoLens.Message GetBucketPropertiesResponse where
-        messageName _ = Data.Text.pack "GetBucketPropertiesResponse"
+instance Data.ProtoLens.Message GetBucketResponse where
+        messageName _ = Data.Text.pack "GetBucketResponse"
         fieldsByTag
           = let props__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "props"
@@ -2580,53 +2569,45 @@ instance Data.ProtoLens.Message GetBucketPropertiesResponse where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "props")))
-                      :: Data.ProtoLens.FieldDescriptor GetBucketPropertiesResponse
+                      :: Data.ProtoLens.FieldDescriptor GetBucketResponse
               in
               Data.Map.fromList [(Data.ProtoLens.Tag 1, props__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _GetBucketPropertiesResponse'_unknownFields
-              (\ x__ y__ ->
-                 x__{_GetBucketPropertiesResponse'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _GetBucketResponse'_unknownFields
+              (\ x__ y__ -> x__{_GetBucketResponse'_unknownFields = y__})
         defMessage
-          = GetBucketPropertiesResponse{_GetBucketPropertiesResponse'props =
-                                          Data.ProtoLens.defMessage,
-                                        _GetBucketPropertiesResponse'_unknownFields = ([])}
-instance Control.DeepSeq.NFData GetBucketPropertiesResponse where
+          = GetBucketResponse{_GetBucketResponse'props =
+                                Data.ProtoLens.defMessage,
+                              _GetBucketResponse'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetBucketResponse where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_GetBucketPropertiesResponse'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_GetBucketPropertiesResponse'props x__)
-                   (()))
+              Control.DeepSeq.deepseq (_GetBucketResponse'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetBucketResponse'props x__) (()))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' GetBucketTypePropertiesRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' GetBucketTypeRequest Data.ByteString.ByteString@
  -}
-data GetBucketTypePropertiesRequest = GetBucketTypePropertiesRequest{_GetBucketTypePropertiesRequest'bucketType
-                                                                     :: !Data.ByteString.ByteString,
-                                                                     _GetBucketTypePropertiesRequest'_unknownFields
-                                                                     :: !Data.ProtoLens.FieldSet}
-                                        deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show GetBucketTypePropertiesRequest where
+data GetBucketTypeRequest = GetBucketTypeRequest{_GetBucketTypeRequest'bucketType
+                                                 :: !Data.ByteString.ByteString,
+                                                 _GetBucketTypeRequest'_unknownFields ::
+                                                 !Data.ProtoLens.FieldSet}
+                              deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show GetBucketTypeRequest where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' GetBucketTypePropertiesRequest
-           "bucketType"
+instance Lens.Labels.HasLens' GetBucketTypeRequest "bucketType"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens
-                 _GetBucketTypePropertiesRequest'bucketType
-                 (\ x__ y__ ->
-                    x__{_GetBucketTypePropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _GetBucketTypeRequest'bucketType
+                 (\ x__ y__ -> x__{_GetBucketTypeRequest'bucketType = y__}))
               Prelude.id
-instance Data.ProtoLens.Message GetBucketTypePropertiesRequest
-         where
-        messageName _ = Data.Text.pack "GetBucketTypePropertiesRequest"
+instance Data.ProtoLens.Message GetBucketTypeRequest where
+        messageName _ = Data.Text.pack "GetBucketTypeRequest"
         fieldsByTag
           = let bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
@@ -2635,27 +2616,22 @@ instance Data.ProtoLens.Message GetBucketTypePropertiesRequest
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucketType")))
-                      :: Data.ProtoLens.FieldDescriptor GetBucketTypePropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor GetBucketTypeRequest
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, bucketType__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _GetBucketTypePropertiesRequest'_unknownFields
-              (\ x__ y__ ->
-                 x__{_GetBucketTypePropertiesRequest'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _GetBucketTypeRequest'_unknownFields
+              (\ x__ y__ -> x__{_GetBucketTypeRequest'_unknownFields = y__})
         defMessage
-          = GetBucketTypePropertiesRequest{_GetBucketTypePropertiesRequest'bucketType
-                                             = Data.ProtoLens.fieldDefault,
-                                           _GetBucketTypePropertiesRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData GetBucketTypePropertiesRequest
-         where
+          = GetBucketTypeRequest{_GetBucketTypeRequest'bucketType =
+                                   Data.ProtoLens.fieldDefault,
+                                 _GetBucketTypeRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData GetBucketTypeRequest where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_GetBucketTypePropertiesRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq
-                   (_GetBucketTypePropertiesRequest'bucketType x__)
+              Control.DeepSeq.deepseq (_GetBucketTypeRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_GetBucketTypeRequest'bucketType x__)
                    (()))
 {- | Fields :
 
@@ -6119,55 +6095,48 @@ instance Control.DeepSeq.NFData PutSchemaRequest where
                 (Control.DeepSeq.deepseq (_PutSchemaRequest'schema x__) (()))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' ResetBucketPropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' ResetBucketPropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' ResetBucketPropertiesRequest
-  (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' ResetBucketRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' ResetBucketRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' ResetBucketRequest (Prelude.Maybe Data.ByteString.ByteString)@
  -}
-data ResetBucketPropertiesRequest = ResetBucketPropertiesRequest{_ResetBucketPropertiesRequest'bucket
-                                                                 :: !Data.ByteString.ByteString,
-                                                                 _ResetBucketPropertiesRequest'bucketType
-                                                                 ::
-                                                                 !(Prelude.Maybe
-                                                                     Data.ByteString.ByteString),
-                                                                 _ResetBucketPropertiesRequest'_unknownFields
-                                                                 :: !Data.ProtoLens.FieldSet}
-                                      deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show ResetBucketPropertiesRequest where
+data ResetBucketRequest = ResetBucketRequest{_ResetBucketRequest'bucket
+                                             :: !Data.ByteString.ByteString,
+                                             _ResetBucketRequest'bucketType ::
+                                             !(Prelude.Maybe Data.ByteString.ByteString),
+                                             _ResetBucketRequest'_unknownFields ::
+                                             !Data.ProtoLens.FieldSet}
+                            deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show ResetBucketRequest where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' ResetBucketPropertiesRequest "bucket"
+instance Lens.Labels.HasLens' ResetBucketRequest "bucket"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _ResetBucketPropertiesRequest'bucket
-                 (\ x__ y__ -> x__{_ResetBucketPropertiesRequest'bucket = y__}))
+              (Lens.Family2.Unchecked.lens _ResetBucketRequest'bucket
+                 (\ x__ y__ -> x__{_ResetBucketRequest'bucket = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' ResetBucketPropertiesRequest
-           "bucketType"
+instance Lens.Labels.HasLens' ResetBucketRequest "bucketType"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens
-                 _ResetBucketPropertiesRequest'bucketType
-                 (\ x__ y__ -> x__{_ResetBucketPropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _ResetBucketRequest'bucketType
+                 (\ x__ y__ -> x__{_ResetBucketRequest'bucketType = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' ResetBucketPropertiesRequest
-           "maybe'bucketType"
+instance Lens.Labels.HasLens' ResetBucketRequest "maybe'bucketType"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens
-                 _ResetBucketPropertiesRequest'bucketType
-                 (\ x__ y__ -> x__{_ResetBucketPropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _ResetBucketRequest'bucketType
+                 (\ x__ y__ -> x__{_ResetBucketRequest'bucketType = y__}))
               Prelude.id
-instance Data.ProtoLens.Message ResetBucketPropertiesRequest where
-        messageName _ = Data.Text.pack "ResetBucketPropertiesRequest"
+instance Data.ProtoLens.Message ResetBucketRequest where
+        messageName _ = Data.Text.pack "ResetBucketRequest"
         fieldsByTag
           = let bucket__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket"
@@ -6176,7 +6145,7 @@ instance Data.ProtoLens.Message ResetBucketPropertiesRequest where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucket")))
-                      :: Data.ProtoLens.FieldDescriptor ResetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor ResetBucketRequest
                 bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
@@ -6184,57 +6153,49 @@ instance Data.ProtoLens.Message ResetBucketPropertiesRequest where
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'bucketType")))
-                      :: Data.ProtoLens.FieldDescriptor ResetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor ResetBucketRequest
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, bucket__field_descriptor),
                  (Data.ProtoLens.Tag 2, bucketType__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _ResetBucketPropertiesRequest'_unknownFields
-              (\ x__ y__ ->
-                 x__{_ResetBucketPropertiesRequest'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _ResetBucketRequest'_unknownFields
+              (\ x__ y__ -> x__{_ResetBucketRequest'_unknownFields = y__})
         defMessage
-          = ResetBucketPropertiesRequest{_ResetBucketPropertiesRequest'bucket
-                                           = Data.ProtoLens.fieldDefault,
-                                         _ResetBucketPropertiesRequest'bucketType = Prelude.Nothing,
-                                         _ResetBucketPropertiesRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData ResetBucketPropertiesRequest where
+          = ResetBucketRequest{_ResetBucketRequest'bucket =
+                                 Data.ProtoLens.fieldDefault,
+                               _ResetBucketRequest'bucketType = Prelude.Nothing,
+                               _ResetBucketRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData ResetBucketRequest where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_ResetBucketPropertiesRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_ResetBucketPropertiesRequest'bucket x__)
-                   (Control.DeepSeq.deepseq
-                      (_ResetBucketPropertiesRequest'bucketType x__)
+              Control.DeepSeq.deepseq (_ResetBucketRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_ResetBucketRequest'bucket x__)
+                   (Control.DeepSeq.deepseq (_ResetBucketRequest'bucketType x__)
                       (())))
 {- | Fields :
 
  -}
-data ResetBucketPropertiesResponse = ResetBucketPropertiesResponse{_ResetBucketPropertiesResponse'_unknownFields
-                                                                   :: !Data.ProtoLens.FieldSet}
-                                       deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show ResetBucketPropertiesResponse where
+data ResetBucketResponse = ResetBucketResponse{_ResetBucketResponse'_unknownFields
+                                               :: !Data.ProtoLens.FieldSet}
+                             deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show ResetBucketResponse where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Data.ProtoLens.Message ResetBucketPropertiesResponse where
-        messageName _ = Data.Text.pack "ResetBucketPropertiesResponse"
+instance Data.ProtoLens.Message ResetBucketResponse where
+        messageName _ = Data.Text.pack "ResetBucketResponse"
         fieldsByTag = let in Data.Map.fromList []
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _ResetBucketPropertiesResponse'_unknownFields
-              (\ x__ y__ ->
-                 x__{_ResetBucketPropertiesResponse'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _ResetBucketResponse'_unknownFields
+              (\ x__ y__ -> x__{_ResetBucketResponse'_unknownFields = y__})
         defMessage
-          = ResetBucketPropertiesResponse{_ResetBucketPropertiesResponse'_unknownFields
-                                            = ([])}
-instance Control.DeepSeq.NFData ResetBucketPropertiesResponse where
+          = ResetBucketResponse{_ResetBucketResponse'_unknownFields = ([])}
+instance Control.DeepSeq.NFData ResetBucketResponse where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_ResetBucketPropertiesResponse'_unknownFields x__)
+              Control.DeepSeq.deepseq (_ResetBucketResponse'_unknownFields x__)
                 (())
 {- | Fields :
 
@@ -7033,64 +6994,58 @@ instance Control.DeepSeq.NFData SecondaryIndexResponse where
                             (())))))
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' SetBucketPropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.props' @:: Lens' SetBucketPropertiesRequest BucketProperties@
-    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' SetBucketPropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' SetBucketPropertiesRequest
-  (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' SetBucketRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.props' @:: Lens' SetBucketRequest BucketProperties@
+    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' SetBucketRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' SetBucketRequest (Prelude.Maybe Data.ByteString.ByteString)@
  -}
-data SetBucketPropertiesRequest = SetBucketPropertiesRequest{_SetBucketPropertiesRequest'bucket
-                                                             :: !Data.ByteString.ByteString,
-                                                             _SetBucketPropertiesRequest'props ::
-                                                             !BucketProperties,
-                                                             _SetBucketPropertiesRequest'bucketType
-                                                             ::
-                                                             !(Prelude.Maybe
-                                                                 Data.ByteString.ByteString),
-                                                             _SetBucketPropertiesRequest'_unknownFields
-                                                             :: !Data.ProtoLens.FieldSet}
-                                    deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show SetBucketPropertiesRequest where
+data SetBucketRequest = SetBucketRequest{_SetBucketRequest'bucket
+                                         :: !Data.ByteString.ByteString,
+                                         _SetBucketRequest'props :: !BucketProperties,
+                                         _SetBucketRequest'bucketType ::
+                                         !(Prelude.Maybe Data.ByteString.ByteString),
+                                         _SetBucketRequest'_unknownFields ::
+                                         !Data.ProtoLens.FieldSet}
+                          deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SetBucketRequest where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' SetBucketPropertiesRequest "bucket"
+instance Lens.Labels.HasLens' SetBucketRequest "bucket"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _SetBucketPropertiesRequest'bucket
-                 (\ x__ y__ -> x__{_SetBucketPropertiesRequest'bucket = y__}))
+              (Lens.Family2.Unchecked.lens _SetBucketRequest'bucket
+                 (\ x__ y__ -> x__{_SetBucketRequest'bucket = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' SetBucketPropertiesRequest "props"
+instance Lens.Labels.HasLens' SetBucketRequest "props"
            (BucketProperties)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _SetBucketPropertiesRequest'props
-                 (\ x__ y__ -> x__{_SetBucketPropertiesRequest'props = y__}))
+              (Lens.Family2.Unchecked.lens _SetBucketRequest'props
+                 (\ x__ y__ -> x__{_SetBucketRequest'props = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' SetBucketPropertiesRequest
-           "bucketType"
+instance Lens.Labels.HasLens' SetBucketRequest "bucketType"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _SetBucketPropertiesRequest'bucketType
-                 (\ x__ y__ -> x__{_SetBucketPropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _SetBucketRequest'bucketType
+                 (\ x__ y__ -> x__{_SetBucketRequest'bucketType = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' SetBucketPropertiesRequest
-           "maybe'bucketType"
+instance Lens.Labels.HasLens' SetBucketRequest "maybe'bucketType"
            (Prelude.Maybe Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _SetBucketPropertiesRequest'bucketType
-                 (\ x__ y__ -> x__{_SetBucketPropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _SetBucketRequest'bucketType
+                 (\ x__ y__ -> x__{_SetBucketRequest'bucketType = y__}))
               Prelude.id
-instance Data.ProtoLens.Message SetBucketPropertiesRequest where
-        messageName _ = Data.Text.pack "SetBucketPropertiesRequest"
+instance Data.ProtoLens.Message SetBucketRequest where
+        messageName _ = Data.Text.pack "SetBucketRequest"
         fieldsByTag
           = let bucket__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket"
@@ -7099,7 +7054,7 @@ instance Data.ProtoLens.Message SetBucketPropertiesRequest where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucket")))
-                      :: Data.ProtoLens.FieldDescriptor SetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor SetBucketRequest
                 props__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "props"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
@@ -7107,7 +7062,7 @@ instance Data.ProtoLens.Message SetBucketPropertiesRequest where
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "props")))
-                      :: Data.ProtoLens.FieldDescriptor SetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor SetBucketRequest
                 bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
@@ -7115,102 +7070,86 @@ instance Data.ProtoLens.Message SetBucketPropertiesRequest where
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'bucketType")))
-                      :: Data.ProtoLens.FieldDescriptor SetBucketPropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor SetBucketRequest
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, bucket__field_descriptor),
                  (Data.ProtoLens.Tag 2, props__field_descriptor),
                  (Data.ProtoLens.Tag 3, bucketType__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _SetBucketPropertiesRequest'_unknownFields
-              (\ x__ y__ ->
-                 x__{_SetBucketPropertiesRequest'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _SetBucketRequest'_unknownFields
+              (\ x__ y__ -> x__{_SetBucketRequest'_unknownFields = y__})
         defMessage
-          = SetBucketPropertiesRequest{_SetBucketPropertiesRequest'bucket =
-                                         Data.ProtoLens.fieldDefault,
-                                       _SetBucketPropertiesRequest'props =
-                                         Data.ProtoLens.defMessage,
-                                       _SetBucketPropertiesRequest'bucketType = Prelude.Nothing,
-                                       _SetBucketPropertiesRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData SetBucketPropertiesRequest where
+          = SetBucketRequest{_SetBucketRequest'bucket =
+                               Data.ProtoLens.fieldDefault,
+                             _SetBucketRequest'props = Data.ProtoLens.defMessage,
+                             _SetBucketRequest'bucketType = Prelude.Nothing,
+                             _SetBucketRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData SetBucketRequest where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_SetBucketPropertiesRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_SetBucketPropertiesRequest'bucket x__)
-                   (Control.DeepSeq.deepseq (_SetBucketPropertiesRequest'props x__)
-                      (Control.DeepSeq.deepseq
-                         (_SetBucketPropertiesRequest'bucketType x__)
-                         (()))))
+              Control.DeepSeq.deepseq (_SetBucketRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_SetBucketRequest'bucket x__)
+                   (Control.DeepSeq.deepseq (_SetBucketRequest'props x__)
+                      (Control.DeepSeq.deepseq (_SetBucketRequest'bucketType x__) (()))))
 {- | Fields :
 
  -}
-data SetBucketPropertiesResponse = SetBucketPropertiesResponse{_SetBucketPropertiesResponse'_unknownFields
-                                                               :: !Data.ProtoLens.FieldSet}
-                                     deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show SetBucketPropertiesResponse where
+data SetBucketResponse = SetBucketResponse{_SetBucketResponse'_unknownFields
+                                           :: !Data.ProtoLens.FieldSet}
+                           deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SetBucketResponse where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Data.ProtoLens.Message SetBucketPropertiesResponse where
-        messageName _ = Data.Text.pack "SetBucketPropertiesResponse"
+instance Data.ProtoLens.Message SetBucketResponse where
+        messageName _ = Data.Text.pack "SetBucketResponse"
         fieldsByTag = let in Data.Map.fromList []
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _SetBucketPropertiesResponse'_unknownFields
-              (\ x__ y__ ->
-                 x__{_SetBucketPropertiesResponse'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _SetBucketResponse'_unknownFields
+              (\ x__ y__ -> x__{_SetBucketResponse'_unknownFields = y__})
         defMessage
-          = SetBucketPropertiesResponse{_SetBucketPropertiesResponse'_unknownFields
-                                          = ([])}
-instance Control.DeepSeq.NFData SetBucketPropertiesResponse where
+          = SetBucketResponse{_SetBucketResponse'_unknownFields = ([])}
+instance Control.DeepSeq.NFData SetBucketResponse where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_SetBucketPropertiesResponse'_unknownFields x__)
+              Control.DeepSeq.deepseq (_SetBucketResponse'_unknownFields x__)
                 (())
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' SetBucketTypePropertiesRequest Data.ByteString.ByteString@
-    * 'Proto.Proto.Riak_Fields.props' @:: Lens' SetBucketTypePropertiesRequest BucketProperties@
+    * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' SetBucketTypeRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.props' @:: Lens' SetBucketTypeRequest BucketProperties@
  -}
-data SetBucketTypePropertiesRequest = SetBucketTypePropertiesRequest{_SetBucketTypePropertiesRequest'bucketType
-                                                                     :: !Data.ByteString.ByteString,
-                                                                     _SetBucketTypePropertiesRequest'props
-                                                                     :: !BucketProperties,
-                                                                     _SetBucketTypePropertiesRequest'_unknownFields
-                                                                     :: !Data.ProtoLens.FieldSet}
-                                        deriving (Prelude.Eq, Prelude.Ord)
-instance Prelude.Show SetBucketTypePropertiesRequest where
+data SetBucketTypeRequest = SetBucketTypeRequest{_SetBucketTypeRequest'bucketType
+                                                 :: !Data.ByteString.ByteString,
+                                                 _SetBucketTypeRequest'props :: !BucketProperties,
+                                                 _SetBucketTypeRequest'_unknownFields ::
+                                                 !Data.ProtoLens.FieldSet}
+                              deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SetBucketTypeRequest where
         showsPrec _ __x __s
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' SetBucketTypePropertiesRequest
-           "bucketType"
+instance Lens.Labels.HasLens' SetBucketTypeRequest "bucketType"
            (Data.ByteString.ByteString)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens
-                 _SetBucketTypePropertiesRequest'bucketType
-                 (\ x__ y__ ->
-                    x__{_SetBucketTypePropertiesRequest'bucketType = y__}))
+              (Lens.Family2.Unchecked.lens _SetBucketTypeRequest'bucketType
+                 (\ x__ y__ -> x__{_SetBucketTypeRequest'bucketType = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' SetBucketTypePropertiesRequest
-           "props"
+instance Lens.Labels.HasLens' SetBucketTypeRequest "props"
            (BucketProperties)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _SetBucketTypePropertiesRequest'props
-                 (\ x__ y__ -> x__{_SetBucketTypePropertiesRequest'props = y__}))
+              (Lens.Family2.Unchecked.lens _SetBucketTypeRequest'props
+                 (\ x__ y__ -> x__{_SetBucketTypeRequest'props = y__}))
               Prelude.id
-instance Data.ProtoLens.Message SetBucketTypePropertiesRequest
-         where
-        messageName _ = Data.Text.pack "SetBucketTypePropertiesRequest"
+instance Data.ProtoLens.Message SetBucketTypeRequest where
+        messageName _ = Data.Text.pack "SetBucketTypeRequest"
         fieldsByTag
           = let bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
@@ -7219,7 +7158,7 @@ instance Data.ProtoLens.Message SetBucketTypePropertiesRequest
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "bucketType")))
-                      :: Data.ProtoLens.FieldDescriptor SetBucketTypePropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor SetBucketTypeRequest
                 props__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "props"
                       (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
@@ -7227,33 +7166,25 @@ instance Data.ProtoLens.Message SetBucketTypePropertiesRequest
                       (Data.ProtoLens.PlainField Data.ProtoLens.Required
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "props")))
-                      :: Data.ProtoLens.FieldDescriptor SetBucketTypePropertiesRequest
+                      :: Data.ProtoLens.FieldDescriptor SetBucketTypeRequest
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, bucketType__field_descriptor),
                  (Data.ProtoLens.Tag 2, props__field_descriptor)]
         unknownFields
-          = Lens.Family2.Unchecked.lens
-              _SetBucketTypePropertiesRequest'_unknownFields
-              (\ x__ y__ ->
-                 x__{_SetBucketTypePropertiesRequest'_unknownFields = y__})
+          = Lens.Family2.Unchecked.lens _SetBucketTypeRequest'_unknownFields
+              (\ x__ y__ -> x__{_SetBucketTypeRequest'_unknownFields = y__})
         defMessage
-          = SetBucketTypePropertiesRequest{_SetBucketTypePropertiesRequest'bucketType
-                                             = Data.ProtoLens.fieldDefault,
-                                           _SetBucketTypePropertiesRequest'props =
-                                             Data.ProtoLens.defMessage,
-                                           _SetBucketTypePropertiesRequest'_unknownFields = ([])}
-instance Control.DeepSeq.NFData SetBucketTypePropertiesRequest
-         where
+          = SetBucketTypeRequest{_SetBucketTypeRequest'bucketType =
+                                   Data.ProtoLens.fieldDefault,
+                                 _SetBucketTypeRequest'props = Data.ProtoLens.defMessage,
+                                 _SetBucketTypeRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData SetBucketTypeRequest where
         rnf
           = \ x__ ->
-              Control.DeepSeq.deepseq
-                (_SetBucketTypePropertiesRequest'_unknownFields x__)
-                (Control.DeepSeq.deepseq
-                   (_SetBucketTypePropertiesRequest'bucketType x__)
-                   (Control.DeepSeq.deepseq
-                      (_SetBucketTypePropertiesRequest'props x__)
-                      (())))
+              Control.DeepSeq.deepseq (_SetBucketTypeRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_SetBucketTypeRequest'bucketType x__)
+                   (Control.DeepSeq.deepseq (_SetBucketTypeRequest'props x__) (())))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.adds' @:: Lens' SetUpdate [Data.ByteString.ByteString]@

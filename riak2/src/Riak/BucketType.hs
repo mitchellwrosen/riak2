@@ -49,18 +49,18 @@ get client (BucketType bucketType) = liftIO $
     fromResponse
     (Client.exchange
       client
-      (RequestGetBucketTypeProperties request)
+      (RequestGetBucketType request)
       (\case
-        ResponseGetBucketProperties response -> Just response
+        ResponseGetBucket response -> Just response
         _ -> Nothing))
 
   where
-    request :: GetBucketTypePropertiesRequest
+    request :: GetBucketTypeRequest
     request =
       defMessage
         & L.bucketType .~ bucketType
 
-    fromResponse :: GetBucketPropertiesResponse -> BucketProperties
+    fromResponse :: GetBucketResponse -> BucketProperties
     fromResponse =
       view L.props
 
@@ -72,14 +72,14 @@ get client (BucketType bucketType) = liftIO $
 -- TODO don't allow setting n
 set
   :: Client -- ^
-  -> Proto.SetBucketTypePropertiesRequest -- ^
-  -> IO (Either Text Proto.SetBucketPropertiesResponse)
+  -> Proto.SetBucketTypeRequest -- ^
+  -> IO (Either Text Proto.SetBucketResponse)
 set client request =
   Client.exchange
     client
-    (RequestSetBucketTypeProperties request)
+    (RequestSetBucketType request)
     (\case
-      ResponseSetBucketProperties response -> Just response
+      ResponseSetBucket response -> Just response
       _ -> Nothing)
 
 -- | Stream all of the buckets in a bucket type.

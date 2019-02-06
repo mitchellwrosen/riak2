@@ -12,7 +12,6 @@ import qualified Utils
 import Data.Bifunctor  (bimap)
 import Data.ByteString (ByteString)
 import Data.Word       (Word8)
-import Debug.Trace     (trace)
 
 import qualified Data.ByteString as ByteString
 import qualified Data.ProtoLens  as Proto
@@ -22,7 +21,7 @@ data Response
   = ResponseDelete DeleteResponse
   | ResponseError ErrorResponse
   | ResponseGet GetResponse
-  | ResponseGetBucketProperties GetBucketPropertiesResponse
+  | ResponseGetBucket GetBucketResponse
   | ResponseGetCrdt GetCrdtResponse
   | ResponseGetIndex GetIndexResponse
   | ResponseGetServerInfo GetServerInfoResponse
@@ -32,9 +31,9 @@ data Response
   -- | ResponseMapReduce MapReduceResponse
   | ResponsePing PingResponse
   | ResponsePut PutResponse
-  | ResponseResetBucketProperties ResetBucketPropertiesResponse
+  | ResponseResetBucket ResetBucketResponse
   | ResponseSecondaryIndex SecondaryIndexResponse
-  | ResponseSetBucketProperties SetBucketPropertiesResponse
+  | ResponseSetBucket SetBucketResponse
   | ResponseUpdateCrdt UpdateCrdtResponse
   deriving stock (Show)
 
@@ -56,12 +55,12 @@ decode code bytes =
     14   -> Right (ResponseDelete Proto.defMessage)
     16   -> decode' ResponseListBuckets
     18   -> decode' ResponseListKeys
-    20   -> decode' ResponseGetBucketProperties
-    22   -> Right (ResponseSetBucketProperties Proto.defMessage)
+    20   -> decode' ResponseGetBucket
+    22   -> Right (ResponseSetBucket Proto.defMessage)
     -- 24   -> decode' ResponseMapReduce
     26   -> decode' ResponseSecondaryIndex
     -- 28   -> decode' ResponseSearch
-    30   -> Right (ResponseResetBucketProperties Proto.defMessage)
+    30   -> Right (ResponseResetBucket Proto.defMessage)
     55   -> decode' ResponseGetIndex
     59   -> decode' ResponseGetSchema
     81   -> decode' ResponseGetCrdt
@@ -79,20 +78,19 @@ decode code bytes =
 -- | Encode a response, including the length prefix.
 encode :: Response -> ByteString
 encode = \case
-  ResponseDelete                response -> Utils.wire 14 response
-  ResponseError                 response -> Utils.wire 0  response
-  ResponseGet                   response -> Utils.wire 10 response
-  ResponseGetBucketProperties   response -> Utils.wire 20 response
-  ResponseGetCrdt               response -> Utils.wire 81 response
-  ResponseGetIndex              response -> Utils.wire 55 response
-  ResponseGetServerInfo         response -> Utils.wire 8  response
-  ResponseGetSchema             response -> Utils.wire 59 response
-  ResponseListBuckets           response -> Utils.wire 16 response
-  ResponseListKeys              response -> Utils.wire 18 response
-  -- ResponseMapReduce             response -> Utils.wire 24 response
-  ResponsePing                  response -> Utils.wire 2  response
-  ResponsePut                   response -> Utils.wire 12 response
-  ResponseResetBucketProperties response -> Utils.wire 30 response
-  ResponseSecondaryIndex        response -> Utils.wire 26 response
-  ResponseSetBucketProperties   response -> Utils.wire 22 response
-  ResponseUpdateCrdt            response -> Utils.wire 83 response
+  ResponseDelete         response -> Utils.wire 14 response
+  ResponseError          response -> Utils.wire 0  response
+  ResponseGet            response -> Utils.wire 10 response
+  ResponseGetBucket      response -> Utils.wire 20 response
+  ResponseGetCrdt        response -> Utils.wire 81 response
+  ResponseGetIndex       response -> Utils.wire 55 response
+  ResponseGetServerInfo  response -> Utils.wire 8  response
+  ResponseGetSchema      response -> Utils.wire 59 response
+  ResponseListBuckets    response -> Utils.wire 16 response
+  ResponseListKeys       response -> Utils.wire 18 response
+  ResponsePing           response -> Utils.wire 2  response
+  ResponsePut            response -> Utils.wire 12 response
+  ResponseResetBucket    response -> Utils.wire 30 response
+  ResponseSecondaryIndex response -> Utils.wire 26 response
+  ResponseSetBucket      response -> Utils.wire 22 response
+  ResponseUpdateCrdt     response -> Utils.wire 83 response

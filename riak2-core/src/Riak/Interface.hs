@@ -55,14 +55,14 @@ get iface request =
 
 getBucket ::
      Interface
-  -> Proto.GetBucketPropertiesRequest
+  -> Proto.GetBucketRequest
   -> IO (Either ByteString Proto.BucketProperties)
 getBucket iface request =
   exchange
     iface
-    (RequestGetBucketProperties request)
+    (RequestGetBucket request)
     (\case
-      ResponseGetBucketProperties response -> Just (response ^. L.props)
+      ResponseGetBucket response -> Just (response ^. L.props)
       _ -> Nothing)
 
 listKeys ::
@@ -93,26 +93,26 @@ put iface request =
 
 resetBucket ::
      Interface
-  -> Proto.ResetBucketPropertiesRequest
+  -> Proto.ResetBucketRequest
   -> IO (Either ByteString ())
 resetBucket iface request =
   exchange
     iface
-    (RequestResetBucketProperties request)
+    (RequestResetBucket request)
     (\case
-      ResponseResetBucketProperties _ -> Just ()
+      ResponseResetBucket _ -> Just ()
       _ -> Nothing)
 
 setBucket ::
      Interface
-  -> Proto.SetBucketPropertiesRequest
+  -> Proto.SetBucketRequest
   -> IO (Either ByteString ())
 setBucket iface request =
   exchange
     iface
-    (RequestSetBucketProperties request)
+    (RequestSetBucket request)
     (\case
-      ResponseSetBucketProperties{} -> Just ()
+      ResponseSetBucket{} -> Just ()
       _ -> Nothing)
 
 secondaryIndex ::

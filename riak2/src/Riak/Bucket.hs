@@ -46,7 +46,7 @@ getBucket client (Bucket bucketType bucket) = liftIO $
   Interface.getBucket client request
 
   where
-    request :: Proto.GetBucketPropertiesRequest
+    request :: Proto.GetBucketRequest
     request =
       defMessage
         & L.bucket .~ bucket
@@ -58,7 +58,7 @@ getBucket client (Bucket bucketType bucket) = liftIO $
 -- TODO don't allow setting n
 setBucket
   :: Client -- ^
-  -> Proto.SetBucketPropertiesRequest -- ^
+  -> Proto.SetBucketRequest -- ^
   -> IO (Either ByteString ())
 setBucket client request =
   Interface.setBucket client request
@@ -73,7 +73,7 @@ resetBucket client (Bucket bucketType bucket) = liftIO $
   Interface.resetBucket client request
 
   where
-    request :: Proto.ResetBucketPropertiesRequest
+    request :: Proto.ResetBucketRequest
     request =
       defMessage
         & L.bucket .~ bucket

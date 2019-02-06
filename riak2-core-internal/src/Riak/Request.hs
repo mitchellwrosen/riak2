@@ -20,8 +20,8 @@ data Request
   = RequestDelete DeleteRequest
   | RequestDeleteIndex DeleteIndexRequest
   | RequestGet GetRequest
-  | RequestGetBucketProperties GetBucketPropertiesRequest
-  | RequestGetBucketTypeProperties GetBucketTypePropertiesRequest
+  | RequestGetBucket GetBucketRequest
+  | RequestGetBucketType GetBucketTypeRequest
   | RequestGetCrdt GetCrdtRequest
   | RequestGetIndex GetIndexRequest
   | RequestGetServerInfo GetServerInfoRequest
@@ -33,10 +33,10 @@ data Request
   | RequestPut PutRequest
   | RequestPutIndex PutIndexRequest
   | RequestPutSchema PutSchemaRequest
-  | RequestResetBucketProperties ResetBucketPropertiesRequest
+  | RequestResetBucket ResetBucketRequest
   | RequestSecondaryIndex SecondaryIndexRequest
-  | RequestSetBucketProperties SetBucketPropertiesRequest
-  | RequestSetBucketTypeProperties SetBucketTypePropertiesRequest
+  | RequestSetBucket SetBucketRequest
+  | RequestSetBucketType SetBucketTypeRequest
   | RequestUpdateCrdt UpdateCrdtRequest
   deriving stock (Show)
 
@@ -59,14 +59,14 @@ decode code bytes =
     13   -> go RequestDelete
     15   -> go RequestListBuckets
     17   -> go RequestListKeys
-    19   -> go RequestGetBucketProperties
-    21   -> go RequestSetBucketProperties
+    19   -> go RequestGetBucket
+    21   -> go RequestSetBucket
     -- 23   -> go RequestMapReduce
     25   -> go RequestSecondaryIndex
     -- 27   -> go RequestSearchQuery
-    29   -> go RequestResetBucketProperties
-    31   -> go RequestGetBucketTypeProperties
-    32   -> go RequestSetBucketTypeProperties
+    29   -> go RequestResetBucket
+    31   -> go RequestGetBucketType
+    32   -> go RequestSetBucketType
     -- 33   -> go RequestGetBucketKeyPreflist
     54   -> go RequestGetIndex
     56   -> go RequestPutIndex
@@ -89,24 +89,23 @@ decode code bytes =
 
 encode :: Request -> ByteString
 encode = \case
-  RequestDelete                  request -> Utils.wire 13 request
-  RequestDeleteIndex             request -> Utils.wire 57 request
-  RequestGet                     request -> Utils.wire  9 request
-  RequestGetBucketProperties     request -> Utils.wire 19 request
-  RequestGetBucketTypeProperties request -> Utils.wire 31 request
-  RequestGetCrdt                 request -> Utils.wire 80 request
-  RequestGetIndex                request -> Utils.wire 54 request
-  RequestGetServerInfo           request -> Utils.wire  7 request
-  RequestGetSchema               request -> Utils.wire 58 request
-  -- RequestMapReduce               request -> Utils.wire 23 request
-  RequestPing                    request -> Utils.wire  1 request
-  RequestPut                     request -> Utils.wire 11 request
-  RequestPutIndex                request -> Utils.wire 56 request
-  RequestPutSchema               request -> Utils.wire 60 request
-  RequestResetBucketProperties   request -> Utils.wire 29 request
-  RequestSecondaryIndex          request -> Utils.wire 25 request
-  RequestSetBucketProperties     request -> Utils.wire 21 request
-  RequestSetBucketTypeProperties request -> Utils.wire 32 request
-  RequestListBuckets             request -> Utils.wire 15 request
-  RequestListKeys                request -> Utils.wire 17 request
-  RequestUpdateCrdt              request -> Utils.wire 82 request
+  RequestDelete         request -> Utils.wire 13 request
+  RequestDeleteIndex    request -> Utils.wire 57 request
+  RequestGet            request -> Utils.wire  9 request
+  RequestGetBucket      request -> Utils.wire 19 request
+  RequestGetBucketType  request -> Utils.wire 31 request
+  RequestGetCrdt        request -> Utils.wire 80 request
+  RequestGetIndex       request -> Utils.wire 54 request
+  RequestGetServerInfo  request -> Utils.wire  7 request
+  RequestGetSchema      request -> Utils.wire 58 request
+  RequestPing           request -> Utils.wire  1 request
+  RequestPut            request -> Utils.wire 11 request
+  RequestPutIndex       request -> Utils.wire 56 request
+  RequestPutSchema      request -> Utils.wire 60 request
+  RequestResetBucket    request -> Utils.wire 29 request
+  RequestSecondaryIndex request -> Utils.wire 25 request
+  RequestSetBucket      request -> Utils.wire 21 request
+  RequestSetBucketType  request -> Utils.wire 32 request
+  RequestListBuckets    request -> Utils.wire 15 request
+  RequestListKeys       request -> Utils.wire 17 request
+  RequestUpdateCrdt     request -> Utils.wire 82 request
