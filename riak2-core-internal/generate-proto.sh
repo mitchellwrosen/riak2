@@ -1,6 +1,6 @@
 #!/bin/sh
 
-OUTDIR=src
+OUTDIR=src-proto
 
 echo "Generating $OUTDIR/Proto/Proto/Riak.hs"
 echo "Generating $OUTDIR/Proto/Proto/Riak_Fields.hs"

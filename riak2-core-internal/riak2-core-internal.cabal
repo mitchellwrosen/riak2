@@ -51,6 +51,7 @@ library
 
   hs-source-dirs:
     src
+    src-proto
 
   other-modules:
     Proto.Proto.Riak
