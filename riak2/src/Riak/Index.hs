@@ -1,21 +1,20 @@
 module Riak.Index
   ( Index(..)
-  , get
-  , getAll
-  , put
-  , delete
+  , getIndex
+  , getIndexes
+  , putIndex
+  , deleteIndex
   ) where
 
 import Riak.Internal.Client  (Client)
-import Riak.Internal.Panic   (impurePanic)
 import Riak.Internal.Prelude
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
 
-import qualified Riak.Internal.Client as Client
+import qualified Riak.Interface as Interface
 
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
+
+import Data.List (head)
 
 -- | A Solr index.
 --
@@ -28,29 +27,18 @@ data Index
   }
 
 -- | Get a Solr index.
-get ::
+getIndex ::
      MonadIO m
   => Client
   -> Text
-  -> m (Either Text (Maybe Index))
-get client name = liftIO $
-  fromResponse <$>
-    Client.exchange
-      client
-      (RequestGetIndex request)
-      (\case
-        ResponseGetIndex response -> Just response
-        _ -> Nothing)
+  -> m (Either ByteString (Maybe Index))
+getIndex client name = liftIO $
+  liftIO (fromResponse <$> Interface.getIndex client (Just (encodeUtf8 name)))
 
   where
-    request :: Proto.GetIndexRequest
-    request =
-      defMessage
-        & L.name .~ encodeUtf8 name
-
     fromResponse ::
-         Either Text Proto.GetIndexResponse
-      -> Either Text (Maybe Index)
+         Either ByteString [Proto.Index]
+      -> Either ByteString (Maybe Index)
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
       -- Left "notfound" ->
@@ -59,33 +47,25 @@ get client name = liftIO $
       Left err ->
         Left err
 
-      Right response ->
-        case response ^. L.index of
-          [index] ->
-            Right $ Just $ Index
-              { name = name
-              , schema = decodeUtf8 (index ^. L.schema)
-              , n = index ^. L.maybe'n
-              }
-
-          _ ->
-            impurePanic "0 or 2+ indexes"
-              ( ( "request",  request  )
-              , ( "response", response )
-              )
+      Right (head -> index) ->
+        Right $ Just $ Index
+          { name = name
+          , schema = decodeUtf8 (index ^. L.schema)
+          , n = index ^. L.maybe'n
+          }
 
 -- | Get all Solr indexes.
-getAll ::
+getIndexes ::
      MonadIO m
   => Client
-  -> m (Either Text [Index])
-getAll client = liftIO $
-  fromResponse <$> doGet client Nothing
+  -> m (Either ByteString [Index])
+getIndexes client =
+  liftIO (fromResponse <$> Interface.getIndex client Nothing)
 
   where
     fromResponse ::
-         Either Text Proto.GetIndexResponse
-      -> Either Text [Index]
+         Either ByteString [Proto.Index]
+      -> Either ByteString [Index]
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
       -- Left "notfound" ->
@@ -93,39 +73,17 @@ getAll client = liftIO $
       Left err ->
         Left err
 
-      Right response ->
-        Right (map fromProto (response ^. L.index))
+      Right indexes ->
+        Right (map fromProto indexes)
 
-doGet ::
-     Client
-  -> Maybe Text
-  -> IO (Either Text Proto.GetIndexResponse)
-doGet client name =
-  Client.exchange
-    client
-    (RequestGetIndex request)
-    (\case
-      ResponseGetIndex response -> Just response
-      _ -> Nothing)
-
-  where
-    request :: Proto.GetIndexRequest
-    request =
-      defMessage
-        & L.maybe'name .~ (encodeUtf8 <$> name)
-
-put ::
+-- | Put a Solr index.
+putIndex ::
      MonadIO m
-  => Client
-  -> Index
-  -> m (Either Text ())
-put client index = liftIO $
-  Client.exchange
-    client
-    (RequestPutIndex request)
-    (\case
-      ResponsePut{} -> Just ()
-      _ -> Nothing)
+  => Client -- ^
+  -> Index -- ^
+  -> m (Either ByteString ())
+putIndex client index = liftIO $
+  Interface.putIndex client request
 
   where
     request :: Proto.PutIndexRequest
@@ -135,24 +93,14 @@ put client index = liftIO $
         -- TODO put index timeout
         -- & L.maybe'timeout .~ undefined
 
-delete ::
+-- | Delete a Solr index.
+deleteIndex ::
      MonadIO m
-  => Client
-  -> Text
-  -> m (Either Text ())
-delete client name = liftIO $
-  Client.exchange
-    client
-    (RequestDeleteIndex request)
-    (\case
-      ResponseDelete{} -> Just ()
-      _ -> Nothing)
-
-  where
-    request :: Proto.DeleteIndexRequest
-    request =
-      defMessage
-        & L.name .~ encodeUtf8 name
+  => Client -- ^
+  -> Text -- ^
+  -> m (Either ByteString ())
+deleteIndex client name = liftIO $
+  Interface.deleteIndex client (encodeUtf8 name)
 
 fromProto :: Proto.Index -> Index
 fromProto index =

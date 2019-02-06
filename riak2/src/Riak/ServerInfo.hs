@@ -1,16 +1,14 @@
 module Riak.ServerInfo
   ( ServerInfo(..)
-  , get
+  , getServerInfo
   ) where
 
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
 
-import qualified Riak.Internal.Client as Client
-import qualified Riak.Proto           as Proto
-import qualified Riak.Proto.Lens      as L
+import qualified Riak.Interface  as Interface
+import qualified Riak.Proto      as Proto
+import qualified Riak.Proto.Lens as L
 
 
 data ServerInfo
@@ -20,19 +18,14 @@ data ServerInfo
   } deriving stock (Show)
 
 -- | Get server info.
-get ::
+getServerInfo ::
      MonadIO m
   => Client -- ^
-  -> m (Either Text ServerInfo)
-get client = liftIO $
+  -> m (Either ByteString ServerInfo)
+getServerInfo client = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.exchange
-      client
-      (RequestGetServerInfo defMessage)
-      (\case
-        ResponseGetServerInfo response -> Just response
-        _ -> Nothing))
+    (Interface.getServerInfo client)
 
   where
     fromResponse :: Proto.GetServerInfoResponse -> ServerInfo

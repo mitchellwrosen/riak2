@@ -9,7 +9,6 @@ module Riak.BucketType
 import Riak.Bucket           (Bucket(..))
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
-import Riak.Proto
 
 import qualified Riak.Interface       as Interface
 import qualified Riak.Proto           as Proto
@@ -39,15 +38,9 @@ getBucketType ::
      MonadIO m
   => Client -- ^
   -> BucketType -- ^
-  -> m (Either ByteString BucketProperties)
-getBucketType client (BucketType bucketType) = liftIO $
-  Interface.getBucketType client request
-
-  where
-    request :: GetBucketTypeRequest
-    request =
-      defMessage
-        & L.bucketType .~ bucketType
+  -> m (Either ByteString Proto.BucketProperties)
+getBucketType client (BucketType bucketType) =
+  liftIO (Interface.getBucketType client bucketType)
 
 -- | Set bucket type properties.
 --

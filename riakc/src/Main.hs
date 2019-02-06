@@ -138,9 +138,9 @@ getParser =
 infoParser :: Parser (Client -> IO ())
 infoParser =
   pure $ \client ->
-    ServerInfo.get client >>= \case
+    ServerInfo.getServerInfo client >>= \case
       Left err -> do
-        Text.putStrLn err
+        Latin1.putStrLn err
         exitFailure
 
       Right ServerInfo { name, version } -> do

@@ -6,8 +6,8 @@ module Riak.Bucket
   , setBucket
   , resetBucket
     -- ** Search
-  , exactQuery
-  , rangeQuery
+  , queryExact
+  , queryRange
     -- ** Full traversals
   , listBucketKeys
   , streamBucketKeys
@@ -82,12 +82,12 @@ resetBucket client (Bucket bucketType bucket) = liftIO $
 -- | Perform an exact query on a secondary index.
 --
 -- Fetches results in batches of 50.
-exactQuery
+queryExact
   :: Client -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
   -> IO (Either ByteString r)
-exactQuery client query@(ExactQuery { value }) keyFold =
+queryExact client query@(ExactQuery { value }) keyFold =
   doIndex
     client
     request
@@ -111,13 +111,13 @@ exactQuery client query@(ExactQuery { value }) keyFold =
 -- | Perform a range query on a secondary index.
 --
 -- Fetches results in batches of 50.
-rangeQuery
+queryRange
   :: forall a r.
      Client -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
   -> IO (Either ByteString r)
-rangeQuery client query keyFold =
+queryRange client query keyFold =
   doIndex
     client
     request

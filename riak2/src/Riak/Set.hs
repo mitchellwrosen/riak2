@@ -1,7 +1,7 @@
 module Riak.Set
   ( Set(..)
-  , get
-  , update
+  , getSet
+  , updateSet
   , SetUpdate(..)
   ) where
 

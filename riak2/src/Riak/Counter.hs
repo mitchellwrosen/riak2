@@ -1,14 +1,14 @@
 module Riak.Counter
   ( Counter(..)
-  , get
-  , update
+  , getCounter
+  , updateCounter
   ) where
 
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Internal.Client as Client
+import qualified Riak.Interface       as Interface
 import qualified Riak.Proto           as Proto
 import qualified Riak.Proto.Lens      as L
 
@@ -29,15 +29,15 @@ data Counter
   } deriving stock (Generic, Show)
 
 -- | Get a counter.
-get ::
+getCounter ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either Text (Maybe Counter))
-get client k@(Key bucketType bucket key) = liftIO $
+  -> m (Either ByteString (Maybe Counter))
+getCounter client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.getCrdt client request)
+    (Interface.getCrdt client request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -71,15 +71,15 @@ get client k@(Key bucketType bucket key) = liftIO $
 -- operation.
 --
 -- /See also/: @Riak.Key.'Riak.Key.none'@
-update ::
+updateCounter ::
      MonadIO m
   => Client -- ^
   -> Counter -- ^
-  -> m (Either Text Counter)
-update client (Counter { key, value }) = liftIO $
+  -> m (Either ByteString Counter)
+updateCounter client (Counter { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.updateCrdt client request)
+    (Interface.updateCrdt client request)
 
   where
     request :: Proto.UpdateCrdtRequest

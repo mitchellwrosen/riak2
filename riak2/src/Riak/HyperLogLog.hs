@@ -4,15 +4,15 @@
 -- * <https://github.com/basho/riak_kv/blob/develop/docs/hll/hll.pdf>
 module Riak.HyperLogLog
   ( HyperLogLog(..)
-  , get
-  , update
+  , getHyperLogLog
+  , updateHyperLogLog
   ) where
 
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Internal.Client as Client
+import qualified Riak.Interface as Interface
 import qualified Riak.Proto           as Proto
 import qualified Riak.Proto.Lens      as L
 
@@ -38,15 +38,15 @@ data HyperLogLog a
   } deriving stock (Functor, Generic, Show)
 
 -- | Get a HyperLogLog.
-get ::
+getHyperLogLog ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either Text (Maybe (HyperLogLog Word64)))
-get client k@(Key bucketType bucket key) = liftIO $
+  -> m (Either ByteString (Maybe (HyperLogLog Word64)))
+getHyperLogLog client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.getCrdt client request)
+    (Interface.getCrdt client request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -77,15 +77,15 @@ get client k@(Key bucketType bucket key) = liftIO $
 -- | Update a HyperLogLog.
 --
 -- /See also/: Riak.Key.'Riak.Key.none'
-update ::
+updateHyperLogLog ::
      MonadIO m
   => Client -- ^
   -> HyperLogLog [ByteString] -- ^
-  -> m (Either Text (HyperLogLog Word64))
-update client (HyperLogLog { key, value }) = liftIO $
+  -> m (Either ByteString (HyperLogLog Word64))
+updateHyperLogLog client (HyperLogLog { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.updateCrdt client request)
+    (Interface.updateCrdt client request)
 
   where
     request :: Proto.UpdateCrdtRequest

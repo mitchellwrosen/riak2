@@ -1,8 +1,8 @@
 module Riak.Map
   ( Map(..)
   , Maps(..)
-  , get
-  , update
+  , getMap
+  , updateMap
   , MapUpdate(..)
   ) where
 
@@ -13,10 +13,10 @@ import Riak.Internal.Prelude
 import Riak.Internal.Set     (SetUpdate)
 import Riak.Key              (Key(..))
 
-import qualified Riak.Internal.Client as Client
-import qualified Riak.Internal.Set    as Set
-import qualified Riak.Proto           as Proto
-import qualified Riak.Proto.Lens      as L
+import qualified Riak.Interface    as Interface
+import qualified Riak.Internal.Set as Set
+import qualified Riak.Proto        as Proto
+import qualified Riak.Proto.Lens   as L
 
 import Data.Monoid (Endo(..))
 
@@ -73,15 +73,15 @@ data MapUpdate
   deriving stock (Eq, Show)
 
 -- | Get a map.
-get ::
+getMap ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either Text (Maybe (Map Maps)))
-get client k@(Key bucketType bucket key) = liftIO $
+  -> m (Either ByteString (Maybe (Map Maps)))
+getMap client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.getCrdt client request)
+    (Interface.getCrdt client request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -113,15 +113,15 @@ get client k@(Key bucketType bucket key) = liftIO $
 -- | Update a map.
 --
 -- /See also/: @Riak.Context.'Riak.Context.none'@, @Riak.Key.'Riak.Key.none'@
-update ::
+updateMap ::
      MonadIO m
   => Client -- ^
   -> Map [MapUpdate] -- ^
-  -> m (Either Text (Map Maps))
-update client (Map { context, key, value }) = liftIO $
+  -> m (Either ByteString (Map Maps))
+updateMap client (Map { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Client.updateCrdt client request)
+    (Interface.updateCrdt client request)
 
   where
     request :: Proto.UpdateCrdtRequest

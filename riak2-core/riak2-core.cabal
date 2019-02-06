@@ -10,6 +10,7 @@ library
     bytestring,
     foldl,
     lens,
+    proto-lens ^>= 0.4.0,
     riak2-core-internal
 
   default-extensions:

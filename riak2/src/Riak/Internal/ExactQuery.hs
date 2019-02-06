@@ -8,7 +8,7 @@ import qualified Riak.SecondaryIndexValue as SecondaryIndexValue
 
 -- | An exact query on a secondary index.
 --
--- /See also/: @'Riak.Bucket.exactQuery'@, @'Riak.RangeQuery.RangeQuery'@
+-- /See also/: @'Riak.Bucket.queryExact'@, @'Riak.RangeQuery.RangeQuery'@
 data ExactQuery
   = forall a.
     ExactQuery

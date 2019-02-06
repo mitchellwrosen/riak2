@@ -8,7 +8,7 @@ import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 
 -- | A range query on a secondary index.
 --
--- /See also/: @'Riak.Bucket.rangeQuery'@, @'Riak.ExactQuery.ExactQuery'@,
+-- /See also/: @'Riak.Bucket.queryRange'@, @'Riak.ExactQuery.ExactQuery'@,
 data RangeQuery a
   = RangeQuery
   { bucket :: !Bucket

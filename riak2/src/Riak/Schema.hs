@@ -1,74 +1,56 @@
 module Riak.Schema
   ( Schema(..)
-  , get
-  , put
+  , getSchema
+  , putSchema
   ) where
 
 import Riak.Internal.Client  (Client)
 import Riak.Internal.Prelude
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
 
-import qualified Riak.Internal.Client as Client
-import qualified Riak.Proto           as Proto
-import qualified Riak.Proto.Lens      as L
+import qualified Riak.Interface  as Interface
+import qualified Riak.Proto      as Proto
+import qualified Riak.Proto.Lens as L
 
 
+-- | A Solr schema.
 data Schema
   = Schema
   { name :: !Text
   , content :: !ByteString -- TODO schema contents are Text?
   }
 
-get ::
+-- | Put a Solr schema.
+getSchema ::
      MonadIO m
-  => Client
-  -> Text
-  -> m (Either Text (Maybe Schema))
-get client name = liftIO $
+  => Client -- ^
+  -> Text -- ^
+  -> m (Either ByteString (Maybe Schema))
+getSchema client name = liftIO $
   fromResponse <$>
-    Client.exchange
+    Interface.getSchema
       client
-      (RequestGetSchema request)
-      (\case
-        ResponseGetSchema response -> Just response
-        _ -> Nothing)
+      (encodeUtf8 name)
 
   where
-    request :: Proto.GetSchemaRequest
-    request =
-      defMessage
-        & L.name .~ encodeUtf8 name
-
     fromResponse ::
-         Either Text Proto.GetSchemaResponse
-      -> Either Text (Maybe Schema)
+         Either ByteString Proto.Schema
+      -> Either ByteString (Maybe Schema)
     fromResponse = \case
       -- TODO text "notfound" string
       Left err ->
         Left err
 
-      Right response ->
-        Right (Just (fromProto (response ^. L.schema)))
+      Right schema ->
+        Right (Just (fromProto schema))
 
-put ::
+-- | Get a Solr schema.
+putSchema ::
      MonadIO m
-  => Client
-  -> Schema
-  -> m (Either Text ())
-put client schema = liftIO $
-  Client.exchange
-    client
-    (RequestPutSchema request)
-    (\case
-      ResponsePut{} -> Just ()
-      _ -> Nothing)
-
-  where
-    request :: Proto.PutSchemaRequest
-    request =
-      defMessage
-        & L.schema .~ toProto schema
+  => Client -- ^
+  -> Schema -- ^
+  -> m (Either ByteString ())
+putSchema client schema =
+  liftIO (Interface.putSchema client (toProto schema))
 
 fromProto :: Proto.Schema -> Schema
 fromProto schema =
