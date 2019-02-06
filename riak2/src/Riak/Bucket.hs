@@ -2,15 +2,15 @@ module Riak.Bucket
   ( -- * Bucket
     Bucket(..)
     -- ** Properties
-  , get
-  , set
-  , reset
+  , getBucket
+  , setBucket
+  , resetBucket
     -- ** Search
   , exactQuery
   , rangeQuery
     -- ** Full traversals
-  , keys
-  , streamKeys
+  , listBucketKeys
+  , streamBucketKeys
   ) where
 
 import Riak.Internal.Bucket     (Bucket(..))
@@ -20,10 +20,8 @@ import Riak.Internal.Key        (Key(..))
 import Riak.Internal.Prelude
 import Riak.Internal.RangeQuery (RangeQuery)
 import Riak.Internal.Utils      (bs2int)
-import Riak.Request             (Request(..))
-import Riak.Response            (Response(..))
 
-import qualified Riak.Internal.Client              as Client
+import qualified Riak.Interface                    as Interface
 import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
@@ -39,20 +37,13 @@ import qualified Control.Foldl as Foldl
 -- | Get bucket properties.
 --
 -- TODO BucketProps
-get ::
+getBucket ::
      MonadIO m
   => Client -- ^
   -> Bucket -- ^
-  -> m (Either Text Proto.BucketProperties)
-get client (Bucket bucketType bucket) = liftIO $
-  (fmap.fmap)
-    fromResponse
-    (Client.exchange
-      client
-      (RequestGetBucketProperties request)
-      (\case
-        ResponseGetBucketProperties response -> Just response
-        _ -> Nothing))
+  -> m (Either ByteString Proto.BucketProperties)
+getBucket client (Bucket bucketType bucket) = liftIO $
+  Interface.getBucket client request
 
   where
     request :: Proto.GetBucketPropertiesRequest
@@ -61,39 +52,25 @@ get client (Bucket bucketType bucket) = liftIO $
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
 
-    fromResponse :: Proto.GetBucketPropertiesResponse -> Proto.BucketProperties
-    fromResponse =
-      view L.props
-
 -- | Set bucket properties.
 --
 -- TODO better set bucket properties type
 -- TODO don't allow setting n
-set
+setBucket
   :: Client -- ^
   -> Proto.SetBucketPropertiesRequest -- ^
-  -> IO (Either Text Proto.SetBucketPropertiesResponse)
-set client request =
-  Client.exchange
-    client
-    (RequestSetBucketProperties request)
-    (\case
-      ResponseSetBucketProperties response -> Just response
-      _ -> Nothing)
+  -> IO (Either ByteString ())
+setBucket client request =
+  Interface.setBucket client request
 
 -- | Reset bucket properties.
-reset ::
+resetBucket ::
      MonadIO m
   => Client
   -> Bucket
-  -> m (Either Text ())
-reset client (Bucket bucketType bucket) = liftIO $
-  Client.exchange
-    client
-    (RequestResetBucketProperties request)
-    (\case
-      ResponseResetBucketProperties _ -> Just ()
-      _ -> Nothing)
+  -> m (Either ByteString ())
+resetBucket client (Bucket bucketType bucket) = liftIO $
+  Interface.resetBucket client request
 
   where
     request :: Proto.ResetBucketPropertiesRequest
@@ -102,58 +79,6 @@ reset client (Bucket bucketType bucket) = liftIO $
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
 
--- | List all of the keys in a bucket.
---
--- This is 'streamKeys' with a simpler type, but pulls all keys into memory
--- before returning them.
---
--- /Note/: This is an extremely expensive operation, and should not be used on a
--- production cluster.
---
--- /Note/: If your backend supports secondary indexes, it is faster to use the
--- 'Riak.ExactQuery.inBucket' query.
---
--- /See also/: 'streamKeys'
-keys ::
-     MonadIO m
-  => Client -- ^
-  -> Bucket -- ^
-  -> m (Either Text [Key])
-keys client bucket =
-  liftIO (streamKeys client bucket (Foldl.generalize Foldl.list))
-
--- | Stream all of the keys in a bucket.
---
--- /Note/: This is an extremely expensive operation, and should not be used on a
--- production cluster.
---
--- /Note/: If your backend supports secondary indexes, it is faster to use the
--- 'Riak.ExactQuery.inBucket' query.
---
--- /See also/: 'keys'
-streamKeys
-  :: Client -- ^
-  -> Bucket -- ^
-  -> FoldM IO Key r -- ^
-  -> IO (Either Text r)
-streamKeys client (Bucket bucketType bucket) keyFold =
-  Client.stream
-    client
-    (RequestListKeys request)
-    (\case
-      ResponseListKeys response -> Just response
-      _ -> Nothing)
-    (view L.done)
-    (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
-
-  where
-    request :: Proto.ListKeysRequest
-    request =
-      defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        -- TODO stream keys timeout
-
 -- | Perform an exact query on a secondary index.
 --
 -- Fetches results in batches of 50.
@@ -161,7 +86,7 @@ exactQuery
   :: Client -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either Text r)
+  -> IO (Either ByteString r)
 exactQuery client query@(ExactQuery { value }) keyFold =
   doIndex
     client
@@ -191,7 +116,7 @@ rangeQuery
      Client -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Either Text r)
+  -> IO (Either ByteString r)
 rangeQuery client query keyFold =
   doIndex
     client
@@ -228,7 +153,7 @@ doIndex ::
      Client
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
-  -> IO (Either Text r)
+  -> IO (Either ByteString r)
 doIndex client =
   loop
 
@@ -236,9 +161,9 @@ doIndex client =
     loop ::
          Proto.SecondaryIndexRequest
       -> FoldM IO Proto.SecondaryIndexResponse r
-      -> IO (Either Text r)
+      -> IO (Either ByteString r)
     loop request responseFold = do
-      result :: Either Text (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
+      result :: Either ByteString (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
         doIndexPage
           client
           request
@@ -262,15 +187,11 @@ doIndexPage ::
      Client
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
-  -> IO (Either Text (r, Maybe ByteString))
+  -> IO (Either ByteString (r, Maybe ByteString))
 doIndexPage client request fold =
-  Client.stream
+  Interface.secondaryIndex
     client
-    (RequestSecondaryIndex request)
-    (\case
-      ResponseSecondaryIndex response -> Just response
-      _ -> Nothing)
-    (view L.done)
+    request
     ((,)
       <$> fold
       <*> continuation)
@@ -282,6 +203,55 @@ doIndexPage client request fold =
         & lmap (view L.maybe'continuation)
         & Foldl.generalize
         & fmap join
+
+-- | List all of the keys in a bucket.
+--
+-- This is 'streamBucketKeys' with a simpler type, but pulls all keys into
+-- memory before returning them.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
+--
+-- /Note/: If your backend supports secondary indexes, it is faster to use the
+-- 'Riak.ExactQuery.inBucket' query.
+--
+-- /See also/: 'streamBucketKeys'
+listBucketKeys ::
+     MonadIO m
+  => Client -- ^
+  -> Bucket -- ^
+  -> m (Either ByteString [Key])
+listBucketKeys client bucket =
+  liftIO (streamBucketKeys client bucket (Foldl.generalize Foldl.list))
+
+-- | Stream all of the keys in a bucket.
+--
+-- /Note/: This is an extremely expensive operation, and should not be used on a
+-- production cluster.
+--
+-- /Note/: If your backend supports secondary indexes, it is faster to use the
+-- 'Riak.ExactQuery.inBucket' query.
+--
+-- /See also/: 'listBucketKeys'
+streamBucketKeys
+  :: Client -- ^
+  -> Bucket -- ^
+  -> FoldM IO Key r -- ^
+  -> IO (Either ByteString r)
+streamBucketKeys client (Bucket bucketType bucket) keyFold =
+  Interface.listKeys
+    client
+    request
+    (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
+
+  where
+    request :: Proto.ListKeysRequest
+    request =
+      defMessage
+        & L.bucket .~ bucket
+        & L.bucketType .~ bucketType
+        -- TODO stream keys timeout
+
 
 extractM :: Monad m => FoldM m a r -> m r
 extractM (FoldM _ x f) =

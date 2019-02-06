@@ -2,7 +2,12 @@ module Riak.Interface
   ( UnexpectedResponse(..)
   , delete
   , get
+  , getBucket
+  , listKeys
   , put
+  , resetBucket
+  , secondaryIndex
+  , setBucket
   ) where
 
 import Riak.Interface.Signature (Interface)
@@ -15,7 +20,7 @@ import qualified Riak.Proto.Lens          as L
 
 import Control.Exception (Exception, throwIO)
 import Control.Foldl     (FoldM(..))
-import Control.Lens      ((^.))
+import Control.Lens      (view, (^.))
 import Data.ByteString   (ByteString)
 
 
@@ -48,6 +53,32 @@ get iface request =
       ResponseGet response -> Just response
       _ -> Nothing)
 
+getBucket ::
+     Interface
+  -> Proto.GetBucketPropertiesRequest
+  -> IO (Either ByteString Proto.BucketProperties)
+getBucket iface request =
+  exchange
+    iface
+    (RequestGetBucketProperties request)
+    (\case
+      ResponseGetBucketProperties response -> Just (response ^. L.props)
+      _ -> Nothing)
+
+listKeys ::
+     Interface
+  -> Proto.ListKeysRequest
+  -> FoldM IO Proto.ListKeysResponse r
+  -> IO (Either ByteString r)
+listKeys iface request =
+  stream
+    iface
+    (RequestListKeys request)
+    (\case
+      ResponseListKeys response -> Just response
+      _ -> Nothing)
+    (view L.done)
+
 put ::
      Interface
   -> Proto.PutRequest
@@ -59,6 +90,44 @@ put iface request =
     (\case
       ResponsePut response -> Just response
       _ -> Nothing)
+
+resetBucket ::
+     Interface
+  -> Proto.ResetBucketPropertiesRequest
+  -> IO (Either ByteString ())
+resetBucket iface request =
+  exchange
+    iface
+    (RequestResetBucketProperties request)
+    (\case
+      ResponseResetBucketProperties _ -> Just ()
+      _ -> Nothing)
+
+setBucket ::
+     Interface
+  -> Proto.SetBucketPropertiesRequest
+  -> IO (Either ByteString ())
+setBucket iface request =
+  exchange
+    iface
+    (RequestSetBucketProperties request)
+    (\case
+      ResponseSetBucketProperties{} -> Just ()
+      _ -> Nothing)
+
+secondaryIndex ::
+     Interface
+  -> Proto.SecondaryIndexRequest
+  -> FoldM IO Proto.SecondaryIndexResponse r
+  -> IO (Either ByteString r)
+secondaryIndex iface request =
+  stream
+    iface
+    (RequestSecondaryIndex request)
+    (\case
+      ResponseSecondaryIndex response -> Just response
+      _ -> Nothing)
+    (view L.done)
 
 exchange ::
      Interface
