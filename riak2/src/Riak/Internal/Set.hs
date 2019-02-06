@@ -69,7 +69,7 @@ getSet client k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a set.
 --
--- /See also/: @Riak.Context.'Riak.Context.none'@, @Riak.Key.'Riak.Key.none'@
+-- /See also/: @Riak.Context.'Riak.Context.none'@, @Riak.Key.'Riak.Key.generatedKey'@
 updateSet ::
      MonadIO m
   => Client -- ^

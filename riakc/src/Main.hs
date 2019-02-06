@@ -2,14 +2,13 @@ module Main where
 
 import Riak                       (Bucket(..), Content(..), GetOpts(..),
                                    Key(..), PutOpts(..), Quorum(..),
-                                   ServerInfo(..))
+                                   ServerInfo(..), generatedKey)
 import Riak.Client                (Client)
 import Riak.Interface.Impl.Socket (Socket)
 
 import qualified Riak.Client                as Client
 import qualified Riak.Context               as Context
 import qualified Riak.Interface.Impl.Socket as Client
-import qualified Riak.Key                   as Key
 import qualified Riak.Object                as Object
 import qualified Riak.ServerInfo            as ServerInfo
 
@@ -197,10 +196,8 @@ putParser =
             , indexes = []
             , key =
                 case bucketOrKey of
-                  Left (Bucket bucketType bucket) ->
-                    Key bucketType bucket Key.none
-                  Right key ->
-                    key
+                  Left bucket -> generatedKey bucket
+                  Right key   -> key
             , metadata = []
             , type' = Nothing
             , value = encodeUtf8 val

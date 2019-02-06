@@ -13,6 +13,7 @@ module Riak
   , HyperLogLog(..)
   , Index(..)
   , Key(..)
+  , generatedKey
   , Map(..)
   , MapUpdate(..)
   , Maps(..)
@@ -39,7 +40,7 @@ import Riak.Counter             (Counter(..))
 import Riak.ExactQuery          (ExactQuery(..))
 import Riak.HyperLogLog         (HyperLogLog(..))
 import Riak.Index               (Index(..))
-import Riak.Key                 (Key(..))
+import Riak.Key
 import Riak.Map                 (Map(..), MapUpdate(..), Maps(..))
 import Riak.Object              (Object(..))
 import Riak.Opts                (GetOpts(..), PutOpts(..))

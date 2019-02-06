@@ -76,7 +76,7 @@ getHyperLogLog client k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a HyperLogLog.
 --
--- /See also/: Riak.Key.'Riak.Key.none'
+-- /See also/: Riak.Key.'Riak.Key.generatedKey'
 updateHyperLogLog ::
      MonadIO m
   => Client -- ^

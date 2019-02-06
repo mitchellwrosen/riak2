@@ -175,7 +175,7 @@ makeGetRequest (Key bucketType bucket key) opts =
 
 -- | Put an object and return its key.
 --
--- /See also/: Riak.Key.'Riak.Key.none'
+-- /See also/: Riak.Key.'Riak.Key.generatedKey'
 put ::
      ( HasType (Content ByteString) content
      , MonadIO m
@@ -218,7 +218,7 @@ put_ client content opts =
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Metadata.deleted'.
 --
--- /See also/: Riak.Key.'Riak.Key.none'
+-- /See also/: Riak.Key.'Riak.Key.generatedKey'
 putGet ::
      ( HasType (Content ByteString) content
      , MonadIO m
@@ -258,7 +258,7 @@ putGet_ client content opts =
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Metadata.deleted'.
 --
--- /See also/: Riak.Key.'Riak.Key.none'
+-- /See also/: Riak.Key.'Riak.Key.generatedKey'
 putGetHead ::
      ( HasType (Content ByteString) content
      , MonadIO m
