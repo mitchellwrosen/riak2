@@ -159,7 +159,7 @@ update client (Map { context, key, value }) = liftIO $
         { context = Context (response ^. L.context)
         , key =
             if ByteString.null k
-              then key { key = response ^. L.key }
+              then Key bucketType bucket (response ^. L.key)
               else key
         , value = mapValuesToMaps (response ^. L.map)
         }

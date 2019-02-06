@@ -155,12 +155,12 @@ doGet client request =
       _ -> Nothing)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
-makeGetRequest key opts =
+makeGetRequest (Key bucketType bucket key) opts =
   defMessage
-    & L.bucket .~ (key ^. field @"bucket")
-    & L.bucketType .~ key ^. field @"bucketType"
+    & L.bucket .~ bucket
+    & L.bucketType .~ bucketType
     & L.deletedContext .~ True
-    & L.key .~ (key ^. field @"key")
+    & L.key .~ key
     & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
     & L.maybe'n .~ Quorum.toWord32 (opts ^. field @"n")
     & L.maybe'notfoundOk .~ defTrue (notfoundOk opts)
@@ -198,13 +198,13 @@ put_ client content opts =
     request =
       makePutRequest key content opts
 
-    key@(Key _ _ k) =
+    key@(Key bucketType bucket k) =
       content ^. field @"key"
 
     fromResponse :: Proto.PutResponse -> Key
     fromResponse response =
       if ByteString.null k
-        then key { key = response ^. L.key }
+        then Key bucketType bucket (response ^. L.key)
         else key
 
 -- | Put an object and return it.

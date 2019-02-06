@@ -192,10 +192,7 @@ parseBucket :: String -> Either String Bucket
 parseBucket string =
   case splitOn "/" string of
     [ bucketType, bucket ] ->
-      Right Bucket
-        { bucketType = Latin1.pack bucketType
-        , bucket = Latin1.pack bucket
-        }
+      Right (Bucket (Latin1.pack bucketType) (Latin1.pack bucket))
 
     _ ->
       Left "Expected: 'type/bucket'"
@@ -204,11 +201,7 @@ parseKey :: String -> Either String Key
 parseKey string =
   case splitOn "/" string of
     [ bucketType, bucket, key ] ->
-      Right Key
-        { bucketType = Latin1.pack bucketType
-        , bucket = Latin1.pack bucket
-        , key = Latin1.pack key
-        }
+      Right (Key (Latin1.pack bucketType) (Latin1.pack bucket) (Latin1.pack key))
 
     _ ->
       Left "Expected: 'type/bucket/key'"

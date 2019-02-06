@@ -119,7 +119,7 @@ update client (Counter { key, value }) = liftIO $
       Counter
         { key =
             if ByteString.null k
-              then key { key = response ^. L.key }
+              then Key bucketType bucket (response ^. L.key)
               else key
         , value = response ^. L.counter
         }

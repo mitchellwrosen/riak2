@@ -120,7 +120,7 @@ update client (HyperLogLog { key, value }) = liftIO $
       HyperLogLog
         { key =
             if ByteString.null k
-              then key { key = response ^. L.key }
+              then Key bucketType bucket (response ^. L.key)
               else key
         , value = response ^. L.hll
         }

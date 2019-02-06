@@ -27,10 +27,9 @@ import qualified Control.Foldl as Foldl
 --
 -- /Note/: Must be UTF-8 encoded.
 newtype BucketType
-  = BucketType
-  { bucketType :: ByteString
-  } deriving stock (Eq, Show)
-    deriving newtype (Hashable)
+  = BucketType ByteString
+  deriving stock (Eq, Show)
+  deriving newtype (Hashable)
 
 instance Default BucketType where
   def :: BucketType
