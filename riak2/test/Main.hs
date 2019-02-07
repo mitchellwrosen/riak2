@@ -109,7 +109,7 @@ integrationTests client =
             Left err -> assertFailure (show err)
             Right [object] -> do
               _ <- put client object def
-              getIfModified client (object ^. field @"content") def `shouldReturnSatisfy` isRightJust
+              getIfModified client object def `shouldReturnSatisfy` isRightJust
             _ -> undefined
       ]
     ]

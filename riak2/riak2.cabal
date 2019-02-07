@@ -226,6 +226,7 @@ test-suite tests
     OverloadedStrings
     ScopedTypeVariables
     TypeApplications
+    UnicodeSyntax
 
   default-language:
     Haskell2010

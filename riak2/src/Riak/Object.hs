@@ -48,7 +48,7 @@ import qualified ByteString
 -- 'put'.
 --
 -- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Metadata.deleted'.
+-- 'Riak.Object.deleted'.
 get
   :: MonadIO m
   => Client -- ^
@@ -71,7 +71,7 @@ get client key opts = liftIO $
 -- 'put'.
 --
 -- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Metadata.deleted'.
+-- 'Riak.Object.deleted'.
 getHead
   :: MonadIO m
   => Client -- ^
@@ -96,15 +96,16 @@ getHead client key opts = liftIO $
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Object.deleted'.
 getIfModified ::
-     -- ( (forall x. HasType (Content x) (content x))
-     ( MonadIO m
+     ∀ a object m.
+     ( HasType (Content a) (object a)
+     , MonadIO m
      )
   => Client -- ^
-  -> Content a -- ^
+  -> object a -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) (Maybe [Object ByteString]))
-getIfModified client content opts =
-  liftIO (getIfModified_ client content opts)
+getIfModified client object opts =
+  liftIO (getIfModified_ client (object ^. typed @(Content a)) opts)
 
 getIfModified_ ::
      Client
@@ -131,14 +132,25 @@ getIfModified_ client (Content { key, context }) opts =
 -- 'put'.
 --
 -- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Metadata.deleted'.
-getHeadIfModified
-  :: MonadIO m
+-- 'Riak.Object.deleted'.
+getHeadIfModified ::
+     ∀ a object m.
+     ( HasType (Content a) (object a)
+     , MonadIO m
+     )
   => Client -- ^
-  -> Content a -- ^
+  -> object a -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) (Maybe [Object ()]))
-getHeadIfModified client (Content { key, context }) opts = liftIO $
+getHeadIfModified client object opts =
+  liftIO (getHeadIfModified_ client (object ^. typed @(Content a)) opts)
+
+getHeadIfModified_ ::
+     Client
+  -> Content a
+  -> GetOpts
+  -> IO (Either (Error 'GetOp) (Maybe [Object ()]))
+getHeadIfModified_ client (Content { key, context }) opts =
   (fmap.fmap)
     fromResponse
     (doGet client request)
@@ -191,15 +203,15 @@ makeGetRequest (Key bucketType bucket key) opts =
 --
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 put ::
-     ( HasType (Content ByteString) content
+     ( HasType (Content ByteString) (object ByteString)
      , MonadIO m
      )
   => Client -- ^
-  -> content -- ^
+  -> object ByteString -- ^
   -> PutOpts -- ^
   -> m (Either (Error 'PutOp) Key)
-put client content opts =
-  liftIO (put_ client (content ^. typed) opts)
+put client object opts =
+  liftIO (put_ client (object ^. typed) opts)
 
 put_ ::
      Client
@@ -230,19 +242,19 @@ put_ client content opts =
 -- 'put'.
 --
 -- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Metadata.deleted'.
+-- 'Riak.Object.deleted'.
 --
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 putGet ::
-     ( HasType (Content ByteString) content
+     ( HasType (Content ByteString) (object ByteString)
      , MonadIO m
      )
   => Client -- ^
-  -> content -- ^
+  -> object ByteString -- ^
   -> PutOpts -- ^
   -> m (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
-putGet client content opts =
-  liftIO (putGet_ client (content ^. typed) opts)
+putGet client object opts =
+  liftIO (putGet_ client (object ^. typed) opts)
 
 putGet_ ::
      Client -- ^
@@ -270,19 +282,19 @@ putGet_ client content opts =
 -- then perform a 'put'.
 --
 -- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Metadata.deleted'.
+-- 'Riak.Object.deleted'.
 --
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 putGetHead ::
-     ( HasType (Content ByteString) content
+     ( HasType (Content ByteString) (object ByteString)
      , MonadIO m
      )
   => Client -- ^
-  -> content -- ^
+  -> object ByteString -- ^
   -> PutOpts -- ^
   -> m (Either (Error 'PutOp) (NonEmpty (Object ())))
-putGetHead client content opts =
-  liftIO (putGetHead_ client (content ^. typed) opts)
+putGetHead client object opts =
+  liftIO (putGetHead_ client (object ^. typed) opts)
 
 putGetHead_ ::
      Client
@@ -360,11 +372,21 @@ makePutRequest (Key bucketType bucket key) content opts =
 
 -- | Delete an object.
 delete ::
-     MonadIO m
+     ∀ a object m.
+     ( HasType (Content a) (object a)
+     , MonadIO m
+     )
   => Client -- ^
-  -> Object a -- ^
+  -> object a -- ^
   -> m (Either (Error 'DeleteOp) ())
-delete client Object { content } = liftIO $
+delete client object =
+  liftIO (delete_ client (object ^. typed @(Content a)))
+
+delete_ ::
+     Client -- ^
+  -> Content a -- ^
+  -> IO (Either (Error 'DeleteOp) ())
+delete_ client content =
   first parseDeleteError <$> Interface.delete client request
 
   where
