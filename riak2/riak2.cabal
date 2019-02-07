@@ -185,7 +185,6 @@ library
 
   other-modules:
     Riak.Internal.Bucket
-    Riak.Internal.Content
     Riak.Internal.Context
     Riak.Internal.Error
     Riak.Internal.ExactQuery

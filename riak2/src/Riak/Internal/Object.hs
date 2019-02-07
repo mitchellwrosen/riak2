@@ -26,7 +26,6 @@ data Object a
   { content :: Content a
   , deleted :: Bool
   , lastModified :: UTCTime
-  , ttl :: Maybe Word32 -- TODO NominalDiffTime
   } deriving stock (Eq, Functor, Generic, Show)
 
 fromProtoContent ::
@@ -44,12 +43,12 @@ fromProtoContent key context proto =
           , indexes = map SecondaryIndex.fromPair (proto ^. L.indexes)
           , key = key
           , metadata = Proto.Content.metadata proto
+          , ttl = proto ^. L.maybe'ttl
           , type' = proto ^. L.maybe'contentType
           , value = proto ^. L.value
           }
     , deleted = proto ^. L.deleted
     , lastModified = Proto.Content.lastModified proto
-    , ttl = proto ^. L.maybe'ttl
     }
 
 -- | Parse a list of objects from a get response.

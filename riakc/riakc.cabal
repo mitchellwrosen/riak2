@@ -7,6 +7,7 @@ build-type: Simple
 executable riakc-new
   build-depends:
       base
+    , base64-bytestring
     , bytestring
     , data-default-class
     , generic-lens

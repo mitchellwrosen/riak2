@@ -16,6 +16,9 @@ module Riak
   , putGetHead
     -- ** Delete object
   , delete
+    -- * Map operations
+  , getMap
+  , updateMap
     -- * Types
   , Bucket(..)
   , BucketProperties(..)
@@ -23,8 +26,10 @@ module Riak
   , Client
   , ConflictResolution(..)
   , Content(..)
+  , newContent
   , Context
   , newContext
+  , unsafeMakeContext
   , Counter(..)
   , ExactQuery(..)
   , GetOpts(..)
@@ -54,14 +59,14 @@ import Riak.BucketProperties    (BucketProperties(..), ConflictResolution(..),
                                  NotfoundBehavior(..))
 import Riak.BucketType          (BucketType(..))
 import Riak.Client
-import Riak.Content             (Content(..))
+import Riak.Content
 import Riak.Context
 import Riak.Counter             (Counter(..))
 import Riak.ExactQuery          (ExactQuery(..))
 import Riak.HyperLogLog         (HyperLogLog(..))
 import Riak.Index               (Index(..))
 import Riak.Key
-import Riak.Map                 (Map(..), MapUpdate(..), Maps(..))
+import Riak.Map
 import Riak.Object
 import Riak.Opts                (GetOpts(..), PutOpts(..))
 import Riak.Quorum              (Quorum(..))

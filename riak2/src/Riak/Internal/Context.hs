@@ -4,6 +4,7 @@ import Riak.Internal.Prelude
 
 import qualified ByteString
 import qualified Data.ByteString.Base64 as Base64
+import qualified Data.ByteString.Char8  as Latin1
 
 
 -- | The opaque causal context attached to an object or data type.
@@ -11,12 +12,12 @@ newtype Context
   = Context { unContext :: ByteString }
   deriving stock (Eq)
 
--- | base-64 encoded for for display purposes. The actual context is an
--- opaque binary blob.
+-- | base-64 encoded for for display purposes. The actual context is an opaque
+-- binary blob.
 instance Show Context where
   show :: Context -> String
   show =
-    coerce (("base64:" ++) . show . Base64.encode)
+    coerce (Latin1.unpack . Base64.encode)
 
 -- | The "new" context. Use this when writing an object or data type for the
 -- first time.
@@ -36,3 +37,9 @@ instance Show Context where
 newContext :: Context
 newContext =
   Context ByteString.empty
+
+-- | Construct a context from an opaque binary blob. Unsafe in the sense that it
+-- is your responsibility to pass bytes that originally came from Riak.
+unsafeMakeContext :: ByteString -> Context
+unsafeMakeContext =
+  Context

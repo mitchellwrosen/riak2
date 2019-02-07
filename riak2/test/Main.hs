@@ -3,12 +3,16 @@
 module Main where
 
 import Riak
-import Riak.Interface.Impl.Socket (Config(..), EventHandlers(..), Socket, withInterface)
+import Riak.Interface.Impl.Socket (Config(..), EventHandlers(..), Socket,
+                                   withInterface)
 
 import qualified Riak.Interface.Impl.Socket as Socket
 
+import Control.Concurrent
 import Control.Lens
+import Data.Either           (isRight)
 import Data.Generics.Product (field)
+import Data.List.NonEmpty    (NonEmpty(..))
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -51,17 +55,7 @@ integrationTests client =
       , testCase "success" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content =
-                Content
-                  { charset = Nothing
-                  , context = newContext
-                  , encoding = Nothing
-                  , indexes = []
-                  , key = generatedKey (Bucket "objects" bucket)
-                  , metadata = []
-                  , type' = Nothing
-                  , value = value
-                  }
+          let content = newContent (generatedKey (Bucket "objects" bucket)) value
           Right key <- put client content def
           get client key def >>= \case
             Left err -> assertFailure (show err)
@@ -69,41 +63,32 @@ integrationTests client =
               (content ^. field @"value") `shouldBe` value
             _ -> undefined
 
+      , testCase "head 404" $ do
+          key <- randomKey
+          getHead client key def `shouldReturn` Right []
+
+      , testCase "head success" $ do
+          bucket <- ByteString.random 32
+          value <- ByteString.random 6
+          let content = newContent (generatedKey (Bucket "objects" bucket)) value
+          Right key <- put client content def
+          getHead client key def `shouldReturnSatisfy` isRight
+
       , testCase "if modified (not modified)" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content =
-                Content
-                  { charset = Nothing
-                  , context = newContext
-                  , encoding = Nothing
-                  , indexes = []
-                  , key = generatedKey (Bucket "objects" bucket)
-                  , metadata = []
-                  , type' = Nothing
-                  , value = value
-                  }
+          let content = newContent (generatedKey (Bucket "objects" bucket)) value
           Right key <- put client content def
           get client key def >>= \case
             Left err -> assertFailure (show err)
-            Right [Object { content }] -> do
-              getIfModified client content def `shouldReturnSatisfy` isRightNothing
+            Right [object] -> do
+              getIfModified client object def `shouldReturnSatisfy` isRightNothing
             _ -> undefined
 
       , testCase "if modified (modified)" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content =
-                Content
-                  { charset = Nothing
-                  , context = newContext
-                  , encoding = Nothing
-                  , indexes = []
-                  , key = generatedKey (Bucket "objects" bucket)
-                  , metadata = []
-                  , type' = Nothing
-                  , value = value
-                  }
+          let content = newContent (generatedKey (Bucket "objects" bucket)) value
           Right key <- put client content def
           get client key def >>= \case
             Left err -> assertFailure (show err)
@@ -111,6 +96,60 @@ integrationTests client =
               _ <- put client object def
               getIfModified client object def `shouldReturnSatisfy` isRightJust
             _ -> undefined
+
+      , testCase "put" $ do
+          bucket <- ByteString.random 32
+          value <- ByteString.random 6
+          let content = newContent (generatedKey (Bucket "objects" bucket)) value
+          put client content def `shouldReturnSatisfy` isRight
+
+      , testCase "putGet" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let content = newContent key value
+          putGet client content def >>= \case
+            Left err -> assertFailure (show err)
+            Right (_:|[]) -> pure ()
+            result -> assertFailure (show result)
+
+      , testCase "putGet (siblings)" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let content = newContent key value
+          put client content def `shouldReturnSatisfy` isRight
+          putGet client content def >>= \case
+            Left err -> assertFailure (show err)
+            Right (_:|[_]) -> pure ()
+            result -> assertFailure (show result)
+
+      , testCase "putGetHead" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let content = newContent key value
+          putGetHead client content def >>= \case
+            Left err -> assertFailure (show err)
+            Right (_:|[]) -> pure ()
+            result -> assertFailure (show result)
+
+      , testCase "putGetHead (siblings)" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let content = newContent key value
+          put client content def `shouldReturnSatisfy` isRight
+          putGetHead client content def >>= \case
+            Left err -> assertFailure (show err)
+            Right (_:|[_]) -> pure ()
+            result -> assertFailure (show result)
+
+      , testCase "delete" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let content = (newContent key value) { metadata = [("foo", Just "bar")], type' = Just "wawa" }
+          -- Right (object:|_) <- putGetHead client content def
+          -- delete client object `shouldReturn` Right ()
+          _ <- put client content def
+          delete client content `shouldReturn` Right ()
+          get client key def `shouldReturn` Right []
       ]
     ]
 
@@ -122,97 +161,7 @@ integrationTests client =
             , version = "2.2.3"
             }
     ]
-
-
   ]
-
---   , testCase "get Text object w/o charset" $ do
---       key <- randomObjectKey
---       let val = "foo"
---       curlPutText  key val
---       Right [RiakObject key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
---         getRiakObject h key def
---       key' `shouldBe` key
---       val' `shouldBe` val
---       ctype `shouldBe` Just (ContentType "text/plain")
---       charset `shouldBe` Nothing
---       encoding `shouldBe` Nothing
---       vtag `shouldSatisfy` isJust
---       ts `shouldSatisfy` isJust
---       meta `shouldBe` RiakMetadata []
---       ixs `shouldBe` []
---       deleted `shouldBe` False
---       ttl `shouldBe` TTL Nothing
-
---   , testCase "get ByteString object" $ do
---       key <- randomObjectKey
---       let val = "foo"
---       curlPutByteString key val
---       Right [RiakObject key' val' ctype charset encoding vtag ts meta ixs deleted ttl] <-
---         getRiakObject h key def
---       key' `shouldBe` key
---       val' `shouldBe` val
---       ctype `shouldBe` Just (ContentType "application/octet-stream")
---       charset `shouldBe` Nothing
---       encoding `shouldBe` Nothing
---       vtag `shouldSatisfy` isJust
---       ts `shouldSatisfy` isJust
---       meta `shouldBe` RiakMetadata []
---       ixs `shouldBe` []
---       deleted `shouldBe` False
---       ttl `shouldBe` TTL Nothing
-
---   , testCase "get two siblings" $ do
---       key <- randomObjectKey
---       let val = "foo"
---       curlPutText key val
---       curlPutText key val
---       Right xs <- getRiakObject @Text h key def
---       length xs `shouldBe` 2
-
---   , testCase "concurrent get/put" $ do
---       let n = 250 -- objects put+got per thread
---       let t = 4   -- num threads
---       done <- newEmptyMVar
---       let
---         go =
---           replicateM_ n $ do
---             key <- randomObjectKey
---             val <- Text.pack <$> randomKeyNameString
---             Right () <- putRiakObject h key val def
---             Right [x] <- getRiakObject h key def
---             (x ^. L.value) `shouldBe` val
---       replicateM_ t (forkFinally go (putMVar done))
---       replicateM_ t (either throwIO (const (pure ())) =<< takeMVar done)
-
---   , testCase "get object head" $ do
---       key <- randomObjectKey
---       curlPutByteString key "foo"
---       Right [RiakObject key' () ctype charset encoding vtag ts meta ixs deleted ttl] <-
---         getRiakObjectHead h key def
---       key' `shouldBe` key
---       ctype `shouldBe` Just (ContentType "application/octet-stream")
---       charset `shouldBe` Nothing
---       encoding `shouldBe` Nothing
---       vtag `shouldSatisfy` isJust
---       ts `shouldSatisfy` isJust
---       meta `shouldBe` RiakMetadata []
---       ixs `shouldBe` []
---       deleted `shouldBe` False
---       ttl `shouldBe` TTL Nothing
-
---   , testCase "get object if modified (modified)" $ do
---       key <- randomObjectKey
---       curlPutByteString key "foo"
---       Right (Modified [_]) <- getRiakObjectIfModified @ByteString h key def
---       pure ()
-
---   , testCase "get object if modified (unmodified)" $ do
---       key <- randomObjectKey
---       curlPutByteString key "foo"
---       Right [_] <- getRiakObjectHead h key def -- cache it
---       getRiakObjectIfModified @ByteString h key def `shouldReturn`
---         Right Unmodified
 
 --   , testCase "exact int query" $ do
 --       let ixname = RiakIndexName "foo"

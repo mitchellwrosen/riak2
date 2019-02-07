@@ -1,8 +1,10 @@
 module Main where
 
-import Riak                       (Bucket(..), Content(..), GetOpts(..),
-                                   Key(..), PutOpts(..), Quorum(..),
-                                   ServerInfo(..), generatedKey, newContext)
+import Riak                       (Bucket(..), Content(..), Context,
+                                   GetOpts(..), Key(..), Map(..), MapUpdate(..),
+                                   PutOpts(..), Quorum(..), ServerInfo(..),
+                                   SetUpdate(..), generatedKey, getMap,
+                                   newContext, unsafeMakeContext, updateMap)
 import Riak.Client                (Client)
 import Riak.Interface.Impl.Socket (Socket)
 
@@ -12,8 +14,9 @@ import qualified Riak.Object                as Object
 import qualified Riak.ServerInfo            as ServerInfo
 
 import Data.ByteString     (ByteString)
-import Data.Foldable       (for_)
+import Data.Foldable       (asum, for_)
 import Data.List.Split     (splitOn)
+import Data.Maybe          (fromMaybe)
 import Data.Text           (Text)
 import Data.Text.Encoding  (decodeUtf8, encodeUtf8)
 import Network.Socket      (HostName, PortNumber)
@@ -21,8 +24,9 @@ import Options.Applicative hiding (infoParser)
 import System.Exit         (exitFailure)
 import Text.Read           (readMaybe)
 
-import qualified Data.ByteString.Char8 as Latin1
-import qualified Data.Text.IO          as Text
+import qualified Data.ByteString.Base64 as Base64
+import qualified Data.ByteString.Char8  as Latin1
+import qualified Data.Text.IO           as Text
 
 main :: IO ()
 main = do
@@ -92,9 +96,11 @@ commandParser =
   hsubparser
     (mconcat
       [ command "get" (info getParser (progDesc "Get an object"))
+      , command "get-map" (info getMapParser (progDesc "Get a map"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
+      , command "update-map" (info updateMapParser (progDesc "Update a map"))
       ])
 
 getParser :: Parser (Client -> IO ())
@@ -132,6 +138,24 @@ getParser =
             , r = r
             , timeout = Nothing
             }
+
+getMapParser :: Parser (Client -> IO ())
+getMapParser =
+  doGetMap
+    <$> keyArgument
+  where
+    doGetMap ::
+         Key
+      -> Client
+      -> IO ()
+    doGetMap key client =
+      getMap client key >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
 
 infoParser :: Parser (Client -> IO ())
 infoParser =
@@ -196,8 +220,9 @@ putParser =
             , key =
                 case bucketOrKey of
                   Left bucket -> generatedKey bucket
-                  Right key   -> key
+                  Right key -> key
             , metadata = []
+            , ttl = Nothing
             , type' = Nothing
             , value = encodeUtf8 val
             }
@@ -212,6 +237,40 @@ putParser =
             , w = w
             }
 
+updateMapParser :: Parser (Client -> IO ())
+updateMapParser =
+  doUpdateMap
+    <$> bucketOrKeyArgument
+    <*> contextOption
+    <*> mapUpdateOptions
+
+  where
+    doUpdateMap ::
+         Either Bucket Key
+      -> Maybe Context
+      -> [MapUpdate]
+      -> Client
+      -> IO ()
+    doUpdateMap bucketOrKey context updates client = do
+      updateMap client operation >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
+
+      where
+        operation :: Map [MapUpdate]
+        operation =
+          Map
+            { context = fromMaybe newContext context
+            , key =
+                case bucketOrKey of
+                  Left bucket -> generatedKey bucket
+                  Right key -> key
+            , value = updates
+            }
 
 --------------------------------------------------------------------------------
 -- Arguments/options
@@ -223,6 +282,17 @@ bucketOrKeyArgument =
     (Right <$> eitherReader parseKey <|> Left <$> eitherReader parseBucket)
     (help "Bucket (type/bucket) or key (type/bucket/key)" <> metavar "BUCKET/KEY")
 
+contextOption :: Parser (Maybe Context)
+contextOption =
+  optional
+    (option
+      (eitherReader parseContext)
+      (long "context" <> help "Causal context"))
+  where
+    parseContext :: String -> Either String Context
+    parseContext =
+      fmap unsafeMakeContext . Base64.decode . Latin1.pack
+
 dwOption :: Parser (Maybe Quorum)
 dwOption =
   optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
@@ -230,6 +300,144 @@ dwOption =
 keyArgument :: Parser Key
 keyArgument =
   argument (eitherReader parseKey) keyMod
+
+mapUpdateOptions :: Parser [MapUpdate]
+mapUpdateOptions =
+  many mapUpdateOption
+
+  where
+    mapUpdateOption :: Parser MapUpdate
+    mapUpdateOption =
+      asum
+        [ removeCounterOption
+        , removeFlagOption
+        , removeMapOption
+        , removeRegisterOption
+        , removeSetOption
+        , incrementCounterOption
+        , disableFlagOption
+        , enableFlagOption
+        , setRegisterOption
+        , addElemOption
+        , removeElemOption
+        ]
+
+    removeCounterOption :: Parser MapUpdate
+    removeCounterOption =
+      makeMapUpdate (RemoveCounter . Latin1.pack) . splitOn "." <$>
+        strOption (long "remove-counter" <> help "Remove a counter")
+
+    removeFlagOption :: Parser MapUpdate
+    removeFlagOption =
+      makeMapUpdate (RemoveFlag . Latin1.pack) . splitOn "." <$>
+        strOption (long "remove-flag" <> help "Remove a flag")
+
+    removeMapOption :: Parser MapUpdate
+    removeMapOption =
+      makeMapUpdate (RemoveMap . Latin1.pack) . splitOn "." <$>
+        strOption (long "remove-map" <> help "Remove a map")
+
+    removeRegisterOption :: Parser MapUpdate
+    removeRegisterOption =
+      makeMapUpdate (RemoveRegister . Latin1.pack) . splitOn "." <$>
+        strOption (long "remove-register" <> help "Remove a register")
+
+    removeSetOption :: Parser MapUpdate
+    removeSetOption =
+      makeMapUpdate (RemoveSet . Latin1.pack) . splitOn "." <$>
+        strOption (long "remove-set" <> help "Remove a set")
+
+    incrementCounterOption :: Parser MapUpdate
+    incrementCounterOption =
+      option
+        (eitherReader parseIncrementCounter)
+        (long "incr-counter" <> help "Increment a counter")
+
+      where
+        parseIncrementCounter :: String -> Either String MapUpdate
+        parseIncrementCounter update =
+          case splitOn "/" update of
+            [ path, readMaybe -> Just val ] ->
+              Right
+                (makeMapUpdate
+                  (\name -> UpdateCounter (Latin1.pack name) val)
+                  (splitOn "." path))
+
+            _ ->
+              Left "Expected: 'path/amount'"
+
+    disableFlagOption :: Parser MapUpdate
+    disableFlagOption =
+      makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) False) . splitOn "." <$>
+        strOption (long "disable-flag" <> help "Disable a flag")
+
+    enableFlagOption :: Parser MapUpdate
+    enableFlagOption =
+      makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) True) . splitOn "." <$>
+        strOption (long "enable-flag" <> help "Enable a flag")
+
+    setRegisterOption :: Parser MapUpdate
+    setRegisterOption =
+      option
+        (eitherReader parseSetRegister)
+        (long "set-register" <> help "Set a register")
+
+      where
+        parseSetRegister :: String -> Either String MapUpdate
+        parseSetRegister update =
+          case splitOn "/" update of
+            [ path, val ] ->
+              Right
+                (makeMapUpdate
+                  (\name -> UpdateRegister (Latin1.pack name) (Latin1.pack val))
+                  (splitOn "." path))
+
+            _ ->
+              Left "Expected: 'path/value'"
+
+
+    addElemOption :: Parser MapUpdate
+    addElemOption =
+      option
+        (eitherReader (parseUpdateSet Add))
+        (long "add-elem" <> help "Add an element to a set")
+
+    removeElemOption :: Parser MapUpdate
+    removeElemOption =
+      option
+        (eitherReader (parseUpdateSet Remove))
+        (long "remove-elem" <> help "Add an element to a set")
+
+    parseUpdateSet ::
+         (ByteString -> SetUpdate)
+      -> String
+      -> Either String MapUpdate
+    parseUpdateSet toUpdate update =
+      case splitOn "/" update of
+        [ path, val ] ->
+          Right
+            (makeMapUpdate
+              (\name -> UpdateSet (Latin1.pack name) [toUpdate (Latin1.pack val)])
+              (splitOn "." path))
+
+        _ ->
+          Left "Expected: 'path/value'"
+
+    makeMapUpdate :: (String -> MapUpdate) -> [String] -> MapUpdate
+    makeMapUpdate onLeaf =
+      loop
+
+      where
+        loop :: [String] -> MapUpdate
+        loop = \case
+          [] ->
+            undefined
+
+          [leaf] ->
+            onLeaf leaf
+
+          p:ps ->
+            UpdateMap (Latin1.pack p) [loop ps]
 
 nOption :: Parser (Maybe Quorum)
 nOption =

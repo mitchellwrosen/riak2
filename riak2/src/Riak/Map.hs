@@ -28,7 +28,7 @@ import qualified HashSet
 
 -- | A map data type.
 --
--- Maps must be stored in a bucket type with the __@datatype = set@__ property.
+-- Maps must be stored in a bucket type with the __@datatype = map@__ property.
 data Map a
   = Map
   { context :: !Context -- ^ Causal context
