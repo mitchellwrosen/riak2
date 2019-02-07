@@ -1,7 +1,7 @@
-module Riak.Counter
-  ( Counter(..)
-  , getCounter
-  , updateCounter
+module Riak.ConvergentCounter
+  ( ConvergentCounter(..)
+  , getConvergentCounter
+  , updateConvergentCounter
   ) where
 
 import Riak.Client           (Client)
@@ -12,31 +12,31 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import Control.Lens ((^.), (.~))
+import Control.Lens ((.~), (^.))
 
 import qualified ByteString
 
 
--- | A counter data type.
+-- | An eventually-convergent counter.
 --
 -- Counters must be stored in a bucket type with the __@datatype = counter@__
 -- property.
 --
 -- /Note/: Counters do not contain a causal context, so it is not necessary to
 -- read a counter before updating it.
-data Counter
-  = Counter
+data ConvergentCounter
+  = ConvergentCounter
   { key :: !Key -- ^
   , value :: !Int64 -- ^
   } deriving stock (Generic, Show)
 
 -- | Get a counter.
-getCounter ::
+getConvergentCounter ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either ByteString (Maybe Counter))
-getCounter client k@(Key bucketType bucket key) = liftIO $
+  -> m (Either ByteString (Maybe ConvergentCounter))
+getConvergentCounter client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.getCrdt client request)
@@ -58,11 +58,11 @@ getCounter client k@(Key bucketType bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Maybe Counter
+    fromResponse :: Proto.GetCrdtResponse -> Maybe ConvergentCounter
     fromResponse response = do
       crdt :: Proto.Crdt <-
         response ^. L.maybe'value
-      pure Counter
+      pure ConvergentCounter
         { key = k
         , value = crdt ^. L.counter
         }
@@ -72,13 +72,13 @@ getCounter client k@(Key bucketType bucket key) = liftIO $
 -- /Note/: Counters, unlike other data types, represent their own update
 -- operation.
 --
--- /See also/: Riak.Key.'Riak.Key.generatedKey'
-updateCounter ::
+-- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+updateConvergentCounter ::
      MonadIO m
   => Client -- ^
-  -> Counter -- ^
-  -> m (Either ByteString Counter)
-updateCounter client (Counter { key, value }) = liftIO $
+  -> ConvergentCounter -- ^
+  -> m (Either ByteString ConvergentCounter)
+updateConvergentCounter client (ConvergentCounter { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt client request)
@@ -116,12 +116,13 @@ updateCounter client (Counter { key, value }) = liftIO $
     Key bucketType bucket k =
       key
 
-    fromResponse :: Proto.UpdateCrdtResponse -> Counter
+    fromResponse :: Proto.UpdateCrdtResponse -> ConvergentCounter
     fromResponse response =
-      Counter
+      ConvergentCounter
         { key =
             if ByteString.null k
               then Key bucketType bucket (response ^. L.key)
               else key
-        , value = response ^. L.counter
+        , value =
+            response ^. L.counter
         }

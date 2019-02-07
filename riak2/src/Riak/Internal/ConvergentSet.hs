@@ -1,4 +1,4 @@
-module Riak.Internal.Set where
+module Riak.Internal.ConvergentSet where
 
 import Riak.Client           (Client)
 import Riak.Internal.Context (Context(..))
@@ -15,29 +15,29 @@ import qualified ByteString
 import qualified HashSet
 
 
--- | A set data type.
+-- | An eventually-convergent set.
 --
 -- Sets must be stored in a bucket type with the __@datatype = set@__ property.
-data Set a
-  = Set
+data ConvergentSet a
+  = ConvergentSet
   { context :: !Context -- ^ Causal context
   , key :: !Key -- ^
   , value :: !a -- ^
   } deriving stock (Functor, Generic, Show)
 
 -- | A set update.
-data SetUpdate
+data ConvergentSetUpdate
   = Add ByteString
   | Remove ByteString
   deriving stock (Eq, Show)
 
 -- | Get a set.
-getSet ::
+getConvergentSet ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either ByteString (Maybe (Set (HashSet ByteString))))
-getSet client k@(Key bucketType bucket key) = liftIO $
+  -> m (Either ByteString (Maybe (ConvergentSet (HashSet ByteString))))
+getConvergentSet client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.getCrdt client request)
@@ -59,11 +59,13 @@ getSet client k@(Key bucketType bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Maybe (Set (HashSet ByteString))
+    fromResponse ::
+         Proto.GetCrdtResponse
+      -> Maybe (ConvergentSet (HashSet ByteString))
     fromResponse response = do
       crdt :: Proto.Crdt <-
         response ^. L.maybe'value
-      pure Set
+      pure ConvergentSet
         { context = Context (response ^. L.context)
         , key = k
         , value = HashSet.fromList (crdt ^. L.set)
@@ -71,13 +73,13 @@ getSet client k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a set.
 --
--- /See also/: @Riak.Context.'Riak.Context.newContext'@, @Riak.Key.'Riak.Key.generatedKey'@
-updateSet ::
+-- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+updateConvergentSet ::
      MonadIO m
   => Client -- ^
-  -> Set [SetUpdate] -- ^
-  -> m (Either ByteString (Set (HashSet ByteString)))
-updateSet client (Set { context, key, value }) = liftIO $
+  -> ConvergentSet [ConvergentSetUpdate] -- ^
+  -> m (Either ByteString (ConvergentSet (HashSet ByteString)))
+updateConvergentSet client (ConvergentSet { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt client request)
@@ -98,7 +100,7 @@ updateSet client (Set { context, key, value }) = liftIO $
               else Just k)
         & L.update .~
             (Proto.defMessage
-              & L.setUpdate .~ updatesToProto value)
+              & L.setUpdate .~ toProtoUpdate value)
         & L.returnBody .~ True
 
 -- TODO set update opts
@@ -112,9 +114,11 @@ updateSet client (Set { context, key, value }) = liftIO $
     Key bucketType bucket k =
       key
 
-    fromResponse :: Proto.UpdateCrdtResponse -> Set (HashSet ByteString)
+    fromResponse ::
+         Proto.UpdateCrdtResponse
+      -> ConvergentSet (HashSet ByteString)
     fromResponse response =
-      Set
+      ConvergentSet
         { context = Context (response ^. L.context)
         , key =
             if ByteString.null k
@@ -123,8 +127,8 @@ updateSet client (Set { context, key, value }) = liftIO $
         , value = HashSet.fromList (response ^. L.set)
         }
 
-updatesToProto :: [SetUpdate] -> Proto.SetUpdate
-updatesToProto updates =
+toProtoUpdate :: [ConvergentSetUpdate] -> Proto.SetUpdate
+toProtoUpdate updates =
   Proto.defMessage
     & L.adds .~ adds
     & L.removes .~ removes

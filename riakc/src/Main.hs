@@ -1,10 +1,12 @@
 module Main where
 
 import Riak                       (Bucket(..), Content(..), Context,
-                                   GetOpts(..), Key(..), Map(..), MapUpdate(..),
-                                   PutOpts(..), Quorum(..), ServerInfo(..),
-                                   SetUpdate(..), generatedKey, getMap,
-                                   newContext, unsafeMakeContext, updateMap)
+                                   ConvergentMap(..), ConvergentMapUpdate(..),
+                                   ConvergentSetUpdate(..), GetOpts(..),
+                                   Key(..), PutOpts(..), Quorum(..),
+                                   ServerInfo(..), generatedKey,
+                                   getConvergentMap, newContext,
+                                   unsafeMakeContext, updateConvergentMap)
 import Riak.Client                (Client)
 import Riak.Interface.Impl.Socket (Socket)
 
@@ -149,7 +151,7 @@ getMapParser =
       -> Client
       -> IO ()
     doGetMap key client =
-      getMap client key >>= \case
+      getConvergentMap client key >>= \case
         Left err -> do
           print err
           exitFailure
@@ -248,11 +250,11 @@ updateMapParser =
     doUpdateMap ::
          Either Bucket Key
       -> Maybe Context
-      -> [MapUpdate]
+      -> [ConvergentMapUpdate]
       -> Client
       -> IO ()
     doUpdateMap bucketOrKey context updates client = do
-      updateMap client operation >>= \case
+      updateConvergentMap client operation >>= \case
         Left err -> do
           print err
           exitFailure
@@ -261,9 +263,9 @@ updateMapParser =
           print val
 
       where
-        operation :: Map [MapUpdate]
+        operation :: ConvergentMap [ConvergentMapUpdate]
         operation =
-          Map
+          ConvergentMap
             { context = fromMaybe newContext context
             , key =
                 case bucketOrKey of
@@ -301,12 +303,12 @@ keyArgument :: Parser Key
 keyArgument =
   argument (eitherReader parseKey) keyMod
 
-mapUpdateOptions :: Parser [MapUpdate]
+mapUpdateOptions :: Parser [ConvergentMapUpdate]
 mapUpdateOptions =
   many mapUpdateOption
 
   where
-    mapUpdateOption :: Parser MapUpdate
+    mapUpdateOption :: Parser ConvergentMapUpdate
     mapUpdateOption =
       asum
         [ removeCounterOption
@@ -322,39 +324,39 @@ mapUpdateOptions =
         , removeElemOption
         ]
 
-    removeCounterOption :: Parser MapUpdate
+    removeCounterOption :: Parser ConvergentMapUpdate
     removeCounterOption =
       makeMapUpdate (RemoveCounter . Latin1.pack) . splitOn "." <$>
         strOption (long "remove-counter" <> help "Remove a counter")
 
-    removeFlagOption :: Parser MapUpdate
+    removeFlagOption :: Parser ConvergentMapUpdate
     removeFlagOption =
       makeMapUpdate (RemoveFlag . Latin1.pack) . splitOn "." <$>
         strOption (long "remove-flag" <> help "Remove a flag")
 
-    removeMapOption :: Parser MapUpdate
+    removeMapOption :: Parser ConvergentMapUpdate
     removeMapOption =
       makeMapUpdate (RemoveMap . Latin1.pack) . splitOn "." <$>
         strOption (long "remove-map" <> help "Remove a map")
 
-    removeRegisterOption :: Parser MapUpdate
+    removeRegisterOption :: Parser ConvergentMapUpdate
     removeRegisterOption =
       makeMapUpdate (RemoveRegister . Latin1.pack) . splitOn "." <$>
         strOption (long "remove-register" <> help "Remove a register")
 
-    removeSetOption :: Parser MapUpdate
+    removeSetOption :: Parser ConvergentMapUpdate
     removeSetOption =
       makeMapUpdate (RemoveSet . Latin1.pack) . splitOn "." <$>
         strOption (long "remove-set" <> help "Remove a set")
 
-    incrementCounterOption :: Parser MapUpdate
+    incrementCounterOption :: Parser ConvergentMapUpdate
     incrementCounterOption =
       option
         (eitherReader parseIncrementCounter)
         (long "incr-counter" <> help "Increment a counter")
 
       where
-        parseIncrementCounter :: String -> Either String MapUpdate
+        parseIncrementCounter :: String -> Either String ConvergentMapUpdate
         parseIncrementCounter update =
           case splitOn "/" update of
             [ path, readMaybe -> Just val ] ->
@@ -366,24 +368,24 @@ mapUpdateOptions =
             _ ->
               Left "Expected: 'path/amount'"
 
-    disableFlagOption :: Parser MapUpdate
+    disableFlagOption :: Parser ConvergentMapUpdate
     disableFlagOption =
       makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) False) . splitOn "." <$>
         strOption (long "disable-flag" <> help "Disable a flag")
 
-    enableFlagOption :: Parser MapUpdate
+    enableFlagOption :: Parser ConvergentMapUpdate
     enableFlagOption =
       makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) True) . splitOn "." <$>
         strOption (long "enable-flag" <> help "Enable a flag")
 
-    setRegisterOption :: Parser MapUpdate
+    setRegisterOption :: Parser ConvergentMapUpdate
     setRegisterOption =
       option
         (eitherReader parseSetRegister)
         (long "set-register" <> help "Set a register")
 
       where
-        parseSetRegister :: String -> Either String MapUpdate
+        parseSetRegister :: String -> Either String ConvergentMapUpdate
         parseSetRegister update =
           case splitOn "/" update of
             [ path, val ] ->
@@ -396,22 +398,22 @@ mapUpdateOptions =
               Left "Expected: 'path/value'"
 
 
-    addElemOption :: Parser MapUpdate
+    addElemOption :: Parser ConvergentMapUpdate
     addElemOption =
       option
         (eitherReader (parseUpdateSet Add))
         (long "add-elem" <> help "Add an element to a set")
 
-    removeElemOption :: Parser MapUpdate
+    removeElemOption :: Parser ConvergentMapUpdate
     removeElemOption =
       option
         (eitherReader (parseUpdateSet Remove))
         (long "remove-elem" <> help "Add an element to a set")
 
     parseUpdateSet ::
-         (ByteString -> SetUpdate)
+         (ByteString -> ConvergentSetUpdate)
       -> String
-      -> Either String MapUpdate
+      -> Either String ConvergentMapUpdate
     parseUpdateSet toUpdate update =
       case splitOn "/" update of
         [ path, val ] ->
@@ -423,12 +425,15 @@ mapUpdateOptions =
         _ ->
           Left "Expected: 'path/value'"
 
-    makeMapUpdate :: (String -> MapUpdate) -> [String] -> MapUpdate
+    makeMapUpdate ::
+         (String -> ConvergentMapUpdate)
+      -> [String]
+      -> ConvergentMapUpdate
     makeMapUpdate onLeaf =
       loop
 
       where
-        loop :: [String] -> MapUpdate
+        loop :: [String] -> ConvergentMapUpdate
         loop = \case
           [] ->
             undefined

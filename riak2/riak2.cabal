@@ -46,10 +46,10 @@ description:
   .
   CRDT types and operations:
   .
-  * "Riak.Counter"
-  * "Riak.HyperLogLog"
-  * "Riak.Map"
-  * "Riak.Set"
+  * "Riak.ConvergentCounter"
+  * "Riak.ConvergentHyperLogLog"
+  * "Riak.ConvergentMap"
+  * "Riak.ConvergentSet"
   .
   Namespace types and operations:
   .
@@ -144,23 +144,23 @@ library
     Riak.Client
     Riak.Content
     Riak.Context
-    Riak.Counter
+    Riak.ConvergentCounter
+    Riak.ConvergentHyperLogLog
+    Riak.ConvergentMap
+    Riak.ConvergentSet
     Riak.Error
     Riak.ExactQuery
-    Riak.HyperLogLog
     Riak.Index
-    Riak.SecondaryIndex
-    Riak.SecondaryIndexValue
-    Riak.Schema
     Riak.Key
-    Riak.Map
     Riak.MapReduce
     Riak.Object
     Riak.Opts
     Riak.Quorum
     Riak.RangeQuery
+    Riak.Schema
+    Riak.SecondaryIndex
+    Riak.SecondaryIndexValue
     Riak.ServerInfo
-    Riak.Set
 
     ZZZ.Erlang
     ZZZ.Riak
@@ -186,6 +186,7 @@ library
   other-modules:
     Riak.Internal.Bucket
     Riak.Internal.Context
+    Riak.Internal.ConvergentSet
     Riak.Internal.Error
     Riak.Internal.ExactQuery
     Riak.Internal.Key
@@ -198,7 +199,6 @@ library
     Riak.Internal.RangeQuery
     Riak.Internal.SecondaryIndex
     Riak.Internal.SecondaryIndexValue
-    Riak.Internal.Set
     Riak.Internal.Utils
 
   mixins:

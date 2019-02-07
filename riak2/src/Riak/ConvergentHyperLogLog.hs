@@ -2,10 +2,10 @@
 -- * <http://docs.basho.com/riak/kv/2.2.3/developing/data-types/hyperloglogs/>
 -- * <http://basho.com/posts/technical/what-in-the-hell-is-hyperloglog/>
 -- * <https://github.com/basho/riak_kv/blob/develop/docs/hll/hll.pdf>
-module Riak.HyperLogLog
-  ( HyperLogLog(..)
-  , getHyperLogLog
-  , updateHyperLogLog
+module Riak.ConvergentHyperLogLog
+  ( ConvergentHyperLogLog(..)
+  , getConvergentHyperLogLog
+  , updateConvergentHyperLogLog
   ) where
 
 import Riak.Client           (Client)
@@ -21,8 +21,8 @@ import Control.Lens ((.~), (^.))
 import qualified ByteString
 
 
--- | A HyperLogLog data type, which provides an approximate cardinality of a
--- set.
+-- | An eventually-convergent HyperLogLog, which provides an approximate
+-- cardinality of a set.
 --
 -- HyperLogLogs must be stored in a bucket type with the __@datatype = hll@__
 -- property.
@@ -33,19 +33,19 @@ import qualified ByteString
 --
 -- /Note/: HyperLogLogs do not contain a causal context, so it is not necessary
 -- to read a HyperLogLog before updating it.
-data HyperLogLog a
-  = HyperLogLog
+data ConvergentHyperLogLog a
+  = ConvergentHyperLogLog
   { key :: !Key -- ^
   , value :: !a -- ^
   } deriving stock (Functor, Generic, Show)
 
 -- | Get a HyperLogLog.
-getHyperLogLog ::
+getConvergentHyperLogLog ::
      MonadIO m
   => Client -- ^
   -> Key -- ^
-  -> m (Either ByteString (Maybe (HyperLogLog Word64)))
-getHyperLogLog client k@(Key bucketType bucket key) = liftIO $
+  -> m (Either ByteString (Maybe (ConvergentHyperLogLog Word64)))
+getConvergentHyperLogLog client k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.getCrdt client request)
@@ -67,24 +67,26 @@ getHyperLogLog client k@(Key bucketType bucket key) = liftIO $
         -- & L.maybe'sloppyQuorum .~ undefined
         -- & L.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Maybe (HyperLogLog Word64)
+    fromResponse ::
+         Proto.GetCrdtResponse
+      -> Maybe (ConvergentHyperLogLog Word64)
     fromResponse response = do
       crdt :: Proto.Crdt <-
         response ^. L.maybe'value
-      pure HyperLogLog
+      pure ConvergentHyperLogLog
         { key = k
         , value = crdt ^. L.hll
         }
 
 -- | Update a HyperLogLog.
 --
--- /See also/: Riak.Key.'Riak.Key.generatedKey'
-updateHyperLogLog ::
+-- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+updateConvergentHyperLogLog ::
      MonadIO m
   => Client -- ^
-  -> HyperLogLog [ByteString] -- ^
-  -> m (Either ByteString (HyperLogLog Word64))
-updateHyperLogLog client (HyperLogLog { key, value }) = liftIO $
+  -> ConvergentHyperLogLog [ByteString] -- ^
+  -> m (Either ByteString (ConvergentHyperLogLog Word64))
+updateConvergentHyperLogLog client (ConvergentHyperLogLog { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Interface.updateCrdt client request)
@@ -117,9 +119,9 @@ updateHyperLogLog client (HyperLogLog { key, value }) = liftIO $
     Key bucketType bucket k =
       key
 
-    fromResponse :: Proto.UpdateCrdtResponse -> HyperLogLog Word64
+    fromResponse :: Proto.UpdateCrdtResponse -> ConvergentHyperLogLog Word64
     fromResponse response =
-      HyperLogLog
+      ConvergentHyperLogLog
         { key =
             if ByteString.null k
               then Key bucketType bucket (response ^. L.key)

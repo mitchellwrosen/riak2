@@ -16,9 +16,18 @@ module Riak
   , putGetHead
     -- ** Delete object
   , delete
+    -- * Counter operations
+  , getConvergentCounter
+  , updateConvergentCounter
+    -- * HyperLogLog operations
+  , getConvergentHyperLogLog
+  , updateConvergentHyperLogLog
     -- * Map operations
-  , getMap
-  , updateMap
+  , getConvergentMap
+  , updateConvergentMap
+    -- * Set operations
+  , getConvergentSet
+  , updateConvergentSet
     -- * Types
   , Bucket(..)
   , BucketProperties(..)
@@ -30,16 +39,18 @@ module Riak
   , Context
   , newContext
   , unsafeMakeContext
-  , Counter(..)
+  , ConvergentCounter(..)
+  , ConvergentHyperLogLog(..)
+  , ConvergentMap(..)
+  , ConvergentMapUpdate(..)
+  , ConvergentMapValue(..)
+  , ConvergentSet(..)
+  , ConvergentSetUpdate(..)
   , ExactQuery(..)
   , GetOpts(..)
-  , HyperLogLog(..)
   , Index(..)
   , Key(..)
   , generatedKey
-  , Map(..)
-  , MapUpdate(..)
-  , Maps(..)
   , NotfoundBehavior(..)
   , Object(..)
   , PutOpts(..)
@@ -48,32 +59,30 @@ module Riak
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
-  , Set(..)
-  , SetUpdate(..)
     -- ** Re-exports
   , def
   ) where
 
-import Riak.Bucket              (Bucket(..))
-import Riak.BucketProperties    (BucketProperties(..), ConflictResolution(..),
-                                 NotfoundBehavior(..))
-import Riak.BucketType          (BucketType(..))
+import Riak.Bucket                (Bucket(..))
+import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
+                                   NotfoundBehavior(..))
+import Riak.BucketType            (BucketType(..))
 import Riak.Client
 import Riak.Content
 import Riak.Context
-import Riak.Counter             (Counter(..))
-import Riak.ExactQuery          (ExactQuery(..))
-import Riak.HyperLogLog         (HyperLogLog(..))
-import Riak.Index               (Index(..))
+import Riak.ConvergentCounter
+import Riak.ConvergentHyperLogLog
+import Riak.ConvergentMap
+import Riak.ConvergentSet
+import Riak.ExactQuery            (ExactQuery(..))
+import Riak.Index                 (Index(..))
 import Riak.Key
-import Riak.Map
 import Riak.Object
-import Riak.Opts                (GetOpts(..), PutOpts(..))
-import Riak.Quorum              (Quorum(..))
-import Riak.RangeQuery          (RangeQuery(..))
-import Riak.SecondaryIndex      (SecondaryIndex(..))
-import Riak.SecondaryIndexValue (SecondaryIndexValue(..))
+import Riak.Opts                  (GetOpts(..), PutOpts(..))
+import Riak.Quorum                (Quorum(..))
+import Riak.RangeQuery            (RangeQuery(..))
+import Riak.SecondaryIndex        (SecondaryIndex(..))
+import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
-import Riak.Set                 (Set(..), SetUpdate(..))
 
 import Data.Default.Class (def)
