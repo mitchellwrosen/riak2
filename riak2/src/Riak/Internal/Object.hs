@@ -14,7 +14,10 @@ import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
 import qualified Riak.Proto                   as Proto
 import qualified Riak.Proto.Lens              as L
 
-import qualified Data.ByteString    as ByteString
+import Control.Lens ((^.))
+import Data.Time    (UTCTime)
+
+import qualified ByteString
 import qualified Data.List.NonEmpty as List1
 
 
@@ -24,7 +27,7 @@ data Object a
   , deleted :: Bool
   , lastModified :: UTCTime
   , ttl :: Maybe Word32 -- TODO NominalDiffTime
-  } deriving stock (Functor, Generic, Show)
+  } deriving stock (Eq, Functor, Generic, Show)
 
 fromProtoContent ::
      Key

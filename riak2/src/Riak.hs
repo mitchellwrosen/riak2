@@ -1,6 +1,23 @@
 -- TODO export functions from Riak
+
 module Riak
-  ( Bucket(..)
+  ( -- * Server info
+    ping
+  , getServerInfo
+    -- * Object operations
+    -- ** Get object
+  , get
+  , getHead
+  , getIfModified
+  , getHeadIfModified
+    -- ** Put object
+  , put
+  , putGet
+  , putGetHead
+    -- ** Delete object
+  , delete
+    -- * Types
+  , Bucket(..)
   , BucketProperties(..)
   , BucketType(..)
   , Client
@@ -28,13 +45,15 @@ module Riak
   , ServerInfo(..)
   , Set(..)
   , SetUpdate(..)
+    -- ** Re-exports
+  , def
   ) where
 
 import Riak.Bucket              (Bucket(..))
 import Riak.BucketProperties    (BucketProperties(..), ConflictResolution(..),
                                  NotfoundBehavior(..))
 import Riak.BucketType          (BucketType(..))
-import Riak.Client              (Client)
+import Riak.Client
 import Riak.Content             (Content(..))
 import Riak.Context
 import Riak.Counter             (Counter(..))
@@ -43,11 +62,13 @@ import Riak.HyperLogLog         (HyperLogLog(..))
 import Riak.Index               (Index(..))
 import Riak.Key
 import Riak.Map                 (Map(..), MapUpdate(..), Maps(..))
-import Riak.Object              (Object(..))
+import Riak.Object
 import Riak.Opts                (GetOpts(..), PutOpts(..))
 import Riak.Quorum              (Quorum(..))
 import Riak.RangeQuery          (RangeQuery(..))
 import Riak.SecondaryIndex      (SecondaryIndex(..))
 import Riak.SecondaryIndexValue (SecondaryIndexValue(..))
-import Riak.ServerInfo          (ServerInfo(..))
+import Riak.ServerInfo
 import Riak.Set                 (Set(..), SetUpdate(..))
+
+import Data.Default.Class (def)

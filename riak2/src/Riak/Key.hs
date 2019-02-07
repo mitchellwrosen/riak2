@@ -7,7 +7,7 @@ module Riak.Key
 import Riak.Internal.Bucket  (Bucket(..))
 import Riak.Internal.Key     (Key(..))
 
-import qualified Data.ByteString as ByteString
+import qualified ByteString
 
 
 -- | Use 'generatedKey' to ask Riak to generate a random key when writing a new

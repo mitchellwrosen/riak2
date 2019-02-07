@@ -9,7 +9,7 @@ import Riak.Internal.Prelude
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import Data.Functor.Identity
+import Control.Lens
 
 data BucketProperties f
   = BucketProperties

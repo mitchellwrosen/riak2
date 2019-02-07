@@ -5,6 +5,8 @@ import Riak.Proto
 
 import qualified Riak.Proto.Lens as L
 
+import Control.Lens ((.~), (^.))
+
 
 fromTuple :: (ByteString, Maybe ByteString) -> Pair
 fromTuple (key, value) =

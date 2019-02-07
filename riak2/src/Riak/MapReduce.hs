@@ -8,6 +8,8 @@ import Riak.Internal.Prelude
 import qualified Riak.Interface as Interface
 import qualified Riak.Proto as Proto
 
+import Control.Foldl (FoldM)
+
 
 mapReduce ::
      MonadIO m

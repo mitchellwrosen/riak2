@@ -2,6 +2,8 @@ module Riak.Internal.Key where
 
 import Riak.Internal.Prelude
 
+import Data.Hashable (Hashable)
+
 
 -- | A bucket type, bucket, and key.
 --

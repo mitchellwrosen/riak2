@@ -1,8 +1,7 @@
 module Riak.Object
-  ( -- * Object
-    Object(..)
+  ( -- * Object operations
     -- ** Get object
-  , get
+    get
   , getHead
   , getIfModified
   , getHeadIfModified
@@ -12,6 +11,8 @@ module Riak.Object
   , putGetHead
     -- ** Delete object
   , delete
+    -- * Object type
+  , Object(..)
   ) where
 
 import Riak.Client           (Client)
@@ -31,9 +32,12 @@ import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
 import qualified Riak.Proto                   as Proto
 import qualified Riak.Proto.Lens              as L
 
+import Control.Lens                ((.~), (^.))
+import Data.Generics.Product       (field)
 import Data.Generics.Product.Typed (HasType(..))
+import Data.Text.Encoding          (decodeUtf8)
 
-import qualified Data.ByteString as ByteString
+import qualified ByteString
 
 -- TODO specialize HasType for Object,Content
 
@@ -90,14 +94,24 @@ getHead client key opts = liftIO $
 -- 'put'.
 --
 -- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Metadata.deleted'.
-getIfModified
-  :: MonadIO m
+-- 'Riak.Object.deleted'.
+getIfModified ::
+     -- ( (forall x. HasType (Content x) (content x))
+     ( MonadIO m
+     )
   => Client -- ^
   -> Content a -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) (Maybe [Object ByteString]))
-getIfModified client (Content { key, context }) opts = liftIO $
+getIfModified client content opts =
+  liftIO (getIfModified_ client content opts)
+
+getIfModified_ ::
+     Client
+  -> Content a
+  -> GetOpts
+  -> IO (Either (Error 'GetOp) (Maybe [Object ByteString]))
+getIfModified_ client (Content { key, context }) opts =
   (fmap.fmap)
     (\response ->
       if response ^. L.unchanged
@@ -151,16 +165,16 @@ doGet client request =
   where
     parseGetError :: ByteString -> Error 'GetOp
     parseGetError err
-      | isBucketTypeDoesNotExist err =
-          BucketTypeDoesNotExist (request ^. L.bucketType)
-      | isInvalidN err =
-          InvalidN (request ^. L.n)
+      | isBucketTypeDoesNotExistError err =
+          BucketTypeDoesNotExistError (request ^. L.bucketType)
+      | isInvalidNError err =
+          InvalidNError (request ^. L.n)
       | otherwise =
           UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest (Key bucketType bucket key) opts =
-  defMessage
+  Proto.defMessage
     & L.bucket .~ bucket
     & L.bucketType .~ bucketType
     & L.deletedContext .~ True
@@ -300,10 +314,10 @@ doPut client request =
   where
     parsePutError :: ByteString -> Error 'PutOp
     parsePutError err
-      | isBucketTypeDoesNotExist err =
-          BucketTypeDoesNotExist (request ^. L.bucketType)
-      | isInvalidN err =
-          InvalidN (request ^. L.n)
+      | isBucketTypeDoesNotExistError err =
+          BucketTypeDoesNotExistError (request ^. L.bucketType)
+      | isInvalidNError err =
+          InvalidNError (request ^. L.n)
       | otherwise =
           UnknownError (decodeUtf8 err)
 
@@ -313,11 +327,11 @@ makePutRequest ::
   -> PutOpts
   -> Proto.PutRequest
 makePutRequest (Key bucketType bucket key) content opts =
-  defMessage
+  Proto.defMessage
     & L.bucket .~ bucket
     & L.bucketType .~ bucketType
     & L.content .~
-        (defMessage
+        (Proto.defMessage
           & L.indexes .~ map SecondaryIndex.toPair (content ^. field @"indexes")
           & L.maybe'charset .~ (content ^. field @"charset")
           & L.maybe'contentEncoding .~ (content ^. field @"encoding")
@@ -350,13 +364,13 @@ delete ::
   => Client -- ^
   -> Object a -- ^
   -> m (Either (Error 'DeleteOp) ())
-delete client (view (field @"content") -> content) = liftIO $
+delete client Object { content } = liftIO $
   first parseDeleteError <$> Interface.delete client request
 
   where
     request :: Proto.DeleteRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.key .~ key

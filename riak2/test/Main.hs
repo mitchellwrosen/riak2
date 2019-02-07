@@ -1,50 +1,130 @@
-{-# LANGUAGE DataKinds, FlexibleContexts, OverloadedLabels, OverloadedStrings,
-             TypeApplications #-}
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
+module Main where
+
+import Riak
+import Riak.Interface.Impl.Socket (Config(..), EventHandlers(..), Socket, withInterface)
+
+import qualified Riak.Interface.Impl.Socket as Socket
+
+import Control.Lens
+import Data.Generics.Product (field)
+import Test.Tasty
+import Test.Tasty.HUnit
+
+import qualified Data.ByteString.Random as ByteString
 
 main :: IO ()
-main = pure ()
+main = do
+  socket :: Socket <-
+    Socket.new1 "localhost" 8087
 
--- import Control.Concurrent
--- import Control.Exception
--- import Control.Monad
--- import Data.ByteString    (ByteString)
--- import Data.Foldable
--- import Data.Maybe         (isJust)
--- import Data.Text          (Text)
--- import Lens.Family2
--- import System.Process
--- import System.Random
--- import Test.Tasty
--- import Test.Tasty.HUnit
--- import Text.Printf        (printf)
+  let
+    config :: Config
+    config =
+      Config
+        { socket = socket
+        , handlers =
+            mempty
+            -- EventHandlers
+            --   { onSend = print
+            --   , onReceive = print
+            --   }
+        }
 
--- import qualified Control.Foldl         as Foldl
--- import qualified Data.ByteString.Char8 as Latin1
--- import qualified Data.Set              as Set
--- import qualified Data.Text             as Text
+  withInterface config $ \client ->
+    defaultMain (testGroup "Riak integration tests" (integrationTests client))
 
--- import           Erlang
--- import           Riak
--- import           Riak.Internal
--- import qualified Riak.Lenses as L
+integrationTests :: Client -> [TestTree]
+integrationTests client =
+  [ testGroup "Riak.Client"
+    [ testCase "ping" $ do
+        ping client `shouldReturn` Right ()
+    ]
 
--- main :: IO ()
--- main = do
---   riakh <- createRiakHandle "localhost" 8087
---   defaultMain (testGroup "Tests" (tests riakh))
+  , testGroup "Riak.Object"
+    [ testGroup "get"
+      [ testCase "404" $ do
+          key <- randomKey
+          get client key def `shouldReturn` Right []
 
--- tests :: RiakHandle -> [TestTree]
--- tests h =
---   [ testCase "ping" $ do
---       pingRiak h `shouldReturn` Right ()
+      , testCase "success" $ do
+          bucket <- ByteString.random 32
+          value <- ByteString.random 6
+          let content =
+                Content
+                  { charset = Nothing
+                  , context = newContext
+                  , encoding = Nothing
+                  , indexes = []
+                  , key = generatedKey (Bucket "objects" bucket)
+                  , metadata = []
+                  , type' = Nothing
+                  , value = value
+                  }
+          Right key <- put client content def
+          get client key def >>= \case
+            Left err -> assertFailure (show err)
+            Right [Object { content }] -> do
+              (content ^. field @"value") `shouldBe` value
+            _ -> undefined
 
---   , testCase "get server info" $ do
---       Right _ <- getRiakServerInfo h
---       pure ()
+      , testCase "if modified (not modified)" $ do
+          bucket <- ByteString.random 32
+          value <- ByteString.random 6
+          let content =
+                Content
+                  { charset = Nothing
+                  , context = newContext
+                  , encoding = Nothing
+                  , indexes = []
+                  , key = generatedKey (Bucket "objects" bucket)
+                  , metadata = []
+                  , type' = Nothing
+                  , value = value
+                  }
+          Right key <- put client content def
+          get client key def >>= \case
+            Left err -> assertFailure (show err)
+            Right [Object { content }] -> do
+              getIfModified client content def `shouldReturnSatisfy` isRightNothing
+            _ -> undefined
 
---   , testCase "get object 404" $ do
---       key <- randomObjectKey
---       getRiakObject @Text h key def `shouldReturn` Right []
+      , testCase "if modified (modified)" $ do
+          bucket <- ByteString.random 32
+          value <- ByteString.random 6
+          let content =
+                Content
+                  { charset = Nothing
+                  , context = newContext
+                  , encoding = Nothing
+                  , indexes = []
+                  , key = generatedKey (Bucket "objects" bucket)
+                  , metadata = []
+                  , type' = Nothing
+                  , value = value
+                  }
+          Right key <- put client content def
+          get client key def >>= \case
+            Left err -> assertFailure (show err)
+            Right [object] -> do
+              _ <- put client object def
+              getIfModified client (object ^. field @"content") def `shouldReturnSatisfy` isRightJust
+            _ -> undefined
+      ]
+    ]
+
+  , testGroup "Riak.ServerInfo"
+    [ testCase "getServerInfo" $ do
+        getServerInfo client `shouldReturn`
+          Right ServerInfo
+            { name = "riak@172.17.0.2"
+            , version = "2.2.3"
+            }
+    ]
+
+
+  ]
 
 --   , testCase "get Text object w/o charset" $ do
 --       key <- randomObjectKey
@@ -284,11 +364,11 @@ main = pure ()
 -- randomText :: IO Text
 -- randomText = Text.pack <$> replicateM 32 (randomRIO ('a', 'z'))
 
--- randomObjectKey :: IO RiakKey
--- randomObjectKey = do
---   bucket <- randomBucketName
---   key <- randomKeyName
---   pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
+randomKey :: IO Key
+randomKey =
+  Key "objects"
+    <$> ByteString.random 32
+    <*> ByteString.random 32
 
 -- randomObjectKeyIn :: ByteString -> IO RiakKey
 -- randomObjectKeyIn bucket = do
@@ -316,15 +396,24 @@ main = pure ()
 -- randomSetKey =
 --   RiakKey <$> randomSetBucket <*> randomKeyName
 
+isRightJust :: Either a (Maybe b) -> Bool
+isRightJust = \case
+  Right Just{} -> True
+  _ -> False
 
--- shouldBe :: (Eq a, HasCallStack, Show a) => a -> a -> IO ()
--- shouldBe = (@?=)
+isRightNothing :: Either a (Maybe b) -> Bool
+isRightNothing = \case
+  Right Nothing -> True
+  _ -> False
 
--- shouldReturn :: (Eq a, HasCallStack, Show a) => IO a -> a -> IO ()
--- shouldReturn m x = m >>= (@?= x)
+shouldBe :: (Eq a, HasCallStack, Show a) => a -> a -> IO ()
+shouldBe = (@?=)
 
--- shouldReturnSatisfy :: (HasCallStack, Show a) => IO a -> (a -> Bool) -> IO ()
--- shouldReturnSatisfy m p = (`shouldSatisfy` p) =<< m
+shouldReturn :: (Eq a, HasCallStack, Show a) => IO a -> a -> IO ()
+shouldReturn m x = m >>= (@?= x)
 
--- shouldSatisfy :: (HasCallStack, Show a) => a -> (a -> Bool) -> IO ()
--- shouldSatisfy x f = assertBool "" (f x)
+shouldReturnSatisfy :: (HasCallStack, Show a) => IO a -> (a -> Bool) -> IO ()
+shouldReturnSatisfy m p = (`shouldSatisfy` p) =<< m
+
+shouldSatisfy :: (HasCallStack, Show a) => a -> (a -> Bool) -> IO ()
+shouldSatisfy x f = assertBool ("Failed predicate on " ++ show x) (f x)

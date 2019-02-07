@@ -21,7 +21,7 @@ import qualified Network.Socket as Network
 
 main :: IO ()
 main = do
-  socketmain
+  pure () -- socketmain
 
 socketmain :: IO ()
 socketmain = do

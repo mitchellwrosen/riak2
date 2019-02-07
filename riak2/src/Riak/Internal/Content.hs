@@ -18,4 +18,4 @@ data Content a
   , metadata :: [(ByteString, Maybe ByteString)] -- ^ User metadata
   , type' :: Maybe ByteString -- ^ Content type
   , value :: a -- ^ Value
-  } deriving stock (Functor, Generic, Show)
+  } deriving stock (Eq, Functor, Generic, Show)

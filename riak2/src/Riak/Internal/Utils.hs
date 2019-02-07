@@ -1,13 +1,14 @@
 module Riak.Internal.Utils where
 
+import Riak.Internal.Panic
+import Riak.Internal.Prelude
+
 import Data.Maybe (fromJust)
 
-import qualified Data.ByteString as ByteString
+import qualified ByteString
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.ByteString.Lex.Integral as ByteString
 
-import Riak.Internal.Panic
-import Riak.Internal.Prelude
 
 -- | Pack a non-negative 'Int64' as an ASCII byte array.
 int2bs :: Int64 -> ByteString

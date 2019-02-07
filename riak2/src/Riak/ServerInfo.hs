@@ -10,12 +10,15 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
+import Control.Lens       ((^.))
+import Data.Text.Encoding (decodeUtf8)
+
 
 data ServerInfo
   = ServerInfo
   { name :: !Text
   , version :: !Text
-  } deriving stock (Show)
+  } deriving stock (Eq, Generic, Show)
 
 -- | Get server info.
 getServerInfo ::

@@ -16,7 +16,9 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import qualified Data.ByteString as ByteString
+import Control.Lens ((.~), (^.))
+
+import qualified ByteString
 
 
 -- | A HyperLogLog data type, which provides an approximate cardinality of a
@@ -51,7 +53,7 @@ getHyperLogLog client k@(Key bucketType bucket key) = liftIO $
   where
     request :: Proto.GetCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.key .~ key
@@ -90,7 +92,7 @@ updateHyperLogLog client (HyperLogLog { key, value }) = liftIO $
   where
     request :: Proto.UpdateCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.maybe'key .~
@@ -98,9 +100,9 @@ updateHyperLogLog client (HyperLogLog { key, value }) = liftIO $
               then Nothing
               else Just k)
         & L.update .~
-            (defMessage
+            (Proto.defMessage
               & L.hllUpdate .~
-                  (defMessage
+                  (Proto.defMessage
                     & L.adds .~ value))
         & L.returnBody .~ True
 

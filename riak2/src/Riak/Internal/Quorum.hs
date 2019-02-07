@@ -2,6 +2,8 @@ module Riak.Internal.Quorum where
 
 import Riak.Internal.Prelude
 
+import Data.Default.Class (Default(..))
+
 
 -- | How many vnodes must respond before an operation is considered successful.
 -- TODO prefix constructors with Quorum

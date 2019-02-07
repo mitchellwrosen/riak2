@@ -2,15 +2,17 @@ module Riak.Internal.Set where
 
 import Riak.Client           (Client)
 import Riak.Internal.Context (Context(..))
-import Riak.Internal.Prelude hiding (Set)
+import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
 import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import qualified Data.ByteString as ByteString
-import qualified Data.HashSet    as HashSet
+import Control.Lens ((.~), (^.))
+
+import qualified ByteString
+import qualified HashSet
 
 
 -- | A set data type.
@@ -43,7 +45,7 @@ getSet client k@(Key bucketType bucket key) = liftIO $
   where
     request :: Proto.GetCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.key .~ key
@@ -83,7 +85,7 @@ updateSet client (Set { context, key, value }) = liftIO $
   where
     request :: Proto.UpdateCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.maybe'context .~
@@ -95,7 +97,7 @@ updateSet client (Set { context, key, value }) = liftIO $
               then Nothing
               else Just k)
         & L.update .~
-            (defMessage
+            (Proto.defMessage
               & L.setUpdate .~ updatesToProto value)
         & L.returnBody .~ True
 
@@ -123,7 +125,7 @@ updateSet client (Set { context, key, value }) = liftIO $
 
 updatesToProto :: [SetUpdate] -> Proto.SetUpdate
 updatesToProto updates =
-  defMessage
+  Proto.defMessage
     & L.adds .~ adds
     & L.removes .~ removes
 

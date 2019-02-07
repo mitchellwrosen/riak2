@@ -14,7 +14,10 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import Control.Lens (folded, to)
+import Control.Foldl      (FoldM(..))
+import Control.Lens       (folded, to, (.~))
+import Data.Default.Class (Default(..))
+import Data.Hashable      (Hashable)
 
 import qualified Control.Foldl as Foldl
 
@@ -91,7 +94,7 @@ streamBuckets client (BucketType bucketType) bucketFold =
   where
     request :: Proto.ListBucketsRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucketType .~ bucketType
         & L.stream .~ True
         -- TODO stream buckets timeout

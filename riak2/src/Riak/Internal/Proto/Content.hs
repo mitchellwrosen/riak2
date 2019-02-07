@@ -6,7 +6,8 @@ import qualified Riak.Internal.Proto.Pair as Pair
 import qualified Riak.Proto               as Proto
 import qualified Riak.Proto.Lens          as L
 
-import Data.Time             (NominalDiffTime)
+import Control.Lens          ((^.))
+import Data.Time             (NominalDiffTime, UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 

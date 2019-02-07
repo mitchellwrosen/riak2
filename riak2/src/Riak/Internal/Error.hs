@@ -2,7 +2,9 @@ module Riak.Internal.Error where
 
 import Riak.Internal.Prelude
 
-import qualified Data.ByteString as ByteString
+import ByteString
+
+-- TODO "Key cannot be zero-length" when putting with empty key
 
 -- | Error responses that Riak may return.
 --
@@ -14,12 +16,12 @@ import qualified Data.ByteString as ByteString
 --
 -- If you encounter an 'UnknownError', please open an issue about it!
 data Error :: Op -> Type where
-  BucketTypeDoesNotExist ::
+  BucketTypeDoesNotExistError ::
        MayReturnBucketTypeDoesNotExist op ~ 'True
     => !ByteString
     -> Error op
 
-  InvalidN ::
+  InvalidNError ::
        MayReturnInvalidN op ~ 'True
     => !Word32
     -> Error op
@@ -28,6 +30,7 @@ data Error :: Op -> Type where
        !Text
     -> Error op
 
+deriving stock instance Eq (Error op)
 deriving stock instance Show (Error op)
 
 -- | Operations used to index the 'Error' type.
@@ -48,10 +51,10 @@ type family MayReturnInvalidN (op :: Op) :: Bool where
   MayReturnInvalidN 'PutOp = 'True
   MayReturnInvalidN _ = 'False
 
-isBucketTypeDoesNotExist :: ByteString -> Bool
-isBucketTypeDoesNotExist =
+isBucketTypeDoesNotExistError :: ByteString -> Bool
+isBucketTypeDoesNotExistError =
   (== "no_type")
 
-isInvalidN :: ByteString -> Bool
-isInvalidN =
+isInvalidNError :: ByteString -> Bool
+isInvalidNError =
   ByteString.isPrefixOf "{n_val_violation"

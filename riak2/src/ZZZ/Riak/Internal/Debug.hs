@@ -4,10 +4,12 @@ module ZZZ.Riak.Internal.Debug
   ( debug
   ) where
 
+import Riak.Internal.Prelude
+
+import Control.Concurrent.MVar
 import System.IO
 import System.IO.Unsafe
 
-import Riak.Internal.Prelude
 
 _lock :: MVar ()
 _lock =

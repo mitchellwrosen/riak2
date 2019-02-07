@@ -12,7 +12,9 @@ import qualified Riak.Interface  as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import qualified Data.ByteString as ByteString
+import Control.Lens ((^.), (.~))
+
+import qualified ByteString
 
 
 -- | A counter data type.
@@ -42,7 +44,7 @@ getCounter client k@(Key bucketType bucket key) = liftIO $
   where
     request :: Proto.GetCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.key .~ key
@@ -84,7 +86,7 @@ updateCounter client (Counter { key, value }) = liftIO $
   where
     request :: Proto.UpdateCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.maybe'key .~
@@ -95,12 +97,12 @@ updateCounter client (Counter { key, value }) = liftIO $
             -- Missing value defaults to 1, so don't bother sending it
             case value of
               1 ->
-                defMessage
+                Proto.defMessage
 
               _ ->
-                defMessage
+                Proto.defMessage
                   & L.counterUpdate .~
-                      (defMessage
+                      (Proto.defMessage
                         & L.increment .~ value)
         & L.returnBody .~ True
 -- TODO counter update opts

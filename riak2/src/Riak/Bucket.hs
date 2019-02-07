@@ -28,7 +28,9 @@ import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 import qualified Riak.Proto                        as Proto
 import qualified Riak.Proto.Lens                   as L
 
-import Control.Lens (folded, to)
+import Control.Foldl   (FoldM(..))
+import Control.Lens    (folded, to, view, (.~), (^.))
+import Data.Profunctor (lmap)
 
 import qualified Control.Foldl as Foldl
 
@@ -47,7 +49,7 @@ getBucket client (Bucket bucketType bucket) = liftIO $
   where
     request :: Proto.GetBucketRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
 
@@ -74,7 +76,7 @@ resetBucket client (Bucket bucketType bucket) = liftIO $
   where
     request :: Proto.ResetBucketRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
 
@@ -98,7 +100,7 @@ queryExact client query@(ExactQuery { value }) keyFold =
 
     request :: Proto.SecondaryIndexRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.index .~ ExactQuery.name query
@@ -128,7 +130,7 @@ queryRange client query keyFold =
 
     request :: Proto.SecondaryIndexRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.index .~ RangeQuery.name query
@@ -246,7 +248,7 @@ streamBucketKeys client (Bucket bucketType bucket) keyFold =
   where
     request :: Proto.ListKeysRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         -- TODO stream keys timeout

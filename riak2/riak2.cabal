@@ -7,6 +7,8 @@ build-type: Simple
 description:
   __Library organization__
   .
+  TODO update this
+  .
   This library's modules are organized around types. A module will typically
   export one type and its API, which consists of the functions whose primary
   input type is the type in question.
@@ -81,38 +83,21 @@ description:
 
 library
   build-depends:
-    aeson ^>= 1.4.0,
-    attoparsec ^>= 0.13.2,
     base ^>= 4.11.1 || ^>= 4.12.0,
     base64-bytestring ^>= 1.0.0,
     bytestring ^>= 0.10.8,
     bytestring-lexing ^>= 0.5.0,
     containers ^>= 0.5.11 || ^>= 0.6.0,
     data-default-class ^>= 0.1.2,
-    dlist ^>= 0.8.0,
     foldl ^>= 1.4.4,
     generic-lens ^>= 1.2.0,
-    ghc-prim ^>= 0.5.2,
     hashable ^>= 1.2.7,
     lens ^>= 4.17,
-    lens-family ^>= 1.2.2,
-    lens-labels ^>= 0.3.0,
-    network ^>= 2.7.0,
-    primitive ^>= 0.6.4,
     profunctors ^>= 5.3,
-    proto-lens ^>= 0.4.0,
     riak2-core,
-    stm ^>= 2.4.5 || ^>= 2.5.0,
-    stm-containers ^>= 1.0.1,
-    streaming,
     text ^>= 1.2.3,
     time,
-    timer-wheel ^>= 0.1.0,
-    transformers ^>= 0.5.5,
-    unliftio ^>= 0.2.7,
-    unliftio-core ^>= 0.1.1,
     unordered-containers ^>= 0.2.9,
-    vector
 
   default-extensions:
     ConstraintKinds
@@ -134,7 +119,6 @@ library
     MagicHash
     MultiParamTypeClasses
     NamedFieldPuns
-    NoImplicitPrelude
     OverloadedLabels
     OverloadedStrings
     PatternSynonyms
@@ -218,36 +202,45 @@ library
     Riak.Internal.Set
     Riak.Internal.Utils
 
-  -- reexported-modules:
-  --   Riak.Interface
+  mixins:
+    bytestring (Data.ByteString as ByteString, Data.ByteString.Char8),
+    text (Data.Text as Text, Data.Text.Encoding),
+    unordered-containers (Data.HashMap.Strict as HashMap, Data.HashSet as HashSet)
 
--- test-suite tests
---   build-depends:
---       base
---     , bytestring
---     , containers
---     , foldl
---     , lens-family
---     , process
---     , random
---     , riak2
---     , tasty
---     , tasty-hunit
---     , text
---
---   default-language:
---     Haskell2010
---
---   ghc-options:
---     -threaded
---     -with-rtsopts=-N4
---     -Wall
---
---   hs-source-dirs:
---     test
---
---   main-is:
---     Main.hs
---
---   type:
---     exitcode-stdio-1.0
+test-suite tests
+  build-depends:
+    base,
+    generic-lens,
+    lens,
+    random-bytestring,
+    riak2,
+    riak2-interface-impls,
+    tasty,
+    tasty-hunit
+
+  default-extensions:
+    DataKinds
+    DuplicateRecordFields
+    LambdaCase
+    NamedFieldPuns
+    OverloadedStrings
+    ScopedTypeVariables
+    TypeApplications
+
+  default-language:
+    Haskell2010
+
+  ghc-options:
+    -Wall
+
+  hs-source-dirs:
+    test
+
+  main-is:
+    Main.hs
+
+  mixins:
+    riak2 requires (Riak.Interface.Signature as Riak.Interface.Impl.Socket)
+
+  type:
+    exitcode-stdio-1.0

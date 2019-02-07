@@ -6,6 +6,8 @@ module Riak.Opts
 import Riak.Internal.Prelude
 import Riak.Quorum           (Quorum)
 
+import Data.Default.Class (Default(..))
+
 
 data GetOpts
   = GetOpts

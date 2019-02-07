@@ -1,6 +1,6 @@
 steps:
   - simple_align:
-      cases: true
+      cases: false
       top_level_patterns: true
       records: false
   - imports:

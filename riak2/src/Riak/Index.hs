@@ -14,7 +14,9 @@ import qualified Riak.Interface as Interface
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
-import Data.List (head)
+import Control.Lens       ((.~), (^.))
+import Data.List          (head)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
 -- | A Solr index.
 --
@@ -88,7 +90,7 @@ putIndex client index = liftIO $
   where
     request :: Proto.PutIndexRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.index .~ toProto index
         -- TODO put index timeout
         -- & L.maybe'timeout .~ undefined
@@ -112,7 +114,7 @@ fromProto index =
 
 toProto :: Index -> Proto.Index
 toProto Index { name, schema, n } =
-  defMessage
+  Proto.defMessage
     & L.name .~ encodeUtf8 name
     & L.schema .~ encodeUtf8 schema
     & L.maybe'n .~ n

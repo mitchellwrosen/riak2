@@ -9,7 +9,7 @@ import Riak.Proto                        (Pair)
 import qualified Riak.Internal.Proto.Pair          as Pair
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 
-import qualified Data.ByteString as ByteString
+import qualified ByteString
 
 
 -- TODO Index values should be a set
@@ -19,6 +19,19 @@ data SecondaryIndex
     SecondaryIndex !ByteString !(SecondaryIndexValue a)
 
 deriving stock instance Show SecondaryIndex
+
+instance Eq SecondaryIndex where
+  SecondaryIndex x1 y1 == SecondaryIndex x2 y2 =
+    x1 == x2 &&
+      case y1 of
+        SecondaryIndexValue.Binary v1 ->
+          case y2 of
+            SecondaryIndexValue.Binary v2 -> v1 == v2
+            SecondaryIndexValue.Integer{} -> False
+        SecondaryIndexValue.Integer v1 ->
+          case y2 of
+            SecondaryIndexValue.Integer v2 -> v1 == v2
+            SecondaryIndexValue.Binary{} -> False
 
 -- | Binary index smart constructor.
 binary ::

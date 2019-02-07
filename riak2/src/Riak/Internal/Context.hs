@@ -2,7 +2,7 @@ module Riak.Internal.Context where
 
 import Riak.Internal.Prelude
 
-import qualified Data.ByteString        as ByteString
+import qualified ByteString
 import qualified Data.ByteString.Base64 as Base64
 
 
@@ -11,10 +11,12 @@ newtype Context
   = Context { unContext :: ByteString }
   deriving stock (Eq)
 
+-- | base-64 encoded for for display purposes. The actual context is an
+-- opaque binary blob.
 instance Show Context where
   show :: Context -> String
   show =
-    coerce (show . Base64.encode)
+    coerce (("base64:" ++) . show . Base64.encode)
 
 -- | The "new" context. Use this when writing an object or data type for the
 -- first time.

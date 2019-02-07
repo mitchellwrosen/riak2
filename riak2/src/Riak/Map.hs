@@ -18,11 +18,12 @@ import qualified Riak.Internal.Set as Set
 import qualified Riak.Proto        as Proto
 import qualified Riak.Proto.Lens   as L
 
-import Data.Monoid (Endo(..))
+import Control.Lens ((.~), (%~), (^.))
+import Data.Monoid  (Endo(..))
 
-import qualified Data.ByteString     as ByteString
-import qualified Data.HashMap.Strict as HashMap
-import qualified Data.HashSet        as HashSet
+import qualified ByteString
+import qualified HashMap
+import qualified HashSet
 
 
 -- | A map data type.
@@ -86,7 +87,7 @@ getMap client k@(Key bucketType bucket key) = liftIO $
   where
     request :: Proto.GetCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.key .~ key
@@ -126,7 +127,7 @@ updateMap client (Map { context, key, value }) = liftIO $
   where
     request :: Proto.UpdateCrdtRequest
     request =
-      defMessage
+      Proto.defMessage
         & L.bucket .~ bucket
         & L.bucketType .~ bucketType
         & L.maybe'context .~
@@ -138,7 +139,7 @@ updateMap client (Map { context, key, value }) = liftIO $
               then Nothing
               else Just k)
         & L.update .~
-            (defMessage
+            (Proto.defMessage
               & L.mapUpdate .~ updatesToProto value)
         & L.returnBody .~ True
 
@@ -193,7 +194,7 @@ mapValueToMaps entry =
 
 updatesToProto :: [MapUpdate] -> Proto.MapUpdate
 updatesToProto =
-  ($ defMessage) . appEndo . foldMap (coerce updateToEndoProto)
+  ($ Proto.defMessage) . appEndo . foldMap (coerce updateToEndoProto)
 
 updateToEndoProto :: MapUpdate -> Proto.MapUpdate -> Proto.MapUpdate
 updateToEndoProto = \case
@@ -216,9 +217,9 @@ updateToEndoProto = \case
     let
       update :: Proto.MapValueUpdate
       update =
-        defMessage
+        Proto.defMessage
           & L.field .~ mapkey name Proto.MapKey'COUNTER
-          & L.counterUpdate .~ (defMessage & L.increment .~ value)
+          & L.counterUpdate .~ (Proto.defMessage & L.increment .~ value)
     in
       L.updates %~ (update :)
 
@@ -226,7 +227,7 @@ updateToEndoProto = \case
     let
       update :: Proto.MapValueUpdate
       update =
-        defMessage
+        Proto.defMessage
           & L.field .~ mapkey name Proto.MapKey'FLAG
           & L.flagUpdate .~
               case value of
@@ -239,7 +240,7 @@ updateToEndoProto = \case
     let
       update :: Proto.MapValueUpdate
       update =
-        defMessage
+        Proto.defMessage
           & L.field .~ mapkey name Proto.MapKey'MAP
           & L.mapUpdate .~ updatesToProto value
     in
@@ -249,7 +250,7 @@ updateToEndoProto = \case
     let
       update :: Proto.MapValueUpdate
       update =
-        defMessage
+        Proto.defMessage
           & L.field .~ mapkey name Proto.MapKey'REGISTER
           & L.registerUpdate .~ value
     in
@@ -259,7 +260,7 @@ updateToEndoProto = \case
     let
       update :: Proto.MapValueUpdate
       update =
-        defMessage
+        Proto.defMessage
           & L.field .~ mapkey name Proto.MapKey'SET
           & L.setUpdate .~ Set.updatesToProto value
     in
@@ -268,6 +269,6 @@ updateToEndoProto = \case
   where
     mapkey :: ByteString -> Proto.MapKey'MapKeyType -> Proto.MapKey
     mapkey name type' =
-      defMessage
+      Proto.defMessage
         & L.name .~ name
         & L.type' .~ type'
