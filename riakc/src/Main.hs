@@ -7,9 +7,12 @@ import Riak                       (Bucket(..), Content(..), Context,
                                    ServerInfo(..), generatedKey,
                                    getConvergentMap, newContext, ping,
                                    unsafeMakeContext, updateConvergentMap)
-import Riak.Handle.Impl.Exclusive (Handle, Socket)
+import Riak.Handle.Impl.Exclusive (Socket)
+import Riak.Handle.Impl.Managed   (Handle)
 
-import qualified Riak.Handle.Impl.Exclusive as Handle
+import qualified Riak.Handle.Impl.Exclusive as Handle (Config(..),
+                                                       EventHandlers(..), new1)
+import qualified Riak.Handle.Impl.Managed   as Handle hiding (Config)
 import qualified Riak.Object                as Object
 import qualified Riak.ServerInfo            as ServerInfo
 

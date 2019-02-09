@@ -20,8 +20,8 @@ import qualified Riak.Handle.Signature as Handle
 
 import Control.Concurrent
 import Control.Concurrent.STM
+import Control.Exception.Safe (bracket, catchAny, tryAny)
 import Control.Monad          (forever, void)
-import UnliftIO.Exception     (bracket, tryAny)
 
 import qualified Control.Exception as Exception
 
@@ -62,7 +62,10 @@ withHandle config k = do
 -- TMVar and retry.
 manager :: Config -> TMVar Handle.Handle -> IO ()
 manager config handleVar =
-  forever loop
+  -- TODO how to handle manager thread crashing?
+  forever $
+    loop `catchAny` \e ->
+      print e
 
   where
     loop :: IO ()

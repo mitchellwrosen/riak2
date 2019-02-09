@@ -8,8 +8,8 @@ library
   build-depends:
     base,
     riak2-core,
-    stm,
-    unliftio
+    safe-exceptions,
+    stm
 
   default-extensions:
     DeriveAnyClass
