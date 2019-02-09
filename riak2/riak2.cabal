@@ -208,7 +208,7 @@ test-suite tests
     lens,
     random-bytestring,
     riak2,
-    riak2-handle-impl-socket,
+    riak2-handle-impl-exclusive,
     tasty,
     tasty-hunit
 
@@ -235,7 +235,7 @@ test-suite tests
     Main.hs
 
   mixins:
-    riak2 requires (Riak.Handle.Signature as Riak.Handle.Impl.Socket)
+    riak2 requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)
 
   type:
     exitcode-stdio-1.0

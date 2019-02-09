@@ -1,4 +1,4 @@
-module Riak.Handle.Impl.Socket.Concurrent
+module Riak.Handle.Impl.Pipeline
   ( Handle
   , Config
   , EventHandlers(..)
@@ -16,8 +16,9 @@ import Riak.Socket   (Socket)
 import qualified Riak.Socket as Socket
 
 import Control.Concurrent.MVar
+import Control.Exception       (throwIO)
+import Control.Exception.Safe  (bracket_, finally)
 import Data.Coerce             (coerce)
-import UnliftIO.Exception      (bracket_, finally, throwIO)
 
 import qualified Control.Exception as Exception
 

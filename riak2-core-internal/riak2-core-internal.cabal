@@ -17,8 +17,7 @@ library
     lens,
     network,
     proto-lens ^>= 0.4.0,
-    proto-lens-runtime ^>= 0.4.0,
-    unliftio
+    proto-lens-runtime ^>= 0.4.0
 
   default-extensions:
     DefaultSignatures

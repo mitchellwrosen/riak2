@@ -1,4 +1,4 @@
-module Riak.Handle.Impl.Socket
+module Riak.Handle.Impl.Exclusive
   ( Handle
   , Config(..)
   , EventHandlers(..)
@@ -14,7 +14,7 @@ module Riak.Handle.Impl.Socket
 
 import Riak.Request  (Request)
 import Riak.Response (Response)
-import Riak.Socket (Socket)
+import Riak.Socket   (Socket)
 
 import qualified Riak.Socket as Socket
 

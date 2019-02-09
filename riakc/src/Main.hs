@@ -1,16 +1,17 @@
 module Main where
 
-import Riak                    (Bucket(..), Content(..), Context,
-                                ConvergentMap(..), ConvergentMapUpdate(..),
-                                ConvergentSetUpdate(..), GetOpts(..), Key(..),
-                                PutOpts(..), Quorum(..), ServerInfo(..),
-                                generatedKey, getConvergentMap, newContext,
-                                ping, unsafeMakeContext, updateConvergentMap)
-import Riak.Handle.Impl.Socket (Handle, Socket)
+import Riak                       (Bucket(..), Content(..), Context,
+                                   ConvergentMap(..), ConvergentMapUpdate(..),
+                                   ConvergentSetUpdate(..), GetOpts(..),
+                                   Key(..), PutOpts(..), Quorum(..),
+                                   ServerInfo(..), generatedKey,
+                                   getConvergentMap, newContext, ping,
+                                   unsafeMakeContext, updateConvergentMap)
+import Riak.Handle.Impl.Exclusive (Handle, Socket)
 
-import qualified Riak.Handle.Impl.Socket as Handle
-import qualified Riak.Object             as Object
-import qualified Riak.ServerInfo         as ServerInfo
+import qualified Riak.Handle.Impl.Exclusive as Handle
+import qualified Riak.Object                as Object
+import qualified Riak.ServerInfo            as ServerInfo
 
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)

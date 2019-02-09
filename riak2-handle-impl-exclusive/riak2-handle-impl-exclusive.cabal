@@ -1,6 +1,6 @@
 cabal-version: 2.4
 
-name: riak2-handle-impl-socket
+name: riak2-handle-impl-exclusive
 version: 0.1.0
 build-type: Simple
 
@@ -21,7 +21,7 @@ library
     Haskell2010
 
   exposed-modules:
-    Riak.Handle.Impl.Socket
+    Riak.Handle.Impl.Exclusive
 
   ghc-options:
     -Wall
@@ -36,7 +36,7 @@ test-suite tests
     proto-lens,
     random,
     riak2-core,
-    riak2-handle-impl-socket,
+    riak2-handle-impl-exclusive,
     stm
 
   default-extensions:
@@ -63,4 +63,4 @@ test-suite tests
 
   mixins:
     riak2-core
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Socket)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)

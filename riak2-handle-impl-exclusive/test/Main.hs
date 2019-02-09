@@ -4,9 +4,9 @@ import Riak.Request  (Request(..))
 import Riak.Response (Response(..))
 import Riak.Socket   (Socket(..))
 
-import qualified Riak.Handle.Impl.Socket as Handle
-import qualified Riak.Proto              as Proto
-import qualified Riak.Socket             as Socket
+import qualified Riak.Handle.Impl.Exclusive as Handle
+import qualified Riak.Proto                 as Proto
+import qualified Riak.Socket                as Socket
 
 import Control.Concurrent
 import Control.Concurrent.STM

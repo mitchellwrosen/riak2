@@ -29,22 +29,22 @@ This package contains low-level Riak bindings:
 * A small [`Riak.Socket`](./riak2-core-internal/src/Riak/Socket.hs) wrapper
   around the `network` package's `Socket`.
 
-### [`riak2-handle-impl-socket`](./riak2-handle-impl-socket)
+### [`riak2-handle-impl-exclusive`](./riak2-handle-impl-exclusive)
 
-![riak2-handle-impl-socket-src-sloc](./etc/riak2-handle-impl-socket-src-sloc.svg) ![riak2-handle-impl-socket-test-sloc](./etc/riak2-handle-impl-socket-test-sloc.svg)
+![riak2-handle-impl-exclusive-src-sloc](./etc/riak2-handle-impl-exclusive-src-sloc.svg) ![riak2-handle-impl-exclusive-test-sloc](./etc/riak2-handle-impl-exclusive-test-sloc.svg)
 
 This package contains a
 ["Riak handle"](./riak2-core/src/Riak/Interface/Signature.hsig)
 implementation that provides exclusive Riak access to one thread at a time.
 
-### [`riak2-handle-impl-concurrent-socket`](./riak2-handle-impl-concurrent-socket)
+### [`riak2-handle-impl-pipeline`](./riak2-handle-impl-pipeline)
 
-![riak2-handle-impl-concurrent-socket-src-sloc](./etc/riak2-handle-impl-concurrent-socket-src-sloc.svg) ![riak2-handle-impl-concurrent-socket-test-sloc](./etc/riak2-handle-impl-concurrent-socket-test-sloc.svg)
+![riak2-handle-impl-pipeline-src-sloc](./etc/riak2-handle-impl-pipeline-src-sloc.svg) ![riak2-handle-impl-pipeline-test-sloc](./etc/riak2-handle-impl-pipeline-test-sloc.svg)
 
 This package contains a
 ["Riak handle"](./riak2-core/src/Riak/Interface/Signature.hsig)
 implementation that improves on
-[`riak2-handle-impl-socket`](./riak2-handle-impl-socket) by pipelining
+[`riak2-handle-impl-exclusive`](./riak2-handle-impl-exclusive) by pipelining
 concurrent requests to Riak.
 
 ### [`riak2-handle-impl-managed`](./riak2-handle-impl-managed)

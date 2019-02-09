@@ -3,10 +3,10 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Socket (Config(..), EventHandlers(..), Socket,
+import Riak.Handle.Impl.Exclusive (Config(..), EventHandlers(..), Socket,
                                 withHandle)
 
-import qualified Riak.Handle.Impl.Socket as Socket
+import qualified Riak.Handle.Impl.Exclusive as Handle
 
 import Control.Concurrent
 import Control.Lens
@@ -21,7 +21,7 @@ import qualified Data.ByteString.Random as ByteString
 main :: IO ()
 main = do
   socket :: Socket <-
-    Socket.new1 "localhost" 8087
+    Handle.new1 "localhost" 8087
 
   let
     config :: Config

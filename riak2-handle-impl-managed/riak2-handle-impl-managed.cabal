@@ -1,10 +1,10 @@
 cabal-version: 2.4
 
-name: riak2-handle-impl-concurrent-socket
+name: riak2-handle-impl-managed
 version: 0.1.0
 build-type: Simple
 
-library riak2-handle-impl-managed
+library
   build-depends:
     base,
     riak2-core,
