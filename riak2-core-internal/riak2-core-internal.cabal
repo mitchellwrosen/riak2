@@ -19,7 +19,7 @@ library
     primitive,
     proto-lens ^>= 0.4.0,
     proto-lens-runtime ^>= 0.4.0,
-    sockets
+    sockets == 0.1.0.0
 
   default-extensions:
     BangPatterns
@@ -42,6 +42,7 @@ library
     Haskell2010
 
   exposed-modules:
+    Riak.Connection
     Riak.Proto
     Riak.Proto.Lens
     Riak.Request
@@ -59,7 +60,6 @@ library
   other-modules:
     Proto.Proto.Riak
     Proto.Proto.Riak_Fields
-    -- Riak.Connection not ready yet
-    Riak.Connection
+    Riak.Connection.Internal
     Socket
     Utils

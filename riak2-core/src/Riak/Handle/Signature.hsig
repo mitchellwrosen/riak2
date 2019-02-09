@@ -1,40 +1,46 @@
 signature Riak.Handle.Signature where
 
-import Riak.Request (Request)
+import Riak.Request  (Request)
 import Riak.Response (Response)
 
-import qualified Control.Exception as Exception
+import Foreign.C     (CInt)
 
 
--- | Handle.
+-- | Riak handle.
 data Handle
 
--- | Handle configuration.
+-- | Riak handle configuration.
 data Config
 
--- | Handle exception. Refer to the specific handle documentation for
--- information about which functions may throw which exceptions.
-data Exception
+-- | An error caused by some problem with the underlying handle. The error
+-- should be recoverable, and not necessarily unexpected, such as a "remote
+-- shutdown" due to Riak being restarted.
+data Error
 
-instance Exception.Exception Exception
+instance Eq Error
+instance Show Error
 
--- | Is this exception due to a graceful remote shutdown?
-isRemoteShutdownException :: Exception -> Bool
 
 withHandle ::
      Config
   -> (Handle -> IO a)
-  -> IO a
+  -> IO (Either CInt a)
 
 -- | Send a request and receive the response (a single message).
+--
+-- /Throws/. Throws 'Exception' is something truly unexpected occurs.
 exchange ::
      Handle
   -> Request
-  -> IO Response
+  -> IO (Either Error Response)
 
 -- | Send a request and stream the response (one or more messages).
+--
+-- /Throws/. Throws 'Exception' is something truly unexpected occurs.
 stream ::
+     ∀ r x.
      Handle
   -> Request
-  -> (IO Response -> IO r)
-  -> IO r
+  -> x
+  -> (x -> Response -> IO (Either x r))
+  -> IO (Either Error r)

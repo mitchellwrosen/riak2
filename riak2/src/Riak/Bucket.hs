@@ -42,7 +42,7 @@ getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either ByteString Proto.BucketProperties)
+  -> m (Either Handle.Error Proto.BucketProperties)
 getBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.getBucket handle request
 
@@ -60,7 +60,7 @@ getBucket handle (Bucket bucketType bucket) = liftIO $
 setBucket
   :: Handle -- ^
   -> Proto.SetBucketRequest -- ^
-  -> IO (Either ByteString ())
+  -> IO (Either Handle.Error ())
 setBucket handle request =
   Handle.setBucket handle request
 
@@ -69,7 +69,7 @@ resetBucket ::
      MonadIO m
   => Handle
   -> Bucket
-  -> m (Either ByteString ())
+  -> m (Either Handle.Error ())
 resetBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.resetBucket handle request
 
@@ -87,7 +87,7 @@ queryExact
   :: Handle -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either ByteString r)
+  -> IO (Either Handle.Error r)
 queryExact handle query@(ExactQuery { value }) keyFold =
   doIndex
     handle
@@ -117,7 +117,7 @@ queryRange
      Handle -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Either ByteString r)
+  -> IO (Either Handle.Error r)
 queryRange handle query keyFold =
   doIndex
     handle
@@ -154,7 +154,7 @@ doIndex ::
      Handle
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
-  -> IO (Either ByteString r)
+  -> IO (Either Handle.Error r)
 doIndex handle =
   loop
 
@@ -162,9 +162,9 @@ doIndex handle =
     loop ::
          Proto.SecondaryIndexRequest
       -> FoldM IO Proto.SecondaryIndexResponse r
-      -> IO (Either ByteString r)
+      -> IO (Either Handle.Error r)
     loop request responseFold = do
-      result :: Either ByteString (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
+      result :: Either Handle.Error (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
         doIndexPage
           handle
           request
@@ -188,7 +188,7 @@ doIndexPage ::
      Handle
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
-  -> IO (Either ByteString (r, Maybe ByteString))
+  -> IO (Either Handle.Error (r, Maybe ByteString))
 doIndexPage handle request fold =
   Handle.secondaryIndex
     handle
@@ -221,7 +221,7 @@ listBucketKeys ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either ByteString [Key])
+  -> m (Either Handle.Error [Key])
 listBucketKeys handle bucket =
   liftIO (streamBucketKeys handle bucket (Foldl.generalize Foldl.list))
 
@@ -238,7 +238,7 @@ streamBucketKeys
   :: Handle -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either ByteString r)
+  -> IO (Either Handle.Error r)
 streamBucketKeys handle (Bucket bucketType bucket) keyFold =
   Handle.listKeys
     handle

@@ -205,6 +205,7 @@ test-suite tests
   build-depends:
     base,
     generic-lens,
+    ip,
     lens,
     random-bytestring,
     riak2,

@@ -88,7 +88,6 @@ import Riak.ServerInfo
 
 import qualified Riak.Handle as Handle
 
-import ByteString             (ByteString)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Default.Class     (def)
 
@@ -97,6 +96,6 @@ import Data.Default.Class     (def)
 ping ::
      MonadIO m
   => Handle -- ^
-  -> m (Either ByteString ())
+  -> m (Either Handle.Error ())
 ping handle =
   liftIO (Handle.ping handle)

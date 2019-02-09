@@ -40,7 +40,7 @@ getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either ByteString Proto.BucketProperties)
+  -> m (Either Handle.Error Proto.BucketProperties)
 getBucketType handle (BucketType bucketType) =
   liftIO (Handle.getBucketType handle bucketType)
 
@@ -53,7 +53,7 @@ getBucketType handle (BucketType bucketType) =
 setBucketType
   :: Handle -- ^
   -> Proto.SetBucketTypeRequest -- ^
-  -> IO (Either ByteString ())
+  -> IO (Either Handle.Error ())
 setBucketType handle request =
   Handle.setBucketType handle request
 
@@ -70,7 +70,7 @@ listBuckets
   :: MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either ByteString [Bucket])
+  -> m (Either Handle.Error [Bucket])
 listBuckets handle bucketType =
   liftIO (streamBuckets handle bucketType (Foldl.generalize Foldl.list))
 
@@ -84,7 +84,7 @@ streamBuckets
   :: Handle -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
-  -> IO (Either ByteString r)
+  -> IO (Either Handle.Error r)
 streamBuckets handle (BucketType bucketType) bucketFold =
   Handle.listBuckets
     handle

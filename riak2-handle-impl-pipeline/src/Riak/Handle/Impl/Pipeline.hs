@@ -5,6 +5,7 @@ module Riak.Handle.Impl.Pipeline
   , withHandle
   , exchange
   , stream
+  , ConnectError(..)
   , Exception(..)
   , isRemoteShutdownException
   ) where
@@ -50,6 +51,9 @@ instance Monoid EventHandlers where
 instance Semigroup EventHandlers where
   EventHandlers a1 b1 <> EventHandlers a2 b2 =
     EventHandlers (a1 <> a2) (b1 <> b2)
+
+data ConnectError
+  = ConnectError
 
 
 withHandle ::

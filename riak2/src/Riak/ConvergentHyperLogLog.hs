@@ -44,7 +44,7 @@ getConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either ByteString (Maybe (ConvergentHyperLogLog Word64)))
+  -> m (Either Handle.Error (Maybe (ConvergentHyperLogLog Word64)))
 getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -85,7 +85,7 @@ updateConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
-  -> m (Either ByteString (ConvergentHyperLogLog Word64))
+  -> m (Either Handle.Error (ConvergentHyperLogLog Word64))
 updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

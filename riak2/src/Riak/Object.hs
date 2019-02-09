@@ -175,14 +175,18 @@ doGet handle request =
   first parseGetError <$>
     Handle.get handle request
   where
-    parseGetError :: ByteString -> Error 'GetOp
-    parseGetError err
-      | isBucketTypeDoesNotExistError err =
-          BucketTypeDoesNotExistError (request ^. L.bucketType)
-      | isInvalidNError err =
-          InvalidNError (request ^. L.n)
-      | otherwise =
-          UnknownError (decodeUtf8 err)
+    parseGetError :: Handle.Error -> Error 'GetOp
+    parseGetError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | isBucketTypeDoesNotExistError err ->
+            BucketTypeDoesNotExistError (request ^. L.bucketType)
+        | isInvalidNError err ->
+            InvalidNError (request ^. L.n)
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest (Key bucketType bucket key) opts =
@@ -324,14 +328,18 @@ doPut handle request =
   first parsePutError <$> Handle.put handle request
 
   where
-    parsePutError :: ByteString -> Error 'PutOp
-    parsePutError err
-      | isBucketTypeDoesNotExistError err =
-          BucketTypeDoesNotExistError (request ^. L.bucketType)
-      | isInvalidNError err =
-          InvalidNError (request ^. L.n)
-      | otherwise =
-          UnknownError (decodeUtf8 err)
+    parsePutError :: Handle.Error -> Error 'PutOp
+    parsePutError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | isBucketTypeDoesNotExistError err ->
+            BucketTypeDoesNotExistError (request ^. L.bucketType)
+        | isInvalidNError err ->
+            InvalidNError (request ^. L.n)
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
 makePutRequest ::
      Key
@@ -410,9 +418,13 @@ delete_ handle content =
     Key bucketType bucket key =
       content ^. field @"key"
 
-    parseDeleteError :: ByteString -> Error 'DeleteOp
-    parseDeleteError err =
-      UnknownError (decodeUtf8 err)
+    parseDeleteError :: Handle.Error -> Error 'DeleteOp
+    parseDeleteError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err ->
+        UnknownError (decodeUtf8 err)
 
 defFalse :: Bool -> Maybe Bool
 defFalse = \case

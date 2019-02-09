@@ -1,6 +1,7 @@
 module Riak.Response
   ( Response(..)
   , parse
+  , parseResponse
   , DecodeError(..)
   , encode
   ) where
@@ -9,12 +10,18 @@ import Riak.Proto
 
 import qualified Utils
 
-import Data.Bifunctor  (bimap)
-import Data.ByteString (ByteString)
-import Data.Word       (Word8)
+import Control.Monad.ST
+import Control.Monad.ST.Unsafe
+import Data.Bifunctor           (bimap)
+import Data.ByteString          (ByteString)
+import Data.Primitive.Addr
+import Data.Primitive.ByteArray
+import Data.Word                (Word8)
+import GHC.Ptr                  (Ptr(..))
 
-import qualified Data.ByteString as ByteString
-import qualified Data.ProtoLens  as Proto
+import qualified Data.ByteString          as ByteString
+import qualified Data.ByteString.Internal as ByteString
+import qualified Data.ProtoLens           as Proto
 
 
 data Response
@@ -43,6 +50,24 @@ data Response
 parse :: ByteString -> Either DecodeError Response
 parse bytes =
   decode (ByteString.head bytes) (ByteString.drop 1 bytes)
+
+-- | Parse a response, which consists of a 1-byte message code and a payload.
+-- This function assumes the 4-byte, big-endian length prefix has already been
+-- stripped.
+parseResponse :: ByteArray -> Either DecodeError Response
+parseResponse bytes =
+  decode (indexByteArray bytes 0) (runST makeByteStringFromPayload)
+  where
+    makeByteStringFromPayload :: ST s ByteString
+    makeByteStringFromPayload =
+      unsafeIOToST
+        (ByteString.create
+          payloadLen
+          (\(Ptr addr) -> copyByteArrayToAddr (Addr addr) bytes 1 payloadLen))
+
+    payloadLen :: Int
+    payloadLen =
+      sizeofByteArray bytes - 1
 
 decode :: Word8 -> ByteString -> Either DecodeError Response
 decode code bytes =

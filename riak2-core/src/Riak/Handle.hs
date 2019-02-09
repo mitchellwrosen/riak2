@@ -1,6 +1,7 @@
 module Riak.Handle
   ( Handle
-  , UnexpectedResponse(..)
+  , Config(..)
+  , withHandle
   , delete
   , deleteIndex
   , get
@@ -22,22 +23,27 @@ module Riak.Handle
   , setBucket
   , setBucketType
   , updateCrdt
+  , Error(..)
+  , UnexpectedResponse(..)
   ) where
 
-import Riak.Handle.Signature (Handle)
-import Riak.Request             (Request(..))
-import Riak.Response            (Response(..))
+import Riak.Handle.Signature (Config(..), Handle, withHandle)
+import Riak.Request          (Request(..))
+import Riak.Response         (Response(..))
 
 import qualified Riak.Handle.Signature as Handle
-import qualified Riak.Proto               as Proto
-import qualified Riak.Proto.Lens          as L
+import qualified Riak.Proto            as Proto
+import qualified Riak.Proto.Lens       as L
 
 import Control.Exception      (Exception, throwIO)
 import Control.Foldl          (FoldM(..))
 import Control.Lens           (view, (.~), (^.))
+import Data.Bifunctor         (first)
 import Data.ByteString        (ByteString)
 import Data.Function          ((&))
 import Data.ProtoLens.Message (defMessage)
+
+import qualified Control.Foldl as Foldl
 
 
 data UnexpectedResponse
@@ -45,10 +51,15 @@ data UnexpectedResponse
   deriving stock (Show)
   deriving anyclass (Exception)
 
+data Error
+  = ErrorRiak ByteString -- ^ Riak returned an error response.
+  | ErrorHandle Handle.Error -- ^ A handle error occurred.
+  deriving stock (Eq, Show)
+
 delete ::
      Handle
   -> Proto.DeleteRequest
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 delete iface request =
   exchange
     iface
@@ -60,7 +71,7 @@ delete iface request =
 deleteIndex ::
      Handle
   -> ByteString
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 deleteIndex iface name =
   exchange
     iface
@@ -77,7 +88,7 @@ deleteIndex iface name =
 get ::
      Handle
   -> Proto.GetRequest
-  -> IO (Either ByteString Proto.GetResponse)
+  -> IO (Either Error Proto.GetResponse)
 get iface request =
   exchange
     iface
@@ -89,7 +100,7 @@ get iface request =
 getBucket ::
      Handle
   -> Proto.GetBucketRequest
-  -> IO (Either ByteString Proto.BucketProperties)
+  -> IO (Either Error Proto.BucketProperties)
 getBucket iface request =
   exchange
     iface
@@ -101,7 +112,7 @@ getBucket iface request =
 getBucketType ::
      Handle
   -> ByteString
-  -> IO (Either ByteString Proto.BucketProperties)
+  -> IO (Either Error Proto.BucketProperties)
 getBucketType iface bucketType =
   exchange
     iface
@@ -119,7 +130,7 @@ getBucketType iface bucketType =
 getCrdt ::
      Handle
   -> Proto.GetCrdtRequest
-  -> IO (Either ByteString Proto.GetCrdtResponse)
+  -> IO (Either Error Proto.GetCrdtResponse)
 getCrdt iface request =
   exchange
     iface
@@ -131,7 +142,7 @@ getCrdt iface request =
 getIndex ::
      Handle
   -> Maybe ByteString
-  -> IO (Either ByteString [Proto.Index])
+  -> IO (Either Error [Proto.Index])
 getIndex iface name =
   exchange
     iface
@@ -148,7 +159,7 @@ getIndex iface name =
 getSchema ::
      Handle
   -> ByteString
-  -> IO (Either ByteString Proto.Schema)
+  -> IO (Either Error Proto.Schema)
 getSchema iface name =
   exchange
     iface
@@ -165,7 +176,7 @@ getSchema iface name =
 
 getServerInfo ::
      Handle
-  -> IO (Either ByteString Proto.GetServerInfoResponse)
+  -> IO (Either Error Proto.GetServerInfoResponse)
 getServerInfo iface =
   exchange
     iface
@@ -178,7 +189,7 @@ listBuckets ::
      Handle
   -> Proto.ListBucketsRequest
   -> FoldM IO Proto.ListBucketsResponse r
-  -> IO (Either ByteString r)
+  -> IO (Either Error r)
 listBuckets iface request =
   stream
     iface
@@ -192,7 +203,7 @@ listKeys ::
      Handle
   -> Proto.ListKeysRequest
   -> FoldM IO Proto.ListKeysResponse r
-  -> IO (Either ByteString r)
+  -> IO (Either Error r)
 listKeys iface request =
   stream
     iface
@@ -206,7 +217,7 @@ mapReduce ::
      Handle
   -> Proto.MapReduceRequest
   -> FoldM IO Proto.MapReduceResponse r
-  -> IO (Either ByteString r)
+  -> IO (Either Error r)
 mapReduce iface request =
   stream
     iface
@@ -218,7 +229,7 @@ mapReduce iface request =
 
 ping ::
      Handle
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 ping iface =
   exchange
     iface
@@ -230,7 +241,7 @@ ping iface =
 put ::
      Handle
   -> Proto.PutRequest
-  -> IO (Either ByteString Proto.PutResponse)
+  -> IO (Either Error Proto.PutResponse)
 put iface request =
   exchange
     iface
@@ -242,7 +253,7 @@ put iface request =
 putIndex ::
      Handle
   -> Proto.PutIndexRequest
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 putIndex iface request =
   exchange
     iface
@@ -254,7 +265,7 @@ putIndex iface request =
 putSchema ::
      Handle
   -> Proto.Schema
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 putSchema iface schema =
   exchange
     iface
@@ -272,7 +283,7 @@ putSchema iface schema =
 resetBucket ::
      Handle
   -> Proto.ResetBucketRequest
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 resetBucket iface request =
   exchange
     iface
@@ -284,7 +295,7 @@ resetBucket iface request =
 setBucket ::
      Handle
   -> Proto.SetBucketRequest
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 setBucket iface request =
   exchange
     iface
@@ -296,7 +307,7 @@ setBucket iface request =
 setBucketType ::
      Handle
   -> Proto.SetBucketTypeRequest
-  -> IO (Either ByteString ())
+  -> IO (Either Error ())
 setBucketType iface request =
   exchange
     iface
@@ -309,7 +320,7 @@ secondaryIndex ::
      Handle
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
-  -> IO (Either ByteString r)
+  -> IO (Either Error r)
 secondaryIndex iface request =
   stream
     iface
@@ -322,7 +333,7 @@ secondaryIndex iface request =
 updateCrdt ::
      Handle -- ^
   -> Proto.UpdateCrdtRequest -- ^
-  -> IO (Either ByteString Proto.UpdateCrdtResponse)
+  -> IO (Either Error Proto.UpdateCrdtResponse)
 updateCrdt iface request =
   exchange
     iface
@@ -335,13 +346,16 @@ exchange ::
      Handle
   -> Request
   -> (Response -> Maybe a)
-  -> IO (Either ByteString a)
+  -> IO (Either Error a)
 exchange iface request f =
   Handle.exchange iface request >>= \case
-    ResponseError response ->
-      pure (Left (response ^. L.errmsg))
+    Left err ->
+      pure (Left (ErrorHandle err))
 
-    response ->
+    Right (ResponseError response) ->
+      pure (Left (ErrorRiak (response ^. L.errmsg)))
+
+    Right response ->
       case f response of
         Nothing ->
           throwIO (UnexpectedResponse request response)
@@ -356,32 +370,50 @@ stream ::
   -> (Response -> Maybe a) -- ^ Correct response?
   -> (a -> Bool) -- ^ Done?
   -> FoldM IO a r -- ^ Fold responses
-  -> IO (Either ByteString r)
-stream iface request f done (FoldM step initial extract) =
-  Handle.stream iface request callback
+  -> IO (Either Error r)
+stream handle request f done (FoldM step (initial :: IO x) extract) = do
+  initial' <- initial
+
+  fromResult <$>
+    Handle.stream
+      handle
+      request
+      initial'
+      step'
 
   where
-    callback :: IO Response -> IO (Either ByteString r)
-    callback recv =
-      loop =<< initial
+    step' ::
+         x
+      -> Response
+      -> IO (Either x (Either ByteString r))
+    step' value = \case
+      ResponseError response ->
+        pure (Right (Left (response ^. L.errmsg)))
 
-      where
-        loop value =
-          recv >>= \case
-            ResponseError response ->
-              pure (Left (response ^. L.errmsg))
+      response ->
+        case f response of
+          Nothing ->
+            throwIO (UnexpectedResponse request response)
 
-            response ->
-              case f response of
-                Nothing ->
-                  throwIO (UnexpectedResponse request response)
+          Just response' -> do
+            newValue :: x <-
+              step value response'
 
-                Just response' -> do
-                  value' <-
-                    step value response'
+            if done response'
+              then
+                Right . Right <$> extract newValue
+              else
+                pure (Left newValue)
 
-                  if done response'
-                    then
-                      Right <$> extract value'
-                    else
-                      loop value'
+    fromResult ::
+         Either Handle.Error (Either ByteString r)
+      -> Either Error r
+    fromResult = \case
+      Left err ->
+        Left (ErrorHandle err)
+
+      Right (Left err) ->
+        Left (ErrorRiak err)
+
+      Right (Right result') ->
+        Right result'

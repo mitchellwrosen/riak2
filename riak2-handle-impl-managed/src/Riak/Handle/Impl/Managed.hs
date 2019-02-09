@@ -9,8 +9,7 @@ module Riak.Handle.Impl.Managed
   , withHandle
   , exchange
   , stream
-  , Exception
-  , isRemoteShutdownException
+  , Error(..)
   ) where
 
 import Riak.Request  (Request)
@@ -20,10 +19,9 @@ import qualified Riak.Handle.Signature as Handle
 
 import Control.Concurrent
 import Control.Concurrent.STM
-import Control.Exception.Safe (bracket, catchAny, tryAny)
+import Control.Exception.Safe (bracket)
 import Control.Monad          (forever, void)
-
-import qualified Control.Exception as Exception
+import Foreign.C              (CInt)
 
 
 newtype Handle
@@ -34,10 +32,17 @@ newtype Handle
 type Config
   = Handle.Config
 
+data Error
+  = Error
+  deriving stock (Eq, Show)
+
+-- | Acquire a handle.
+--
+-- /Throws/. Whatever the underlying handle might throw during its 'withHandle'.
 withHandle ::
      Config
   -> (Handle -> IO a)
-  -> IO a
+  -> IO (Either CInt a)
 withHandle config k = do
   handleVar :: TMVar Handle.Handle <-
     newEmptyTMVarIO
@@ -47,9 +52,10 @@ withHandle config k = do
       unmask (manager config handleVar))
     killThread
     (\_ ->
-      k Handle
-        { handleVar = handleVar
-        })
+      Right <$>
+        k Handle
+          { handleVar = handleVar
+          })
 
 -- The manager thread:
 --
@@ -64,11 +70,15 @@ manager :: Config -> TMVar Handle.Handle -> IO ()
 manager config handleVar =
   -- TODO how to handle manager thread crashing?
   forever $
-    loop `catchAny` \e ->
-      print e
+    loop >>= \case
+      Left errno ->
+        print errno
+
+      Right () ->
+        pure ()
 
   where
-    loop :: IO ()
+    loop :: IO (Either CInt ())
     loop =
       Handle.withHandle config $ \handle -> do
         atomically (putTMVar handleVar handle)
@@ -81,53 +91,50 @@ manager config handleVar =
 exchange ::
      Handle
   -> Request
-  -> IO Response
+  -> IO (Either Error Response)
 exchange Handle { handleVar } request =
   loop
 
   where
-    loop :: IO Response
+    loop :: IO (Either Error Response)
     loop = do
       handle :: Handle.Handle <-
         atomically (readTMVar handleVar)
 
-      tryAny (Handle.exchange handle request) >>= \case
+      Handle.exchange handle request >>= \case
         Left _ -> do
           void (atomically (takeTMVar handleVar))
           loop
 
         Right response ->
-          pure response
+          pure (Right response)
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
-     forall r.
-     Handle
-  -> Request
-  -> (IO Response -> IO r)
-  -> IO r
-stream Handle { handleVar } request callback =
+     -- forall r.
+     -- Handle
+  -- -> Request
+  -- -> (IO (Either Error Response) -> IO r)
+  -- -> IO (Either Error r)
+     ∀ r x.
+     Handle -- ^
+  -> Request -- ^
+  -> x
+  -> (x -> Response -> IO (Either x r))
+  -> IO (Either Error r)
+stream Handle { handleVar } request value step =
   loop
 
   where
-    loop :: IO r
+    loop :: IO (Either Error r)
     loop = do
       handle :: Handle.Handle <-
         atomically (readTMVar handleVar)
 
-      tryAny (Handle.stream handle request callback) >>= \case
+      Handle.stream handle request value step >>= \case
         Left _ -> do
           void (atomically (takeTMVar handleVar))
           loop
 
         Right response ->
-          pure response
-
-
-data Exception
-  deriving stock (Show)
-  deriving anyclass (Exception.Exception)
-
-isRemoteShutdownException :: Exception -> Bool
-isRemoteShutdownException _ =
-  False
+          pure (Right response)

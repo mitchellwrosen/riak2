@@ -3,8 +3,8 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Exclusive (Config(..), EventHandlers(..), Socket,
-                                withHandle)
+import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..),
+                                   Handle, withHandle)
 
 import qualified Riak.Handle.Impl.Exclusive as Handle
 
@@ -13,6 +13,9 @@ import Control.Lens
 import Data.Either           (isRight)
 import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
+import Foreign.C             (CInt)
+import Net.IPv4              (ipv4)
+import System.Exit           (ExitCode(..), exitWith)
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -20,14 +23,28 @@ import qualified Data.ByteString.Random as ByteString
 
 main :: IO ()
 main = do
-  socket :: Socket <-
-    Handle.new1 "localhost" 8087
+  result :: Either CInt () <-
+    withHandle config
+      (\handle ->
+        defaultMain
+          (testGroup "Riak integration tests" (integrationTests handle)))
 
-  let
+  case result of
+    Left errno ->
+      exitWith (ExitFailure (fromIntegral errno))
+
+    Right () ->
+      pure ()
+
+  where
     config :: Config
     config =
       Config
-        { socket = socket
+        { endpoint =
+            Endpoint
+              { address = ipv4 127 0 0 1
+              , port = 8087
+              }
         , handlers =
             mempty
             -- EventHandlers
@@ -36,28 +53,25 @@ main = do
             --   }
         }
 
-  withHandle config $ \client ->
-    defaultMain (testGroup "Riak integration tests" (integrationTests client))
-
 integrationTests :: Handle -> [TestTree]
-integrationTests client =
+integrationTests handle =
   [ testGroup "Riak"
     [ testCase "ping" $ do
-        ping client `shouldReturn` Right ()
+        ping handle `shouldReturn` Right ()
     ]
 
   , testGroup "Riak.Object"
     [ testGroup "get"
       [ testCase "404" $ do
           key <- randomKey
-          get client key def `shouldReturn` Right []
+          get handle key def `shouldReturn` Right []
 
       , testCase "success" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
           let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put client content def
-          get client key def >>= \case
+          Right key <- put handle content def
+          get handle key def >>= \case
             Left err -> assertFailure (show err)
             Right [Object { content }] -> do
               (content ^. field @"value") `shouldBe` value
@@ -65,49 +79,49 @@ integrationTests client =
 
       , testCase "head 404" $ do
           key <- randomKey
-          getHead client key def `shouldReturn` Right []
+          getHead handle key def `shouldReturn` Right []
 
       , testCase "head success" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
           let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put client content def
-          getHead client key def `shouldReturnSatisfy` isRight
+          Right key <- put handle content def
+          getHead handle key def `shouldReturnSatisfy` isRight
 
       , testCase "if modified (not modified)" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
           let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put client content def
-          get client key def >>= \case
+          Right key <- put handle content def
+          get handle key def >>= \case
             Left err -> assertFailure (show err)
             Right [object] -> do
-              getIfModified client object def `shouldReturnSatisfy` isRightNothing
+              getIfModified handle object def `shouldReturnSatisfy` isRightNothing
             _ -> undefined
 
       , testCase "if modified (modified)" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
           let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put client content def
-          get client key def >>= \case
+          Right key <- put handle content def
+          get handle key def >>= \case
             Left err -> assertFailure (show err)
             Right [object] -> do
-              _ <- put client object def
-              getIfModified client object def `shouldReturnSatisfy` isRightJust
+              _ <- put handle object def
+              getIfModified handle object def `shouldReturnSatisfy` isRightJust
             _ -> undefined
 
       , testCase "put" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
           let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          put client content def `shouldReturnSatisfy` isRight
+          put handle content def `shouldReturnSatisfy` isRight
 
       , testCase "putGet" $ do
           key <- randomKey
           value <- ByteString.random 6
           let content = newContent key value
-          putGet client content def >>= \case
+          putGet handle content def >>= \case
             Left err -> assertFailure (show err)
             Right (_:|[]) -> pure ()
             result -> assertFailure (show result)
@@ -116,8 +130,8 @@ integrationTests client =
           key <- randomKey
           value <- ByteString.random 6
           let content = newContent key value
-          put client content def `shouldReturnSatisfy` isRight
-          putGet client content def >>= \case
+          put handle content def `shouldReturnSatisfy` isRight
+          putGet handle content def >>= \case
             Left err -> assertFailure (show err)
             Right (_:|[_]) -> pure ()
             result -> assertFailure (show result)
@@ -126,7 +140,7 @@ integrationTests client =
           key <- randomKey
           value <- ByteString.random 6
           let content = newContent key value
-          putGetHead client content def >>= \case
+          putGetHead handle content def >>= \case
             Left err -> assertFailure (show err)
             Right (_:|[]) -> pure ()
             result -> assertFailure (show result)
@@ -135,27 +149,27 @@ integrationTests client =
           key <- randomKey
           value <- ByteString.random 6
           let content = newContent key value
-          put client content def `shouldReturnSatisfy` isRight
-          putGetHead client content def >>= \case
+          put handle content def `shouldReturnSatisfy` isRight
+          putGetHead handle content def >>= \case
             Left err -> assertFailure (show err)
             Right (_:|[_]) -> pure ()
             result -> assertFailure (show result)
 
-      , testCase "delete" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let content = (newContent key value) { metadata = [("foo", Just "bar")], type' = Just "wawa" }
-          -- Right (object:|_) <- putGetHead client content def
-          -- delete client object `shouldReturn` Right ()
-          _ <- put client content def
-          delete client content `shouldReturn` Right ()
-          get client key def `shouldReturn` Right []
+      -- , testCase "delete" $ do
+      --     key <- randomKey
+      --     value <- ByteString.random 6
+      --     let content = (newContent key value) { metadata = [("foo", Just "bar")], type' = Just "wawa" }
+      --     -- Right (object:|_) <- putGetHead handle content def
+      --     -- delete handle object `shouldReturn` Right ()
+      --     _ <- put handle content def
+      --     delete handle content `shouldReturn` Right ()
+      --     get handle key def `shouldReturn` Right []
       ]
     ]
 
   , testGroup "Riak.ServerInfo"
     [ testCase "getServerInfo" $ do
-        getServerInfo client `shouldReturn`
+        getServerInfo handle `shouldReturn`
           Right ServerInfo
             { name = "riak@172.17.0.2"
             , version = "2.2.3"

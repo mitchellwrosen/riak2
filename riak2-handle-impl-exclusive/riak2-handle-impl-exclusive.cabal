@@ -7,8 +7,8 @@ build-type: Simple
 library
   build-depends:
     base,
-    riak2-core-internal,
-    unliftio
+    foldl,
+    riak2-core-internal
 
   default-extensions:
     DeriveAnyClass
@@ -16,6 +16,9 @@ library
     DuplicateRecordFields
     LambdaCase
     NamedFieldPuns
+    ScopedTypeVariables
+    UnicodeSyntax
+    ViewPatterns
 
   default-language:
     Haskell2010

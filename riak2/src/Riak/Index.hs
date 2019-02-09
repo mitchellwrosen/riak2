@@ -33,14 +33,14 @@ getIndex ::
      MonadIO m
   => Handle
   -> Text
-  -> m (Either ByteString (Maybe Index))
+  -> m (Either Handle.Error (Maybe Index))
 getIndex handle name = liftIO $
   liftIO (fromResponse <$> Handle.getIndex handle (Just (encodeUtf8 name)))
 
   where
     fromResponse ::
-         Either ByteString [Proto.Index]
-      -> Either ByteString (Maybe Index)
+         Either Handle.Error [Proto.Index]
+      -> Either Handle.Error (Maybe Index)
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
       -- Left "notfound" ->
@@ -60,14 +60,14 @@ getIndex handle name = liftIO $
 getIndexes ::
      MonadIO m
   => Handle
-  -> m (Either ByteString [Index])
+  -> m (Either Handle.Error [Index])
 getIndexes handle =
   liftIO (fromResponse <$> Handle.getIndex handle Nothing)
 
   where
     fromResponse ::
-         Either ByteString [Proto.Index]
-      -> Either ByteString [Index]
+         Either Handle.Error [Proto.Index]
+      -> Either Handle.Error [Index]
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
       -- Left "notfound" ->
@@ -83,7 +83,7 @@ putIndex ::
      MonadIO m
   => Handle -- ^
   -> Index -- ^
-  -> m (Either ByteString ())
+  -> m (Either Handle.Error ())
 putIndex handle index = liftIO $
   Handle.putIndex handle request
 
@@ -100,7 +100,7 @@ deleteIndex ::
      MonadIO m
   => Handle -- ^
   -> Text -- ^
-  -> m (Either ByteString ())
+  -> m (Either Handle.Error ())
 deleteIndex handle name = liftIO $
   Handle.deleteIndex handle (encodeUtf8 name)
 

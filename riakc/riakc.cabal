@@ -11,6 +11,7 @@ executable riakc-new
     , bytestring
     , data-default-class
     , generic-lens
+    , ip
     , lens
     , optparse-applicative
     , network
@@ -42,7 +43,6 @@ executable riakc-new
   main-is:
     Main.hs
 
-  -- TODO switch to managed client
   mixins:
     riak2 requires
       (Riak.Handle.Signature as Riak.Handle.Impl.Managed),

@@ -27,7 +27,7 @@ getSchema ::
      MonadIO m
   => Handle -- ^
   -> Text -- ^
-  -> m (Either ByteString (Maybe Schema))
+  -> m (Either Handle.Error (Maybe Schema))
 getSchema handle name = liftIO $
   fromResponse <$>
     Handle.getSchema
@@ -36,8 +36,8 @@ getSchema handle name = liftIO $
 
   where
     fromResponse ::
-         Either ByteString Proto.Schema
-      -> Either ByteString (Maybe Schema)
+         Either Handle.Error Proto.Schema
+      -> Either Handle.Error (Maybe Schema)
     fromResponse = \case
       -- TODO text "notfound" string
       Left err ->
@@ -51,7 +51,7 @@ putSchema ::
      MonadIO m
   => Handle -- ^
   -> Schema -- ^
-  -> m (Either ByteString ())
+  -> m (Either Handle.Error ())
 putSchema handle schema =
   liftIO (Handle.putSchema handle (toProto schema))
 

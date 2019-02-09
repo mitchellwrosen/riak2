@@ -35,7 +35,7 @@ getConvergentCounter ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either ByteString (Maybe ConvergentCounter))
+  -> m (Either Handle.Error (Maybe ConvergentCounter))
 getConvergentCounter handle k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -77,7 +77,7 @@ updateConvergentCounter ::
      MonadIO m
   => Handle -- ^
   -> ConvergentCounter -- ^
-  -> m (Either ByteString ConvergentCounter)
+  -> m (Either Handle.Error ConvergentCounter)
 updateConvergentCounter handle (ConvergentCounter { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

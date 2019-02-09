@@ -79,7 +79,7 @@ getConvergentMap ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either ByteString (Maybe (ConvergentMap ConvergentMapValue)))
+  -> m (Either Handle.Error (Maybe (ConvergentMap ConvergentMapValue)))
 getConvergentMap handle k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
@@ -121,7 +121,7 @@ updateConvergentMap ::
      MonadIO m
   => Handle -- ^
   -> ConvergentMap [ConvergentMapUpdate] -- ^
-  -> m (Either ByteString (ConvergentMap ConvergentMapValue))
+  -> m (Either Handle.Error (ConvergentMap ConvergentMapValue))
 updateConvergentMap handle (ConvergentMap { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse

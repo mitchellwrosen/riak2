@@ -2,11 +2,14 @@ module Riak.Internal.Error where
 
 import Riak.Internal.Prelude
 
+import qualified Riak.Handle.Signature as Handle
+
 import ByteString
 
 -- TODO "Key cannot be zero-length" when putting with empty key
 
--- | Error responses that Riak may return.
+-- | Error responses that Riak may return, plus a generic "handle error" that
+-- occurs when something goes wrong with the underlying connection.
 --
 -- The goal here is to parse Riak's rather terse error strings into an ADT that
 -- can be meaningfully pattern matched on, and incorporated into business logic.
@@ -24,6 +27,10 @@ data Error :: Op -> Type where
   InvalidNError ::
        MayReturnInvalidN op ~ 'True
     => !Word32
+    -> Error op
+
+  HandleError ::
+       !Handle.Error
     -> Error op
 
   UnknownError ::

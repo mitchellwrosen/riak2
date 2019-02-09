@@ -7,14 +7,12 @@ import Riak                       (Bucket(..), Content(..), Context,
                                    ServerInfo(..), generatedKey,
                                    getConvergentMap, newContext, ping,
                                    unsafeMakeContext, updateConvergentMap)
-import Riak.Handle.Impl.Exclusive (Socket)
+import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..))
 import Riak.Handle.Impl.Managed   (Handle)
 
-import qualified Riak.Handle.Impl.Exclusive as Handle (Config(..),
-                                                       EventHandlers(..), new1)
-import qualified Riak.Handle.Impl.Managed   as Handle hiding (Config)
-import qualified Riak.Object                as Object
-import qualified Riak.ServerInfo            as ServerInfo
+import qualified Riak.Handle.Impl.Managed as Handle hiding (Config)
+import qualified Riak.Object              as Object
+import qualified Riak.ServerInfo          as ServerInfo
 
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
@@ -22,9 +20,10 @@ import Data.List.Split     (splitOn)
 import Data.Maybe          (fromMaybe)
 import Data.Text           (Text)
 import Data.Text.Encoding  (decodeUtf8, encodeUtf8)
+import Net.IPv4            (ipv4)
 import Network.Socket      (HostName, PortNumber)
 import Options.Applicative hiding (infoParser)
-import System.Exit         (exitFailure)
+import System.Exit         (ExitCode(..), exitFailure, exitWith)
 import Text.Read           (readMaybe)
 
 import qualified Data.ByteString.Base64 as Base64
@@ -44,28 +43,34 @@ main = do
             <*> commandParser))
         (progDesc "Riak command-line client")))
 
-  socket :: Socket <-
-    Handle.new1 host port
-
   let
-    config :: Handle.Config
+    config :: Config
     config =
-      Handle.Config
-        { Handle.socket = socket
-        , Handle.handlers =
-            Handle.EventHandlers
-              { Handle.onSend =
+      Config
+        { endpoint =
+            Endpoint
+              { address = ipv4 127 0 0 1 -- TODO actually use host
+              , port = fromIntegral port
+              }
+        , handlers =
+            EventHandlers
+              { onSend =
                   if verbose
                     then \msg -> putStrLn (">>> " ++ show msg)
                     else mempty
-              , Handle.onReceive =
+              , onReceive =
                   if verbose
                     then \msg -> putStrLn ("<<< " ++ show msg)
                     else mempty
               }
         }
 
-  Handle.withHandle config run
+  Handle.withHandle config run >>= \case
+    Left errno ->
+      exitWith (ExitFailure (fromIntegral errno))
+
+    Right () ->
+      pure ()
 
 nodeParser :: Parser (HostName, PortNumber)
 nodeParser =
@@ -165,7 +170,7 @@ infoParser =
   pure $ \handle ->
     ServerInfo.getServerInfo handle >>= \case
       Left err -> do
-        Latin1.putStrLn err
+        print err
         exitFailure
 
       Right ServerInfo { name, version } -> do
@@ -176,7 +181,7 @@ pingParser =
   pure $ \handle ->
     ping handle >>= \case
       Left err -> do
-        Latin1.putStrLn err
+        print err
         exitFailure
 
       Right () ->

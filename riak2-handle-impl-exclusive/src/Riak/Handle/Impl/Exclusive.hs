@@ -5,42 +5,41 @@ module Riak.Handle.Impl.Exclusive
   , withHandle
   , exchange
   , stream
-  , Exception(..)
-  , isRemoteShutdownException
+  , Error(..)
     -- ** Re-exports
-  , Socket.Socket(..)
-  , Socket.new1
+  , Endpoint(..)
+  , DecodeError(..)
   ) where
 
-import Riak.Request  (Request)
-import Riak.Response (Response)
-import Riak.Socket   (Socket)
+import Riak.Connection (Connection, Endpoint(..), ReceiveError(..),
+                        SocketException(..), withConnection)
+import Riak.Request    (Request)
+import Riak.Response   (DecodeError(..), Response)
 
-import qualified Riak.Socket as Socket
+import qualified Riak.Connection as Connection
 
 import Control.Concurrent.MVar
-import UnliftIO.Exception      (bracket_, throwIO)
-
-import qualified Control.Exception as Exception
+import Control.Exception       (Exception, throwIO)
+import Foreign.C               (CInt)
 
 
 data Handle
   = Handle
-  { socket :: !Socket
+  { connection :: !Connection
   , lock :: !(MVar ())
   , handlers :: !EventHandlers
   }
 
 data Config
   = Config
-  { socket :: !Socket
+  { endpoint :: !Endpoint
   , handlers :: !EventHandlers
   }
 
 data EventHandlers
   = EventHandlers
   { onSend :: Request -> IO ()
-  , onReceive :: Response -> IO ()
+  , onReceive :: Either Error Response -> IO ()
   }
 
 instance Monoid EventHandlers where
@@ -51,38 +50,82 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 <> EventHandlers a2 b2 =
     EventHandlers (a1 <> a2) (b1 <> b2)
 
-withHandle :: Config -> (Handle -> IO a) -> IO a
-withHandle Config { socket, handlers } k = do
-  lock <- newMVar ()
+data Error
+  = RemoteShutdown
+  | SendError !CInt
+  | ReceiveError !CInt
+  deriving stock (Eq, Show)
 
-  bracket_
-    (Socket.connect socket)
-    (Socket.disconnect socket)
-    (k Handle
-      { socket = socket
-      , lock = lock
-      , handlers = handlers
-      })
+-- | During connection teardown, Riak unexpectedly sent more data.
+data RemoteNotShutdown
+  = RemoteNotShutdown
+  deriving stock (Show)
+  deriving anyclass (Exception)
 
+-- | Acquire a handle.
+--
+-- /Throws/. If, during connection teardown, Riak unexpectedly sends more data,
+-- throws 'RemoteNotShutdown'.
+withHandle ::
+     Config
+  -> (Handle -> IO a)
+  -> IO (Either CInt a)
+withHandle Config { endpoint, handlers } k = do
+  lock :: MVar () <-
+    newMVar ()
+
+  result <-
+    withConnection endpoint $ \connection ->
+      k Handle
+        { connection = connection
+        , lock = lock
+        , handlers = handlers
+        }
+
+  case result of
+    Left err ->
+      socketExceptionToConnectError err
+
+    Right value ->
+      pure (Right value)
+
+-- | Send a request.
+--
+-- /Throws/. If response decoding fails, throws 'DecodeError'.
 send ::
      Handle
   -> Request
-  -> IO ()
-send Handle { socket, handlers } request = do
+  -> IO (Either Error ())
+send Handle { connection, handlers } request = do
   onSend handlers request
-  Socket.send socket request
 
+  Connection.send connection request >>= \case
+    Left err ->
+      socketExceptionToError SendError err
+
+    Right () ->
+      pure (Right ())
+
+-- | Receive a response.
+--
+-- /Throws/. If response decoding fails, throws 'DecodeError'.
 receive ::
      Handle -- ^
-  -> IO Response
-receive Handle { socket, handlers } =
-  Socket.receive socket >>= \case
-    Nothing ->
-      throwIO RemoteShutdown
-
-    Just response -> do
+  -> IO (Either Error Response)
+receive Handle { connection, handlers } =
+  Connection.receive connection >>= \case
+    Left (ReceiveErrorSocket err) -> do
+      response <- socketExceptionToError ReceiveError err
       onReceive handlers response
       pure response
+
+    Left (ReceiveErrorDecode err) ->
+      throwIO err
+
+    Right (Right -> response) -> do
+      onReceive handlers response
+      pure response
+
 
 -- | Send a request and receive the response (a single message).
 --
@@ -90,31 +133,76 @@ receive Handle { socket, handlers } =
 exchange ::
      Handle -- ^
   -> Request -- ^
-  -> IO Response
-exchange iface request =
-  withMVar (lock iface) $ \_ -> do
-    send iface request
-    receive iface
+  -> IO (Either Error Response)
+exchange handle request =
+  withMVar (lock handle) $ \_ ->
+    send handle request >>= \case
+      Left err ->
+        pure (Left err)
+
+      Right () ->
+        receive handle
 
 -- | Send a request and stream the response (one or more messages).
---
--- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 stream ::
+     ∀ r x.
      Handle -- ^
   -> Request -- ^
-  -> (IO Response -> IO r) -- ^
-  -> IO r
-stream iface request callback =
-  withMVar (lock iface) $ \_ -> do
-    send iface request
-    callback (receive iface)
+  -> x
+  -> (x -> Response -> IO (Either x r))
+  -> IO (Either Error r)
+stream handle request value0 step =
+  withMVar (lock handle) $ \_ ->
+    send handle request >>= \case
+      Left err ->
+        pure (Left err)
 
+      Right () ->
+        consume value0
 
-data Exception
-  = RemoteShutdown
-  deriving stock (Show)
-  deriving anyclass (Exception.Exception)
+  where
+    consume :: x -> IO (Either Error r)
+    consume value =
+      receive handle >>= \case
+        Left err ->
+          pure (Left err)
 
-isRemoteShutdownException :: Exception -> Bool
-isRemoteShutdownException _ =
-  True
+        Right response ->
+          step value response >>= \case
+            Left newValue ->
+              consume newValue
+            Right result ->
+              pure (Right result)
+
+socketExceptionToConnectError :: SocketException -> IO (Either CInt a)
+socketExceptionToConnectError = \case
+  SocketException _ (Connection.ErrorCode errno) ->
+    pure (Left errno)
+
+  SocketException _ Connection.RemoteNotShutdown ->
+    throwIO RemoteNotShutdown
+
+  SocketException _ Connection.MessageTruncated{} -> undefined
+  SocketException _ Connection.NegativeBytesRequested -> undefined
+  SocketException _ Connection.OptionValueSize -> undefined
+  SocketException _ Connection.RemoteShutdown -> undefined
+  SocketException _ Connection.SocketAddressFamily -> undefined
+  SocketException _ Connection.SocketAddressSize -> undefined
+
+socketExceptionToError ::
+     (CInt -> Error)
+  -> SocketException
+  -> IO (Either Error a)
+socketExceptionToError fromErrno = \case
+  SocketException _ Connection.RemoteShutdown ->
+    pure (Left RemoteShutdown)
+
+  SocketException _ (Connection.ErrorCode errno) ->
+    pure (Left (fromErrno errno))
+
+  SocketException _ Connection.RemoteNotShutdown -> undefined
+  SocketException _ Connection.MessageTruncated{} -> undefined
+  SocketException _ Connection.NegativeBytesRequested -> undefined
+  SocketException _ Connection.OptionValueSize -> undefined
+  SocketException _ Connection.SocketAddressFamily -> undefined
+  SocketException _ Connection.SocketAddressSize -> undefined
