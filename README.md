@@ -10,9 +10,17 @@
 
   ![riak2-core-internal-src-sloc](./etc/riak2-core-internal-src-sloc.svg) ![riak2-core-internal-test-sloc](./etc/riak2-core-internal-test-sloc.svg)
 
-- [`riak2-interface-impls`](./riak2-interface-impls)
+- [`riak2-handle-impl-socket`](./riak2-handle-impl-socket)
 
-  ![riak2-interface-impls-src-sloc](./etc/riak2-interface-impls-src-sloc.svg) ![riak2-interface-impls-test-sloc](./etc/riak2-interface-impls-test-sloc.svg)
+  ![riak2-handle-impl-socket-src-sloc](./etc/riak2-handle-impl-socket-src-sloc.svg) ![riak2-handle-impl-socket-test-sloc](./etc/riak2-handle-impl-socket-test-sloc.svg)
+
+- [`riak2-handle-impl-concurrent-socket`](./riak2-handle-impl-concurrent-socket)
+
+  ![riak2-handle-impl-concurrent-socket-src-sloc](./etc/riak2-handle-impl-concurrent-socket-src-sloc.svg) ![riak2-handle-impl-concurrent-socket-test-sloc](./etc/riak2-handle-impl-concurrent-socket-test-sloc.svg)
+
+- [`riak2-handle-impl-managed`](./riak2-handle-impl-managed)
+
+  ![riak2-handle-impl-managed-src-sloc](./etc/riak2-handle-impl-managed-src-sloc.svg) ![riak2-handle-impl-managed-test-sloc](./etc/riak2-handle-impl-managed-test-sloc.svg)
 
 - [`riakc`](./riakc)
 
