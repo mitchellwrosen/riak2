@@ -44,4 +44,4 @@ executable riakc-new
   -- TODO switch to managed client
   mixins:
     riak2 requires
-      (Riak.Interface.Signature as Riak.Handle.Impl.Socket)
+      (Riak.Handle.Signature as Riak.Handle.Impl.Socket)

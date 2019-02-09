@@ -34,11 +34,6 @@ description:
   .
   * "Riak"
   .
-  Connection establishment and basic server information:
-  .
-  * "Riak.Client"
-  * "Riak.ServerInfo"
-  .
   Key/value store types and operations:
   .
   * "Riak.Object"
@@ -74,12 +69,13 @@ description:
   .
   * "Riak.MapReduce"
   .
-  Miscellaneous types:
+  Miscellaneous:
   .
   * "Riak.Context"
   * "Riak.Error"
   * "Riak.Opts"
   * "Riak.Quorum"
+  * "Riak.ServerInfo"
 
 library
   build-depends:
@@ -141,7 +137,6 @@ library
     Riak.Bucket
     Riak.BucketProperties
     Riak.BucketType
-    Riak.Client
     Riak.Content
     Riak.Context
     Riak.ConvergentCounter
@@ -240,7 +235,7 @@ test-suite tests
     Main.hs
 
   mixins:
-    riak2 requires (Riak.Interface.Signature as Riak.Handle.Impl.Socket)
+    riak2 requires (Riak.Handle.Signature as Riak.Handle.Impl.Socket)
 
   type:
     exitcode-stdio-1.0

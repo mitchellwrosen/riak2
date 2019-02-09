@@ -15,8 +15,8 @@ module Riak.Object
   , Object(..)
   ) where
 
-import Riak.Client           (Client)
 import Riak.Content          (Content(..))
+import Riak.Handle           (Handle)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Error
 import Riak.Internal.Object  (Object(..))
@@ -24,7 +24,7 @@ import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Opts             (GetOpts(..), PutOpts(..))
 
-import qualified Riak.Interface               as Interface
+import qualified Riak.Handle                  as Handle
 import qualified Riak.Internal.Object         as Object
 import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
@@ -51,14 +51,14 @@ import qualified ByteString
 -- 'Riak.Object.deleted'.
 get
   :: MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) [Object ByteString])
-get client key opts = liftIO $
+get handle key opts = liftIO $
   (fmap.fmap)
     (Object.fromGetResponse key)
-    (doGet client request)
+    (doGet handle request)
 
   where
     request :: Proto.GetRequest
@@ -74,14 +74,14 @@ get client key opts = liftIO $
 -- 'Riak.Object.deleted'.
 getHead
   :: MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) [Object ()])
-getHead client key opts = liftIO $
+getHead handle key opts = liftIO $
   (fmap.fmap)
     (map (() <$) . Object.fromGetResponse key)
-    (doGet client request)
+    (doGet handle request)
   where
     request :: Proto.GetRequest
     request =
@@ -100,25 +100,25 @@ getIfModified ::
      ( HasType (Content a) (object a)
      , MonadIO m
      )
-  => Client -- ^
+  => Handle -- ^
   -> object a -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) (Maybe [Object ByteString]))
-getIfModified client object opts =
-  liftIO (getIfModified_ client (object ^. typed @(Content a)) opts)
+getIfModified handle object opts =
+  liftIO (getIfModified_ handle (object ^. typed @(Content a)) opts)
 
 getIfModified_ ::
-     Client
+     Handle
   -> Content a
   -> GetOpts
   -> IO (Either (Error 'GetOp) (Maybe [Object ByteString]))
-getIfModified_ client (Content { key, context }) opts =
+getIfModified_ handle (Content { key, context }) opts =
   (fmap.fmap)
     (\response ->
       if response ^. L.unchanged
         then Nothing
         else Just (Object.fromGetResponse key response))
-    (doGet client request)
+    (doGet handle request)
 
   where
     request :: Proto.GetRequest
@@ -138,22 +138,22 @@ getHeadIfModified ::
      ( HasType (Content a) (object a)
      , MonadIO m
      )
-  => Client -- ^
+  => Handle -- ^
   -> object a -- ^
   -> GetOpts -- ^
   -> m (Either (Error 'GetOp) (Maybe [Object ()]))
-getHeadIfModified client object opts =
-  liftIO (getHeadIfModified_ client (object ^. typed @(Content a)) opts)
+getHeadIfModified handle object opts =
+  liftIO (getHeadIfModified_ handle (object ^. typed @(Content a)) opts)
 
 getHeadIfModified_ ::
-     Client
+     Handle
   -> Content a
   -> GetOpts
   -> IO (Either (Error 'GetOp) (Maybe [Object ()]))
-getHeadIfModified_ client (Content { key, context }) opts =
+getHeadIfModified_ handle (Content { key, context }) opts =
   (fmap.fmap)
     fromResponse
-    (doGet client request)
+    (doGet handle request)
   where
     request :: Proto.GetRequest
     request =
@@ -168,12 +168,12 @@ getHeadIfModified_ client (Content { key, context }) opts =
         else Just ((() <$) <$> Object.fromGetResponse key response)
 
 doGet ::
-     Client
+     Handle
   -> Proto.GetRequest
   -> IO (Either (Error 'GetOp) Proto.GetResponse)
-doGet client request =
+doGet handle request =
   first parseGetError <$>
-    Interface.get client request
+    Handle.get handle request
   where
     parseGetError :: ByteString -> Error 'GetOp
     parseGetError err
@@ -206,22 +206,22 @@ put ::
      ( HasType (Content ByteString) (object ByteString)
      , MonadIO m
      )
-  => Client -- ^
+  => Handle -- ^
   -> object ByteString -- ^
   -> PutOpts -- ^
   -> m (Either (Error 'PutOp) Key)
-put client object opts =
-  liftIO (put_ client (object ^. typed) opts)
+put handle object opts =
+  liftIO (put_ handle (object ^. typed) opts)
 
 put_ ::
-     Client
+     Handle
   -> Content ByteString
   -> PutOpts
   -> IO (Either (Error 'PutOp) Key)
-put_ client content opts =
+put_ handle content opts =
   (fmap.fmap)
     fromResponse
-    (doPut client request)
+    (doPut handle request)
   where
     request :: Proto.PutRequest
     request =
@@ -249,22 +249,22 @@ putGet ::
      ( HasType (Content ByteString) (object ByteString)
      , MonadIO m
      )
-  => Client -- ^
+  => Handle -- ^
   -> object ByteString -- ^
   -> PutOpts -- ^
   -> m (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
-putGet client object opts =
-  liftIO (putGet_ client (object ^. typed) opts)
+putGet handle object opts =
+  liftIO (putGet_ handle (object ^. typed) opts)
 
 putGet_ ::
-     Client -- ^
+     Handle -- ^
   -> Content ByteString -- ^
   -> PutOpts -- ^
   -> IO (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
-putGet_ client content opts =
+putGet_ handle content opts =
   (fmap.fmap)
     (Object.fromPutResponse key)
-    (doPut client request)
+    (doPut handle request)
 
   where
     request :: Proto.PutRequest
@@ -289,22 +289,22 @@ putGetHead ::
      ( HasType (Content ByteString) (object ByteString)
      , MonadIO m
      )
-  => Client -- ^
+  => Handle -- ^
   -> object ByteString -- ^
   -> PutOpts -- ^
   -> m (Either (Error 'PutOp) (NonEmpty (Object ())))
-putGetHead client object opts =
-  liftIO (putGetHead_ client (object ^. typed) opts)
+putGetHead handle object opts =
+  liftIO (putGetHead_ handle (object ^. typed) opts)
 
 putGetHead_ ::
-     Client
+     Handle
   -> Content ByteString
   -> PutOpts
   -> IO (Either (Error 'PutOp) (NonEmpty (Object ())))
-putGetHead_ client content opts =
+putGetHead_ handle content opts =
   (fmap.fmap)
     (fmap (() <$) . Object.fromPutResponse key)
-    (doPut client request)
+    (doPut handle request)
 
   where
     request :: Proto.PutRequest
@@ -317,11 +317,11 @@ putGetHead_ client content opts =
       content ^. field @"key"
 
 doPut ::
-     Client
+     Handle
   -> Proto.PutRequest
   -> IO (Either (Error 'PutOp) Proto.PutResponse)
-doPut client request =
-  first parsePutError <$> Interface.put client request
+doPut handle request =
+  first parsePutError <$> Handle.put handle request
 
   where
     parsePutError :: ByteString -> Error 'PutOp
@@ -376,18 +376,18 @@ delete ::
      ( HasType (Content a) (object a)
      , MonadIO m
      )
-  => Client -- ^
+  => Handle -- ^
   -> object a -- ^
   -> m (Either (Error 'DeleteOp) ())
-delete client object =
-  liftIO (delete_ client (object ^. typed @(Content a)))
+delete handle object =
+  liftIO (delete_ handle (object ^. typed @(Content a)))
 
 delete_ ::
-     Client -- ^
+     Handle -- ^
   -> Content a -- ^
   -> IO (Either (Error 'DeleteOp) ())
-delete_ client content =
-  first parseDeleteError <$> Interface.delete client request
+delete_ handle content =
+  first parseDeleteError <$> Handle.delete handle request
 
   where
     request :: Proto.DeleteRequest

@@ -3,10 +3,10 @@ module Riak.ServerInfo
   , getServerInfo
   ) where
 
-import Riak.Client           (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Interface  as Interface
+import qualified Riak.Handle     as Handle
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
@@ -23,12 +23,12 @@ data ServerInfo
 -- | Get server info.
 getServerInfo ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> m (Either ByteString ServerInfo)
-getServerInfo client = liftIO $
+getServerInfo handle = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getServerInfo client)
+    (Handle.getServerInfo handle)
 
   where
     fromResponse :: Proto.GetServerInfoResponse -> ServerInfo

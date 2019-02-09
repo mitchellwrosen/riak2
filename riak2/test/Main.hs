@@ -3,10 +3,10 @@
 module Main where
 
 import Riak
-import Riak.Interface.Impl.Socket (Config(..), EventHandlers(..), Socket,
-                                   withInterface)
+import Riak.Handle.Impl.Socket (Config(..), EventHandlers(..), Socket,
+                                withHandle)
 
-import qualified Riak.Interface.Impl.Socket as Socket
+import qualified Riak.Handle.Impl.Socket as Socket
 
 import Control.Concurrent
 import Control.Lens
@@ -36,12 +36,12 @@ main = do
             --   }
         }
 
-  withInterface config $ \client ->
+  withHandle config $ \client ->
     defaultMain (testGroup "Riak integration tests" (integrationTests client))
 
-integrationTests :: Client -> [TestTree]
+integrationTests :: Handle -> [TestTree]
 integrationTests client =
-  [ testGroup "Riak.Client"
+  [ testGroup "Riak"
     [ testCase "ping" $ do
         ping client `shouldReturn` Right ()
     ]

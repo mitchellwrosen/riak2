@@ -2,20 +2,20 @@ module Riak.MapReduce
   ( mapReduce
   ) where
 
-import Riak.Client (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Interface as Interface
-import qualified Riak.Proto as Proto
+import qualified Riak.Handle as Handle
+import qualified Riak.Proto  as Proto
 
 import Control.Foldl (FoldM)
 
 
 mapReduce ::
      MonadIO m
-  => Client
+  => Handle
   -> Proto.MapReduceRequest
   -> FoldM IO Proto.MapReduceResponse r
   -> m (Either ByteString r)
-mapReduce client request responseFold =
-  liftIO (Interface.mapReduce client request responseFold)
+mapReduce handle request responseFold =
+  liftIO (Handle.mapReduce handle request responseFold)

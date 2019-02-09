@@ -23,7 +23,7 @@ library
     Haskell2010
 
   exposed-modules:
-    Riak.Interface
+    Riak.Handle
 
   reexported-modules:
     Riak.Proto,
@@ -36,4 +36,4 @@ library
     src
 
   signatures:
-    Riak.Interface.Signature
+    Riak.Handle.Signature

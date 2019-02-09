@@ -52,4 +52,4 @@ test-suite tests
 
   -- mixins:
   --   riak2-core
-  --     requires (Riak.Interface.Signature as Riak.Handle.Impl.Socket.Concurrent)
+  --     requires (Riak.Handle.Signature as Riak.Handle.Impl.Socket.Concurrent)

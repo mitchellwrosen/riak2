@@ -4,11 +4,11 @@ module Riak.ConvergentCounter
   , updateConvergentCounter
   ) where
 
-import Riak.Client           (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Interface  as Interface
+import qualified Riak.Handle     as Handle
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
@@ -33,13 +33,13 @@ data ConvergentCounter
 -- | Get a counter.
 getConvergentCounter ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Key -- ^
   -> m (Either ByteString (Maybe ConvergentCounter))
-getConvergentCounter client k@(Key bucketType bucket key) = liftIO $
+getConvergentCounter handle k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getCrdt client request)
+    (Handle.getCrdt handle request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -75,13 +75,13 @@ getConvergentCounter client k@(Key bucketType bucket key) = liftIO $
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 updateConvergentCounter ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> ConvergentCounter -- ^
   -> m (Either ByteString ConvergentCounter)
-updateConvergentCounter client (ConvergentCounter { key, value }) = liftIO $
+updateConvergentCounter handle (ConvergentCounter { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.updateCrdt client request)
+    (Handle.updateCrdt handle request)
 
   where
     request :: Proto.UpdateCrdtRequest

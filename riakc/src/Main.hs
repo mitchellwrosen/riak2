@@ -1,19 +1,16 @@
 module Main where
 
-import Riak                       (Bucket(..), Content(..), Context,
-                                   ConvergentMap(..), ConvergentMapUpdate(..),
-                                   ConvergentSetUpdate(..), GetOpts(..),
-                                   Key(..), PutOpts(..), Quorum(..),
-                                   ServerInfo(..), generatedKey,
-                                   getConvergentMap, newContext,
-                                   unsafeMakeContext, updateConvergentMap)
-import Riak.Client                (Client)
-import Riak.Interface.Impl.Socket (Socket)
+import Riak                    (Bucket(..), Content(..), Context,
+                                ConvergentMap(..), ConvergentMapUpdate(..),
+                                ConvergentSetUpdate(..), GetOpts(..), Key(..),
+                                PutOpts(..), Quorum(..), ServerInfo(..),
+                                generatedKey, getConvergentMap, newContext,
+                                ping, unsafeMakeContext, updateConvergentMap)
+import Riak.Handle.Impl.Socket (Handle, Socket)
 
-import qualified Riak.Client                as Client
-import qualified Riak.Interface.Impl.Socket as Client
-import qualified Riak.Object                as Object
-import qualified Riak.ServerInfo            as ServerInfo
+import qualified Riak.Handle.Impl.Socket as Handle
+import qualified Riak.Object             as Object
+import qualified Riak.ServerInfo         as ServerInfo
 
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
@@ -44,27 +41,27 @@ main = do
         (progDesc "Riak command-line client")))
 
   socket :: Socket <-
-    Client.new1 host port
+    Handle.new1 host port
 
   let
-    config :: Client.Config
+    config :: Handle.Config
     config =
-      Client.Config
-        { Client.socket = socket
-        , Client.handlers =
-            Client.EventHandlers
-              { Client.onSend =
+      Handle.Config
+        { Handle.socket = socket
+        , Handle.handlers =
+            Handle.EventHandlers
+              { Handle.onSend =
                   if verbose
                     then \msg -> putStrLn (">>> " ++ show msg)
                     else mempty
-              , Client.onReceive =
+              , Handle.onReceive =
                   if verbose
                     then \msg -> putStrLn ("<<< " ++ show msg)
                     else mempty
               }
         }
 
-  Client.withInterface config run
+  Handle.withHandle config run
 
 nodeParser :: Parser (HostName, PortNumber)
 nodeParser =
@@ -93,7 +90,7 @@ verboseParser :: Parser Bool
 verboseParser =
   switch (short 'v' <> long "verbose" <> help "Verbose")
 
-commandParser :: Parser (Client -> IO ())
+commandParser :: Parser (Handle -> IO ())
 commandParser =
   hsubparser
     (mconcat
@@ -105,7 +102,7 @@ commandParser =
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
       ])
 
-getParser :: Parser (Client -> IO ())
+getParser :: Parser (Handle -> IO ())
 getParser =
   doGet
     <$> argument (eitherReader parseKey) keyMod
@@ -118,10 +115,10 @@ getParser =
       -> Maybe Quorum
       -> Maybe Quorum
       -> Maybe Quorum
-      -> Client
+      -> Handle
       -> IO ()
-    doGet key n r pr client =
-      Object.get client key opts >>= \case
+    doGet key n r pr handle =
+      Object.get handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -141,17 +138,17 @@ getParser =
             , timeout = Nothing
             }
 
-getMapParser :: Parser (Client -> IO ())
+getMapParser :: Parser (Handle -> IO ())
 getMapParser =
   doGetMap
     <$> keyArgument
   where
     doGetMap ::
          Key
-      -> Client
+      -> Handle
       -> IO ()
-    doGetMap key client =
-      getConvergentMap client key >>= \case
+    doGetMap key handle =
+      getConvergentMap handle key >>= \case
         Left err -> do
           print err
           exitFailure
@@ -159,10 +156,10 @@ getMapParser =
         Right val ->
           print val
 
-infoParser :: Parser (Client -> IO ())
+infoParser :: Parser (Handle -> IO ())
 infoParser =
-  pure $ \client ->
-    ServerInfo.getServerInfo client >>= \case
+  pure $ \handle ->
+    ServerInfo.getServerInfo handle >>= \case
       Left err -> do
         Latin1.putStrLn err
         exitFailure
@@ -170,10 +167,10 @@ infoParser =
       Right ServerInfo { name, version } -> do
         Text.putStrLn (name <> " " <> version)
 
-pingParser :: Parser (Client -> IO ())
+pingParser :: Parser (Handle -> IO ())
 pingParser =
-  pure $ \client ->
-    Client.ping client >>= \case
+  pure $ \handle ->
+    ping handle >>= \case
       Left err -> do
         Latin1.putStrLn err
         exitFailure
@@ -181,7 +178,7 @@ pingParser =
       Right () ->
         pure ()
 
-putParser :: Parser (Client -> IO ())
+putParser :: Parser (Handle -> IO ())
 putParser =
   doPut
     <$> bucketOrKeyArgument
@@ -198,10 +195,10 @@ putParser =
       -> Maybe Quorum
       -> Maybe Quorum
       -> Maybe Quorum
-      -> Client
+      -> Handle
       -> IO ()
-    doPut bucketOrKey val n w dw pw client =
-      Object.put client content opts >>= \case
+    doPut bucketOrKey val n w dw pw handle =
+      Object.put handle content opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -239,7 +236,7 @@ putParser =
             , w = w
             }
 
-updateMapParser :: Parser (Client -> IO ())
+updateMapParser :: Parser (Handle -> IO ())
 updateMapParser =
   doUpdateMap
     <$> bucketOrKeyArgument
@@ -251,10 +248,10 @@ updateMapParser =
          Either Bucket Key
       -> Maybe Context
       -> [ConvergentMapUpdate]
-      -> Client
+      -> Handle
       -> IO ()
-    doUpdateMap bucketOrKey context updates client = do
-      updateConvergentMap client operation >>= \case
+    doUpdateMap bucketOrKey context updates handle = do
+      updateConvergentMap handle operation >>= \case
         Left err -> do
           print err
           exitFailure

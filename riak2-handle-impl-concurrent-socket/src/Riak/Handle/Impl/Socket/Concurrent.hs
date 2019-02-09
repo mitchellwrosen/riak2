@@ -1,8 +1,8 @@
-module Riak.Interface.Impl.Socket.Concurrent
-  ( Interface
+module Riak.Handle.Impl.Socket.Concurrent
+  ( Handle
   , Config
   , EventHandlers(..)
-  , withInterface
+  , withHandle
   , exchange
   , stream
   , Exception(..)
@@ -22,8 +22,8 @@ import UnliftIO.Exception      (bracket_, finally, throwIO)
 import qualified Control.Exception as Exception
 
 
-data Interface
-  = Interface
+data Handle
+  = Handle
   { socket :: !Socket
   , sync :: !Synchronized
   , relay :: !Relay
@@ -51,11 +51,11 @@ instance Semigroup EventHandlers where
     EventHandlers (a1 <> a2) (b1 <> b2)
 
 
-withInterface ::
+withHandle ::
      Config -- ^
-  -> (Interface -> IO a) -- ^
+  -> (Handle -> IO a) -- ^
   -> IO a
-withInterface Config { socket, handlers } k = do
+withHandle Config { socket, handlers } k = do
   sync :: Synchronized <-
     newSynchronized
 
@@ -65,7 +65,7 @@ withInterface Config { socket, handlers } k = do
   bracket_
     (Socket.connect socket)
     (Socket.disconnect socket)
-    (k Interface
+    (k Handle
       { socket = socket
       , sync = sync
       , relay = relay
@@ -76,10 +76,10 @@ withInterface Config { socket, handlers } k = do
 --
 -- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 exchange ::
-     Interface
+     Handle
   -> Request
   -> IO Response
-exchange Interface { socket, sync, relay, handlers } request = do
+exchange Handle { socket, sync, relay, handlers } request = do
   baton :: Baton <-
     synchronized sync $ do
       onSend handlers request
@@ -98,11 +98,11 @@ exchange Interface { socket, sync, relay, handlers } request = do
 --
 -- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 stream ::
-     Interface
+     Handle
   -> Request
   -> (IO Response -> IO r)
   -> IO r
-stream Interface { socket, sync, handlers } request callback =
+stream Handle { socket, sync, handlers } request callback =
   -- Riak request handling state machine is odd. Streaming responses are
   -- special; when one is active, no other requests can be serviced on this
   -- socket. I learned this the hard way by reading Riak source code.

@@ -3,10 +3,10 @@
 -- Still TODO: some way of configuring when we want to reconnect, and when we
 -- want to give up on the connection permanently.
 
-module Riak.Interface.Impl.Managed
-  ( Interface
+module Riak.Handle.Impl.Managed
+  ( Handle
   , Config
-  , withInterface
+  , withHandle
   , exchange
   , stream
   , Exception
@@ -16,7 +16,7 @@ module Riak.Interface.Impl.Managed
 import Riak.Request  (Request)
 import Riak.Response (Response)
 
-import qualified Riak.Interface.Signature as Interface
+import qualified Riak.Handle.Signature as Handle
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -26,29 +26,29 @@ import UnliftIO.Exception     (bracket, tryAny)
 import qualified Control.Exception as Exception
 
 
-newtype Interface
-  = Interface
-  { ifaceVar :: TMVar Interface.Interface
+newtype Handle
+  = Handle
+  { handleVar :: TMVar Handle.Handle
   }
 
 type Config
-  = Interface.Config
+  = Handle.Config
 
-withInterface ::
+withHandle ::
      Config
-  -> (Interface -> IO a)
+  -> (Handle -> IO a)
   -> IO a
-withInterface config k = do
-  ifaceVar :: TMVar Interface.Interface <-
+withHandle config k = do
+  handleVar :: TMVar Handle.Handle <-
     newEmptyTMVarIO
 
   bracket
     (forkIOWithUnmask $ \unmask ->
-      unmask (manager config ifaceVar))
+      unmask (manager config handleVar))
     killThread
     (\_ ->
-      k Interface
-        { ifaceVar = ifaceVar
+      k Handle
+        { handleVar = handleVar
         })
 
 -- The manager thread:
@@ -57,40 +57,40 @@ withInterface config k = do
 -- * Smuggle it out to the rest of the world via a TMVar.
 -- * Wait for this TMVar to empty out, then repeat.
 --
--- Meanwhile, users of this interface (via exchange/stream) grab the underlying
--- interface (if available), use it, and if anything goes wrong, empty out the
+-- Meanwhile, users of this handle (via exchange/stream) grab the underlying
+-- handle (if available), use it, and if anything goes wrong, empty out the
 -- TMVar and retry.
-manager :: Config -> TMVar Interface.Interface -> IO ()
-manager config ifaceVar =
+manager :: Config -> TMVar Handle.Handle -> IO ()
+manager config handleVar =
   forever loop
 
   where
     loop :: IO ()
     loop =
-      Interface.withInterface config $ \iface -> do
-        atomically (putTMVar ifaceVar iface)
+      Handle.withHandle config $ \handle -> do
+        atomically (putTMVar handleVar handle)
         atomically $
-          isEmptyTMVar ifaceVar >>= \case
+          isEmptyTMVar handleVar >>= \case
             True -> pure ()
             False -> retry
 
 -- | Send a request and receive the response (a single message).
 exchange ::
-     Interface
+     Handle
   -> Request
   -> IO Response
-exchange Interface { ifaceVar } request =
+exchange Handle { handleVar } request =
   loop
 
   where
     loop :: IO Response
     loop = do
-      iface :: Interface.Interface <-
-        atomically (readTMVar ifaceVar)
+      handle :: Handle.Handle <-
+        atomically (readTMVar handleVar)
 
-      tryAny (Interface.exchange iface request) >>= \case
+      tryAny (Handle.exchange handle request) >>= \case
         Left _ -> do
-          void (atomically (takeTMVar ifaceVar))
+          void (atomically (takeTMVar handleVar))
           loop
 
         Right response ->
@@ -99,22 +99,22 @@ exchange Interface { ifaceVar } request =
 -- | Send a request and stream the response (one or more messages).
 stream ::
      forall r.
-     Interface
+     Handle
   -> Request
   -> (IO Response -> IO r)
   -> IO r
-stream Interface { ifaceVar } request callback =
+stream Handle { handleVar } request callback =
   loop
 
   where
     loop :: IO r
     loop = do
-      iface :: Interface.Interface <-
-        atomically (readTMVar ifaceVar)
+      handle :: Handle.Handle <-
+        atomically (readTMVar handleVar)
 
-      tryAny (Interface.stream iface request callback) >>= \case
+      tryAny (Handle.stream handle request callback) >>= \case
         Left _ -> do
-          void (atomically (takeTMVar ifaceVar))
+          void (atomically (takeTMVar handleVar))
           loop
 
         Right response ->

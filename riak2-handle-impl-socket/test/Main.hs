@@ -4,12 +4,9 @@ import Riak.Request  (Request(..))
 import Riak.Response (Response(..))
 import Riak.Socket   (Socket(..))
 
--- import qualified Riak.Interface.Impl.Managed.Concurrent as Iface.Managed.Concurrent
--- import qualified Riak.Interface.Impl.Managed.Socket     as Iface.Managed.Socket
-import qualified Riak.Interface.Impl.Socket as Iface.Socket
--- import qualified Riak.Interface.Impl.Socket.Concurrent  as Iface.Concurrent
-import qualified Riak.Proto    as Proto
-import qualified Riak.Socket   as Socket
+import qualified Riak.Handle.Impl.Socket as Handle
+import qualified Riak.Proto              as Proto
+import qualified Riak.Socket             as Socket
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -28,14 +25,14 @@ socketmain = do
   client <- mockServer
 
   let
-    config :: Iface.Socket.Config
+    config :: Handle.Config
     config =
-      Iface.Socket.Config
-        { Iface.Socket.socket = client
-        , Iface.Socket.handlers = mempty
+      Handle.Config
+        { Handle.socket = client
+        , Handle.handlers = mempty
         }
 
-  Iface.Socket.withInterface config $ \iface -> do
+  Handle.withHandle config $ \iface -> do
 
     let workers = 10
     let requests = 1000
@@ -55,7 +52,7 @@ socketmain = do
             , RequestDelete Proto.defMessage
             ]
 
-        response <- Iface.Socket.exchange iface request
+        response <- Handle.exchange iface request
 
         unless (expectedResponse request response) $ do
           putStrLn "ERROR"
@@ -111,7 +108,7 @@ mockServer = do
             RequestGet{}            -> respond ResponseGet
             RequestListBuckets{}    -> respond ResponseListBuckets
             RequestListKeys{}       -> respond ResponseListKeys
-            -- RequestMapReduce{}   -> respond ResponseMapReduce
+            RequestMapReduce{}      -> respond ResponseMapReduce
             RequestPing{}           -> respond ResponsePing
             RequestPut{}            -> respond ResponsePut
             RequestPutIndex{}       -> respond ResponsePut
@@ -171,10 +168,10 @@ expectedResponse request response =
       case response of
         ResponseListKeys{} -> True
         _ -> False
-    -- RequestMapReduce{} ->
-    --   case response of
-    --     ResponseMapReduce{} -> True
-    --     _ -> False
+    RequestMapReduce{} ->
+      case response of
+        ResponseMapReduce{} -> True
+        _ -> False
     RequestPing{} ->
       case response of
         ResponsePing{} -> True

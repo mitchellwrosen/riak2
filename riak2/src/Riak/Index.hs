@@ -6,10 +6,10 @@ module Riak.Index
   , deleteIndex
   ) where
 
-import Riak.Client           (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Interface as Interface
+import qualified Riak.Handle as Handle
 
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
@@ -31,11 +31,11 @@ data Index
 -- | Get a Solr index.
 getIndex ::
      MonadIO m
-  => Client
+  => Handle
   -> Text
   -> m (Either ByteString (Maybe Index))
-getIndex client name = liftIO $
-  liftIO (fromResponse <$> Interface.getIndex client (Just (encodeUtf8 name)))
+getIndex handle name = liftIO $
+  liftIO (fromResponse <$> Handle.getIndex handle (Just (encodeUtf8 name)))
 
   where
     fromResponse ::
@@ -59,10 +59,10 @@ getIndex client name = liftIO $
 -- | Get all Solr indexes.
 getIndexes ::
      MonadIO m
-  => Client
+  => Handle
   -> m (Either ByteString [Index])
-getIndexes client =
-  liftIO (fromResponse <$> Interface.getIndex client Nothing)
+getIndexes handle =
+  liftIO (fromResponse <$> Handle.getIndex handle Nothing)
 
   where
     fromResponse ::
@@ -81,11 +81,11 @@ getIndexes client =
 -- | Put a Solr index.
 putIndex ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Index -- ^
   -> m (Either ByteString ())
-putIndex client index = liftIO $
-  Interface.putIndex client request
+putIndex handle index = liftIO $
+  Handle.putIndex handle request
 
   where
     request :: Proto.PutIndexRequest
@@ -98,11 +98,11 @@ putIndex client index = liftIO $
 -- | Delete a Solr index.
 deleteIndex ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Text -- ^
   -> m (Either ByteString ())
-deleteIndex client name = liftIO $
-  Interface.deleteIndex client (encodeUtf8 name)
+deleteIndex handle name = liftIO $
+  Handle.deleteIndex handle (encodeUtf8 name)
 
 fromProto :: Proto.Index -> Index
 fromProto index =

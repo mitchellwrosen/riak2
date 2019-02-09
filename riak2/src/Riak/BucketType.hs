@@ -7,10 +7,10 @@ module Riak.BucketType
   ) where
 
 import Riak.Bucket           (Bucket(..))
-import Riak.Client           (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Interface  as Interface
+import qualified Riak.Handle     as Handle
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
@@ -38,11 +38,11 @@ instance Default BucketType where
 -- | Get bucket type properties.
 getBucketType ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> BucketType -- ^
   -> m (Either ByteString Proto.BucketProperties)
-getBucketType client (BucketType bucketType) =
-  liftIO (Interface.getBucketType client bucketType)
+getBucketType handle (BucketType bucketType) =
+  liftIO (Handle.getBucketType handle bucketType)
 
 -- | Set bucket type properties.
 --
@@ -51,11 +51,11 @@ getBucketType client (BucketType bucketType) =
 -- TODO better set bucket type properties type
 -- TODO don't allow setting n
 setBucketType
-  :: Client -- ^
+  :: Handle -- ^
   -> Proto.SetBucketTypeRequest -- ^
   -> IO (Either ByteString ())
-setBucketType client request =
-  Interface.setBucketType client request
+setBucketType handle request =
+  Handle.setBucketType handle request
 
 -- | List all of the buckets in a bucket type.
 --
@@ -68,11 +68,11 @@ setBucketType client request =
 -- /See also/: 'streamBuckets'
 listBuckets
   :: MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> BucketType -- ^
   -> m (Either ByteString [Bucket])
-listBuckets client bucketType =
-  liftIO (streamBuckets client bucketType (Foldl.generalize Foldl.list))
+listBuckets handle bucketType =
+  liftIO (streamBuckets handle bucketType (Foldl.generalize Foldl.list))
 
 -- | Stream all of the buckets in a bucket type.
 --
@@ -81,13 +81,13 @@ listBuckets client bucketType =
 --
 -- /See also/: 'listBuckets'
 streamBuckets
-  :: Client -- ^
+  :: Handle -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> IO (Either ByteString r)
-streamBuckets client (BucketType bucketType) bucketFold =
-  Interface.listBuckets
-    client
+streamBuckets handle (BucketType bucketType) bucketFold =
+  Handle.listBuckets
+    handle
     request
     (makeResponseFold bucketType bucketFold)
 

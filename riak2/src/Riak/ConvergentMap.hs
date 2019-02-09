@@ -6,14 +6,14 @@ module Riak.ConvergentMap
   , ConvergentMapUpdate(..)
   ) where
 
-import Riak.Client                 (Client)
 import Riak.Context                (Context)
+import Riak.Handle                 (Handle)
 import Riak.Internal.Context       (Context(..))
 import Riak.Internal.ConvergentSet (ConvergentSetUpdate)
 import Riak.Internal.Prelude
 import Riak.Key                    (Key(..))
 
-import qualified Riak.Interface              as Interface
+import qualified Riak.Handle                 as Handle
 import qualified Riak.Internal.ConvergentSet as ConvergentSet
 import qualified Riak.Proto                  as Proto
 import qualified Riak.Proto.Lens             as L
@@ -77,13 +77,13 @@ data ConvergentMapUpdate
 -- | Get a map.
 getConvergentMap ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Key -- ^
   -> m (Either ByteString (Maybe (ConvergentMap ConvergentMapValue)))
-getConvergentMap client k@(Key bucketType bucket key) = liftIO $
+getConvergentMap handle k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getCrdt client request)
+    (Handle.getCrdt handle request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -119,13 +119,13 @@ getConvergentMap client k@(Key bucketType bucket key) = liftIO $
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 updateConvergentMap ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> ConvergentMap [ConvergentMapUpdate] -- ^
   -> m (Either ByteString (ConvergentMap ConvergentMapValue))
-updateConvergentMap client (ConvergentMap { context, key, value }) = liftIO $
+updateConvergentMap handle (ConvergentMap { context, key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.updateCrdt client request)
+    (Handle.updateCrdt handle request)
 
   where
     request :: Proto.UpdateCrdtRequest

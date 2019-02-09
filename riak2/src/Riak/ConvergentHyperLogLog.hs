@@ -8,11 +8,11 @@ module Riak.ConvergentHyperLogLog
   , updateConvergentHyperLogLog
   ) where
 
-import Riak.Client           (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Interface  as Interface
+import qualified Riak.Handle     as Handle
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
@@ -42,13 +42,13 @@ data ConvergentHyperLogLog a
 -- | Get a HyperLogLog.
 getConvergentHyperLogLog ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Key -- ^
   -> m (Either ByteString (Maybe (ConvergentHyperLogLog Word64)))
-getConvergentHyperLogLog client k@(Key bucketType bucket key) = liftIO $
+getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.getCrdt client request)
+    (Handle.getCrdt handle request)
 
   where
     request :: Proto.GetCrdtRequest
@@ -83,13 +83,13 @@ getConvergentHyperLogLog client k@(Key bucketType bucket key) = liftIO $
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 updateConvergentHyperLogLog ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
   -> m (Either ByteString (ConvergentHyperLogLog Word64))
-updateConvergentHyperLogLog client (ConvergentHyperLogLog { key, value }) = liftIO $
+updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = liftIO $
   (fmap.fmap)
     fromResponse
-    (Interface.updateCrdt client request)
+    (Handle.updateCrdt handle request)
 
   where
     request :: Proto.UpdateCrdtRequest

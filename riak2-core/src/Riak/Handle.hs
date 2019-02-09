@@ -1,5 +1,5 @@
-module Riak.Interface
-  ( Interface
+module Riak.Handle
+  ( Handle
   , UnexpectedResponse(..)
   , delete
   , deleteIndex
@@ -24,11 +24,11 @@ module Riak.Interface
   , updateCrdt
   ) where
 
-import Riak.Interface.Signature (Interface)
+import Riak.Handle.Signature (Handle)
 import Riak.Request             (Request(..))
 import Riak.Response            (Response(..))
 
-import qualified Riak.Interface.Signature as Interface
+import qualified Riak.Handle.Signature as Handle
 import qualified Riak.Proto               as Proto
 import qualified Riak.Proto.Lens          as L
 
@@ -46,7 +46,7 @@ data UnexpectedResponse
   deriving anyclass (Exception)
 
 delete ::
-     Interface
+     Handle
   -> Proto.DeleteRequest
   -> IO (Either ByteString ())
 delete iface request =
@@ -58,7 +58,7 @@ delete iface request =
       _ -> Nothing)
 
 deleteIndex ::
-     Interface
+     Handle
   -> ByteString
   -> IO (Either ByteString ())
 deleteIndex iface name =
@@ -75,7 +75,7 @@ deleteIndex iface name =
         & L.name .~ name
 
 get ::
-     Interface
+     Handle
   -> Proto.GetRequest
   -> IO (Either ByteString Proto.GetResponse)
 get iface request =
@@ -87,7 +87,7 @@ get iface request =
       _ -> Nothing)
 
 getBucket ::
-     Interface
+     Handle
   -> Proto.GetBucketRequest
   -> IO (Either ByteString Proto.BucketProperties)
 getBucket iface request =
@@ -99,7 +99,7 @@ getBucket iface request =
       _ -> Nothing)
 
 getBucketType ::
-     Interface
+     Handle
   -> ByteString
   -> IO (Either ByteString Proto.BucketProperties)
 getBucketType iface bucketType =
@@ -117,7 +117,7 @@ getBucketType iface bucketType =
         & L.bucketType .~ bucketType
 
 getCrdt ::
-     Interface
+     Handle
   -> Proto.GetCrdtRequest
   -> IO (Either ByteString Proto.GetCrdtResponse)
 getCrdt iface request =
@@ -129,7 +129,7 @@ getCrdt iface request =
       _ -> Nothing)
 
 getIndex ::
-     Interface
+     Handle
   -> Maybe ByteString
   -> IO (Either ByteString [Proto.Index])
 getIndex iface name =
@@ -146,7 +146,7 @@ getIndex iface name =
         & L.maybe'name .~ name
 
 getSchema ::
-     Interface
+     Handle
   -> ByteString
   -> IO (Either ByteString Proto.Schema)
 getSchema iface name =
@@ -164,7 +164,7 @@ getSchema iface name =
         & L.name .~ name
 
 getServerInfo ::
-     Interface
+     Handle
   -> IO (Either ByteString Proto.GetServerInfoResponse)
 getServerInfo iface =
   exchange
@@ -175,7 +175,7 @@ getServerInfo iface =
       _ -> Nothing)
 
 listBuckets ::
-     Interface
+     Handle
   -> Proto.ListBucketsRequest
   -> FoldM IO Proto.ListBucketsResponse r
   -> IO (Either ByteString r)
@@ -189,7 +189,7 @@ listBuckets iface request =
     (view L.done)
 
 listKeys ::
-     Interface
+     Handle
   -> Proto.ListKeysRequest
   -> FoldM IO Proto.ListKeysResponse r
   -> IO (Either ByteString r)
@@ -203,7 +203,7 @@ listKeys iface request =
     (view L.done)
 
 mapReduce ::
-     Interface
+     Handle
   -> Proto.MapReduceRequest
   -> FoldM IO Proto.MapReduceResponse r
   -> IO (Either ByteString r)
@@ -217,7 +217,7 @@ mapReduce iface request =
     (view L.done)
 
 ping ::
-     Interface
+     Handle
   -> IO (Either ByteString ())
 ping iface =
   exchange
@@ -228,7 +228,7 @@ ping iface =
       _ -> Nothing)
 
 put ::
-     Interface
+     Handle
   -> Proto.PutRequest
   -> IO (Either ByteString Proto.PutResponse)
 put iface request =
@@ -240,7 +240,7 @@ put iface request =
       _ -> Nothing)
 
 putIndex ::
-     Interface
+     Handle
   -> Proto.PutIndexRequest
   -> IO (Either ByteString ())
 putIndex iface request =
@@ -252,7 +252,7 @@ putIndex iface request =
       _ -> Nothing)
 
 putSchema ::
-     Interface
+     Handle
   -> Proto.Schema
   -> IO (Either ByteString ())
 putSchema iface schema =
@@ -270,7 +270,7 @@ putSchema iface schema =
         & L.schema .~ schema
 
 resetBucket ::
-     Interface
+     Handle
   -> Proto.ResetBucketRequest
   -> IO (Either ByteString ())
 resetBucket iface request =
@@ -282,7 +282,7 @@ resetBucket iface request =
       _ -> Nothing)
 
 setBucket ::
-     Interface
+     Handle
   -> Proto.SetBucketRequest
   -> IO (Either ByteString ())
 setBucket iface request =
@@ -294,7 +294,7 @@ setBucket iface request =
       _ -> Nothing)
 
 setBucketType ::
-     Interface
+     Handle
   -> Proto.SetBucketTypeRequest
   -> IO (Either ByteString ())
 setBucketType iface request =
@@ -306,7 +306,7 @@ setBucketType iface request =
       _ -> Nothing)
 
 secondaryIndex ::
-     Interface
+     Handle
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
   -> IO (Either ByteString r)
@@ -319,8 +319,8 @@ secondaryIndex iface request =
       _ -> Nothing)
     (view L.done)
 
-updateCrdt
-  :: Interface -- ^
+updateCrdt ::
+     Handle -- ^
   -> Proto.UpdateCrdtRequest -- ^
   -> IO (Either ByteString Proto.UpdateCrdtResponse)
 updateCrdt iface request =
@@ -332,12 +332,12 @@ updateCrdt iface request =
       _ -> Nothing)
 
 exchange ::
-     Interface
+     Handle
   -> Request
   -> (Response -> Maybe a)
   -> IO (Either ByteString a)
 exchange iface request f =
-  Interface.exchange iface request >>= \case
+  Handle.exchange iface request >>= \case
     ResponseError response ->
       pure (Left (response ^. L.errmsg))
 
@@ -351,14 +351,14 @@ exchange iface request f =
 
 stream ::
      forall a r.
-     Interface
+     Handle
   -> Request -- ^ Request
   -> (Response -> Maybe a) -- ^ Correct response?
   -> (a -> Bool) -- ^ Done?
   -> FoldM IO a r -- ^ Fold responses
   -> IO (Either ByteString r)
 stream iface request f done (FoldM step initial extract) =
-  Interface.stream iface request callback
+  Handle.stream iface request callback
 
   where
     callback :: IO Response -> IO (Either ByteString r)

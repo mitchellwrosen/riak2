@@ -32,7 +32,6 @@ module Riak
   , Bucket(..)
   , BucketProperties(..)
   , BucketType(..)
-  , Client
   , ConflictResolution(..)
   , Content(..)
   , newContent
@@ -48,6 +47,7 @@ module Riak
   , ConvergentSetUpdate(..)
   , ExactQuery(..)
   , GetOpts(..)
+  , Handle
   , Index(..)
   , Key(..)
   , generatedKey
@@ -59,6 +59,7 @@ module Riak
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
+  , UnexpectedResponse(..)
     -- ** Re-exports
   , def
   ) where
@@ -67,7 +68,6 @@ import Riak.Bucket                (Bucket(..))
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
                                    NotfoundBehavior(..))
 import Riak.BucketType            (BucketType(..))
-import Riak.Client
 import Riak.Content
 import Riak.Context
 import Riak.ConvergentCounter
@@ -75,6 +75,7 @@ import Riak.ConvergentHyperLogLog
 import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ExactQuery            (ExactQuery(..))
+import Riak.Handle                (Handle, UnexpectedResponse(..))
 import Riak.Index                 (Index(..))
 import Riak.Key
 import Riak.Object
@@ -85,4 +86,17 @@ import Riak.SecondaryIndex        (SecondaryIndex(..))
 import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
 
-import Data.Default.Class (def)
+import qualified Riak.Handle as Handle
+
+import ByteString             (ByteString)
+import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.Default.Class     (def)
+
+
+-- | Ping the server.
+ping ::
+     MonadIO m
+  => Handle -- ^
+  -> m (Either ByteString ())
+ping handle =
+  liftIO (Handle.ping handle)

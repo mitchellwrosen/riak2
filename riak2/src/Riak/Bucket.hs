@@ -13,7 +13,7 @@ module Riak.Bucket
   , streamBucketKeys
   ) where
 
-import Riak.Client              (Client)
+import Riak.Handle              (Handle)
 import Riak.Internal.Bucket     (Bucket(..))
 import Riak.Internal.ExactQuery (ExactQuery(..))
 import Riak.Internal.Key        (Key(..))
@@ -21,7 +21,7 @@ import Riak.Internal.Prelude
 import Riak.Internal.RangeQuery (RangeQuery)
 import Riak.Internal.Utils      (bs2int)
 
-import qualified Riak.Interface                    as Interface
+import qualified Riak.Handle                       as Handle
 import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
@@ -40,11 +40,11 @@ import qualified Control.Foldl as Foldl
 -- TODO BucketProps
 getBucket ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Bucket -- ^
   -> m (Either ByteString Proto.BucketProperties)
-getBucket client (Bucket bucketType bucket) = liftIO $
-  Interface.getBucket client request
+getBucket handle (Bucket bucketType bucket) = liftIO $
+  Handle.getBucket handle request
 
   where
     request :: Proto.GetBucketRequest
@@ -58,20 +58,20 @@ getBucket client (Bucket bucketType bucket) = liftIO $
 -- TODO better set bucket properties type
 -- TODO don't allow setting n
 setBucket
-  :: Client -- ^
+  :: Handle -- ^
   -> Proto.SetBucketRequest -- ^
   -> IO (Either ByteString ())
-setBucket client request =
-  Interface.setBucket client request
+setBucket handle request =
+  Handle.setBucket handle request
 
 -- | Reset bucket properties.
 resetBucket ::
      MonadIO m
-  => Client
+  => Handle
   -> Bucket
   -> m (Either ByteString ())
-resetBucket client (Bucket bucketType bucket) = liftIO $
-  Interface.resetBucket client request
+resetBucket handle (Bucket bucketType bucket) = liftIO $
+  Handle.resetBucket handle request
 
   where
     request :: Proto.ResetBucketRequest
@@ -84,13 +84,13 @@ resetBucket client (Bucket bucketType bucket) = liftIO $
 --
 -- Fetches results in batches of 50.
 queryExact
-  :: Client -- ^
+  :: Handle -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
   -> IO (Either ByteString r)
-queryExact client query@(ExactQuery { value }) keyFold =
+queryExact handle query@(ExactQuery { value }) keyFold =
   doIndex
-    client
+    handle
     request
     (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
 
@@ -114,13 +114,13 @@ queryExact client query@(ExactQuery { value }) keyFold =
 -- Fetches results in batches of 50.
 queryRange
   :: forall a r.
-     Client -- ^
+     Handle -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
   -> IO (Either ByteString r)
-queryRange client query keyFold =
+queryRange handle query keyFold =
   doIndex
-    client
+    handle
     request
     (Foldl.handlesM (L.results . folded . to fromResult) keyFold)
 
@@ -151,11 +151,11 @@ queryRange client query keyFold =
 
 doIndex ::
      forall r.
-     Client
+     Handle
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
   -> IO (Either ByteString r)
-doIndex client =
+doIndex handle =
   loop
 
   where
@@ -166,7 +166,7 @@ doIndex client =
     loop request responseFold = do
       result :: Either ByteString (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
         doIndexPage
-          client
+          handle
           request
           (Foldl.duplicateM responseFold)
 
@@ -185,13 +185,13 @@ doIndex client =
                 nextResponseFold
 
 doIndexPage ::
-     Client
+     Handle
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
   -> IO (Either ByteString (r, Maybe ByteString))
-doIndexPage client request fold =
-  Interface.secondaryIndex
-    client
+doIndexPage handle request fold =
+  Handle.secondaryIndex
+    handle
     request
     ((,)
       <$> fold
@@ -219,11 +219,11 @@ doIndexPage client request fold =
 -- /See also/: 'streamBucketKeys'
 listBucketKeys ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Bucket -- ^
   -> m (Either ByteString [Key])
-listBucketKeys client bucket =
-  liftIO (streamBucketKeys client bucket (Foldl.generalize Foldl.list))
+listBucketKeys handle bucket =
+  liftIO (streamBucketKeys handle bucket (Foldl.generalize Foldl.list))
 
 -- | Stream all of the keys in a bucket.
 --
@@ -235,13 +235,13 @@ listBucketKeys client bucket =
 --
 -- /See also/: 'listBucketKeys'
 streamBucketKeys
-  :: Client -- ^
+  :: Handle -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> IO (Either ByteString r)
-streamBucketKeys client (Bucket bucketType bucket) keyFold =
-  Interface.listKeys
-    client
+streamBucketKeys handle (Bucket bucketType bucket) keyFold =
+  Handle.listKeys
+    handle
     request
     (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
 

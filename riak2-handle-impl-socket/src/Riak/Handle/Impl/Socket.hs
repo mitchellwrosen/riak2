@@ -1,8 +1,8 @@
 module Riak.Handle.Impl.Socket
-  ( Interface
+  ( Handle
   , Config(..)
   , EventHandlers(..)
-  , withInterface
+  , withHandle
   , exchange
   , stream
   , Exception(..)
@@ -24,8 +24,8 @@ import UnliftIO.Exception      (bracket_, throwIO)
 import qualified Control.Exception as Exception
 
 
-data Interface
-  = Interface
+data Handle
+  = Handle
   { socket :: !Socket
   , lock :: !(MVar ())
   , handlers :: !EventHandlers
@@ -51,31 +51,31 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 <> EventHandlers a2 b2 =
     EventHandlers (a1 <> a2) (b1 <> b2)
 
-withInterface :: Config -> (Interface -> IO a) -> IO a
-withInterface Config { socket, handlers } k = do
+withHandle :: Config -> (Handle -> IO a) -> IO a
+withHandle Config { socket, handlers } k = do
   lock <- newMVar ()
 
   bracket_
     (Socket.connect socket)
     (Socket.disconnect socket)
-    (k Interface
+    (k Handle
       { socket = socket
       , lock = lock
       , handlers = handlers
       })
 
 send ::
-     Interface
+     Handle
   -> Request
   -> IO ()
-send Interface { socket, handlers } request = do
+send Handle { socket, handlers } request = do
   onSend handlers request
   Socket.send socket request
 
 receive ::
-     Interface -- ^
+     Handle -- ^
   -> IO Response
-receive Interface { socket, handlers } =
+receive Handle { socket, handlers } =
   Socket.receive socket >>= \case
     Nothing ->
       throwIO RemoteShutdown
@@ -88,7 +88,7 @@ receive Interface { socket, handlers } =
 --
 -- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 exchange ::
-     Interface -- ^
+     Handle -- ^
   -> Request -- ^
   -> IO Response
 exchange iface request =
@@ -100,7 +100,7 @@ exchange iface request =
 --
 -- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
 stream ::
-     Interface -- ^
+     Handle -- ^
   -> Request -- ^
   -> (IO Response -> IO r) -- ^
   -> IO r

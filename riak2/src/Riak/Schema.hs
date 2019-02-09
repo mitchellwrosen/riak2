@@ -4,10 +4,10 @@ module Riak.Schema
   , putSchema
   ) where
 
-import Riak.Client           (Client)
+import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Interface  as Interface
+import qualified Riak.Handle     as Handle
 import qualified Riak.Proto      as Proto
 import qualified Riak.Proto.Lens as L
 
@@ -25,13 +25,13 @@ data Schema
 -- | Put a Solr schema.
 getSchema ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Text -- ^
   -> m (Either ByteString (Maybe Schema))
-getSchema client name = liftIO $
+getSchema handle name = liftIO $
   fromResponse <$>
-    Interface.getSchema
-      client
+    Handle.getSchema
+      handle
       (encodeUtf8 name)
 
   where
@@ -49,11 +49,11 @@ getSchema client name = liftIO $
 -- | Get a Solr schema.
 putSchema ::
      MonadIO m
-  => Client -- ^
+  => Handle -- ^
   -> Schema -- ^
   -> m (Either ByteString ())
-putSchema client schema =
-  liftIO (Interface.putSchema client (toProto schema))
+putSchema handle schema =
+  liftIO (Handle.putSchema handle (toProto schema))
 
 fromProto :: Proto.Schema -> Schema
 fromProto schema =
