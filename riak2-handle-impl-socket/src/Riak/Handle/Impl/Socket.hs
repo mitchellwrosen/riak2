@@ -1,4 +1,4 @@
-module Riak.Interface.Impl.Socket
+module Riak.Handle.Impl.Socket
   ( Interface
   , Config(..)
   , EventHandlers(..)

@@ -15,7 +15,7 @@ executable riakc-new
     , optparse-applicative
     , network
     , riak2
-    , riak2-interface-impls
+    , riak2-handle-impl-socket
     , split
     , text
 
@@ -41,7 +41,7 @@ executable riakc-new
   main-is:
     Main.hs
 
-  -- TODO when visibility public works, switch to managed client
+  -- TODO switch to managed client
   mixins:
     riak2 requires
-      (Riak.Interface.Signature as Riak.Interface.Impl.Socket)
+      (Riak.Interface.Signature as Riak.Handle.Impl.Socket)

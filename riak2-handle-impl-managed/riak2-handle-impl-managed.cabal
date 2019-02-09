@@ -1,0 +1,57 @@
+cabal-version: 2.4
+
+name: riak2-handle-impl-concurrent-socket
+version: 0.1.0
+build-type: Simple
+
+library riak2-handle-impl-managed
+  build-depends:
+    base,
+    riak2-core,
+    stm,
+    unliftio
+
+  default-extensions:
+    DeriveAnyClass
+    DerivingStrategies
+    EmptyDataDeriving
+    LambdaCase
+    NamedFieldPuns
+    ScopedTypeVariables
+
+  default-language:
+    Haskell2010
+
+  exposed-modules:
+    Riak.Handle.Impl.Managed
+
+  ghc-options:
+    -Wall
+
+  hs-source-dirs:
+    src
+
+test-suite tests
+  build-depends:
+    base
+
+  default-language:
+    Haskell2010
+
+  ghc-options:
+    -threaded
+    -with-rtsopts=-N
+    -Wall
+
+  hs-source-dirs:
+    test
+
+  main-is:
+    Main.hs
+
+  type:
+    exitcode-stdio-1.0
+
+  -- mixins:
+  --   riak2-core
+  --     requires (Riak.Interface.Signature as Riak.Handle.Impl.Socket.Concurrent)

@@ -73,6 +73,7 @@ data ConvergentMapUpdate
   | UpdateSet ByteString [ConvergentSetUpdate]
   deriving stock (Eq, Show)
 
+
 -- | Get a map.
 getConvergentMap ::
      MonadIO m

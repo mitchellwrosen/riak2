@@ -4,7 +4,9 @@ packages:
   riak2,
   riak2-core,
   riak2-core-internal,
-  riak2-interface-impls,
+  riak2-handle-impl-concurrent-socket,
+  riak2-handle-impl-socket,
+  riak2-handle-impl-managed,
   riakc
 
 source-repository-package
