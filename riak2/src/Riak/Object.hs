@@ -13,29 +13,31 @@ module Riak.Object
   , delete
     -- * Object type
   , Object(..)
+  , newObject
   ) where
 
 import Riak.Content          (Content(..))
 import Riak.Handle           (Handle)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Error
-import Riak.Internal.Object  (Object(..))
+import Riak.Internal.Key     (Key(..))
+import Riak.Internal.Object  (Object(..), fromGetResponse, fromPutResponse,
+                              newObject)
 import Riak.Internal.Prelude
-import Riak.Key              (Key(..))
+import Riak.Internal.Sibling (Sibling)
 import Riak.Opts             (GetOpts(..), PutOpts(..))
 
 import qualified Riak.Handle                  as Handle
-import qualified Riak.Internal.Object         as Object
+import qualified Riak.Internal.Key            as Key
 import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
 import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
 import qualified Riak.Proto                   as Proto
 import qualified Riak.Proto.Lens              as L
 
-import Control.Lens                ((.~), (^.))
-import Data.Generics.Product       (field)
-import Data.Generics.Product.Typed (HasType(..))
-import Data.Text.Encoding          (decodeUtf8)
+import Control.Lens          ((.~), (^.))
+import Data.Generics.Product (field)
+import Data.Text.Encoding    (decodeUtf8)
 
 import qualified ByteString
 
@@ -46,18 +48,15 @@ import qualified ByteString
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
---
--- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Object.deleted'.
-get
-  :: MonadIO m
+get ::
+     MonadIO m
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) [Object ByteString])
+  -> m (Either (Error 'GetOp) (Object [Sibling ByteString]))
 get handle key opts = liftIO $
   (fmap.fmap)
-    (Object.fromGetResponse key)
+    (fromGetResponse key)
     (doGet handle request)
 
   where
@@ -69,18 +68,15 @@ get handle key opts = liftIO $
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
---
--- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Object.deleted'.
-getHead
-  :: MonadIO m
+getHead ::
+     MonadIO m
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) [Object ()])
+  -> m (Either (Error 'GetOp) (Object [Sibling ()]))
 getHead handle key opts = liftIO $
   (fmap.fmap)
-    (map (() <$) . Object.fromGetResponse key)
+    ((fmap.map) (() <$)  . fromGetResponse key)
     (doGet handle request)
   where
     request :: Proto.GetRequest
@@ -92,32 +88,18 @@ getHead handle key opts = liftIO $
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
---
--- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Object.deleted'.
 getIfModified ::
-     ∀ a object m.
-     ( HasType (Content a) (object a)
-     , MonadIO m
-     )
+     MonadIO m
   => Handle -- ^
-  -> object a -- ^
+  -> Object a -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) (Maybe [Object ByteString]))
-getIfModified handle object opts =
-  liftIO (getIfModified_ handle (object ^. typed @(Content a)) opts)
-
-getIfModified_ ::
-     Handle
-  -> Content a
-  -> GetOpts
-  -> IO (Either (Error 'GetOp) (Maybe [Object ByteString]))
-getIfModified_ handle (Content { key, context }) opts =
+  -> m (Either (Error 'GetOp) (Maybe (Object [Sibling ByteString])))
+getIfModified handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     (\response ->
       if response ^. L.unchanged
         then Nothing
-        else Just (Object.fromGetResponse key response))
+        else Just (fromGetResponse key response))
     (doGet handle request)
 
   where
@@ -130,27 +112,13 @@ getIfModified_ handle (Content { key, context }) opts =
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
---
--- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Object.deleted'.
 getHeadIfModified ::
-     ∀ a object m.
-     ( HasType (Content a) (object a)
-     , MonadIO m
-     )
+     MonadIO m
   => Handle -- ^
-  -> object a -- ^
+  -> Object a -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) (Maybe [Object ()]))
-getHeadIfModified handle object opts =
-  liftIO (getHeadIfModified_ handle (object ^. typed @(Content a)) opts)
-
-getHeadIfModified_ ::
-     Handle
-  -> Content a
-  -> GetOpts
-  -> IO (Either (Error 'GetOp) (Maybe [Object ()]))
-getHeadIfModified_ handle (Content { key, context }) opts =
+  -> m (Either (Error 'GetOp) (Maybe (Object [Sibling ()])))
+getHeadIfModified handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     fromResponse
     (doGet handle request)
@@ -161,11 +129,11 @@ getHeadIfModified_ handle (Content { key, context }) opts =
         & L.head .~ True
         & L.ifModified .~ unContext context
 
-    fromResponse :: Proto.GetResponse -> Maybe [Object ()]
+    fromResponse :: Proto.GetResponse -> Maybe (Object [Sibling ()])
     fromResponse response =
       if response ^. L.unchanged
         then Nothing
-        else Just ((() <$) <$> Object.fromGetResponse key response)
+        else Just (map (() <$) <$> fromGetResponse key response)
 
 doGet ::
      Handle
@@ -189,12 +157,10 @@ doGet handle request =
             UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
-makeGetRequest (Key bucketType bucket key) opts =
+makeGetRequest key opts =
   Proto.defMessage
-    & L.bucket .~ bucket
-    & L.bucketType .~ bucketType
+    & Key.setProto key
     & L.deletedContext .~ True
-    & L.key .~ key
     & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
     & L.maybe'n .~ (Quorum.toWord32 <$> (opts ^. field @"n"))
     & L.maybe'notfoundOk .~ notfoundOk opts
@@ -207,32 +173,21 @@ makeGetRequest (Key bucketType bucket key) opts =
 --
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 put ::
-     ( HasType (Content ByteString) (object ByteString)
-     , MonadIO m
-     )
-  => Handle -- ^
-  -> object ByteString -- ^
+     Handle -- ^
+  -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> m (Either (Error 'PutOp) Key)
-put handle object opts =
-  liftIO (put_ handle (object ^. typed) opts)
-
-put_ ::
-     Handle
-  -> Content ByteString
-  -> PutOpts
   -> IO (Either (Error 'PutOp) Key)
-put_ handle content opts =
+put handle object opts =
   (fmap.fmap)
     fromResponse
     (doPut handle request)
   where
     request :: Proto.PutRequest
     request =
-      makePutRequest key content opts
+      makePutRequest object opts
 
     key@(Key bucketType bucket k) =
-      content ^. field @"key"
+      object ^. field @"key"
 
     fromResponse :: Proto.PutResponse -> Key
     fromResponse response =
@@ -250,75 +205,44 @@ put_ handle content opts =
 --
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 putGet ::
-     ( HasType (Content ByteString) (object ByteString)
-     , MonadIO m
-     )
+     MonadIO m
   => Handle -- ^
-  -> object ByteString -- ^
+  -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> m (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
-putGet handle object opts =
-  liftIO (putGet_ handle (object ^. typed) opts)
-
-putGet_ ::
-     Handle -- ^
-  -> Content ByteString -- ^
-  -> PutOpts -- ^
-  -> IO (Either (Error 'PutOp) (NonEmpty (Object ByteString)))
-putGet_ handle content opts =
+  -> m (Either (Error 'PutOp) (Object (NonEmpty (Sibling ByteString))))
+putGet handle object opts = liftIO $
   (fmap.fmap)
-    (Object.fromPutResponse key)
+    (fromPutResponse (object ^. field @"key"))
     (doPut handle request)
 
   where
     request :: Proto.PutRequest
     request =
-      makePutRequest key content opts
+      makePutRequest object opts
         & L.returnBody .~ True
-
-    key :: Key
-    key =
-      content ^. field @"key"
 
 -- | Put an object and return its metadata.
 --
 -- If multiple siblings are returned, you should perform a 'get', resolve them,
 -- then perform a 'put'.
 --
--- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Object.deleted'.
---
 -- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
 putGetHead ::
-     ( HasType (Content ByteString) (object ByteString)
-     , MonadIO m
-     )
+     MonadIO m
   => Handle -- ^
-  -> object ByteString -- ^
+  -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> m (Either (Error 'PutOp) (NonEmpty (Object ())))
-putGetHead handle object opts =
-  liftIO (putGetHead_ handle (object ^. typed) opts)
-
-putGetHead_ ::
-     Handle
-  -> Content ByteString
-  -> PutOpts
-  -> IO (Either (Error 'PutOp) (NonEmpty (Object ())))
-putGetHead_ handle content opts =
+  -> m (Either (Error 'PutOp) (Object (NonEmpty (Sibling ()))))
+putGetHead handle object opts = liftIO $
   (fmap.fmap)
-    (fmap (() <$) . Object.fromPutResponse key)
+    ((fmap.fmap) (() <$) . fromPutResponse (object ^. field @"key"))
     (doPut handle request)
 
   where
     request :: Proto.PutRequest
     request =
-      makePutRequest key content opts
+      makePutRequest object opts
         & L.returnHead .~ True
-
-    key :: Key
-    key =
-      content ^. field @"key"
 
 doPut ::
      Handle
@@ -342,14 +266,12 @@ doPut handle request =
             UnknownError (decodeUtf8 err)
 
 makePutRequest ::
-     Key
-  -> Content ByteString
+     Object (Content ByteString)
   -> PutOpts
   -> Proto.PutRequest
-makePutRequest (Key bucketType bucket key) content opts =
+makePutRequest Object { content, context, key } opts =
   Proto.defMessage
-    & L.bucket .~ bucket
-    & L.bucketType .~ bucketType
+    & Key.setMaybeProto key
     & L.content .~
         (Proto.defMessage
           & L.indexes .~ map SecondaryIndex.toPair (content ^. field @"indexes")
@@ -360,50 +282,29 @@ makePutRequest (Key bucketType bucket key) content opts =
           & L.value .~ (content ^. field @"value")
         )
     & L.maybe'dw .~ (Quorum.toWord32 <$> dw opts)
-    & L.maybe'key .~
-        (if ByteString.null key
-          then Nothing
-          else Just key)
     & L.maybe'n .~ (Quorum.toWord32 <$> (opts ^. field @"n"))
     & L.maybe'pw .~ (Quorum.toWord32 <$> pw opts)
     & L.maybe'context .~
-        (let
-          context :: ByteString
-          context =
-            unContext (content ^. field @"context")
-        in
-          if ByteString.null context
-            then Nothing
-            else Just context)
+        (if ByteString.null (unContext context)
+          then Nothing
+          else Just (unContext context))
     & L.maybe'w .~ (Quorum.toWord32 <$> w opts)
     & L.maybe'timeout .~ (opts ^. field @"timeout")
 
 -- | Delete an object.
 delete ::
-     ∀ a object m.
-     ( HasType (Content a) (object a)
-     , MonadIO m
-     )
+     MonadIO m
   => Handle -- ^
-  -> object a -- ^
+  -> Object a -- ^
   -> m (Either (Error 'DeleteOp) ())
-delete handle object =
-  liftIO (delete_ handle (object ^. typed @(Content a)))
-
-delete_ ::
-     Handle -- ^
-  -> Content a -- ^
-  -> IO (Either (Error 'DeleteOp) ())
-delete_ handle content =
+delete handle Object { context, key } = liftIO $
   first parseDeleteError <$> Handle.delete handle request
 
   where
     request :: Proto.DeleteRequest
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.key .~ key
+        & Key.setProto key
         -- TODO delete opts
         -- & L.maybe'dw .~ undefined
         -- & L.maybe'n .~ undefined
@@ -413,10 +314,7 @@ delete_ handle content =
         -- & L.maybe'rw .~ undefined
         -- & L.maybe'timeout .~ undefined
         -- & L.maybe'w .~ undefined
-        & L.context .~ unContext (content ^. field @"context")
-
-    Key bucketType bucket key =
-      content ^. field @"key"
+        & L.context .~ unContext context
 
     parseDeleteError :: Handle.Error -> Error 'DeleteOp
     parseDeleteError = \case

@@ -64,95 +64,93 @@ integrationTests handle =
     [ testGroup "get"
       [ testCase "404" $ do
           key <- randomKey
-          get handle key def `shouldReturn` Right []
+          get handle key def >>= \case
+            Right Object { content = [] } -> pure ()
+            result -> assertFailure (show result)
 
       , testCase "success" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put handle content def
+          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
+          Right key <- put handle object def
           get handle key def >>= \case
-            Left err -> assertFailure (show err)
-            Right [Object { content }] -> do
+            Right Object { content = [Sibling content] } ->
               (content ^. field @"value") `shouldBe` value
-            _ -> undefined
+            result -> assertFailure (show result)
 
       , testCase "head 404" $ do
           key <- randomKey
-          getHead handle key def `shouldReturn` Right []
+          getHead handle key def >>= \case
+            Right Object { content = [] } -> pure ()
+            result -> assertFailure (show result)
 
       , testCase "head success" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put handle content def
+          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
+          Right key <- put handle object def
           getHead handle key def `shouldReturnSatisfy` isRight
 
       , testCase "if modified (not modified)" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put handle content def
+          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
+          Right key <- put handle object def
           get handle key def >>= \case
-            Left err -> assertFailure (show err)
-            Right [object] -> do
+            Right object -> do
               getIfModified handle object def `shouldReturnSatisfy` isRightNothing
-            _ -> undefined
+            result -> assertFailure (show result)
 
       , testCase "if modified (modified)" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          Right key <- put handle content def
+          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
+          Right key <- put handle object def
           get handle key def >>= \case
-            Left err -> assertFailure (show err)
-            Right [object] -> do
-              _ <- put handle object def
-              getIfModified handle object def `shouldReturnSatisfy` isRightJust
-            _ -> undefined
+            Right object@(Object { content = [Sibling content] }) -> do
+              let object' = object & field @"content" .~ content
+              _ <- put handle object' def
+              getIfModified handle object' def `shouldReturnSatisfy` isRightJust
+            result -> assertFailure (show result)
 
       , testCase "put" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
-          let content = newContent (generatedKey (Bucket "objects" bucket)) value
-          put handle content def `shouldReturnSatisfy` isRight
+          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
+          put handle object def `shouldReturnSatisfy` isRight
 
       , testCase "putGet" $ do
           key <- randomKey
           value <- ByteString.random 6
-          let content = newContent key value
-          putGet handle content def >>= \case
-            Left err -> assertFailure (show err)
-            Right (_:|[]) -> pure ()
+          let object = newObject key (newContent value)
+          putGet handle object def >>= \case
+            Right Object { content = _:|[] } -> pure ()
             result -> assertFailure (show result)
 
       , testCase "putGet (siblings)" $ do
           key <- randomKey
           value <- ByteString.random 6
-          let content = newContent key value
-          put handle content def `shouldReturnSatisfy` isRight
-          putGet handle content def >>= \case
-            Left err -> assertFailure (show err)
-            Right (_:|[_]) -> pure ()
+          let object = newObject key (newContent value)
+          put handle object def `shouldReturnSatisfy` isRight
+          putGet handle object def >>= \case
+            Right Object { content = _:|[_] } -> pure ()
             result -> assertFailure (show result)
 
       , testCase "putGetHead" $ do
           key <- randomKey
           value <- ByteString.random 6
-          let content = newContent key value
-          putGetHead handle content def >>= \case
-            Left err -> assertFailure (show err)
-            Right (_:|[]) -> pure ()
+          let object = newObject key (newContent value)
+          putGetHead handle object def >>= \case
+            Right Object { content = _:|[] } -> pure ()
             result -> assertFailure (show result)
 
       , testCase "putGetHead (siblings)" $ do
           key <- randomKey
           value <- ByteString.random 6
-          let content = newContent key value
-          put handle content def `shouldReturnSatisfy` isRight
-          putGetHead handle content def >>= \case
-            Left err -> assertFailure (show err)
-            Right (_:|[_]) -> pure ()
+          let object = newObject key (newContent value)
+          put handle object def `shouldReturnSatisfy` isRight
+          putGetHead handle object def >>= \case
+            Right Object { content = _:|[_] } -> pure ()
             result -> assertFailure (show result)
 
       -- , testCase "delete" $ do

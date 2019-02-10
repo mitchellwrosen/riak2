@@ -53,12 +53,14 @@ module Riak
   , generatedKey
   , NotfoundBehavior(..)
   , Object(..)
+  , newObject
   , PutOpts(..)
   , Quorum(..)
   , RangeQuery(..)
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
+  , Sibling(..)
   , UnexpectedResponse(..)
     -- ** Re-exports
   , def
@@ -85,6 +87,7 @@ import Riak.RangeQuery            (RangeQuery(..))
 import Riak.SecondaryIndex        (SecondaryIndex(..))
 import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
+import Riak.Sibling
 
 import qualified Riak.Handle as Handle
 

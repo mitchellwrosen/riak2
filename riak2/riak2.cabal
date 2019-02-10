@@ -38,6 +38,7 @@ description:
   .
   * "Riak.Object"
   * "Riak.Content"
+  * "Riak.Sibling"
   .
   CRDT types and operations:
   .
@@ -89,6 +90,7 @@ library
     generic-lens ^>= 1.2.0,
     hashable ^>= 1.2.7,
     lens ^>= 4.17,
+    lens-labels,
     profunctors ^>= 5.3,
     riak2-core,
     text ^>= 1.2.3,
@@ -156,6 +158,7 @@ library
     Riak.SecondaryIndex
     Riak.SecondaryIndexValue
     Riak.ServerInfo
+    Riak.Sibling
 
     ZZZ.Erlang
     ZZZ.Riak
@@ -194,6 +197,7 @@ library
     Riak.Internal.RangeQuery
     Riak.Internal.SecondaryIndex
     Riak.Internal.SecondaryIndexValue
+    Riak.Internal.Sibling
     Riak.Internal.Utils
 
   mixins:
