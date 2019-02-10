@@ -38,7 +38,7 @@ test-suite tests
     ip,
     proto-lens,
     riak2-core,
-    riak2-handle-impl-exclusive,
+    riak2-handle-impl-exclusive
 
   default-extensions:
     LambdaCase

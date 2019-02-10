@@ -30,8 +30,7 @@ library
     Riak.Proto,
     Riak.Proto.Lens,
     Riak.Request,
-    Riak.Response,
-    Riak.Socket
+    Riak.Response
 
   hs-source-dirs:
     src

@@ -16,7 +16,6 @@ library
     foldl,
     lens,
     lens-labels,
-    network,
     primitive,
     proto-lens ^>= 0.4.0,
     proto-lens-runtime ^>= 0.4.0,
@@ -48,7 +47,6 @@ library
     Riak.Proto.Lens
     Riak.Request
     Riak.Response
-    Riak.Socket
 
   ghc-options:
     -Wall
@@ -62,5 +60,4 @@ library
     Proto.Proto.Riak
     Proto.Proto.Riak_Fields
     Riak.Connection.Internal
-    Socket
     Utils

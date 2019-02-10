@@ -17,6 +17,8 @@ library
     LambdaCase
     NamedFieldPuns
     ScopedTypeVariables
+    UnicodeSyntax
+    ViewPatterns
 
   default-language:
     Haskell2010
