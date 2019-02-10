@@ -14,7 +14,7 @@ data Config
 
 -- | An error caused by some problem with the underlying handle. The error
 -- should be recoverable, and not necessarily unexpected, such as a "remote
--- shutdown" due to Riak being restarted.
+-- shutdown" due to Riak being restarted, or even a "connection refused".
 data Error
 
 instance Eq Error

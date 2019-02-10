@@ -60,9 +60,9 @@ delete ::
      Handle
   -> Proto.DeleteRequest
   -> IO (Either Error ())
-delete iface request =
+delete handle request =
   exchange
-    iface
+    handle
     (RequestDelete request)
     (\case
       ResponseDelete{} -> Just ()
@@ -72,9 +72,9 @@ deleteIndex ::
      Handle
   -> ByteString
   -> IO (Either Error ())
-deleteIndex iface name =
+deleteIndex handle name =
   exchange
-    iface
+    handle
     (RequestDeleteIndex request)
     (\case
       ResponseDelete{} -> Just ()
@@ -89,9 +89,9 @@ get ::
      Handle
   -> Proto.GetRequest
   -> IO (Either Error Proto.GetResponse)
-get iface request =
+get handle request =
   exchange
-    iface
+    handle
     (RequestGet request)
     (\case
       ResponseGet response -> Just response
@@ -101,9 +101,9 @@ getBucket ::
      Handle
   -> Proto.GetBucketRequest
   -> IO (Either Error Proto.BucketProperties)
-getBucket iface request =
+getBucket handle request =
   exchange
-    iface
+    handle
     (RequestGetBucket request)
     (\case
       ResponseGetBucket response -> Just (response ^. L.props)
@@ -113,9 +113,9 @@ getBucketType ::
      Handle
   -> ByteString
   -> IO (Either Error Proto.BucketProperties)
-getBucketType iface bucketType =
+getBucketType handle bucketType =
   exchange
-    iface
+    handle
     (RequestGetBucketType request)
     (\case
       ResponseGetBucket response -> Just (response ^. L.props)
@@ -131,9 +131,9 @@ getCrdt ::
      Handle
   -> Proto.GetCrdtRequest
   -> IO (Either Error Proto.GetCrdtResponse)
-getCrdt iface request =
+getCrdt handle request =
   exchange
-    iface
+    handle
     (RequestGetCrdt request)
     (\case
       ResponseGetCrdt response -> Just response
@@ -143,9 +143,9 @@ getIndex ::
      Handle
   -> Maybe ByteString
   -> IO (Either Error [Proto.Index])
-getIndex iface name =
+getIndex handle name =
   exchange
-    iface
+    handle
     (RequestGetIndex request)
     (\case
       ResponseGetIndex response -> Just (response ^. L.index)
@@ -160,9 +160,9 @@ getSchema ::
      Handle
   -> ByteString
   -> IO (Either Error Proto.Schema)
-getSchema iface name =
+getSchema handle name =
   exchange
-    iface
+    handle
     (RequestGetSchema request)
     (\case
       ResponseGetSchema response -> Just (response ^. L.schema)
@@ -177,9 +177,9 @@ getSchema iface name =
 getServerInfo ::
      Handle
   -> IO (Either Error Proto.GetServerInfoResponse)
-getServerInfo iface =
+getServerInfo handle =
   exchange
-    iface
+    handle
     (RequestGetServerInfo defMessage)
     (\case
       ResponseGetServerInfo response -> Just response
@@ -190,9 +190,9 @@ listBuckets ::
   -> Proto.ListBucketsRequest
   -> FoldM IO Proto.ListBucketsResponse r
   -> IO (Either Error r)
-listBuckets iface request =
+listBuckets handle request =
   stream
-    iface
+    handle
     (RequestListBuckets request)
     (\case
       ResponseListBuckets response -> Just response
@@ -204,9 +204,9 @@ listKeys ::
   -> Proto.ListKeysRequest
   -> FoldM IO Proto.ListKeysResponse r
   -> IO (Either Error r)
-listKeys iface request =
+listKeys handle request =
   stream
-    iface
+    handle
     (RequestListKeys request)
     (\case
       ResponseListKeys response -> Just response
@@ -218,9 +218,9 @@ mapReduce ::
   -> Proto.MapReduceRequest
   -> FoldM IO Proto.MapReduceResponse r
   -> IO (Either Error r)
-mapReduce iface request =
+mapReduce handle request =
   stream
-    iface
+    handle
     (RequestMapReduce request)
     (\case
       ResponseMapReduce response -> Just response
@@ -230,9 +230,9 @@ mapReduce iface request =
 ping ::
      Handle
   -> IO (Either Error ())
-ping iface =
+ping handle =
   exchange
-    iface
+    handle
     (RequestPing defMessage)
     (\case
       ResponsePing _ -> Just ()
@@ -242,9 +242,9 @@ put ::
      Handle
   -> Proto.PutRequest
   -> IO (Either Error Proto.PutResponse)
-put iface request =
+put handle request =
   exchange
-    iface
+    handle
     (RequestPut request)
     (\case
       ResponsePut response -> Just response
@@ -254,9 +254,9 @@ putIndex ::
      Handle
   -> Proto.PutIndexRequest
   -> IO (Either Error ())
-putIndex iface request =
+putIndex handle request =
   exchange
-    iface
+    handle
     (RequestPutIndex request)
     (\case
       ResponsePut{} -> Just ()
@@ -266,9 +266,9 @@ putSchema ::
      Handle
   -> Proto.Schema
   -> IO (Either Error ())
-putSchema iface schema =
+putSchema handle schema =
   exchange
-    iface
+    handle
     (RequestPutSchema request)
     (\case
       ResponsePut{} -> Just ()
@@ -284,9 +284,9 @@ resetBucket ::
      Handle
   -> Proto.ResetBucketRequest
   -> IO (Either Error ())
-resetBucket iface request =
+resetBucket handle request =
   exchange
-    iface
+    handle
     (RequestResetBucket request)
     (\case
       ResponseResetBucket _ -> Just ()
@@ -296,9 +296,9 @@ setBucket ::
      Handle
   -> Proto.SetBucketRequest
   -> IO (Either Error ())
-setBucket iface request =
+setBucket handle request =
   exchange
-    iface
+    handle
     (RequestSetBucket request)
     (\case
       ResponseSetBucket{} -> Just ()
@@ -308,9 +308,9 @@ setBucketType ::
      Handle
   -> Proto.SetBucketTypeRequest
   -> IO (Either Error ())
-setBucketType iface request =
+setBucketType handle request =
   exchange
-    iface
+    handle
     (RequestSetBucketType request)
     (\case
       ResponseSetBucket{} -> Just ()
@@ -321,9 +321,9 @@ secondaryIndex ::
   -> Proto.SecondaryIndexRequest
   -> FoldM IO Proto.SecondaryIndexResponse r
   -> IO (Either Error r)
-secondaryIndex iface request =
+secondaryIndex handle request =
   stream
-    iface
+    handle
     (RequestSecondaryIndex request)
     (\case
       ResponseSecondaryIndex response -> Just response
@@ -334,9 +334,9 @@ updateCrdt ::
      Handle -- ^
   -> Proto.UpdateCrdtRequest -- ^
   -> IO (Either Error Proto.UpdateCrdtResponse)
-updateCrdt iface request =
+updateCrdt handle request =
   exchange
-    iface
+    handle
     (RequestUpdateCrdt request)
     (\case
       ResponseUpdateCrdt response -> Just response
@@ -347,8 +347,8 @@ exchange ::
   -> Request
   -> (Response -> Maybe a)
   -> IO (Either Error a)
-exchange iface request f =
-  Handle.exchange iface request >>= \case
+exchange handle request f =
+  Handle.exchange handle request >>= \case
     Left err ->
       pure (Left (ErrorHandle err))
 

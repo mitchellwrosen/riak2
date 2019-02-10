@@ -28,6 +28,7 @@ import qualified Riak.Connection.Internal as Connection
 data ReceiveError
   = ReceiveErrorSocket SocketException
   | ReceiveErrorDecode DecodeError
+  deriving stock (Show)
 
 -- | Send a request.
 --

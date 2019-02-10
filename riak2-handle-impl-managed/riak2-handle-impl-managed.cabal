@@ -12,9 +12,9 @@ library
     stm
 
   default-extensions:
+    BangPatterns
     DeriveAnyClass
     DerivingStrategies
-    EmptyDataDeriving
     LambdaCase
     NamedFieldPuns
     ScopedTypeVariables

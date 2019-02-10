@@ -7,30 +7,18 @@ build-type: Simple
 description:
   __Library organization__
   .
-  TODO update this
-  .
-  This library's modules are organized around types. A module will typically
-  export one type and its API, which consists of the functions whose primary
-  input type is the type in question.
+  For documentation readability purposes, this library's modules are organized
+  around types. A module will typically export one type and its API, which
+  consists of the functions whose primary input type is the type in question.
   .
   For example, to /list the keys in a bucket/, the primary input type is the
   /bucket/, so this function is exported by the the "Riak.Bucket" module.
   .
-  Modules are designed for qualified imports, but all types are re-exported by
-  the top-level "Riak" module.
-  .
-  Your imports may therefore look like this:
-  .
-  @
-  import qualified Riak (Bucket(..), BucketType(..), Key(..))
-  import qualified Riak.Bucket
-  import qualified Riak.BucketType
-  import qualified Riak.Key
-  @
+  However, every symbol is also re-exported by the top-level "Riak" module.
   .
   __Module guide__
   .
-  Top-level re-export of all types
+  Top-level re-export of all types and functions:
   .
   * "Riak"
   .
@@ -47,7 +35,7 @@ description:
   * "Riak.ConvergentMap"
   * "Riak.ConvergentSet"
   .
-  Namespace types and operations:
+  Key namespace types and operations:
   .
   * "Riak.BucketType"
   * "Riak.Bucket"
@@ -70,13 +58,16 @@ description:
   .
   * "Riak.MapReduce"
   .
+  Cluster types and operations:
+  .
+  * "Riak.ServerInfo"
+  .
   Miscellaneous:
   .
   * "Riak.Context"
   * "Riak.Error"
   * "Riak.Opts"
   * "Riak.Quorum"
-  * "Riak.ServerInfo"
 
 library
   build-depends:
