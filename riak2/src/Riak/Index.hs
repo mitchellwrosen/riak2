@@ -31,8 +31,8 @@ data Index
 -- | Get a Solr index.
 getIndex ::
      MonadIO m
-  => Handle
-  -> Text
+  => Handle -- ^
+  -> Text -- ^
   -> m (Either Handle.Error (Maybe Index))
 getIndex handle name = liftIO $
   liftIO (fromResponse <$> Handle.getIndex handle (Just (encodeUtf8 name)))
@@ -59,7 +59,7 @@ getIndex handle name = liftIO $
 -- | Get all Solr indexes.
 getIndexes ::
      MonadIO m
-  => Handle
+  => Handle -- ^
   -> m (Either Handle.Error [Index])
 getIndexes handle =
   liftIO (fromResponse <$> Handle.getIndex handle Nothing)

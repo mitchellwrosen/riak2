@@ -80,7 +80,7 @@ getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a HyperLogLog.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 updateConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^

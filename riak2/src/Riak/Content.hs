@@ -10,8 +10,7 @@ import Data.Time          (UTCTime(..))
 import Data.Time.Calendar (Day(..))
 
 
--- | Object content. This is data that is provided when reading and writing an
--- object.
+-- | Object content.
 data Content a
   = Content
   { charset :: !(Maybe ByteString) -- ^ Charset
@@ -26,7 +25,7 @@ data Content a
 
 -- | Create a new content from a value.
 --
--- An arbitrary date in the 1850s is chosen for 'lastModified'. This is only
+-- An arbitrary date in the 1850s is chosen for @lastModified@. This is only
 -- relevant if you are using the unrecommended bucket settings that both
 -- disallow siblings and use internal (unreliable) timestamps for conflict
 -- resolution.

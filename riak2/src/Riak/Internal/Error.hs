@@ -52,7 +52,7 @@ type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 
--- | @{n_val_violation,_}
+-- | @{n_val_violation,_}@
 type family MayReturnInvalidN (op :: Op) :: Bool where
   MayReturnInvalidN 'GetOp = 'True
   MayReturnInvalidN 'PutOp = 'True

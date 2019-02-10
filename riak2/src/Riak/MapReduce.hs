@@ -13,9 +13,9 @@ import Control.Foldl (FoldM)
 
 mapReduce ::
      MonadIO m
-  => Handle
-  -> Proto.MapReduceRequest
-  -> FoldM IO Proto.MapReduceResponse r
+  => Handle -- ^
+  -> Proto.MapReduceRequest -- ^
+  -> FoldM IO Proto.MapReduceResponse r -- ^
   -> m (Either Handle.Error r)
 mapReduce handle request responseFold =
   liftIO (Handle.mapReduce handle request responseFold)

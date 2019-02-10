@@ -9,8 +9,8 @@ module Riak.Bucket
   , queryExact
   , queryRange
     -- ** Full traversals
-  , listBucketKeys
-  , streamBucketKeys
+  , listKeys
+  , streamKeys
   ) where
 
 import Riak.Handle              (Handle)
@@ -207,7 +207,7 @@ doIndexPage handle request fold =
 
 -- | List all of the keys in a bucket.
 --
--- This is 'streamBucketKeys' with a simpler type, but pulls all keys into
+-- This is 'streamKeys' with a simpler type, but pulls all keys into
 -- memory before returning them.
 --
 -- /Note/: This is an extremely expensive operation, and should not be used on a
@@ -216,14 +216,14 @@ doIndexPage handle request fold =
 -- /Note/: If your backend supports secondary indexes, it is faster to use the
 -- 'Riak.ExactQuery.inBucket' query.
 --
--- /See also/: 'streamBucketKeys'
-listBucketKeys ::
+-- /See also/: 'streamKeys'
+listKeys ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
   -> m (Either Handle.Error [Key])
-listBucketKeys handle bucket =
-  liftIO (streamBucketKeys handle bucket (Foldl.generalize Foldl.list))
+listKeys handle bucket =
+  liftIO (streamKeys handle bucket (Foldl.generalize Foldl.list))
 
 -- | Stream all of the keys in a bucket.
 --
@@ -233,13 +233,13 @@ listBucketKeys handle bucket =
 -- /Note/: If your backend supports secondary indexes, it is faster to use the
 -- 'Riak.ExactQuery.inBucket' query.
 --
--- /See also/: 'listBucketKeys'
-streamBucketKeys
+-- /See also/: 'listKeys'
+streamKeys
   :: Handle -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> IO (Either Handle.Error r)
-streamBucketKeys handle (Bucket bucketType bucket) keyFold =
+streamKeys handle (Bucket bucketType bucket) keyFold =
   Handle.listKeys
     handle
     request

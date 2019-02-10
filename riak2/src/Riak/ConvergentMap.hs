@@ -116,7 +116,7 @@ getConvergentMap handle k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a map.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 updateConvergentMap ::
      MonadIO m
   => Handle -- ^

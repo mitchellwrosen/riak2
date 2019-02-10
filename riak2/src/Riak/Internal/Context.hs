@@ -40,8 +40,10 @@ newContext :: Context
 newContext =
   Context ByteString.empty
 
--- | Construct a context from an opaque binary blob. Unsafe in the sense that it
--- is your responsibility to pass bytes that originally came from Riak.
+-- | Construct a context from an opaque binary blob.
+--
+-- Unsafe in the sense that it is your responsibility to pass bytes that
+-- originally came from Riak.
 unsafeMakeContext :: ByteString -> Context
 unsafeMakeContext =
   Context

@@ -72,7 +72,7 @@ getConvergentCounter handle k@(Key bucketType bucket key) = liftIO $
 -- /Note/: Counters, unlike other data types, represent their own update
 -- operation.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 updateConvergentCounter ::
      MonadIO m
   => Handle -- ^

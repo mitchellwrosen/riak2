@@ -171,7 +171,7 @@ makeGetRequest key opts =
 
 -- | Put an object and return its key.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 put ::
      Handle -- ^
   -> Object (Content ByteString) -- ^
@@ -203,7 +203,7 @@ put handle object opts =
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Object.deleted'.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 putGet ::
      MonadIO m
   => Handle -- ^
@@ -226,7 +226,7 @@ putGet handle object opts = liftIO $
 -- If multiple siblings are returned, you should perform a 'get', resolve them,
 -- then perform a 'put'.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 putGetHead ::
      MonadIO m
   => Handle -- ^

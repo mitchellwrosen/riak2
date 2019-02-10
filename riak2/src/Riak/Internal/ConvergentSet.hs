@@ -73,7 +73,7 @@ getConvergentSet handle k@(Key bucketType bucket key) = liftIO $
 
 -- | Update a set.
 --
--- /See also/: Riak.Context.'Riak.Context.newContext', Riak.Key.'Riak.Key.generatedKey'
+-- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 updateConvergentSet ::
      MonadIO m
   => Handle -- ^

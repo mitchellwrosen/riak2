@@ -1,12 +1,9 @@
 -- TODO export functions from Riak
 
 module Riak
-  ( -- * Server info
-    ping
-  , getServerInfo
-    -- * Object operations
+  ( -- * Object operations
     -- ** Get object
-  , get
+    get
   , getHead
   , getIfModified
   , getHeadIfModified
@@ -28,6 +25,36 @@ module Riak
     -- * Set operations
   , getConvergentSet
   , updateConvergentSet
+    -- * Bucket type operations
+    -- ** Bucket type properties
+  , getBucketType
+  , setBucketType
+    -- ** Full bucket traversals
+  , listBuckets
+  , streamBuckets
+    -- * Bucket operations
+    -- ** Bucket properties
+  , getBucket
+  , setBucket
+  , resetBucket
+    -- ** Secondary index search
+  , queryExact
+  , queryRange
+    -- ** Full key traversals
+  , listKeys
+  , streamKeys
+    -- * Solr operations
+    -- ** Schema
+  , getSchema
+  , putSchema
+    -- ** Index
+  , getIndex
+  , getIndexes
+  , putIndex
+  , deleteIndex
+    -- * Server info
+  , ping
+  , getServerInfo
     -- * Types
   , Bucket(..)
   , BucketProperties(..)
@@ -57,6 +84,7 @@ module Riak
   , PutOpts(..)
   , Quorum(..)
   , RangeQuery(..)
+  , Schema(..)
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
@@ -66,10 +94,10 @@ module Riak
   , def
   ) where
 
-import Riak.Bucket                (Bucket(..))
+import Riak.Bucket
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
                                    NotfoundBehavior(..))
-import Riak.BucketType            (BucketType(..))
+import Riak.BucketType
 import Riak.Content
 import Riak.Context
 import Riak.ConvergentCounter
@@ -78,12 +106,13 @@ import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ExactQuery            (ExactQuery(..))
 import Riak.Handle                (Handle, UnexpectedResponse(..))
-import Riak.Index                 (Index(..))
+import Riak.Index
 import Riak.Key
 import Riak.Object
 import Riak.Opts                  (GetOpts(..), PutOpts(..))
 import Riak.Quorum                (Quorum(..))
 import Riak.RangeQuery            (RangeQuery(..))
+import Riak.Schema
 import Riak.SecondaryIndex        (SecondaryIndex(..))
 import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
