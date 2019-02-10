@@ -27,6 +27,7 @@ fromProtoContent content =
         { charset = content ^. L.maybe'charset
         , encoding = content ^. L.maybe'contentEncoding
         , indexes = map SecondaryIndex.fromPair (content ^. L.indexes)
+        , lastModified = Proto.Content.lastModified content
         , metadata = Proto.Content.metadata content
         , ttl = content ^. L.maybe'ttl
         , type' = content ^. L.maybe'contentType

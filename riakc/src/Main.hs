@@ -113,25 +113,30 @@ deleteParser :: Parser (Handle -> IO ())
 deleteParser =
   doDelete
     <$> keyArgument
+    <*> contextOption
   where
     doDelete ::
          Key
+      -> Maybe Context
       -> Handle
       -> IO ()
-    doDelete key handle =
-      Object.get handle key def >>= \case
+    doDelete key context handle =
+      Object.delete handle object >>= \case
         Left err -> do
           print err
           exitFailure
 
-        Right object ->
-          Object.delete handle object >>= \case
-            Left err -> do
-              print err
-              exitFailure
+        Right () ->
+          pure ()
 
-            Right () ->
-              pure ()
+      where
+        object :: Object ()
+        object =
+          Object
+            { content = ()
+            , context = fromMaybe newContext context
+            , key = key
+            }
 
 getParser :: Parser (Handle -> IO ())
 getParser =
@@ -214,6 +219,7 @@ putParser =
   doPut
     <$> bucketOrKeyArgument
     <*> strArgument (help "Value" <> metavar "VALUE")
+    <*> contextOption
     <*> nOption
     <*> wOption
     <*> dwOption
@@ -222,13 +228,14 @@ putParser =
     doPut ::
          Either Bucket Key
       -> Text
+      -> Maybe Context
       -> Maybe Quorum
       -> Maybe Quorum
       -> Maybe Quorum
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doPut bucketOrKey val n w dw pw handle =
+    doPut bucketOrKey val context n w dw pw handle =
       Object.put handle object opts >>= \case
         Left err -> do
           print err
@@ -242,11 +249,14 @@ putParser =
       where
         object :: Object (Content ByteString)
         object =
-          newObject
-            (case bucketOrKey of
-              Left bucket -> generatedKey bucket
-              Right key -> key)
-            (newContent (encodeUtf8 val))
+          Object
+            { content = newContent (encodeUtf8 val)
+            , context = fromMaybe newContext context
+            , key =
+                case bucketOrKey of
+                  Left bucket -> generatedKey bucket
+                  Right key -> key
+            }
 
         opts :: PutOpts
         opts =

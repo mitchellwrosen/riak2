@@ -16,8 +16,10 @@ newtype Context
 -- binary blob.
 instance Show Context where
   show :: Context -> String
-  show =
-    coerce (Latin1.unpack . Base64.encode)
+  show (Context context) =
+    if ByteString.null context
+      then "<empty>"
+      else Latin1.unpack (Base64.encode context)
 
 -- | The "new" context. Use this when writing an object or data type for the
 -- first time.
