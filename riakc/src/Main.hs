@@ -1,12 +1,6 @@
 module Main where
 
-import Riak                       (Bucket(..), Content(..), Context,
-                                   ConvergentMap(..), ConvergentMapUpdate(..),
-                                   ConvergentSetUpdate(..), GetOpts(..),
-                                   Key(..), PutOpts(..), Quorum(..),
-                                   ServerInfo(..), generatedKey,
-                                   getConvergentMap, newContext, ping,
-                                   unsafeMakeContext, updateConvergentMap)
+import Riak
 import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..))
 import Riak.Handle.Impl.Managed   (Handle)
 
@@ -15,20 +9,22 @@ import qualified Riak.Object              as Object
 import qualified Riak.ServerInfo          as ServerInfo
 
 import Data.ByteString     (ByteString)
-import Data.Foldable       (asum, for_)
+import Data.Foldable       (asum)
 import Data.List.Split     (splitOn)
 import Data.Maybe          (fromMaybe)
 import Data.Text           (Text)
 import Data.Text.Encoding  (decodeUtf8, encodeUtf8)
-import Net.IPv4            (ipv4)
-import Network.Socket      (HostName, PortNumber)
+import Data.Word
+import Net.IPv4            (IPv4, ipv4)
 import Options.Applicative hiding (infoParser)
 import System.Exit         (ExitCode(..), exitFailure, exitWith)
 import Text.Read           (readMaybe)
 
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
+import qualified Data.Text              as Text
 import qualified Data.Text.IO           as Text
+import qualified Net.IPv4               as IPv4
 
 main :: IO ()
 main = do
@@ -49,8 +45,8 @@ main = do
       Config
         { endpoint =
             Endpoint
-              { address = ipv4 127 0 0 1 -- TODO actually use host
-              , port = fromIntegral port
+              { address = host
+              , port = port
               }
         , handlers =
             EventHandlers
@@ -72,28 +68,29 @@ main = do
     Right () ->
       pure ()
 
-nodeParser :: Parser (HostName, PortNumber)
+nodeParser :: Parser (IPv4, Word16)
 nodeParser =
   argument
     (eitherReader parseNode)
     (help "Riak node, e.g. localhost:8087" <> metavar "NODE")
 
   where
-    parseNode :: String -> Either String (HostName, PortNumber)
+    parseNode :: String -> Either String (IPv4, Word16)
     parseNode s =
       maybe (Left "Expected: 'host' or 'host:port'") Right $ do
         case span (/= ':') s of
-          (mkHost -> host, ':':port) -> do
+          (mkHost -> Just host, ':':port) -> do
             port' <- readMaybe port
             pure (host, port')
-          (mkHost -> host, []) ->
+          (mkHost -> Just host, []) ->
             pure (host, 8087)
-          _ -> undefined
+          _ ->
+            Nothing
 
-    mkHost :: String -> String
+    mkHost :: String -> Maybe IPv4
     mkHost = \case
-      "" -> "localhost"
-      host -> host
+      "" -> Just (ipv4 127 0 0 1)
+      host -> IPv4.decode (Text.pack host)
 
 verboseParser :: Parser Bool
 verboseParser =
@@ -105,16 +102,41 @@ commandParser =
     (mconcat
       [ command "get" (info getParser (progDesc "Get an object"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
+      , command "delete" (info deleteParser (progDesc "Delete an object"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
       ])
 
+deleteParser :: Parser (Handle -> IO ())
+deleteParser =
+  doDelete
+    <$> keyArgument
+  where
+    doDelete ::
+         Key
+      -> Handle
+      -> IO ()
+    doDelete key handle =
+      Object.get handle key def >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right object ->
+          Object.delete handle object >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right () ->
+              pure ()
+
 getParser :: Parser (Handle -> IO ())
 getParser =
   doGet
-    <$> argument (eitherReader parseKey) keyMod
+    <$> keyArgument
     <*> nOption
     <*> rOption
     <*> prOption
@@ -132,8 +154,8 @@ getParser =
           print err
           exitFailure
 
-        Right siblings -> do
-          for_ siblings print
+        Right object -> do
+          print object
 
       where
         opts :: GetOpts
@@ -207,7 +229,7 @@ putParser =
       -> Handle
       -> IO ()
     doPut bucketOrKey val n w dw pw handle =
-      Object.put handle content opts >>= \case
+      Object.put handle object opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -218,22 +240,13 @@ putParser =
             Right _ -> pure ()
 
       where
-        content :: Content ByteString
-        content =
-          Content
-            { charset = Nothing
-            , context = newContext
-            , encoding = Nothing
-            , indexes = []
-            , key =
-                case bucketOrKey of
-                  Left bucket -> generatedKey bucket
-                  Right key -> key
-            , metadata = []
-            , ttl = Nothing
-            , type' = Nothing
-            , value = encodeUtf8 val
-            }
+        object :: Object (Content ByteString)
+        object =
+          newObject
+            (case bucketOrKey of
+              Left bucket -> generatedKey bucket
+              Right key -> key)
+            (newContent (encodeUtf8 val))
 
         opts :: PutOpts
         opts =

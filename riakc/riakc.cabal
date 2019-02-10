@@ -4,7 +4,7 @@ name: riakc
 version: 0.1.0
 build-type: Simple
 
-executable riakc-new
+executable riakc
   build-depends:
       base
     , base64-bytestring
@@ -14,7 +14,6 @@ executable riakc-new
     , ip
     , lens
     , optparse-applicative
-    , network
     , riak2
     , riak2-handle-impl-exclusive
     , riak2-handle-impl-managed
