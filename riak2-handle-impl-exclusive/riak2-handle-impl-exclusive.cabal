@@ -35,12 +35,10 @@ library
 test-suite tests
   build-depends:
     base,
-    network,
+    ip,
     proto-lens,
-    random,
     riak2-core,
     riak2-handle-impl-exclusive,
-    stm
 
   default-extensions:
     LambdaCase
