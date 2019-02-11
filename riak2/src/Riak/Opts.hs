@@ -1,5 +1,6 @@
 module Riak.Opts
-  ( GetOpts(..)
+  ( DeleteOpts(..)
+  , GetOpts(..)
   , PutOpts(..)
   ) where
 
@@ -8,6 +9,30 @@ import Riak.Quorum           (Quorum)
 
 import Data.Default.Class (Default(..))
 
+
+data DeleteOpts
+  = DeleteOpts
+  { dw :: !(Maybe Quorum)
+  , n :: !(Maybe Quorum)
+  , pr :: !(Maybe Quorum)
+  , pw :: !(Maybe Quorum)
+  , r :: !(Maybe Quorum)
+  , timeout :: !(Maybe Word32)
+  , w :: !(Maybe Quorum)
+  } deriving stock (Generic, Show)
+
+instance Default DeleteOpts where
+  def :: DeleteOpts
+  def =
+    DeleteOpts
+      { dw = Nothing
+      , n = Nothing
+      , pr = Nothing
+      , pw = Nothing
+      , r = Nothing
+      , timeout = Nothing
+      , w = Nothing
+      }
 
 data GetOpts
   = GetOpts

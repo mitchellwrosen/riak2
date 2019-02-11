@@ -25,7 +25,7 @@ import Riak.Internal.Object  (Object(..), fromGetResponse, fromPutResponse,
                               newObject)
 import Riak.Internal.Prelude
 import Riak.Internal.Sibling (Sibling)
-import Riak.Opts             (GetOpts(..), PutOpts(..))
+import Riak.Opts             (DeleteOpts(..), GetOpts(..), PutOpts(..))
 
 import qualified Libriak.Handle               as Handle
 import qualified Libriak.Proto                as Proto
@@ -155,16 +155,16 @@ doGet handle request =
             UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
-makeGetRequest key opts =
+makeGetRequest key GetOpts { basicQuorum, n, notfoundOk, pr, r, timeout } =
   Proto.defMessage
     & Key.setProto key
     & L.deletedContext .~ True
-    & L.maybe'basicQuorum .~ defFalse (basicQuorum opts)
-    & L.maybe'n .~ (Quorum.toWord32 <$> (opts ^. field @"n"))
-    & L.maybe'notfoundOk .~ notfoundOk opts
-    & L.maybe'pr .~ (Quorum.toWord32 <$> pr opts)
-    & L.maybe'r .~ (Quorum.toWord32 <$> r opts)
-    & L.maybe'timeout .~ (opts ^. field @"timeout")
+    & L.maybe'basicQuorum .~ defFalse basicQuorum
+    & L.maybe'n .~ (Quorum.toWord32 <$> n)
+    & L.maybe'notfoundOk .~ notfoundOk
+    & L.maybe'pr .~ (Quorum.toWord32 <$> pr)
+    & L.maybe'r .~ (Quorum.toWord32 <$> r)
+    & L.maybe'timeout .~ timeout
 
 
 -- | Put an object and return its key.
@@ -267,7 +267,7 @@ makePutRequest ::
      Object (Content ByteString)
   -> PutOpts
   -> Proto.PutRequest
-makePutRequest Object { content, context, key } opts =
+makePutRequest Object { content, context, key } PutOpts { dw, n, pw, timeout, w } =
   Proto.defMessage
     & Key.setMaybeProto key
     & L.content .~
@@ -279,23 +279,24 @@ makePutRequest Object { content, context, key } opts =
           & L.usermeta .~ map Proto.Pair.fromTuple (content ^. field @"metadata")
           & L.value .~ (content ^. field @"value")
         )
-    & L.maybe'dw .~ (Quorum.toWord32 <$> dw opts)
-    & L.maybe'n .~ (Quorum.toWord32 <$> (opts ^. field @"n"))
-    & L.maybe'pw .~ (Quorum.toWord32 <$> pw opts)
+    & L.maybe'dw .~ (Quorum.toWord32 <$> dw)
+    & L.maybe'n .~ (Quorum.toWord32 <$> n)
+    & L.maybe'pw .~ (Quorum.toWord32 <$> pw)
     & L.maybe'context .~
         (if ByteString.null (unContext context)
           then Nothing
           else Just (unContext context))
-    & L.maybe'w .~ (Quorum.toWord32 <$> w opts)
-    & L.maybe'timeout .~ (opts ^. field @"timeout")
+    & L.maybe'w .~ (Quorum.toWord32 <$> w)
+    & L.maybe'timeout .~ timeout
 
 -- | Delete an object.
 delete ::
      MonadIO m
   => Handle -- ^
   -> Object a -- ^
+  -> DeleteOpts -- ^
   -> m (Either (Error 'DeleteOp) ())
-delete handle Object { context, key } = liftIO $
+delete handle Object { context, key } DeleteOpts { dw, n, pr, pw, r, timeout, w } = liftIO $
   first parseDeleteError <$> Handle.delete handle request
 
   where
@@ -303,15 +304,13 @@ delete handle Object { context, key } = liftIO $
     request =
       Proto.defMessage
         & Key.setProto key
-        -- TODO delete opts
-        -- & L.maybe'dw .~ undefined
-        -- & L.maybe'n .~ undefined
-        -- & L.maybe'pr .~ undefined
-        -- & L.maybe'pw .~ undefined
-        -- & L.maybe'r .~ undefined
-        -- & L.maybe'rw .~ undefined
-        -- & L.maybe'timeout .~ undefined
-        -- & L.maybe'w .~ undefined
+        & L.maybe'dw .~ (Quorum.toWord32 <$> dw)
+        & L.maybe'n .~ (Quorum.toWord32 <$> n)
+        & L.maybe'pr .~ (Quorum.toWord32 <$> pr)
+        & L.maybe'pw .~ (Quorum.toWord32 <$> pw)
+        & L.maybe'r .~ (Quorum.toWord32 <$> r)
+        & L.maybe'timeout .~ timeout
+        & L.maybe'w .~ (Quorum.toWord32 <$> w)
         & L.context .~ unContext context
 
     parseDeleteError :: Handle.Error -> Error 'DeleteOp

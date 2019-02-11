@@ -6,9 +6,6 @@ import Riak
 import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..),
                                    Handle, withHandle)
 
-import qualified Riak.Handle.Impl.Exclusive as Handle
-
-import Control.Concurrent
 import Control.Lens
 import Data.Either           (isRight)
 import Data.Generics.Product (field)
@@ -162,7 +159,7 @@ integrationTests handle =
           value <- ByteString.random 6
           let object = newObject key (newContent value)
           put handle object def `shouldReturnSatisfy` isRight
-          delete handle object { context = newContext } `shouldReturn` Right ()
+          delete handle object { context = newContext } def `shouldReturn` Right ()
           get handle key def >>= \case
             Right Object { content = [Tombstone _, Sibling _] } -> pure ()
             result -> assertFailure (show result)
@@ -173,7 +170,7 @@ integrationTests handle =
           let object = newObject key (newContent value)
           putGet handle object def >>= \case
             Right object' -> do
-              delete handle object' `shouldReturn` Right ()
+              delete handle object' def `shouldReturn` Right ()
               get handle key def >>= \case
                 Right Object { content = [] } -> pure ()
                 result -> assertFailure (show result)

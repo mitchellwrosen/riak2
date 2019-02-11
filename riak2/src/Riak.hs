@@ -73,6 +73,7 @@ module Riak
   , ConvergentSet(..)
   , ConvergentSetUpdate(..)
   , ExactQuery(..)
+  , DeleteOpts(..)
   , GetOpts(..)
   , Handle
   , Index(..)
@@ -110,7 +111,7 @@ import Riak.ExactQuery            (ExactQuery(..))
 import Riak.Index
 import Riak.Key
 import Riak.Object
-import Riak.Opts                  (GetOpts(..), PutOpts(..))
+import Riak.Opts
 import Riak.Quorum                (Quorum(..))
 import Riak.RangeQuery            (RangeQuery(..))
 import Riak.Schema

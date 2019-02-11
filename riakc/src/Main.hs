@@ -121,7 +121,8 @@ deleteParser =
       -> Handle
       -> IO ()
     doDelete key context handle =
-      Object.delete handle object >>= \case
+      -- TODO riakc delete options
+      Object.delete handle object def >>= \case
         Left err -> do
           print err
           exitFailure
@@ -520,7 +521,7 @@ parseQuorum string =
       Left "Expected: integer"
 
     Just q ->
-      Right (Of q)
+      Right (QuorumOf q)
 
 keyMod :: HasMetavar f => Mod f a
 keyMod =
