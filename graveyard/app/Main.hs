@@ -138,23 +138,18 @@ commandParser =
 --parser :: Parser (IO ())
 --parser =
 --    nodeArgument
---    -- TODO --help output is ugly here (COMMAND | COMMAND | ...), fix it
 --    <*>
 --    (asum . map (hsubparser . mconcat))
 --      [ [ putObjectParser
---          -- TODO riak-cli put-new-object
 --        , deleteObjectParser
 --        ]
 --      , [ commandGroup "Counter operations"
 --        , getCounterParser
 --        , updateCounterParser
---          -- TODO riak-cli update-new-counter
 --        ]
 --      , [ commandGroup "Grow-only set operations"
---        , command "TODO" (info empty mempty)
 --        ]
 --      , [ commandGroup "HyperLogLog operations"
---        , command "TODO" (info empty mempty)
 --        ]
 --      , [ commandGroup "Map operations"
 --        , getMapParser
@@ -169,7 +164,6 @@ commandParser =
 --        , listParser
 --        ]
 --      , [ commandGroup "MapReduce"
---        , command "TODO" (info empty mempty)
 --        ]
 --      , [ commandGroup "Secondary indexes (2i)"
 --        , queryParser
@@ -191,7 +185,6 @@ commandParser =
 --    (info
 --      (doDeleteObject
 --        <$> locationArgument)
---        -- TODO delete optional params
 --      (progDesc "Delete an object"))
 
 --getBinaryObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
@@ -216,7 +209,6 @@ commandParser =
 --    (info
 --      (doGetCounter
 --        <$> locationArgument)
---        -- TODO get-counter optional params
 --      (progDesc "Get a counter"))
 
 --getMapParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
@@ -226,7 +218,6 @@ commandParser =
 --    (info
 --      (doGetMap
 --        <$> locationArgument)
---        -- TODO get-map optional params
 --      (progDesc "Get a map"))
 
 --getTextObjectParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
@@ -251,7 +242,6 @@ commandParser =
 --    (info
 --      (doGetSet
 --        <$> locationArgument)
---        -- TODO get-set optional params
 --      (progDesc "Get a set"))
 
 --getBucketPropsParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
@@ -372,7 +362,6 @@ commandParser =
 --                  ])))
 --      (progDesc "Search using secondary indexes"))
 
----- TODO riak-cli allow decrementing counters
 --updateCounterParser :: Mod CommandFields (HostName -> PortNumber -> IO ())
 --updateCounterParser =
 --  command
@@ -385,7 +374,6 @@ commandParser =
 --                [ help "Amount"
 --                , metavar "N"
 --                ]))
---        -- TODO other update-counter optional params
 --      (progDesc "Increment or decrement a counter"))
 
 ----------------------------------------------------------------------------------
@@ -541,7 +529,6 @@ doGetObject f key head params (host, port) = do
 --  h <- createRiakHandle host port
 --  getRiakSet @Text h key def >>= \case
 --    Left err -> print err
---    Right vals -> for_ vals print -- TODO encoding?
 
 --doGetServerInfo :: HostName -> PortNumber -> IO ()
 --doGetServerInfo host port = do

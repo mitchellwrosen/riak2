@@ -150,9 +150,7 @@ module ZZZ.Riak where
 -- import qualified Lens.Labels   as L
 
 
--- TODO _ variants that don't decode replies
 
--- TODO since annotations
 
 --------------------------------------------------------------------------------
 -- Handle
@@ -160,7 +158,6 @@ module ZZZ.Riak where
 
 -- | A thread-safe handle to Riak.
 --
--- TODO: RiakHandle optional cache
 -- data RiakHandle
 --   = RiakHandle !RiakManager !RiakCache
 
@@ -407,10 +404,10 @@ module ZZZ.Riak where
 --      defMessage
 --        & #index L..~
 --            (defMessage
---              & #maybe'nVal L..~ Nothing -- TODO putRiakIndex n_val
+--              & #maybe'nVal L..~ Nothing
 --              & #name L..~ unRiakIndexName index
 --              & #schema L..~ unSolrSchemaName schema)
---        & #maybe'timeout L..~ Nothing -- TODO putRiakIndex timeout
+--        & #maybe'timeout L..~ Nothing
 
 
 --deleteRiakIndex
@@ -487,8 +484,6 @@ module ZZZ.Riak where
 ---- $documentation
 ----
 ---- = Objects
-----
----- TODO write this
 ----
 ---- = Optional parameters
 ----

@@ -7,8 +7,6 @@ module ZZZ.Riak.Internal.Params where
 -- import ZZZ.Riak.Internal.Types
 
 
--- TODO default these that can't be set in props?
-
 -- newtype BasicQuorum    = BasicQuorum    { unBasicQuorum    :: Maybe Bool       }
 -- newtype IncludeContext = IncludeContext { unIncludeContext :: Maybe Bool       }
 -- newtype DF             = DF             { unDF             :: Maybe ByteString }

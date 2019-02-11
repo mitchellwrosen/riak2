@@ -101,7 +101,6 @@ module ZZZ.Riak.Internal.Manager where
 --        Connected conn _ ->
 --          void (tryAny (Interface.disconnect conn))
 
---  -- TODO configurable wheel spokes?
 --  wheel :: TimerWheel <-
 --    TimerWheel.new 1024 (max 1 (inactive / 4))
 
