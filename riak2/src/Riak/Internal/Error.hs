@@ -24,10 +24,25 @@ data Error :: Op -> Type where
     => !ByteString
     -> Error op
 
+  -- | The search index does not exist.
+  IndexDoesNotExistError ::
+       !Text
+    -> Error 'SearchOp
+
   InvalidNError ::
        MayReturnInvalidN op ~ 'True
     => !Word32
     -> Error op
+
+  -- | The search failed. Typically, this means the query was malformed. Check
+  -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
+  SearchFailedError ::
+       Error 'SearchOp
+
+  -- | A search was attempted, but either search is disabled in @riak.conf@, or
+  -- the yokozuna service is not yet up.
+  SearchNotEnabledError ::
+       Error 'SearchOp
 
   HandleError ::
        !Handle.Error
@@ -45,6 +60,7 @@ data Op
   = DeleteOp
   | GetOp
   | PutOp
+  | SearchOp
 
 -- | @no_type@
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
@@ -62,6 +78,20 @@ isBucketTypeDoesNotExistError :: ByteString -> Bool
 isBucketTypeDoesNotExistError =
   (== "no_type")
 
+-- No index <<"foo">> found.
+isIndexDoesNotExistError :: ByteString -> Bool
+isIndexDoesNotExistError msg =
+  ByteString.isPrefixOf "No index <<\"" msg &&
+    ByteString.isSuffixOf "\">> found." msg
+
 isInvalidNError :: ByteString -> Bool
 isInvalidNError =
   ByteString.isPrefixOf "{n_val_violation"
+
+isSearchFailedError :: ByteString -> Bool
+isSearchFailedError =
+  (== "Query unsuccessful check the logs.")
+
+isSearchNotEnabledError :: ByteString -> Bool
+isSearchNotEnabledError =
+  (== "Unknown message code: 27")

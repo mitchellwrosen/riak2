@@ -3,11 +3,11 @@ module Riak.Search
   , bucketTypeField
   , bucketField
   , keyField
-  , Search(..)
   , SearchOpts(..)
   ) where
 
 import Libriak.Handle        (Handle)
+import Riak.Internal.Error
 import Riak.Internal.Prelude
 
 import qualified Libriak.Handle           as Handle
@@ -17,14 +17,8 @@ import qualified Riak.Internal.Proto.Pair as Proto.Pair
 
 import Control.Lens       ((.~), (^.))
 import Data.Default.Class (Default(..))
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
-
-data Search
-  = Search
-  { index :: !Text
-  , query :: !ByteString
-  } deriving stock (Generic, Show)
 
 data SearchOpts
   = SearchOpts
@@ -51,17 +45,18 @@ instance Default SearchOpts where
 search ::
      MonadIO m
   => Handle -- ^
-  -> Search -- ^
+  -> Text -- ^ Search index
+  -> ByteString -- ^ Search query
   -> SearchOpts -- ^
-  -> m (Either Handle.Error [[(ByteString, ByteString)]])
+  -> m (Either (Error 'SearchOp) [[(ByteString, ByteString)]])
 search
     handle
-    Search { index, query }
+    index
+    query
     SearchOpts { fieldList, filter, presort, rows, sort, start } = liftIO $
 
-  (fmap.fmap)
-    fromResponse
-    (Handle.search handle request)
+  bimap parseSearchError fromResponse <$>
+    Handle.search handle request
 
   where
     request :: Proto.SearchRequest
@@ -75,6 +70,21 @@ search
         & L.maybe'sort .~ sort
         & L.maybe'start .~ start
         & L.query .~ query
+
+    parseSearchError :: Handle.Error -> Error 'SearchOp
+    parseSearchError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | isIndexDoesNotExistError err ->
+            IndexDoesNotExistError index
+        | isSearchFailedError err ->
+            SearchFailedError
+        | isSearchNotEnabledError err ->
+            SearchNotEnabledError
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
     fromResponse :: Proto.SearchResponse -> [[(ByteString, ByteString)]]
     fromResponse response =

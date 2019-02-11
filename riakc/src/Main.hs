@@ -9,7 +9,7 @@ import qualified Riak.Object              as Object
 import qualified Riak.ServerInfo          as ServerInfo
 
 import Data.ByteString     (ByteString)
-import Data.Foldable       (asum)
+import Data.Foldable       (asum, for_)
 import Data.List.Split     (splitOn)
 import Data.Maybe          (fromMaybe)
 import Data.Text           (Text)
@@ -106,6 +106,7 @@ commandParser =
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
+      , command "search" (info searchParser (progDesc "Perform a search"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
       ])
 
@@ -220,15 +221,23 @@ putParser =
   doPut
     <$> bucketOrKeyArgument
     <*> strArgument (help "Value" <> metavar "VALUE")
+    <*> contentTypeOption
     <*> contextOption
     <*> nOption
     <*> wOption
     <*> dwOption
     <*> pwOption
   where
+    contentTypeOption :: Parser (Maybe ByteString)
+    contentTypeOption =
+      optional
+        (strOption
+          (help "Content type" <> long "content-type" <> metavar "TYPE"))
+
     doPut ::
          Either Bucket Key
       -> Text
+      -> Maybe ByteString
       -> Maybe Context
       -> Maybe Quorum
       -> Maybe Quorum
@@ -236,7 +245,7 @@ putParser =
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doPut bucketOrKey val context n w dw pw handle =
+    doPut bucketOrKey val type' context n w dw pw handle =
       Object.put handle object opts >>= \case
         Left err -> do
           print err
@@ -251,8 +260,12 @@ putParser =
         object :: Object (Content ByteString)
         object =
           Object
-            { content = newContent (encodeUtf8 val)
-            , context = fromMaybe newContext context
+            { content =
+                (newContent (encodeUtf8 val))
+                  { type' = type'
+                  }
+            , context =
+                fromMaybe newContext context
             , key =
                 case bucketOrKey of
                   Left bucket -> generatedKey bucket
@@ -268,6 +281,42 @@ putParser =
             , timeout = Nothing
             , w = w
             }
+
+
+
+searchParser :: Parser (Handle -> IO ())
+searchParser =
+  doSearch
+    <$> indexArgument
+    <*> queryArgument
+
+  where
+    doSearch ::
+         Text
+      -> Text
+      -> Handle
+      -> IO ()
+    doSearch index query handle =
+      search handle index (encodeUtf8 query) def >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right documents ->
+          for_ documents printDocument
+
+    indexArgument :: Parser Text
+    indexArgument =
+      strArgument (help "Search index" <> metavar "INDEX")
+
+    queryArgument :: Parser Text
+    queryArgument =
+      strArgument (help "Query" <> metavar "QUERY")
+
+    -- Assume the keys and values are UTF-8 encoded
+    printDocument :: [(ByteString, ByteString)] -> IO ()
+    printDocument =
+      print . map (\(key, val) -> (decodeUtf8 key, decodeUtf8 val))
 
 updateMapParser :: Parser (Handle -> IO ())
 updateMapParser =
@@ -357,33 +406,33 @@ mapUpdateOptions =
     removeCounterOption :: Parser ConvergentMapUpdate
     removeCounterOption =
       makeMapUpdate (RemoveCounter . Latin1.pack) . splitOn "." <$>
-        strOption (long "remove-counter" <> help "Remove a counter")
+        strOption (help "Remove a counter" <> long "remove-counter" <> metavar "PATH")
 
     removeFlagOption :: Parser ConvergentMapUpdate
     removeFlagOption =
       makeMapUpdate (RemoveFlag . Latin1.pack) . splitOn "." <$>
-        strOption (long "remove-flag" <> help "Remove a flag")
+        strOption (help "Remove a flag" <> long "remove-flag" <> metavar "PATH")
 
     removeMapOption :: Parser ConvergentMapUpdate
     removeMapOption =
       makeMapUpdate (RemoveMap . Latin1.pack) . splitOn "." <$>
-        strOption (long "remove-map" <> help "Remove a map")
+        strOption (help "Remove a map" <> long "remove-map" <> metavar "PATH")
 
     removeRegisterOption :: Parser ConvergentMapUpdate
     removeRegisterOption =
       makeMapUpdate (RemoveRegister . Latin1.pack) . splitOn "." <$>
-        strOption (long "remove-register" <> help "Remove a register")
+        strOption (help "Remove a register" <> long "remove-register" <> metavar "PATH")
 
     removeSetOption :: Parser ConvergentMapUpdate
     removeSetOption =
       makeMapUpdate (RemoveSet . Latin1.pack) . splitOn "." <$>
-        strOption (long "remove-set" <> help "Remove a set")
+        strOption (help "Remove a set" <> long "remove-set" <> metavar "PATH")
 
     incrementCounterOption :: Parser ConvergentMapUpdate
     incrementCounterOption =
       option
         (eitherReader parseIncrementCounter)
-        (long "incr-counter" <> help "Increment a counter")
+        (help "Increment a counter" <> long "incr-counter" <> metavar "PATH/AMOUNT")
 
       where
         parseIncrementCounter :: String -> Either String ConvergentMapUpdate
@@ -401,18 +450,18 @@ mapUpdateOptions =
     disableFlagOption :: Parser ConvergentMapUpdate
     disableFlagOption =
       makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) False) . splitOn "." <$>
-        strOption (long "disable-flag" <> help "Disable a flag")
+        strOption (help "Disable a flag" <> long "disable-flag" <> metavar "PATH")
 
     enableFlagOption :: Parser ConvergentMapUpdate
     enableFlagOption =
       makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) True) . splitOn "." <$>
-        strOption (long "enable-flag" <> help "Enable a flag")
+        strOption (help "Enable a flag" <> long "enable-flag" <> metavar "PATH")
 
     setRegisterOption :: Parser ConvergentMapUpdate
     setRegisterOption =
       option
         (eitherReader parseSetRegister)
-        (long "set-register" <> help "Set a register")
+        (help "Set a register" <> long "set-register" <> metavar "PATH/VALUE")
 
       where
         parseSetRegister :: String -> Either String ConvergentMapUpdate
@@ -432,13 +481,13 @@ mapUpdateOptions =
     addElemOption =
       option
         (eitherReader (parseUpdateSet Add))
-        (long "add-elem" <> help "Add an element to a set")
+        (help "Add an element to a set" <> long "add-elem" <> metavar "PATH/VALUE")
 
     removeElemOption :: Parser ConvergentMapUpdate
     removeElemOption =
       option
         (eitherReader (parseUpdateSet Remove))
-        (long "remove-elem" <> help "Add an element to a set")
+        (help "Add an element to a set" <> long "remove-elem" <> metavar "PATH/VALUE")
 
     parseUpdateSet ::
          (ByteString -> ConvergentSetUpdate)
@@ -476,25 +525,38 @@ mapUpdateOptions =
 
 nOption :: Parser (Maybe Quorum)
 nOption =
-  optional (option (eitherReader parseQuorum) (long "n" <> help "N"))
+  optional
+    (option
+      (eitherReader parseQuorum)
+        (help "N value" <> long "n" <> metavar "QUORUM"))
 
 prOption :: Parser (Maybe Quorum)
 prOption =
-  optional (option (eitherReader parseQuorum) (long "pr" <> help "PR"))
+  optional
+    (option
+      (eitherReader parseQuorum)
+        (help "Primary read quorum" <> long "pr" <> metavar "QUORUM"))
 
 pwOption :: Parser (Maybe Quorum)
 pwOption =
-  optional (option (eitherReader parseQuorum) (long "pw" <> help "PW"))
+  optional
+    (option
+      (eitherReader parseQuorum)
+      (help "Prmary write quorum" <> long "pw" <> metavar "QUORUM"))
 
 rOption :: Parser (Maybe Quorum)
 rOption =
-  optional (option (eitherReader parseQuorum) (long "r" <> help "R"))
+  optional
+    (option
+      (eitherReader parseQuorum)
+      (help "Read quorum" <> long "r" <> metavar "QUORUM"))
 
 wOption :: Parser (Maybe Quorum)
 wOption =
-  optional (option (eitherReader parseQuorum) (long "w" <> help "W"))
-
-
+  optional
+    (option
+      (eitherReader parseQuorum)
+      (help "Write quorum" <> long "w" <> metavar "QUORUM"))
 
 parseBucket :: String -> Either String Bucket
 parseBucket string =
@@ -525,4 +587,4 @@ parseQuorum string =
 
 keyMod :: HasMetavar f => Mod f a
 keyMod =
-  (help "Key (type/bucket/key)" <> metavar "KEY")
+  (help "Key" <> metavar "(TYPE/)BUCKET/KEY")

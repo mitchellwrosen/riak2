@@ -94,7 +94,6 @@ module Riak
   , Quorum(..)
   , RangeQuery(..)
   , Schema(..)
-  , Search(..)
   , SearchOpts(..)
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
