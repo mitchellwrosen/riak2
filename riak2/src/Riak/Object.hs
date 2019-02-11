@@ -41,8 +41,6 @@ import Data.Text.Encoding    (decodeUtf8)
 
 import qualified ByteString
 
--- TODO specialize HasType for Object,Content
-
 
 -- | Get an object.
 --
