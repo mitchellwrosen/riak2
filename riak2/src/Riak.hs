@@ -46,9 +46,6 @@ module Riak
   , mapReduceKeys
     -- * Search operations
   , search
-  , bucketTypeField
-  , bucketField
-  , keyField
     -- ** Search schema
   , getSchema
   , putSchema
@@ -95,6 +92,7 @@ module Riak
   , RangeQuery(..)
   , Schema(..)
   , SearchOpts(..)
+  , SearchResults(..)
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)

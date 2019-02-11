@@ -1,9 +1,39 @@
+-- |
+-- * <https://docs.basho.com/riak/kv/2.2.3/developing/usage/search/>
+-- * <https://docs.basho.com/riak/kv/2.2.3/developing/usage/searching-data-types/>
+--
+-- Search examples:
+--
+-- * Counters
+--
+--     The default Solr schema indexes counters under the field name
+--     @"counter"@.
+--
+--     For example, to search for counters in bucket @"foo"@ with values greater
+--     than 100:
+--
+--     > _yz_rb:foo && counter:{100 TO *]
+--
+-- * Sets
+--
+-- * Maps
+--
+--     The default Solr schema indexes dynamic fields ending in @"_counter"@,
+--     @"_flag"@, @"_register"@, @"_set"@, and the default
+--     @application/riak_map@ extractor dynamically renames map keys per their
+--     type by suffixing them with @"_counter"@, @"_flag"@, @"_map"@,
+--     @"_register"@, or @"_set@", using @'.'@ as a delimiter for nested maps.
+--
+--     For example, to search for maps with an inner map named @"foo"@ that
+--     contain an inner map named @"bar"@ that contain a set named @"baz"@ that
+--     contain the string @"qux"@:
+--
+--     > foo_map.bar_map.baz_set:qux
+
 module Riak.Search
   ( search
-  , bucketTypeField
-  , bucketField
-  , keyField
   , SearchOpts(..)
+  , SearchResults(..)
   ) where
 
 import Libriak.Handle        (Handle)
@@ -19,6 +49,13 @@ import Control.Lens       ((.~), (^.))
 import Data.Default.Class (Default(..))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
+
+data SearchResults
+  = SearchResults
+  { documents :: ![[(ByteString, ByteString)]]
+  , maxScore :: !Float
+  , numFound :: !Word32
+  } deriving stock (Generic, Show)
 
 data SearchOpts
   = SearchOpts
@@ -47,8 +84,8 @@ search ::
   => Handle -- ^
   -> Text -- ^ Search index
   -> ByteString -- ^ Search query
-  -> SearchOpts -- ^
-  -> m (Either (Error 'SearchOp) [[(ByteString, ByteString)]])
+  -> SearchOpts -- ^ Search options
+  -> m (Either (Error 'SearchOp) SearchResults)
 search
     handle
     index
@@ -86,22 +123,14 @@ search
         | otherwise ->
             UnknownError (decodeUtf8 err)
 
-    fromResponse :: Proto.SearchResponse -> [[(ByteString, ByteString)]]
+    fromResponse :: Proto.SearchResponse -> SearchResults
     fromResponse response =
-      map fromDocument (response ^. L.docs)
+      SearchResults
+        { documents = map fromDocument (response ^. L.docs)
+        , maxScore = response ^. L.maxScore
+        , numFound = response ^. L.numFound
+        }
 
     fromDocument :: Proto.Document -> [(ByteString, ByteString)]
     fromDocument doc =
       map Proto.Pair.toTuple (doc ^. L.fields)
-
-bucketTypeField :: ByteString
-bucketTypeField =
-  "_yz_rt"
-
-bucketField :: ByteString
-bucketField =
-  "_yz_rb"
-
-keyField :: ByteString
-keyField =
-  "_yz_rk"

@@ -94,16 +94,10 @@ updateConvergentCounter handle (ConvergentCounter { key, value }) = liftIO $
               then Nothing
               else Just k)
         & L.update .~
-            -- Missing value defaults to 1, so don't bother sending it
-            case value of
-              1 ->
-                Proto.defMessage
-
-              _ ->
-                Proto.defMessage
-                  & L.counterUpdate .~
-                      (Proto.defMessage
-                        & L.increment .~ value)
+            (Proto.defMessage
+              & L.counterUpdate .~
+                  (Proto.defMessage
+                    & L.increment .~ value))
         & L.returnBody .~ True
 -- TODO counter update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),

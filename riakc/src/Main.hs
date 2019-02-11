@@ -10,6 +10,7 @@ import qualified Riak.ServerInfo          as ServerInfo
 
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
+import Data.Int            (Int64)
 import Data.List.Split     (splitOn)
 import Data.Maybe          (fromMaybe)
 import Data.Text           (Text)
@@ -101,12 +102,14 @@ commandParser =
   hsubparser
     (mconcat
       [ command "get" (info getParser (progDesc "Get an object"))
+      , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
       , command "delete" (info deleteParser (progDesc "Delete an object"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
       , command "search" (info searchParser (progDesc "Perform a search"))
+      , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
       ])
 
@@ -175,6 +178,24 @@ getParser =
             , r = r
             , timeout = Nothing
             }
+
+getCounterParser :: Parser (Handle -> IO ())
+getCounterParser =
+  doGetCounter
+    <$> keyArgument
+  where
+    doGetCounter ::
+         Key
+      -> Handle
+      -> IO ()
+    doGetCounter key handle =
+      getConvergentCounter handle key >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
 
 getMapParser :: Parser (Handle -> IO ())
 getMapParser =
@@ -297,12 +318,15 @@ searchParser =
       -> Handle
       -> IO ()
     doSearch index query handle =
+      -- TODO search options
       search handle index (encodeUtf8 query) def >>= \case
         Left err -> do
           print err
           exitFailure
 
-        Right documents ->
+        Right SearchResults { documents, maxScore, numFound } -> do
+          putStrLn ("Max score: " ++ show maxScore)
+          putStrLn ("Num found: " ++ show numFound)
           for_ documents printDocument
 
     indexArgument :: Parser Text
@@ -317,6 +341,43 @@ searchParser =
     printDocument :: [(ByteString, ByteString)] -> IO ()
     printDocument =
       print . map (\(key, val) -> (decodeUtf8 key, decodeUtf8 val))
+
+updateCounterParser :: Parser (Handle -> IO ())
+updateCounterParser =
+  doUpdateCounter
+    <$> bucketOrKeyArgument
+    <*> amountArgument
+
+  where
+    amountArgument :: Parser Int64
+    amountArgument =
+      argument auto (help "Amount" <> metavar "AMOUNT")
+
+    doUpdateCounter ::
+         Either Bucket Key
+      -> Int64
+      -> Handle
+      -> IO ()
+    doUpdateCounter bucketOrKey amount handle = do
+      updateConvergentCounter handle operation >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
+
+      where
+        operation :: ConvergentCounter
+        operation =
+          ConvergentCounter
+            { key =
+                case bucketOrKey of
+                  Left bucket -> generatedKey bucket
+                  Right key -> key
+            , value =
+                amount
+            }
 
 updateMapParser :: Parser (Handle -> IO ())
 updateMapParser =
@@ -395,7 +456,7 @@ mapUpdateOptions =
         , removeMapOption
         , removeRegisterOption
         , removeSetOption
-        , incrementCounterOption
+        , updateCounterOption
         , disableFlagOption
         , enableFlagOption
         , setRegisterOption
@@ -428,15 +489,15 @@ mapUpdateOptions =
       makeMapUpdate (RemoveSet . Latin1.pack) . splitOn "." <$>
         strOption (help "Remove a set" <> long "remove-set" <> metavar "PATH")
 
-    incrementCounterOption :: Parser ConvergentMapUpdate
-    incrementCounterOption =
+    updateCounterOption :: Parser ConvergentMapUpdate
+    updateCounterOption =
       option
-        (eitherReader parseIncrementCounter)
-        (help "Increment a counter" <> long "incr-counter" <> metavar "PATH/AMOUNT")
+        (eitherReader parseUpdateCounter)
+        (help "Update a counter" <> long "update-counter" <> metavar "PATH/AMOUNT")
 
       where
-        parseIncrementCounter :: String -> Either String ConvergentMapUpdate
-        parseIncrementCounter update =
+        parseUpdateCounter :: String -> Either String ConvergentMapUpdate
+        parseUpdateCounter update =
           case splitOn "/" update of
             [ path, readMaybe -> Just val ] ->
               Right
@@ -587,4 +648,4 @@ parseQuorum string =
 
 keyMod :: HasMetavar f => Mod f a
 keyMod =
-  (help "Key" <> metavar "(TYPE/)BUCKET/KEY")
+  (help "Key" <> metavar "TYPE/BUCKET/KEY")
