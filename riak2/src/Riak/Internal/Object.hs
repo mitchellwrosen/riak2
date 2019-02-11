@@ -5,9 +5,9 @@ import Riak.Internal.Prelude
 import Riak.Internal.Sibling (Sibling(..))
 import Riak.Key              (Key(..))
 
+import qualified Libriak.Proto         as Proto
+import qualified Libriak.Proto.Lens    as L
 import qualified Riak.Internal.Sibling as Sibling
-import qualified Riak.Proto            as Proto
-import qualified Riak.Proto.Lens       as L
 
 import Control.Lens ((^.))
 

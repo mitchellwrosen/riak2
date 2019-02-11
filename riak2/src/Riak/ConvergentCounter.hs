@@ -4,13 +4,13 @@ module Riak.ConvergentCounter
   , updateConvergentCounter
   ) where
 
-import Riak.Handle           (Handle)
+import Libriak.Handle        (Handle)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Riak.Handle     as Handle
-import qualified Riak.Proto      as Proto
-import qualified Riak.Proto.Lens as L
+import qualified Libriak.Handle     as Handle
+import qualified Libriak.Proto      as Proto
+import qualified Libriak.Proto.Lens as L
 
 import Control.Lens ((.~), (^.))
 

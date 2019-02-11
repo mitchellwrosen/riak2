@@ -16,8 +16,8 @@ module Riak.Object
   , newObject
   ) where
 
+import Libriak.Handle        (Handle)
 import Riak.Content          (Content(..))
-import Riak.Handle           (Handle)
 import Riak.Internal.Context (Context(..))
 import Riak.Internal.Error
 import Riak.Internal.Key     (Key(..))
@@ -27,13 +27,13 @@ import Riak.Internal.Prelude
 import Riak.Internal.Sibling (Sibling)
 import Riak.Opts             (GetOpts(..), PutOpts(..))
 
-import qualified Riak.Handle                  as Handle
+import qualified Libriak.Handle               as Handle
+import qualified Libriak.Proto                as Proto
+import qualified Libriak.Proto.Lens           as L
 import qualified Riak.Internal.Key            as Key
 import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
 import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
-import qualified Riak.Proto                   as Proto
-import qualified Riak.Proto.Lens              as L
 
 import Control.Lens          ((.~), (^.))
 import Data.Generics.Product (field)

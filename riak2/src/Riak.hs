@@ -94,6 +94,8 @@ module Riak
   , def
   ) where
 
+-- TODO rename Config/Error export them
+import Libriak.Handle             (Handle, UnexpectedResponse(..))
 import Riak.Bucket
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
                                    NotfoundBehavior(..))
@@ -105,7 +107,6 @@ import Riak.ConvergentHyperLogLog
 import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ExactQuery            (ExactQuery(..))
-import Riak.Handle                (Handle, UnexpectedResponse(..))
 import Riak.Index
 import Riak.Key
 import Riak.Object
@@ -118,7 +119,7 @@ import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
 import Riak.Sibling
 
-import qualified Riak.Handle as Handle
+import qualified Libriak.Handle as Handle
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Default.Class     (def)

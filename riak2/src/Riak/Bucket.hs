@@ -13,7 +13,7 @@ module Riak.Bucket
   , streamKeys
   ) where
 
-import Riak.Handle              (Handle)
+import Libriak.Handle           (Handle)
 import Riak.Internal.Bucket     (Bucket(..))
 import Riak.Internal.ExactQuery (ExactQuery(..))
 import Riak.Internal.Key        (Key(..))
@@ -21,12 +21,12 @@ import Riak.Internal.Prelude
 import Riak.Internal.RangeQuery (RangeQuery)
 import Riak.Internal.Utils      (bs2int)
 
-import qualified Riak.Handle                       as Handle
+import qualified Libriak.Handle                    as Handle
+import qualified Libriak.Proto                     as Proto
+import qualified Libriak.Proto.Lens                as L
 import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
-import qualified Riak.Proto                        as Proto
-import qualified Riak.Proto.Lens                   as L
 
 import Control.Foldl   (FoldM(..))
 import Control.Lens    (folded, to, view, (.~), (^.))

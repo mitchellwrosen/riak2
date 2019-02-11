@@ -1,10 +1,10 @@
 module Riak.Internal.SecondaryIndex where
 
+import Libriak.Proto                     (Pair)
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
 import Riak.Internal.SecondaryIndexValue (SecondaryIndexValue)
 import Riak.Internal.Utils
-import Riak.Proto                        (Pair)
 
 import qualified Riak.Internal.Proto.Pair          as Pair
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue

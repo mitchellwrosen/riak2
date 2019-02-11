@@ -6,13 +6,13 @@ module Riak.BucketType
   , streamBuckets
   ) where
 
+import Libriak.Handle        (Handle)
 import Riak.Bucket           (Bucket(..))
-import Riak.Handle           (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Handle     as Handle
-import qualified Riak.Proto      as Proto
-import qualified Riak.Proto.Lens as L
+import qualified Libriak.Handle     as Handle
+import qualified Libriak.Proto      as Proto
+import qualified Libriak.Proto.Lens as L
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~))

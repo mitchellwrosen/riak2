@@ -1,9 +1,9 @@
 module Main where
 
+import Libriak.Request            (Request(..))
 import Riak.Handle.Impl.Exclusive
-import Riak.Request               (Request(..))
 
-import qualified Riak.Proto as Proto
+import qualified Libriak.Proto as Proto
 
 import Control.Concurrent
 import Control.Exception  (throwIO)

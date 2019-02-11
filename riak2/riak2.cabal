@@ -151,13 +151,6 @@ library
     Riak.ServerInfo
     Riak.Sibling
 
-    ZZZ.Erlang
-    ZZZ.Riak
-    ZZZ.Riak.Internal.Debug
-    ZZZ.Riak.Internal.Manager
-    ZZZ.Riak.Internal.MapReduce
-    ZZZ.Riak.Internal.Params
-
   ghc-options:
     -Weverything
     -fno-warn-all-missed-specialisations

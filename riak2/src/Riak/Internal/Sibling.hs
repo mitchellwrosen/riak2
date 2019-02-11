@@ -6,10 +6,10 @@ import Riak.Internal.Prelude
 import Control.Lens ((^.))
 import Data.Time    (UTCTime)
 
+import qualified Libriak.Proto                as Proto
+import qualified Libriak.Proto.Lens           as L
 import qualified Riak.Internal.Proto.Content  as Proto.Content
 import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
-import qualified Riak.Proto                   as Proto
-import qualified Riak.Proto.Lens              as L
 
 data Sibling a
   = Sibling !(Content a)

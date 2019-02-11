@@ -2,11 +2,11 @@ module Riak.MapReduce
   ( mapReduce
   ) where
 
-import Riak.Handle           (Handle)
+import Libriak.Handle        (Handle)
 import Riak.Internal.Prelude
 
-import qualified Riak.Handle as Handle
-import qualified Riak.Proto  as Proto
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
 
 import Control.Foldl (FoldM)
 

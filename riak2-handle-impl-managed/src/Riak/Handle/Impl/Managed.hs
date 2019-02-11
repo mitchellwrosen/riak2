@@ -12,8 +12,8 @@ module Riak.Handle.Impl.Managed
   , Error(..)
   ) where
 
-import Riak.Request  (Request)
-import Riak.Response (Response)
+import Libriak.Request  (Request)
+import Libriak.Response (Response)
 
 import qualified Riak.Handle.Signature as Handle
 

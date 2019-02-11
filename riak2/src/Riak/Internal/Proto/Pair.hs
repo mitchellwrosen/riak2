@@ -1,9 +1,9 @@
 module Riak.Internal.Proto.Pair where
 
+import Libriak.Proto
 import Riak.Internal.Prelude
-import Riak.Proto
 
-import qualified Riak.Proto.Lens as L
+import qualified Libriak.Proto.Lens as L
 
 import Control.Lens ((.~), (^.))
 
