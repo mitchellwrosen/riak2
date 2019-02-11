@@ -8,7 +8,7 @@ library
   build-depends:
     base,
     foldl,
-    riak2-core-internal
+    libriak-internal
 
   default-extensions:
     DeriveAnyClass
@@ -36,8 +36,8 @@ test-suite tests
   build-depends:
     base,
     ip,
+    libriak,
     proto-lens,
-    riak2-core,
     riak2-handle-impl-exclusive
 
   default-extensions:
@@ -63,5 +63,5 @@ test-suite tests
     exitcode-stdio-1.0
 
   mixins:
-    riak2-core
+    libriak
       requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)

@@ -1,4 +1,4 @@
-module Utils
+module Libriak.Internal.Utils
   ( wire
   ) where
 

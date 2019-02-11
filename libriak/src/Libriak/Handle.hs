@@ -1,4 +1,4 @@
-module Riak.Handle
+module Libriak.Handle
   ( Handle
   , Config(..)
   , withHandle
@@ -27,13 +27,13 @@ module Riak.Handle
   , UnexpectedResponse(..)
   ) where
 
+import Libriak.Request       (Request(..))
+import Libriak.Response      (Response(..))
 import Riak.Handle.Signature (Config(..), Handle, withHandle)
-import Riak.Request          (Request(..))
-import Riak.Response         (Response(..))
 
+import qualified Libriak.Proto         as Proto
+import qualified Libriak.Proto.Lens    as L
 import qualified Riak.Handle.Signature as Handle
-import qualified Riak.Proto            as Proto
-import qualified Riak.Proto.Lens       as L
 
 import Control.Exception      (Exception, throwIO)
 import Control.Foldl          (FoldM(..))

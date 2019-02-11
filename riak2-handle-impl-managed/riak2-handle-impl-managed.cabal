@@ -7,7 +7,7 @@ build-type: Simple
 library
   build-depends:
     base,
-    riak2-core,
+    libriak,
     safe-exceptions,
     stm
 
@@ -52,7 +52,3 @@ test-suite tests
 
   type:
     exitcode-stdio-1.0
-
-  -- mixins:
-  --   riak2-core
-  --     requires (Riak.Interface.Signature as Riak.Handle.Impl.Socket.Concurrent)

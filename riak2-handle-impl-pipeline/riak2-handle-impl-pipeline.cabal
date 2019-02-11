@@ -7,7 +7,7 @@ build-type: Simple
 library
   build-depends:
     base,
-    riak2-core-internal,
+    libriak-internal,
     safe-exceptions
 
   default-extensions:

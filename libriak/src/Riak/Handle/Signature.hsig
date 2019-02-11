@@ -1,7 +1,7 @@
 signature Riak.Handle.Signature where
 
-import Riak.Request  (Request)
-import Riak.Response (Response)
+import Libriak.Request  (Request)
+import Libriak.Response (Response)
 
 import Foreign.C     (CInt)
 

@@ -3,7 +3,7 @@
 --
 -- Like the underlying socket, this is not a thread-safe abstraction.
 
-module Riak.Connection.Internal
+module Libriak.Internal.Connection
   ( Connection
   , withConnection
   , send

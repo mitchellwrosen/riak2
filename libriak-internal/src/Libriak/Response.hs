@@ -1,14 +1,10 @@
-module Riak.Response
+module Libriak.Response
   ( Response(..)
-  , parse
   , parseResponse
   , DecodeError(..)
-  , encode
   ) where
 
-import Riak.Proto
-
-import qualified Utils
+import Libriak.Proto
 
 import Control.Monad.ST
 import Control.Monad.ST.Unsafe
@@ -43,13 +39,6 @@ data Response
   | ResponseSetBucket SetBucketResponse
   | ResponseUpdateCrdt UpdateCrdtResponse
   deriving stock (Show)
-
--- | Parse a response, which consists of a 1-byte message code and a payload.
--- This function assumes the 4-byte, big-endian length prefix has already been
--- stripped.
-parse :: ByteString -> Either DecodeError Response
-parse bytes =
-  decode (ByteString.head bytes) (ByteString.drop 1 bytes)
 
 -- | Parse a response, which consists of a 1-byte message code and a payload.
 -- This function assumes the 4-byte, big-endian length prefix has already been
@@ -99,24 +88,3 @@ decode code bytes =
       -> Either DecodeError Response
     decode' f =
       bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
-
--- | Encode a response, including the length prefix.
-encode :: Response -> ByteString
-encode = \case
-  ResponseDelete         response -> Utils.wire 14 response
-  ResponseError          response -> Utils.wire 0  response
-  ResponseGet            response -> Utils.wire 10 response
-  ResponseGetBucket      response -> Utils.wire 20 response
-  ResponseGetCrdt        response -> Utils.wire 81 response
-  ResponseGetIndex       response -> Utils.wire 55 response
-  ResponseGetServerInfo  response -> Utils.wire 8  response
-  ResponseGetSchema      response -> Utils.wire 59 response
-  ResponseListBuckets    response -> Utils.wire 16 response
-  ResponseListKeys       response -> Utils.wire 18 response
-  ResponseMapReduce      response -> Utils.wire 24 response
-  ResponsePing           response -> Utils.wire 2  response
-  ResponsePut            response -> Utils.wire 12 response
-  ResponseResetBucket    response -> Utils.wire 30 response
-  ResponseSecondaryIndex response -> Utils.wire 26 response
-  ResponseSetBucket      response -> Utils.wire 22 response
-  ResponseUpdateCrdt     response -> Utils.wire 83 response

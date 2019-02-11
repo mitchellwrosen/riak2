@@ -11,12 +11,12 @@ module Riak.Handle.Impl.Exclusive
   , DecodeError(..)
   ) where
 
-import Riak.Connection (Connection, Endpoint(..), ReceiveError(..),
-                        SocketException(..), withConnection)
-import Riak.Request    (Request)
-import Riak.Response   (DecodeError(..), Response)
+import Libriak.Connection (Connection, Endpoint(..), ReceiveError(..),
+                           SocketException(..), withConnection)
+import Libriak.Request    (Request)
+import Libriak.Response   (DecodeError(..), Response)
 
-import qualified Riak.Connection as Connection
+import qualified Libriak.Connection as Connection
 
 import Control.Concurrent.MVar
 import Control.Exception       (Exception, throwIO)

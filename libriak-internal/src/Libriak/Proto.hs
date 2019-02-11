@@ -1,4 +1,4 @@
-module Riak.Proto
+module Libriak.Proto
   ( DecodeError(..)
   , module Proto.Proto.Riak
     -- ** Re-exports

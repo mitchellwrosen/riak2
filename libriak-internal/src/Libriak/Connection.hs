@@ -2,7 +2,7 @@
 --
 -- Like the underlying socket, this is not a thread-safe abstraction.
 
-module Riak.Connection
+module Libriak.Connection
   ( Connection
   , withConnection
   , send
@@ -16,13 +16,13 @@ module Riak.Connection
   , Reason(..)
   ) where
 
-import Riak.Connection.Internal (Connection, Context(..), Endpoint(..),
-                                 Reason(..), SocketException(..),
-                                 withConnection)
-import Riak.Request             (Request, encodeRequest)
-import Riak.Response            (DecodeError(..), Response, parseResponse)
+import Libriak.Internal.Connection (Connection, Context(..), Endpoint(..),
+                                    Reason(..), SocketException(..),
+                                    withConnection)
+import Libriak.Request             (Request, encodeRequest)
+import Libriak.Response            (DecodeError(..), Response, parseResponse)
 
-import qualified Riak.Connection.Internal as Connection
+import qualified Libriak.Internal.Connection as Connection
 
 -- | Something went wrong while receiving a response.
 data ReceiveError

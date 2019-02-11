@@ -1,6 +1,6 @@
 cabal-version: 2.4
 
-name: riak2-core
+name: libriak
 version: 0.1.0
 build-type: Simple
 
@@ -10,8 +10,8 @@ library
     bytestring,
     foldl,
     lens,
-    proto-lens ^>= 0.4.0,
-    riak2-core-internal
+    libriak-internal,
+    proto-lens ^>= 0.4.0
 
   default-extensions:
     DeriveAnyClass
@@ -24,13 +24,13 @@ library
     Haskell2010
 
   exposed-modules:
-    Riak.Handle
+    Libriak.Handle
 
   reexported-modules:
-    Riak.Proto,
-    Riak.Proto.Lens,
-    Riak.Request,
-    Riak.Response
+    Libriak.Proto,
+    Libriak.Proto.Lens,
+    Libriak.Request,
+    Libriak.Response
 
   hs-source-dirs:
     src
