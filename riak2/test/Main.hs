@@ -21,6 +21,7 @@ import Test.Tasty.HUnit
 
 import qualified Data.ByteString.Random as ByteString
 
+
 main :: IO ()
 main = do
   result :: Either CInt () <-
@@ -112,14 +113,15 @@ integrationTests handle =
               _ <- put handle object' def
               getIfModified handle object' def `shouldReturnSatisfy` isRightJust
             result -> assertFailure (show result)
-
-      , testCase "put" $ do
+      ]
+    , testGroup "put"
+      [ testCase "random key" $ do
           bucket <- ByteString.random 32
           value <- ByteString.random 6
           let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
           put handle object def `shouldReturnSatisfy` isRight
 
-      , testCase "putGet" $ do
+      , testCase "return body" $ do
           key <- randomKey
           value <- ByteString.random 6
           let object = newObject key (newContent value)
@@ -127,7 +129,7 @@ integrationTests handle =
             Right Object { content = _:|[] } -> pure ()
             result -> assertFailure (show result)
 
-      , testCase "putGet (siblings)" $ do
+      , testCase "return body (siblings)" $ do
           key <- randomKey
           value <- ByteString.random 6
           let object = newObject key (newContent value)
@@ -136,7 +138,7 @@ integrationTests handle =
             Right Object { content = _:|[_] } -> pure ()
             result -> assertFailure (show result)
 
-      , testCase "putGetHead" $ do
+      , testCase "return head" $ do
           key <- randomKey
           value <- ByteString.random 6
           let object = newObject key (newContent value)
@@ -144,7 +146,7 @@ integrationTests handle =
             Right Object { content = _:|[] } -> pure ()
             result -> assertFailure (show result)
 
-      , testCase "putGetHead (siblings)" $ do
+      , testCase "return head (siblings)" $ do
           key <- randomKey
           value <- ByteString.random 6
           let object = newObject key (newContent value)
@@ -152,16 +154,30 @@ integrationTests handle =
           putGetHead handle object def >>= \case
             Right Object { content = _:|[_] } -> pure ()
             result -> assertFailure (show result)
+      ]
 
-      -- , testCase "delete" $ do
-      --     key <- randomKey
-      --     value <- ByteString.random 6
-      --     let content = (newContent key value) { metadata = [("foo", Just "bar")], type' = Just "wawa" }
-      --     -- Right (object:|_) <- putGetHead handle content def
-      --     -- delete handle object `shouldReturn` Right ()
-      --     _ <- put handle content def
-      --     delete handle content `shouldReturn` Right ()
-      --     get handle key def `shouldReturn` Right []
+    , testGroup "delete"
+      [ testCase "tombstone" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let object = newObject key (newContent value)
+          put handle object def `shouldReturnSatisfy` isRight
+          delete handle object { context = newContext } `shouldReturn` Right ()
+          get handle key def >>= \case
+            Right Object { content = [Tombstone _, Sibling _] } -> pure ()
+            result -> assertFailure (show result)
+
+      , testCase "no tombstone" $ do
+          key <- randomKey
+          value <- ByteString.random 6
+          let object = newObject key (newContent value)
+          putGet handle object def >>= \case
+            Right object' -> do
+              delete handle object' `shouldReturn` Right ()
+              get handle key def >>= \case
+                Right Object { content = [] } -> pure ()
+                result -> assertFailure (show result)
+            result -> assertFailure (show result)
       ]
     ]
 
