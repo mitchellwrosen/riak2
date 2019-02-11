@@ -43,6 +43,9 @@ module Riak
     -- ** Full key traversals
   , listKeys
   , streamKeys
+    -- * MapReduce operations
+  , mapReduceBucket
+  , mapReduceKeys
     -- * Solr operations
     -- ** Schema
   , getSchema
@@ -72,6 +75,7 @@ module Riak
   , ConvergentMapValue(..)
   , ConvergentSet(..)
   , ConvergentSetUpdate(..)
+  , ErlangTerm(..)
   , ExactQuery(..)
   , DeleteOpts(..)
   , GetOpts(..)
@@ -79,6 +83,8 @@ module Riak
   , Index(..)
   , Key(..)
   , generatedKey
+  , MapReduceFunction(..)
+  , MapReducePhase(..)
   , NotfoundBehavior(..)
   , Object(..)
   , newObject
@@ -107,9 +113,11 @@ import Riak.ConvergentCounter
 import Riak.ConvergentHyperLogLog
 import Riak.ConvergentMap
 import Riak.ConvergentSet
+import Riak.ErlangTerm
 import Riak.ExactQuery            (ExactQuery(..))
 import Riak.Index
 import Riak.Key
+import Riak.MapReduce
 import Riak.Object
 import Riak.Opts
 import Riak.Quorum                (Quorum(..))

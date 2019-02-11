@@ -3,9 +3,10 @@ module Riak.Internal.Prelude
   ) where
 
 import ByteString             as X (ByteString)
+import Control.Applicative    as X ((<|>))
 import Control.Category       as X ((>>>))
 import Control.Exception      as X (Exception)
-import Control.Monad          as X (join)
+import Control.Monad          as X (join, void)
 import Control.Monad.IO.Class as X (MonadIO, liftIO)
 import Data.Bifunctor         as X (first)
 import Data.Coerce            as X (coerce)

@@ -57,6 +57,7 @@ description:
   MapReduce types and operations:
   .
   * "Riak.MapReduce"
+  * "Riak.ErlangTerm"
   .
   Cluster types and operations:
   .
@@ -71,6 +72,7 @@ description:
 
 library
   build-depends:
+    attoparsec,
     base ^>= 4.11.1 || ^>= 4.12.0,
     base64-bytestring ^>= 1.0.0,
     bytestring ^>= 0.10.8,
@@ -87,6 +89,7 @@ library
     text ^>= 1.2.3,
     time,
     unordered-containers ^>= 0.2.9,
+    vector,
 
   default-extensions:
     ConstraintKinds
@@ -136,6 +139,7 @@ library
     Riak.ConvergentHyperLogLog
     Riak.ConvergentMap
     Riak.ConvergentSet
+    Riak.ErlangTerm
     Riak.Error
     Riak.ExactQuery
     Riak.Index
@@ -169,9 +173,13 @@ library
     Riak.Internal.Bucket
     Riak.Internal.Context
     Riak.Internal.ConvergentSet
+    Riak.Internal.ErlangTerm
     Riak.Internal.Error
     Riak.Internal.ExactQuery
     Riak.Internal.Key
+    Riak.Internal.MapReduceFunction
+    Riak.Internal.MapReduceInput
+    Riak.Internal.MapReducePhase
     Riak.Internal.Object
     Riak.Internal.Panic
     Riak.Internal.Prelude
@@ -185,9 +193,10 @@ library
     Riak.Internal.Utils
 
   mixins:
-    bytestring (Data.ByteString as ByteString, Data.ByteString.Char8),
+    bytestring (Data.ByteString as ByteString, Data.ByteString.Builder, Data.ByteString.Char8, Data.ByteString.Lazy),
     text (Data.Text as Text, Data.Text.Encoding),
-    unordered-containers (Data.HashMap.Strict as HashMap, Data.HashSet as HashSet)
+    unordered-containers (Data.HashMap.Strict as HashMap, Data.HashSet as HashSet),
+    vector (Data.Vector as Vector)
 
 test-suite tests
   build-depends:

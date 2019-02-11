@@ -5,6 +5,7 @@ import Riak.Internal.Utils (int2bs)
 
 
 -- | A secondary index value.
+-- TODO change constructor names?
 data SecondaryIndexValue :: Type -> Type where
   Binary :: !ByteString -> SecondaryIndexValue ByteString
   Integer :: !Int64 -> SecondaryIndexValue Int64

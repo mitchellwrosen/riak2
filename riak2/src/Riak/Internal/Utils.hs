@@ -10,7 +10,7 @@ import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.ByteString.Lex.Integral as ByteString
 
 
--- | Pack a non-negative 'Int64' as an ASCII byte array.
+-- | Pack an 'Int64' as an ASCII byte array.
 int2bs :: Int64 -> ByteString
 int2bs n
   | n >= 0    = fromJust (ByteString.packDecimal n)
