@@ -6,16 +6,13 @@ module Libriak.Request
 import Libriak.Proto
 
 import Control.Monad.ST
-import Data.Bifunctor           (bimap)
-import Data.ByteString          (ByteString)
 import Data.ByteString.Internal (ByteString(..))
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Word                (Word8)
 import GHC.ForeignPtr           (ForeignPtr(..))
 
-import qualified Data.ByteString as ByteString
-import qualified Data.ProtoLens  as Proto
+import qualified Data.ProtoLens as Proto
 
 
 data Request
@@ -36,6 +33,7 @@ data Request
   | RequestPutIndex PutIndexRequest
   | RequestPutSchema PutSchemaRequest
   | RequestResetBucket ResetBucketRequest
+  | RequestSearch SearchRequest
   | RequestSecondaryIndex SecondaryIndexRequest
   | RequestSetBucket SetBucketRequest
   | RequestSetBucketType SetBucketTypeRequest
@@ -61,6 +59,7 @@ encodeRequest = \case
   RequestPutIndex       request -> go 56 request
   RequestPutSchema      request -> go 60 request
   RequestResetBucket    request -> go 29 request
+  RequestSearch         request -> go 27 request
   RequestSecondaryIndex request -> go 25 request
   RequestSetBucket      request -> go 21 request
   RequestSetBucketType  request -> go 32 request

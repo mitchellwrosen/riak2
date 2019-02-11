@@ -9,12 +9,12 @@ module Proto.Proto.Riak
        (BucketProperties(), BucketProperties'RpbReplMode(..),
         BucketProperties'RpbReplMode(), CommitHook(), Content(),
         CounterUpdate(), Crdt(), CrdtUpdate(), DeleteIndexRequest(),
-        DeleteRequest(), DeleteResponse(), ErrorResponse(), GSetUpdate(),
-        GetBucketRequest(), GetBucketResponse(), GetBucketTypeRequest(),
-        GetCrdtRequest(), GetCrdtResponse(), GetCrdtResponse'CrdtType(..),
-        GetCrdtResponse'CrdtType(), GetIndexRequest(), GetIndexResponse(),
-        GetRequest(), GetResponse(), GetSchemaRequest(),
-        GetSchemaResponse(), GetServerInfoRequest(),
+        DeleteRequest(), DeleteResponse(), Document(), ErrorResponse(),
+        GSetUpdate(), GetBucketRequest(), GetBucketResponse(),
+        GetBucketTypeRequest(), GetCrdtRequest(), GetCrdtResponse(),
+        GetCrdtResponse'CrdtType(..), GetCrdtResponse'CrdtType(),
+        GetIndexRequest(), GetIndexResponse(), GetRequest(), GetResponse(),
+        GetSchemaRequest(), GetSchemaResponse(), GetServerInfoRequest(),
         GetServerInfoResponse(), HllUpdate(), Index(), Link(),
         ListBucketsRequest(), ListBucketsResponse(), ListKeysRequest(),
         ListKeysResponse(), MapKey(), MapKey'MapKeyType(..),
@@ -24,7 +24,7 @@ module Proto.Proto.Riak
         ModuleFunction(), Pair(), PingRequest(), PingResponse(),
         PutIndexRequest(), PutRequest(), PutResponse(), PutSchemaRequest(),
         ResetBucketRequest(), ResetBucketResponse(), Schema(),
-        SecondaryIndexRequest(),
+        SearchRequest(), SearchResponse(), SecondaryIndexRequest(),
         SecondaryIndexRequest'SecondaryIndexQueryType(..),
         SecondaryIndexRequest'SecondaryIndexQueryType(),
         SecondaryIndexResponse(), SetBucketRequest(), SetBucketResponse(),
@@ -2346,6 +2346,48 @@ instance Control.DeepSeq.NFData DeleteResponse where
         rnf
           = \ x__ ->
               Control.DeepSeq.deepseq (_DeleteResponse'_unknownFields x__) (())
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.fields' @:: Lens' Document [Pair]@
+ -}
+data Document = Document{_Document'fields :: ![Pair],
+                         _Document'_unknownFields :: !Data.ProtoLens.FieldSet}
+                  deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show Document where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' Document "fields" ([Pair]) where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _Document'fields
+                 (\ x__ y__ -> x__{_Document'fields = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message Document where
+        messageName _ = Data.Text.pack "Document"
+        fieldsByTag
+          = let fields__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "fields"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor Pair)
+                      (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "fields")))
+                      :: Data.ProtoLens.FieldDescriptor Document
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, fields__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _Document'_unknownFields
+              (\ x__ y__ -> x__{_Document'_unknownFields = y__})
+        defMessage
+          = Document{_Document'fields = [], _Document'_unknownFields = ([])}
+instance Control.DeepSeq.NFData Document where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_Document'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_Document'fields x__) (()))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.errmsg' @:: Lens' ErrorResponse Data.ByteString.ByteString@
@@ -6459,6 +6501,416 @@ instance Control.DeepSeq.NFData Schema where
               Control.DeepSeq.deepseq (_Schema'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_Schema'name x__)
                    (Control.DeepSeq.deepseq (_Schema'content x__) (())))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.query' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.index' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.rows' @:: Lens' SearchRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'rows' @:: Lens' SearchRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.start' @:: Lens' SearchRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'start' @:: Lens' SearchRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.sort' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'sort' @:: Lens' SearchRequest (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.filter' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'filter' @:: Lens' SearchRequest (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.defaultField' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'defaultField' @:: Lens' SearchRequest (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.defaultOp' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'defaultOp' @:: Lens' SearchRequest (Prelude.Maybe Data.ByteString.ByteString)@
+    * 'Proto.Proto.Riak_Fields.fieldList' @:: Lens' SearchRequest [Data.ByteString.ByteString]@
+    * 'Proto.Proto.Riak_Fields.presort' @:: Lens' SearchRequest Data.ByteString.ByteString@
+    * 'Proto.Proto.Riak_Fields.maybe'presort' @:: Lens' SearchRequest (Prelude.Maybe Data.ByteString.ByteString)@
+ -}
+data SearchRequest = SearchRequest{_SearchRequest'query ::
+                                   !Data.ByteString.ByteString,
+                                   _SearchRequest'index :: !Data.ByteString.ByteString,
+                                   _SearchRequest'rows :: !(Prelude.Maybe Data.Word.Word32),
+                                   _SearchRequest'start :: !(Prelude.Maybe Data.Word.Word32),
+                                   _SearchRequest'sort ::
+                                   !(Prelude.Maybe Data.ByteString.ByteString),
+                                   _SearchRequest'filter ::
+                                   !(Prelude.Maybe Data.ByteString.ByteString),
+                                   _SearchRequest'defaultField ::
+                                   !(Prelude.Maybe Data.ByteString.ByteString),
+                                   _SearchRequest'defaultOp ::
+                                   !(Prelude.Maybe Data.ByteString.ByteString),
+                                   _SearchRequest'fieldList :: ![Data.ByteString.ByteString],
+                                   _SearchRequest'presort ::
+                                   !(Prelude.Maybe Data.ByteString.ByteString),
+                                   _SearchRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
+                       deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SearchRequest where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' SearchRequest "query"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'query
+                 (\ x__ y__ -> x__{_SearchRequest'query = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "index"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'index
+                 (\ x__ y__ -> x__{_SearchRequest'index = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "rows"
+           (Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'rows
+                 (\ x__ y__ -> x__{_SearchRequest'rows = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'rows"
+           (Prelude.Maybe Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'rows
+                 (\ x__ y__ -> x__{_SearchRequest'rows = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "start"
+           (Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'start
+                 (\ x__ y__ -> x__{_SearchRequest'start = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'start"
+           (Prelude.Maybe Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'start
+                 (\ x__ y__ -> x__{_SearchRequest'start = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "sort"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'sort
+                 (\ x__ y__ -> x__{_SearchRequest'sort = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'sort"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'sort
+                 (\ x__ y__ -> x__{_SearchRequest'sort = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "filter"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'filter
+                 (\ x__ y__ -> x__{_SearchRequest'filter = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'filter"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'filter
+                 (\ x__ y__ -> x__{_SearchRequest'filter = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "defaultField"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'defaultField
+                 (\ x__ y__ -> x__{_SearchRequest'defaultField = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'defaultField"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'defaultField
+                 (\ x__ y__ -> x__{_SearchRequest'defaultField = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "defaultOp"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'defaultOp
+                 (\ x__ y__ -> x__{_SearchRequest'defaultOp = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'defaultOp"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'defaultOp
+                 (\ x__ y__ -> x__{_SearchRequest'defaultOp = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "fieldList"
+           ([Data.ByteString.ByteString])
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'fieldList
+                 (\ x__ y__ -> x__{_SearchRequest'fieldList = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchRequest "presort"
+           (Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'presort
+                 (\ x__ y__ -> x__{_SearchRequest'presort = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchRequest "maybe'presort"
+           (Prelude.Maybe Data.ByteString.ByteString)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchRequest'presort
+                 (\ x__ y__ -> x__{_SearchRequest'presort = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message SearchRequest where
+        messageName _ = Data.Text.pack "SearchRequest"
+        fieldsByTag
+          = let query__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "query"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "query")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                index__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "index"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.PlainField Data.ProtoLens.Required
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "index")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                rows__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "rows"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'rows")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                start__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "start"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'start")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                sort__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "sort"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'sort")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                filter__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "filter"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'filter")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                defaultField__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "defaultField"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) ::
+                               (Lens.Labels.Proxy#) "maybe'defaultField")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                defaultOp__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "defaultOp"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'defaultOp")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                fieldList__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "fieldList"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "fieldList")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+                presort__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "presort"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.BytesField ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.ByteString.ByteString)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'presort")))
+                      :: Data.ProtoLens.FieldDescriptor SearchRequest
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, query__field_descriptor),
+                 (Data.ProtoLens.Tag 2, index__field_descriptor),
+                 (Data.ProtoLens.Tag 3, rows__field_descriptor),
+                 (Data.ProtoLens.Tag 4, start__field_descriptor),
+                 (Data.ProtoLens.Tag 5, sort__field_descriptor),
+                 (Data.ProtoLens.Tag 6, filter__field_descriptor),
+                 (Data.ProtoLens.Tag 7, defaultField__field_descriptor),
+                 (Data.ProtoLens.Tag 8, defaultOp__field_descriptor),
+                 (Data.ProtoLens.Tag 9, fieldList__field_descriptor),
+                 (Data.ProtoLens.Tag 10, presort__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _SearchRequest'_unknownFields
+              (\ x__ y__ -> x__{_SearchRequest'_unknownFields = y__})
+        defMessage
+          = SearchRequest{_SearchRequest'query = Data.ProtoLens.fieldDefault,
+                          _SearchRequest'index = Data.ProtoLens.fieldDefault,
+                          _SearchRequest'rows = Prelude.Nothing,
+                          _SearchRequest'start = Prelude.Nothing,
+                          _SearchRequest'sort = Prelude.Nothing,
+                          _SearchRequest'filter = Prelude.Nothing,
+                          _SearchRequest'defaultField = Prelude.Nothing,
+                          _SearchRequest'defaultOp = Prelude.Nothing,
+                          _SearchRequest'fieldList = [],
+                          _SearchRequest'presort = Prelude.Nothing,
+                          _SearchRequest'_unknownFields = ([])}
+instance Control.DeepSeq.NFData SearchRequest where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_SearchRequest'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_SearchRequest'query x__)
+                   (Control.DeepSeq.deepseq (_SearchRequest'index x__)
+                      (Control.DeepSeq.deepseq (_SearchRequest'rows x__)
+                         (Control.DeepSeq.deepseq (_SearchRequest'start x__)
+                            (Control.DeepSeq.deepseq (_SearchRequest'sort x__)
+                               (Control.DeepSeq.deepseq (_SearchRequest'filter x__)
+                                  (Control.DeepSeq.deepseq (_SearchRequest'defaultField x__)
+                                     (Control.DeepSeq.deepseq (_SearchRequest'defaultOp x__)
+                                        (Control.DeepSeq.deepseq (_SearchRequest'fieldList x__)
+                                           (Control.DeepSeq.deepseq (_SearchRequest'presort x__)
+                                              (())))))))))))
+{- | Fields :
+
+    * 'Proto.Proto.Riak_Fields.docs' @:: Lens' SearchResponse [Document]@
+    * 'Proto.Proto.Riak_Fields.maxScore' @:: Lens' SearchResponse Prelude.Float@
+    * 'Proto.Proto.Riak_Fields.maybe'maxScore' @:: Lens' SearchResponse (Prelude.Maybe Prelude.Float)@
+    * 'Proto.Proto.Riak_Fields.numFound' @:: Lens' SearchResponse Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'numFound' @:: Lens' SearchResponse (Prelude.Maybe Data.Word.Word32)@
+ -}
+data SearchResponse = SearchResponse{_SearchResponse'docs ::
+                                     ![Document],
+                                     _SearchResponse'maxScore :: !(Prelude.Maybe Prelude.Float),
+                                     _SearchResponse'numFound :: !(Prelude.Maybe Data.Word.Word32),
+                                     _SearchResponse'_unknownFields :: !Data.ProtoLens.FieldSet}
+                        deriving (Prelude.Eq, Prelude.Ord)
+instance Prelude.Show SearchResponse where
+        showsPrec _ __x __s
+          = Prelude.showChar '{'
+              (Prelude.showString (Data.ProtoLens.showMessageShort __x)
+                 (Prelude.showChar '}' __s))
+instance Lens.Labels.HasLens' SearchResponse "docs" ([Document])
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchResponse'docs
+                 (\ x__ y__ -> x__{_SearchResponse'docs = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchResponse "maxScore"
+           (Prelude.Float)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchResponse'maxScore
+                 (\ x__ y__ -> x__{_SearchResponse'maxScore = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchResponse "maybe'maxScore"
+           (Prelude.Maybe Prelude.Float)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchResponse'maxScore
+                 (\ x__ y__ -> x__{_SearchResponse'maxScore = y__}))
+              Prelude.id
+instance Lens.Labels.HasLens' SearchResponse "numFound"
+           (Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchResponse'numFound
+                 (\ x__ y__ -> x__{_SearchResponse'numFound = y__}))
+              (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
+instance Lens.Labels.HasLens' SearchResponse "maybe'numFound"
+           (Prelude.Maybe Data.Word.Word32)
+         where
+        lensOf' _
+          = (Prelude..)
+              (Lens.Family2.Unchecked.lens _SearchResponse'numFound
+                 (\ x__ y__ -> x__{_SearchResponse'numFound = y__}))
+              Prelude.id
+instance Data.ProtoLens.Message SearchResponse where
+        messageName _ = Data.Text.pack "SearchResponse"
+        fieldsByTag
+          = let docs__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "docs"
+                      (Data.ProtoLens.MessageField Data.ProtoLens.MessageType ::
+                         Data.ProtoLens.FieldTypeDescriptor Document)
+                      (Data.ProtoLens.RepeatedField Data.ProtoLens.Unpacked
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "docs")))
+                      :: Data.ProtoLens.FieldDescriptor SearchResponse
+                maxScore__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "max_score"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.FloatField ::
+                         Data.ProtoLens.FieldTypeDescriptor Prelude.Float)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'maxScore")))
+                      :: Data.ProtoLens.FieldDescriptor SearchResponse
+                numFound__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "num_found"
+                      (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
+                         Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
+                      (Data.ProtoLens.OptionalField
+                         (Lens.Labels.lensOf'
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'numFound")))
+                      :: Data.ProtoLens.FieldDescriptor SearchResponse
+              in
+              Data.Map.fromList
+                [(Data.ProtoLens.Tag 1, docs__field_descriptor),
+                 (Data.ProtoLens.Tag 2, maxScore__field_descriptor),
+                 (Data.ProtoLens.Tag 3, numFound__field_descriptor)]
+        unknownFields
+          = Lens.Family2.Unchecked.lens _SearchResponse'_unknownFields
+              (\ x__ y__ -> x__{_SearchResponse'_unknownFields = y__})
+        defMessage
+          = SearchResponse{_SearchResponse'docs = [],
+                           _SearchResponse'maxScore = Prelude.Nothing,
+                           _SearchResponse'numFound = Prelude.Nothing,
+                           _SearchResponse'_unknownFields = ([])}
+instance Control.DeepSeq.NFData SearchResponse where
+        rnf
+          = \ x__ ->
+              Control.DeepSeq.deepseq (_SearchResponse'_unknownFields x__)
+                (Control.DeepSeq.deepseq (_SearchResponse'docs x__)
+                   (Control.DeepSeq.deepseq (_SearchResponse'maxScore x__)
+                      (Control.DeepSeq.deepseq (_SearchResponse'numFound x__) (()))))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' SecondaryIndexRequest Data.ByteString.ByteString@

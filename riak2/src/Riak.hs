@@ -1,5 +1,3 @@
--- TODO export functions from Riak
-
 module Riak
   ( -- * Object operations
     -- ** Get object
@@ -46,11 +44,15 @@ module Riak
     -- * MapReduce operations
   , mapReduceBucket
   , mapReduceKeys
-    -- * Solr operations
-    -- ** Schema
+    -- * Search operations
+  , search
+  , bucketTypeField
+  , bucketField
+  , keyField
+    -- ** Search schema
   , getSchema
   , putSchema
-    -- ** Index
+    -- ** Search index
   , getIndex
   , getIndexes
   , putIndex
@@ -92,6 +94,8 @@ module Riak
   , Quorum(..)
   , RangeQuery(..)
   , Schema(..)
+  , Search(..)
+  , SearchOpts(..)
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
@@ -123,6 +127,7 @@ import Riak.Opts
 import Riak.Quorum                (Quorum(..))
 import Riak.RangeQuery            (RangeQuery(..))
 import Riak.Schema
+import Riak.Search
 import Riak.SecondaryIndex        (SecondaryIndex(..))
 import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo

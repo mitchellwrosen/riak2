@@ -49,8 +49,9 @@ description:
   * "Riak.ExactQuery"
   * "Riak.RangeQuery"
   .
-  Solr types and operations:
+  Search types and operations:
   .
+  * "Riak.Search"
   * "Riak.Schema"
   * "Riak.Index"
   .
@@ -150,6 +151,7 @@ library
     Riak.Quorum
     Riak.RangeQuery
     Riak.Schema
+    Riak.Search
     Riak.SecondaryIndex
     Riak.SecondaryIndexValue
     Riak.ServerInfo

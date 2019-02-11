@@ -8,13 +8,12 @@ import qualified Libriak.Proto.Lens as L
 import Control.Lens ((.~), (^.))
 
 
-fromTuple :: (ByteString, Maybe ByteString) -> Pair
+fromTuple :: (ByteString, ByteString) -> Pair
 fromTuple (key, value) =
   defMessage
     & L.key .~ key
-    & L.maybe'value .~ value
+    & L.value .~ value
 
-toTuple :: Pair -> (ByteString, Maybe ByteString)
+toTuple :: Pair -> (ByteString, ByteString)
 toTuple pair =
-  (pair ^. L.key, pair ^. L.maybe'value)
-
+  (pair ^. L.key, pair ^. L.value)

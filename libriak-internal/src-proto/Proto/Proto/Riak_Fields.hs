@@ -183,6 +183,20 @@ datatype ::
 datatype
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "datatype")
+defaultField ::
+             forall f s a .
+               (Prelude.Functor f, Lens.Labels.HasLens' s "defaultField" a) =>
+               Lens.Family2.LensLike' f s a
+defaultField
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "defaultField")
+defaultOp ::
+          forall f s a .
+            (Prelude.Functor f, Lens.Labels.HasLens' s "defaultOp" a) =>
+            Lens.Family2.LensLike' f s a
+defaultOp
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "defaultOp")
 deleted ::
         forall f s a .
           (Prelude.Functor f, Lens.Labels.HasLens' s "deleted" a) =>
@@ -197,6 +211,13 @@ deletedContext ::
 deletedContext
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "deletedContext")
+docs ::
+     forall f s a .
+       (Prelude.Functor f, Lens.Labels.HasLens' s "docs" a) =>
+       Lens.Family2.LensLike' f s a
+docs
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "docs")
 done ::
      forall f s a .
        (Prelude.Functor f, Lens.Labels.HasLens' s "done" a) =>
@@ -225,6 +246,27 @@ field ::
 field
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "field")
+fieldList ::
+          forall f s a .
+            (Prelude.Functor f, Lens.Labels.HasLens' s "fieldList" a) =>
+            Lens.Family2.LensLike' f s a
+fieldList
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "fieldList")
+fields ::
+       forall f s a .
+         (Prelude.Functor f, Lens.Labels.HasLens' s "fields" a) =>
+         Lens.Family2.LensLike' f s a
+fields
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "fields")
+filter ::
+       forall f s a .
+         (Prelude.Functor f, Lens.Labels.HasLens' s "filter" a) =>
+         Lens.Family2.LensLike' f s a
+filter
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "filter")
 flag ::
      forall f s a .
        (Prelude.Functor f, Lens.Labels.HasLens' s "flag" a) =>
@@ -421,6 +463,13 @@ maxResults ::
 maxResults
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maxResults")
+maxScore ::
+         forall f s a .
+           (Prelude.Functor f, Lens.Labels.HasLens' s "maxScore" a) =>
+           Lens.Family2.LensLike' f s a
+maxScore
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maxScore")
 maybe'allowMult ::
                 forall f s a .
                   (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'allowMult" a) =>
@@ -563,6 +612,21 @@ maybe'datatype ::
 maybe'datatype
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'datatype")
+maybe'defaultField ::
+                   forall f s a .
+                     (Prelude.Functor f,
+                      Lens.Labels.HasLens' s "maybe'defaultField" a) =>
+                     Lens.Family2.LensLike' f s a
+maybe'defaultField
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'defaultField")
+maybe'defaultOp ::
+                forall f s a .
+                  (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'defaultOp" a) =>
+                  Lens.Family2.LensLike' f s a
+maybe'defaultOp
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'defaultOp")
 maybe'deleted ::
               forall f s a .
                 (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'deleted" a) =>
@@ -593,6 +657,13 @@ maybe'dw ::
 maybe'dw
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'dw")
+maybe'filter ::
+             forall f s a .
+               (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'filter" a) =>
+               Lens.Family2.LensLike' f s a
+maybe'filter
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'filter")
 maybe'flag ::
            forall f s a .
              (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'flag" a) =>
@@ -752,6 +823,13 @@ maybe'maxResults ::
 maybe'maxResults
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'maxResults")
+maybe'maxScore ::
+               forall f s a .
+                 (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'maxScore" a) =>
+                 Lens.Family2.LensLike' f s a
+maybe'maxScore
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'maxScore")
 maybe'modfun ::
              forall f s a .
                (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'modfun" a) =>
@@ -787,6 +865,13 @@ maybe'notfoundOk ::
 maybe'notfoundOk
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'notfoundOk")
+maybe'numFound ::
+               forall f s a .
+                 (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'numFound" a) =>
+                 Lens.Family2.LensLike' f s a
+maybe'numFound
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'numFound")
 maybe'oldVclock ::
                 forall f s a .
                   (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'oldVclock" a) =>
@@ -817,6 +902,13 @@ maybe'pr ::
 maybe'pr
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'pr")
+maybe'presort ::
+              forall f s a .
+                (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'presort" a) =>
+                Lens.Family2.LensLike' f s a
+maybe'presort
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'presort")
 maybe'pw ::
          forall f s a .
            (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'pw" a) =>
@@ -897,6 +989,13 @@ maybe'returnTerms ::
 maybe'returnTerms
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'returnTerms")
+maybe'rows ::
+           forall f s a .
+             (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'rows" a) =>
+             Lens.Family2.LensLike' f s a
+maybe'rows
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'rows")
 maybe'rw ::
          forall f s a .
            (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'rw" a) =>
@@ -949,6 +1048,20 @@ maybe'smallVclock ::
 maybe'smallVclock
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'smallVclock")
+maybe'sort ::
+           forall f s a .
+             (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'sort" a) =>
+             Lens.Family2.LensLike' f s a
+maybe'sort
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'sort")
+maybe'start ::
+            forall f s a .
+              (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'start" a) =>
+              Lens.Family2.LensLike' f s a
+maybe'start
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'start")
 maybe'stream ::
              forall f s a .
                (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'stream" a) =>
@@ -1074,6 +1187,13 @@ notfoundOk ::
 notfoundOk
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "notfoundOk")
+numFound ::
+         forall f s a .
+           (Prelude.Functor f, Lens.Labels.HasLens' s "numFound" a) =>
+           Lens.Family2.LensLike' f s a
+numFound
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "numFound")
 oldVclock ::
           forall f s a .
             (Prelude.Functor f, Lens.Labels.HasLens' s "oldVclock" a) =>
@@ -1116,6 +1236,13 @@ precommit ::
 precommit
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "precommit")
+presort ::
+        forall f s a .
+          (Prelude.Functor f, Lens.Labels.HasLens' s "presort" a) =>
+          Lens.Family2.LensLike' f s a
+presort
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "presort")
 props ::
       forall f s a .
         (Prelude.Functor f, Lens.Labels.HasLens' s "props" a) =>
@@ -1130,6 +1257,13 @@ pw ::
 pw
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "pw")
+query ::
+      forall f s a .
+        (Prelude.Functor f, Lens.Labels.HasLens' s "query" a) =>
+        Lens.Family2.LensLike' f s a
+query
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "query")
 r ::
   forall f s a . (Prelude.Functor f, Lens.Labels.HasLens' s "r" a) =>
     Lens.Family2.LensLike' f s a
@@ -1219,6 +1353,13 @@ returnTerms ::
 returnTerms
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "returnTerms")
+rows ::
+     forall f s a .
+       (Prelude.Functor f, Lens.Labels.HasLens' s "rows" a) =>
+       Lens.Family2.LensLike' f s a
+rows
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "rows")
 rw ::
    forall f s a .
      (Prelude.Functor f, Lens.Labels.HasLens' s "rw" a) =>
@@ -1275,6 +1416,20 @@ smallVclock ::
 smallVclock
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "smallVclock")
+sort ::
+     forall f s a .
+       (Prelude.Functor f, Lens.Labels.HasLens' s "sort" a) =>
+       Lens.Family2.LensLike' f s a
+sort
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "sort")
+start ::
+      forall f s a .
+        (Prelude.Functor f, Lens.Labels.HasLens' s "start" a) =>
+        Lens.Family2.LensLike' f s a
+start
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "start")
 stream ::
        forall f s a .
          (Prelude.Functor f, Lens.Labels.HasLens' s "stream" a) =>

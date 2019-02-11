@@ -491,28 +491,28 @@ message Link {
 /*     required bytes cover_context = 4; // Opaque context to pass into 2I query. */
 /* } */
 
-/* message RpbSearchDoc { */
-/*   repeated Pair fields = 1; */
-/* } */
+message Document {
+    repeated Pair fields = 1;
+}
 
-/* message RpbSearchQueryReq { */
-/*   required bytes  q      =  1;  // Query string */
-/*   required bytes  index  =  2;  // Index */
-/*   optional uint32 rows   =  3;  // Limit rows */
-/*   optional uint32 start  =  4;  // Starting offset */
-/*   optional bytes  sort   =  5;  // Sort order */
-/*   optional bytes  filter =  6;  // Inline fields filtering query */
-/*   optional bytes  df     =  7;  // Default field */
-/*   optional bytes  op     =  8;  // Default op */
-/*   repeated bytes  fl     =  9;  // Return fields limit (for ids only, generally) */
-/*   optional bytes  presort = 10; // Presort (key / score) */
-/* } */
+message SearchRequest {
+    required bytes  query        = 1;  // Query string
+    required bytes  index        = 2;  // Index
+    optional uint32 rows         = 3;  // Limit rows
+    optional uint32 start        = 4;  // Starting offset
+    optional bytes  sort         = 5;  // Sort order
+    optional bytes  filter       = 6;  // Inline fields filtering query
+    optional bytes  defaultField = 7;  // Default field
+    optional bytes  defaultOp    = 8;  // Default op
+    repeated bytes  fieldList    = 9;  // Return fields limit (for ids only, generally)
+    optional bytes  presort      = 10; // Presort (key / score)
+}
 
-/* message RpbSearchQueryResp { */
-/*   repeated RpbSearchDoc docs      = 1; // Result documents */
-/*   optional float        max_score = 2; // Maximum score */
-/*   optional uint32       num_found = 3; // Number of results */
-/* } */
+message SearchResponse {
+    repeated Document docs      = 1; // Result documents
+    optional float    max_score = 2; // Maximum score
+    optional uint32   num_found = 3; // Number of results
+}
 
 message Index {
     required bytes name = 1; // Index name

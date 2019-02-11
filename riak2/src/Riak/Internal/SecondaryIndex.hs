@@ -52,10 +52,10 @@ integer index value =
 fromPair :: Pair -> SecondaryIndex
 fromPair =
   Pair.toTuple >>> \case
-    (ByteString.stripSuffix "_bin" -> Just k, Just v) ->
+    (ByteString.stripSuffix "_bin" -> Just k, v) ->
       SecondaryIndex k (SecondaryIndexValue.Binary v)
 
-    (ByteString.stripSuffix "_int" -> Just k, Just v) ->
+    (ByteString.stripSuffix "_int" -> Just k, v) ->
       SecondaryIndex k (SecondaryIndexValue.Integer (bs2int v))
 
     (k, v) ->
@@ -67,7 +67,7 @@ fromPair =
 toPair :: SecondaryIndex -> Pair
 toPair = \case
   SecondaryIndex k (SecondaryIndexValue.Binary v) ->
-    Pair.fromTuple (k <> "_bin", Just v)
+    Pair.fromTuple (k <> "_bin", v)
 
   SecondaryIndex k (SecondaryIndexValue.Integer v) ->
-    Pair.fromTuple (k <> "_int", Just (int2bs v))
+    Pair.fromTuple (k <> "_int", int2bs v)

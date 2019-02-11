@@ -15,7 +15,6 @@ import Data.Primitive.ByteArray
 import Data.Word                (Word8)
 import GHC.Ptr                  (Ptr(..))
 
-import qualified Data.ByteString          as ByteString
 import qualified Data.ByteString.Internal as ByteString
 import qualified Data.ProtoLens           as Proto
 
@@ -35,6 +34,7 @@ data Response
   | ResponsePing PingResponse
   | ResponsePut PutResponse
   | ResponseResetBucket ResetBucketResponse
+  | ResponseSearch SearchResponse
   | ResponseSecondaryIndex SecondaryIndexResponse
   | ResponseSetBucket SetBucketResponse
   | ResponseUpdateCrdt UpdateCrdtResponse
@@ -73,7 +73,7 @@ decode code bytes =
     22   -> Right (ResponseSetBucket Proto.defMessage)
     24   -> decode' ResponseMapReduce
     26   -> decode' ResponseSecondaryIndex
-    -- 28   -> decode' ResponseSearch
+    28   -> decode' ResponseSearch
     30   -> Right (ResponseResetBucket Proto.defMessage)
     55   -> decode' ResponseGetIndex
     59   -> decode' ResponseGetSchema

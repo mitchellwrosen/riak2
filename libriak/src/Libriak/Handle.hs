@@ -19,6 +19,7 @@ module Libriak.Handle
   , putIndex
   , putSchema
   , resetBucket
+  , search
   , secondaryIndex
   , setBucket
   , setBucketType
@@ -314,6 +315,18 @@ setBucketType handle request =
     (RequestSetBucketType request)
     (\case
       ResponseSetBucket{} -> Just ()
+      _ -> Nothing)
+
+search ::
+     Handle
+  -> Proto.SearchRequest
+  -> IO (Either Error Proto.SearchResponse)
+search handle request =
+  exchange
+    handle
+    (RequestSearch request)
+    (\case
+      ResponseSearch response -> Just response
       _ -> Nothing)
 
 secondaryIndex ::

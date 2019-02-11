@@ -24,6 +24,6 @@ lastModified content =
     microseconds =
       realToFrac (content ^. L.lastModUsecs) / 1000000
 
-metadata :: Proto.Content -> [(ByteString, Maybe ByteString)]
+metadata :: Proto.Content -> [(ByteString, ByteString)]
 metadata content =
   map Pair.toTuple (content ^. L.usermeta)

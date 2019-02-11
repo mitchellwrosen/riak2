@@ -17,7 +17,7 @@ data Content a
   , encoding :: !(Maybe ByteString) -- ^ Content encoding
   , indexes :: ![SecondaryIndex] -- ^ Secondary indexes
   , lastModified :: !UTCTime -- ^ Last modified.
-  , metadata :: ![(ByteString, Maybe ByteString)] -- ^ User metadata
+  , metadata :: ![(ByteString, ByteString)] -- ^ User metadata
   , type' :: !(Maybe ByteString) -- ^ Content type
   , ttl :: !(Maybe Word32) -- ^ Time to live. Unused on write. TODO NominalDiffTime
   , value :: !a -- ^ Value

@@ -1,3 +1,5 @@
+-- TODO move opts out of this module and delete it
+
 module Riak.Opts
   ( DeleteOpts(..)
   , GetOpts(..)
