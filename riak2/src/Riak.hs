@@ -26,14 +26,14 @@ module Riak
     -- * Bucket type operations
     -- ** Bucket type properties
   , getBucketType
-  , setBucketType
+  -- , setBucketType
     -- ** Full bucket traversals
   , listBuckets
   , streamBuckets
     -- * Bucket operations
     -- ** Bucket properties
   , getBucket
-  , setBucket
+  -- , setBucket
   , resetBucket
     -- ** Secondary index search
   , queryExact

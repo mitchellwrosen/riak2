@@ -3,7 +3,7 @@ module Riak.Bucket
     Bucket(..)
     -- ** Properties
   , getBucket
-  , setBucket
+  -- , setBucket
   , resetBucket
     -- ** Search
   , queryExact

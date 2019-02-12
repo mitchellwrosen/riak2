@@ -171,6 +171,7 @@ library
 
   other-modules:
     Riak.Internal.Bucket
+    Riak.Internal.BucketProperties
     Riak.Internal.Context
     Riak.Internal.ConvergentSet
     Riak.Internal.ErlangTerm

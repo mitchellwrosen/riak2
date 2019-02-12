@@ -102,6 +102,7 @@ commandParser =
   hsubparser
     (mconcat
       [ command "get" (info getParser (progDesc "Get an object"))
+      , command "get-bucket-type" (info getBucketTypeParser (progDesc "Get a bucket type"))
       , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
       , command "delete" (info deleteParser (progDesc "Delete an object"))
@@ -178,6 +179,24 @@ getParser =
             , r = r
             , timeout = Nothing
             }
+
+getBucketTypeParser :: Parser (Handle -> IO ())
+getBucketTypeParser =
+  doGetBucketType
+    <$> bucketTypeArgument
+  where
+    doGetBucketType ::
+         BucketType
+      -> Handle
+      -> IO ()
+    doGetBucketType bucketType handle =
+      getBucketType handle bucketType >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right props ->
+          print props
 
 getCounterParser :: Parser (Handle -> IO ())
 getCounterParser =
@@ -418,11 +437,16 @@ updateMapParser =
 -- Arguments/options
 --------------------------------------------------------------------------------
 
+bucketTypeArgument :: Parser BucketType
+bucketTypeArgument =
+  BucketType . encodeUtf8 <$>
+    strArgument (help "Bucket type" <> metavar "TYPE")
+
 bucketOrKeyArgument :: Parser (Either Bucket Key)
 bucketOrKeyArgument =
   argument
     (Right <$> eitherReader parseKey <|> Left <$> eitherReader parseBucket)
-    (help "Bucket (type/bucket) or key (type/bucket/key)" <> metavar "BUCKET/KEY")
+    (help "Bucket or key" <> metavar "TYPE/BUCKET(/KEY)")
 
 contextOption :: Parser (Maybe Context)
 contextOption =

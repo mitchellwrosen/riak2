@@ -99,8 +99,8 @@ get handle request =
       _ -> Nothing)
 
 getBucket ::
-     Handle
-  -> Proto.GetBucketRequest
+     Handle -- ^
+  -> Proto.GetBucketRequest -- ^
   -> IO (Either Error Proto.BucketProperties)
 getBucket handle request =
   exchange
@@ -111,8 +111,8 @@ getBucket handle request =
       _ -> Nothing)
 
 getBucketType ::
-     Handle
-  -> ByteString
+     Handle -- ^
+  -> ByteString -- ^ Bucket type
   -> IO (Either Error Proto.BucketProperties)
 getBucketType handle bucketType =
   exchange

@@ -1,18 +1,22 @@
 module Riak.BucketType
   ( BucketType(..)
+    -- ** Bucket type properties
   , getBucketType
-  , setBucketType
+  -- , setBucketType
+    -- ** Full traversals
   , listBuckets
   , streamBuckets
   ) where
 
-import Libriak.Handle        (Handle)
-import Riak.Bucket           (Bucket(..))
+import Libriak.Handle                 (Handle)
+import Riak.Bucket                    (Bucket(..))
+import Riak.Internal.BucketProperties (BucketProperties)
 import Riak.Internal.Prelude
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Handle                 as Handle
+import qualified Libriak.Proto                  as Proto
+import qualified Libriak.Proto.Lens             as L
+import qualified Riak.Internal.BucketProperties as BucketProperties
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~))
@@ -30,19 +34,21 @@ newtype BucketType
   deriving stock (Eq, Show)
   deriving newtype (Hashable)
 
-instance Default BucketType where
-  def :: BucketType
-  def =
-    BucketType "default"
-
 -- | Get bucket type properties.
 getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either Handle.Error Proto.BucketProperties)
-getBucketType handle (BucketType bucketType) =
-  liftIO (Handle.getBucketType handle bucketType)
+  -> m (Either Handle.Error BucketProperties)
+getBucketType handle (BucketType bucketType) = liftIO $
+  (fmap.fmap)
+    fromResponse
+    (Handle.getBucketType handle bucketType)
+
+  where
+    fromResponse :: Proto.BucketProperties -> BucketProperties
+    fromResponse =
+      BucketProperties.fromProto
 
 -- | Set bucket type properties.
 --
