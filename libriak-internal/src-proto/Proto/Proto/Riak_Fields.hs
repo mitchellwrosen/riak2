@@ -837,13 +837,6 @@ maybe'modfun ::
 maybe'modfun
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'modfun")
-maybe'n ::
-        forall f s a .
-          (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'n" a) =>
-          Lens.Family2.LensLike' f s a
-maybe'n
-  = Lens.Labels.lensOf'
-      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'n")
 maybe'name ::
            forall f s a .
              (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'name" a) =>
@@ -960,6 +953,13 @@ maybe'repl ::
 maybe'repl
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'repl")
+maybe'replicas ::
+               forall f s a .
+                 (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'replicas" a) =>
+                 Lens.Family2.LensLike' f s a
+maybe'replicas
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")
 maybe'response ::
                forall f s a .
                  (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'response" a) =>
@@ -1161,11 +1161,6 @@ module' ::
 module'
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "module'")
-n ::
-  forall f s a . (Prelude.Functor f, Lens.Labels.HasLens' s "n" a) =>
-    Lens.Family2.LensLike' f s a
-n = Lens.Labels.lensOf'
-      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "n")
 name ::
      forall f s a .
        (Prelude.Functor f, Lens.Labels.HasLens' s "name" a) =>
@@ -1311,6 +1306,13 @@ repl ::
 repl
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "repl")
+replicas ::
+         forall f s a .
+           (Prelude.Functor f, Lens.Labels.HasLens' s "replicas" a) =>
+           Lens.Family2.LensLike' f s a
+replicas
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "replicas")
 request ::
         forall f s a .
           (Prelude.Functor f, Lens.Labels.HasLens' s "request" a) =>

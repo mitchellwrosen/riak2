@@ -35,13 +35,13 @@ data ObjectBucketProperties
   = ObjectBucketProperties
   { conflictResolution :: !ConflictResolution
   , dw :: !Quorum
-  , n :: !Quorum
   , notfoundBehavior :: !NotfoundBehavior
   , postcommitHooks :: ![Proto.CommitHook]
   , pr :: !Quorum
   , precommitHooks :: ![Proto.CommitHook]
   , pw :: !Quorum
   , r :: !Quorum
+  , replicas :: !Quorum
   , index :: !(Maybe Text) -- ^ Search index
   , w :: !Quorum
   } deriving stock (Generic, Show)
@@ -79,7 +79,6 @@ fromProto props =
               (False, False) -> UseTimestamps
               (False, True)  -> LastWriteWins
         , dw = Quorum.fromWord32 (props ^. L.dw)
-        , n = Quorum.fromWord32 (props ^. L.n)
         , notfoundBehavior =
             case (fromMaybe True (props ^. L.maybe'notfoundOk), props ^. L.basicQuorum) of
               (True, _)      -> NotfoundCounts
@@ -90,6 +89,7 @@ fromProto props =
         , precommitHooks = props ^. L.precommit
         , pw = Quorum.fromWord32 (props ^. L.pw)
         , r = Quorum.fromWord32 (props ^. L.r)
+        , replicas = Quorum.fromWord32 (props ^. L.replicas)
         , index = decodeUtf8 <$> (props ^. L.maybe'searchIndex)
         , w = Quorum.fromWord32 (props ^. L.w)
         }

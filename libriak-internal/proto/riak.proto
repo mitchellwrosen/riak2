@@ -56,7 +56,7 @@ message CommitHook {
 
 message BucketProperties {
     // Declared in riak_core_app
-    optional uint32 n = 1;
+    optional uint32 replicas = 1;
     optional bool allow_mult = 2;
     optional bool last_write_wins = 3;
     repeated CommitHook precommit = 4;
@@ -157,7 +157,7 @@ message GetCrdtRequest {
     optional bool   notfound_ok   =  7;
     optional uint32 timeout       =  8;
     optional bool   sloppy_quorum =  9;  // Experimental, may change/disappear
-    optional uint32 n             = 10;  // Experimental, may change/disappear
+    optional uint32 replicas      = 10;  // Experimental, may change/disappear
 
     // For read-only requests or context-free operations, you can set
     // this to false to reduce the size of the response payload.
@@ -256,7 +256,7 @@ message UpdateCrdtRequest {
     optional bool   return_body     =  9 [default=false];
     optional uint32 timeout         = 10;
     optional bool   sloppy_quorum   = 11;  // Experimental, may change/disappear
-    optional uint32 n               = 12;  // Experimental, may change/disappear
+    optional uint32 replicas        = 12;  // Experimental, may change/disappear
     optional bool   include_context = 13 [default=true]; // When return_body is true, should the context be returned too?
 }
 
@@ -287,7 +287,7 @@ message GetRequest {
     optional bool deleted_context = 9;    // return the tombstone's vclock, if applicable
     optional uint32 timeout       = 10;
     optional bool sloppy_quorum   = 11;   // Experimental, may change/disappear
-    optional uint32 n             = 12;   // Experimental, may change/disappear
+    optional uint32 replicas      = 12;   // Experimental, may change/disappear
     optional bytes bucket_type    = 13;
 }
 
@@ -315,7 +315,7 @@ message PutRequest {
     optional uint32 timeout       = 12;
     optional bool asis            = 13;
     optional bool sloppy_quorum   = 14; // Experimental, may change/disappear
-    optional uint32 n             = 15; // Experimental, may change/disappear
+    optional uint32 replicas      = 15; // Experimental, may change/disappear
     optional bytes bucket_type    = 16;
 }
 
@@ -339,7 +339,7 @@ message DeleteRequest {
     optional uint32 dw          = 9;
     optional uint32 timeout     = 10;
     optional bool sloppy_quorum = 11; // Experimental, may change/disappear
-    optional uint32 n           = 12; // Experimental, may change/disappear
+    optional uint32 replicas    = 12; // Experimental, may change/disappear
     optional bytes bucket_type  = 13;
 }
 
@@ -517,7 +517,7 @@ message SearchResponse {
 message Index {
     required bytes name = 1; // Index name
     optional bytes schema = 2; // Schema name
-    optional uint32 n = 3; // N value
+    optional uint32 replicas = 3; // N value
 }
 
 // GET request - If a name is given, return matching index, else return all

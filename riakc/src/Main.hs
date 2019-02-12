@@ -101,11 +101,11 @@ commandParser :: Parser (Handle -> IO ())
 commandParser =
   hsubparser
     (mconcat
-      [ command "get" (info getParser (progDesc "Get an object"))
+      [ command "delete" (info deleteParser (progDesc "Delete an object"))
+      , command "get" (info getParser (progDesc "Get an object"))
       , command "get-bucket-type" (info getBucketTypeParser (progDesc "Get a bucket type"))
       , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
-      , command "delete" (info deleteParser (progDesc "Delete an object"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
@@ -148,7 +148,7 @@ getParser :: Parser (Handle -> IO ())
 getParser =
   doGet
     <$> keyArgument
-    <*> nOption
+    <*> replicasOption
     <*> rOption
     <*> prOption
   where
@@ -159,7 +159,7 @@ getParser =
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doGet key n r pr handle =
+    doGet key replicas r pr handle =
       Object.get handle key opts >>= \case
         Left err -> do
           print err
@@ -173,10 +173,10 @@ getParser =
         opts =
           GetOpts
             { basicQuorum = False
-            , n = n
             , notfoundOk = Nothing
             , pr = pr
             , r = r
+            , replicas = replicas
             , timeout = Nothing
             }
 
@@ -263,7 +263,7 @@ putParser =
     <*> strArgument (help "Value" <> metavar "VALUE")
     <*> contentTypeOption
     <*> contextOption
-    <*> nOption
+    <*> replicasOption
     <*> wOption
     <*> dwOption
     <*> pwOption
@@ -285,7 +285,7 @@ putParser =
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doPut bucketOrKey val type' context n w dw pw handle =
+    doPut bucketOrKey val type' context replicas w dw pw handle =
       Object.put handle object opts >>= \case
         Left err -> do
           print err
@@ -317,7 +317,7 @@ putParser =
           PutOpts
             { dw = dw
             , pw = pw
-            , n = n
+            , replicas = replicas
             , timeout = Nothing
             , w = w
             }
@@ -608,12 +608,12 @@ mapUpdateOptions =
           p:ps ->
             UpdateMap (Latin1.pack p) [loop ps]
 
-nOption :: Parser (Maybe Quorum)
-nOption =
+replicasOption :: Parser (Maybe Quorum)
+replicasOption =
   optional
     (option
       (eitherReader parseQuorum)
-        (help "N value" <> long "n" <> metavar "QUORUM"))
+        (help "Number of replicas" <> long "replicas" <> metavar "QUORUM"))
 
 prOption :: Parser (Maybe Quorum)
 prOption =

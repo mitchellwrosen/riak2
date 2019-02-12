@@ -23,9 +23,9 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 -- /Note/. The index name may only contain ASCII values from @32-127@.
 data Index
   = Index
-  { name :: Text
-  , schema :: Text
-  , n :: Maybe Word32 -- TODO does riak always return this?
+  { name :: !Text
+  , replicas :: Maybe Word32 -- TODO does riak always return this?
+  , schema :: !Text
   }
 
 -- | Get a Solr index.
@@ -52,8 +52,8 @@ getIndex handle name = liftIO $
       Right (head -> index) ->
         Right $ Just $ Index
           { name = name
+          , replicas = index ^. L.maybe'replicas
           , schema = decodeUtf8 (index ^. L.schema)
-          , n = index ^. L.maybe'n
           }
 
 -- | Get all Solr indexes.
@@ -108,13 +108,13 @@ fromProto :: Proto.Index -> Index
 fromProto index =
   Index
     { name = decodeUtf8 (index ^. L.name)
+    , replicas = index ^. L.maybe'replicas
     , schema = decodeUtf8 (index ^. L.schema)
-    , n = index ^. L.maybe'n
     }
 
 toProto :: Index -> Proto.Index
-toProto Index { name, schema, n } =
+toProto Index { name, schema, replicas } =
   Proto.defMessage
     & L.name .~ encodeUtf8 name
+    & L.maybe'replicas .~ replicas
     & L.schema .~ encodeUtf8 schema
-    & L.maybe'n .~ n
