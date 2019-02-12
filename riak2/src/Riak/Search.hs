@@ -12,7 +12,7 @@
 --     For example, to search for counters in bucket @"foo"@ with values greater
 --     than 100:
 --
---     > _yz_rb:foo && counter:{100 TO *]
+--     > _yz_rb:foo AND counter:{100 TO *]
 --
 -- * Sets
 --

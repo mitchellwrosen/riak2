@@ -68,7 +68,6 @@ description:
   .
   * "Riak.Context"
   * "Riak.Error"
-  * "Riak.Opts"
   * "Riak.Quorum"
 
 library
@@ -147,7 +146,6 @@ library
     Riak.Key
     Riak.MapReduce
     Riak.Object
-    Riak.Opts
     Riak.Quorum
     Riak.RangeQuery
     Riak.Schema

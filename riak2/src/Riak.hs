@@ -120,7 +120,6 @@ import Riak.Index
 import Riak.Key
 import Riak.MapReduce
 import Riak.Object
-import Riak.Opts
 import Riak.Quorum                (Quorum(..))
 import Riak.RangeQuery            (RangeQuery(..))
 import Riak.Schema
