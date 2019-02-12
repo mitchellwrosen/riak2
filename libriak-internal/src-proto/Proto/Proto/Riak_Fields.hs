@@ -851,6 +851,13 @@ maybe'node ::
 maybe'node
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'node")
+maybe'nodes ::
+            forall f s a .
+              (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'nodes" a) =>
+              Lens.Family2.LensLike' f s a
+maybe'nodes
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")
 maybe'notfoundOk ::
                  forall f s a .
                    (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'notfoundOk" a) =>
@@ -953,13 +960,6 @@ maybe'repl ::
 maybe'repl
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'repl")
-maybe'replicas ::
-               forall f s a .
-                 (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'replicas" a) =>
-                 Lens.Family2.LensLike' f s a
-maybe'replicas
-  = Lens.Labels.lensOf'
-      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")
 maybe'response ::
                forall f s a .
                  (Prelude.Functor f, Lens.Labels.HasLens' s "maybe'response" a) =>
@@ -1175,6 +1175,13 @@ node ::
 node
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "node")
+nodes ::
+      forall f s a .
+        (Prelude.Functor f, Lens.Labels.HasLens' s "nodes" a) =>
+        Lens.Family2.LensLike' f s a
+nodes
+  = Lens.Labels.lensOf'
+      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "nodes")
 notfoundOk ::
            forall f s a .
              (Prelude.Functor f, Lens.Labels.HasLens' s "notfoundOk" a) =>
@@ -1306,13 +1313,6 @@ repl ::
 repl
   = Lens.Labels.lensOf'
       ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "repl")
-replicas ::
-         forall f s a .
-           (Prelude.Functor f, Lens.Labels.HasLens' s "replicas" a) =>
-           Lens.Family2.LensLike' f s a
-replicas
-  = Lens.Labels.lensOf'
-      ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "replicas")
 request ::
         forall f s a .
           (Prelude.Functor f, Lens.Labels.HasLens' s "request" a) =>

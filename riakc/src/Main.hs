@@ -148,7 +148,7 @@ getParser :: Parser (Handle -> IO ())
 getParser =
   doGet
     <$> keyArgument
-    <*> replicasOption
+    <*> nodesOption
     <*> rOption
     <*> prOption
   where
@@ -159,7 +159,7 @@ getParser =
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doGet key replicas r pr handle =
+    doGet key nodes r pr handle =
       Object.get handle key opts >>= \case
         Left err -> do
           print err
@@ -173,10 +173,10 @@ getParser =
         opts =
           GetOpts
             { basicQuorum = False
+            , nodes = nodes
             , notfoundOk = Nothing
             , pr = pr
             , r = r
-            , replicas = replicas
             , timeout = Nothing
             }
 
@@ -263,7 +263,7 @@ putParser =
     <*> strArgument (help "Value" <> metavar "VALUE")
     <*> contentTypeOption
     <*> contextOption
-    <*> replicasOption
+    <*> nodesOption
     <*> wOption
     <*> dwOption
     <*> pwOption
@@ -285,7 +285,7 @@ putParser =
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doPut bucketOrKey val type' context replicas w dw pw handle =
+    doPut bucketOrKey val type' context nodes w dw pw handle =
       Object.put handle object opts >>= \case
         Left err -> do
           print err
@@ -316,8 +316,8 @@ putParser =
         opts =
           PutOpts
             { dw = dw
+            , nodes = nodes
             , pw = pw
-            , replicas = replicas
             , timeout = Nothing
             , w = w
             }
@@ -608,12 +608,12 @@ mapUpdateOptions =
           p:ps ->
             UpdateMap (Latin1.pack p) [loop ps]
 
-replicasOption :: Parser (Maybe Quorum)
-replicasOption =
+nodesOption :: Parser (Maybe Quorum)
+nodesOption =
   optional
     (option
       (eitherReader parseQuorum)
-        (help "Number of replicas" <> long "replicas" <> metavar "QUORUM"))
+        (help "Number of nodes" <> long "nodes" <> metavar "QUORUM"))
 
 prOption :: Parser (Maybe Quorum)
 prOption =

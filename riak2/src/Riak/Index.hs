@@ -24,7 +24,7 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 data Index
   = Index
   { name :: !Text
-  , replicas :: Maybe Word32 -- TODO does riak always return this?
+  , nodes :: Maybe Word32 -- TODO does riak always return this?
   , schema :: !Text
   }
 
@@ -52,7 +52,7 @@ getIndex handle name = liftIO $
       Right (head -> index) ->
         Right $ Just $ Index
           { name = name
-          , replicas = index ^. L.maybe'replicas
+          , nodes = index ^. L.maybe'nodes
           , schema = decodeUtf8 (index ^. L.schema)
           }
 
@@ -108,13 +108,13 @@ fromProto :: Proto.Index -> Index
 fromProto index =
   Index
     { name = decodeUtf8 (index ^. L.name)
-    , replicas = index ^. L.maybe'replicas
+    , nodes = index ^. L.maybe'nodes
     , schema = decodeUtf8 (index ^. L.schema)
     }
 
 toProto :: Index -> Proto.Index
-toProto Index { name, schema, replicas } =
+toProto Index { name, nodes, schema } =
   Proto.defMessage
+    & L.maybe'nodes .~ nodes
     & L.name .~ encodeUtf8 name
-    & L.maybe'replicas .~ replicas
     & L.schema .~ encodeUtf8 schema

@@ -2,7 +2,7 @@ module Riak.Error
   ( Error(..)
   , Op(..)
   , MayReturnBucketTypeDoesNotExist
-  , MayReturnInvalidReplicas
+  , MayReturnInvalidNodes
   ) where
 
 import Riak.Internal.Error

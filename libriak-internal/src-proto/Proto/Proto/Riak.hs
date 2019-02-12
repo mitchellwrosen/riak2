@@ -60,8 +60,8 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
 
 {- | Fields :
 
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' BucketProperties Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' BucketProperties (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' BucketProperties Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' BucketProperties (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.allowMult' @:: Lens' BucketProperties Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'allowMult' @:: Lens' BucketProperties (Prelude.Maybe Prelude.Bool)@
     * 'Proto.Proto.Riak_Fields.lastWriteWins' @:: Lens' BucketProperties Prelude.Bool@
@@ -119,8 +119,8 @@ import qualified Data.ProtoLens.Runtime.Text.Read as Text.Read
     * 'Proto.Proto.Riak_Fields.ttl' @:: Lens' BucketProperties Data.Word.Word32@
     * 'Proto.Proto.Riak_Fields.maybe'ttl' @:: Lens' BucketProperties (Prelude.Maybe Data.Word.Word32)@
  -}
-data BucketProperties = BucketProperties{_BucketProperties'replicas
-                                         :: !(Prelude.Maybe Data.Word.Word32),
+data BucketProperties = BucketProperties{_BucketProperties'nodes ::
+                                         !(Prelude.Maybe Data.Word.Word32),
                                          _BucketProperties'allowMult ::
                                          !(Prelude.Maybe Prelude.Bool),
                                          _BucketProperties'lastWriteWins ::
@@ -177,21 +177,21 @@ instance Prelude.Show BucketProperties where
           = Prelude.showChar '{'
               (Prelude.showString (Data.ProtoLens.showMessageShort __x)
                  (Prelude.showChar '}' __s))
-instance Lens.Labels.HasLens' BucketProperties "replicas"
+instance Lens.Labels.HasLens' BucketProperties "nodes"
            (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _BucketProperties'replicas
-                 (\ x__ y__ -> x__{_BucketProperties'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _BucketProperties'nodes
+                 (\ x__ y__ -> x__{_BucketProperties'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' BucketProperties "maybe'replicas"
+instance Lens.Labels.HasLens' BucketProperties "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _BucketProperties'replicas
-                 (\ x__ y__ -> x__{_BucketProperties'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _BucketProperties'nodes
+                 (\ x__ y__ -> x__{_BucketProperties'nodes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' BucketProperties "allowMult"
            (Prelude.Bool)
@@ -646,13 +646,13 @@ instance Lens.Labels.HasLens' BucketProperties "maybe'ttl"
 instance Data.ProtoLens.Message BucketProperties where
         messageName _ = Data.Text.pack "BucketProperties"
         fieldsByTag
-          = let replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+          = let nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor BucketProperties
                 allowMult__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "allow_mult"
@@ -897,7 +897,7 @@ instance Data.ProtoLens.Message BucketProperties where
                       :: Data.ProtoLens.FieldDescriptor BucketProperties
               in
               Data.Map.fromList
-                [(Data.ProtoLens.Tag 1, replicas__field_descriptor),
+                [(Data.ProtoLens.Tag 1, nodes__field_descriptor),
                  (Data.ProtoLens.Tag 2, allowMult__field_descriptor),
                  (Data.ProtoLens.Tag 3, lastWriteWins__field_descriptor),
                  (Data.ProtoLens.Tag 4, precommit__field_descriptor),
@@ -931,7 +931,7 @@ instance Data.ProtoLens.Message BucketProperties where
           = Lens.Family2.Unchecked.lens _BucketProperties'_unknownFields
               (\ x__ y__ -> x__{_BucketProperties'_unknownFields = y__})
         defMessage
-          = BucketProperties{_BucketProperties'replicas = Prelude.Nothing,
+          = BucketProperties{_BucketProperties'nodes = Prelude.Nothing,
                              _BucketProperties'allowMult = Prelude.Nothing,
                              _BucketProperties'lastWriteWins = Prelude.Nothing,
                              _BucketProperties'precommit = [],
@@ -966,7 +966,7 @@ instance Control.DeepSeq.NFData BucketProperties where
         rnf
           = \ x__ ->
               Control.DeepSeq.deepseq (_BucketProperties'_unknownFields x__)
-                (Control.DeepSeq.deepseq (_BucketProperties'replicas x__)
+                (Control.DeepSeq.deepseq (_BucketProperties'nodes x__)
                    (Control.DeepSeq.deepseq (_BucketProperties'allowMult x__)
                       (Control.DeepSeq.deepseq (_BucketProperties'lastWriteWins x__)
                          (Control.DeepSeq.deepseq (_BucketProperties'precommit x__)
@@ -1949,8 +1949,8 @@ instance Control.DeepSeq.NFData DeleteIndexRequest where
     * 'Proto.Proto.Riak_Fields.maybe'timeout' @:: Lens' DeleteRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.sloppyQuorum' @:: Lens' DeleteRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'sloppyQuorum' @:: Lens' DeleteRequest (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' DeleteRequest Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' DeleteRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' DeleteRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' DeleteRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' DeleteRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' DeleteRequest (Prelude.Maybe Data.ByteString.ByteString)@
  -}
@@ -1967,7 +1967,7 @@ data DeleteRequest = DeleteRequest{_DeleteRequest'bucket ::
                                    _DeleteRequest'dw :: !(Prelude.Maybe Data.Word.Word32),
                                    _DeleteRequest'timeout :: !(Prelude.Maybe Data.Word.Word32),
                                    _DeleteRequest'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
-                                   _DeleteRequest'replicas :: !(Prelude.Maybe Data.Word.Word32),
+                                   _DeleteRequest'nodes :: !(Prelude.Maybe Data.Word.Word32),
                                    _DeleteRequest'bucketType ::
                                    !(Prelude.Maybe Data.ByteString.ByteString),
                                    _DeleteRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
@@ -2131,21 +2131,21 @@ instance Lens.Labels.HasLens' DeleteRequest "maybe'sloppyQuorum"
               (Lens.Family2.Unchecked.lens _DeleteRequest'sloppyQuorum
                  (\ x__ y__ -> x__{_DeleteRequest'sloppyQuorum = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' DeleteRequest "replicas"
+instance Lens.Labels.HasLens' DeleteRequest "nodes"
            (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _DeleteRequest'replicas
-                 (\ x__ y__ -> x__{_DeleteRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _DeleteRequest'nodes
+                 (\ x__ y__ -> x__{_DeleteRequest'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' DeleteRequest "maybe'replicas"
+instance Lens.Labels.HasLens' DeleteRequest "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _DeleteRequest'replicas
-                 (\ x__ y__ -> x__{_DeleteRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _DeleteRequest'nodes
+                 (\ x__ y__ -> x__{_DeleteRequest'nodes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' DeleteRequest "bucketType"
            (Data.ByteString.ByteString)
@@ -2255,13 +2255,13 @@ instance Data.ProtoLens.Message DeleteRequest where
                             ((Lens.Labels.proxy#) ::
                                (Lens.Labels.Proxy#) "maybe'sloppyQuorum")))
                       :: Data.ProtoLens.FieldDescriptor DeleteRequest
-                replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+                nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor DeleteRequest
                 bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
@@ -2284,7 +2284,7 @@ instance Data.ProtoLens.Message DeleteRequest where
                  (Data.ProtoLens.Tag 9, dw__field_descriptor),
                  (Data.ProtoLens.Tag 10, timeout__field_descriptor),
                  (Data.ProtoLens.Tag 11, sloppyQuorum__field_descriptor),
-                 (Data.ProtoLens.Tag 12, replicas__field_descriptor),
+                 (Data.ProtoLens.Tag 12, nodes__field_descriptor),
                  (Data.ProtoLens.Tag 13, bucketType__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _DeleteRequest'_unknownFields
@@ -2302,7 +2302,7 @@ instance Data.ProtoLens.Message DeleteRequest where
                           _DeleteRequest'dw = Prelude.Nothing,
                           _DeleteRequest'timeout = Prelude.Nothing,
                           _DeleteRequest'sloppyQuorum = Prelude.Nothing,
-                          _DeleteRequest'replicas = Prelude.Nothing,
+                          _DeleteRequest'nodes = Prelude.Nothing,
                           _DeleteRequest'bucketType = Prelude.Nothing,
                           _DeleteRequest'_unknownFields = ([])}
 instance Control.DeepSeq.NFData DeleteRequest where
@@ -2321,8 +2321,7 @@ instance Control.DeepSeq.NFData DeleteRequest where
                                            (Control.DeepSeq.deepseq (_DeleteRequest'timeout x__)
                                               (Control.DeepSeq.deepseq
                                                  (_DeleteRequest'sloppyQuorum x__)
-                                                 (Control.DeepSeq.deepseq
-                                                    (_DeleteRequest'replicas x__)
+                                                 (Control.DeepSeq.deepseq (_DeleteRequest'nodes x__)
                                                     (Control.DeepSeq.deepseq
                                                        (_DeleteRequest'bucketType x__)
                                                        (()))))))))))))))
@@ -2695,8 +2694,8 @@ instance Control.DeepSeq.NFData GetBucketTypeRequest where
     * 'Proto.Proto.Riak_Fields.maybe'timeout' @:: Lens' GetCrdtRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.sloppyQuorum' @:: Lens' GetCrdtRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'sloppyQuorum' @:: Lens' GetCrdtRequest (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' GetCrdtRequest Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' GetCrdtRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' GetCrdtRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' GetCrdtRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.includeContext' @:: Lens' GetCrdtRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'includeContext' @:: Lens' GetCrdtRequest (Prelude.Maybe Prelude.Bool)@
  -}
@@ -2710,7 +2709,7 @@ data GetCrdtRequest = GetCrdtRequest{_GetCrdtRequest'bucket ::
                                      _GetCrdtRequest'notfoundOk :: !(Prelude.Maybe Prelude.Bool),
                                      _GetCrdtRequest'timeout :: !(Prelude.Maybe Data.Word.Word32),
                                      _GetCrdtRequest'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
-                                     _GetCrdtRequest'replicas :: !(Prelude.Maybe Data.Word.Word32),
+                                     _GetCrdtRequest'nodes :: !(Prelude.Maybe Data.Word.Word32),
                                      _GetCrdtRequest'includeContext ::
                                      !(Prelude.Maybe Prelude.Bool),
                                      _GetCrdtRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
@@ -2839,21 +2838,21 @@ instance Lens.Labels.HasLens' GetCrdtRequest "maybe'sloppyQuorum"
               (Lens.Family2.Unchecked.lens _GetCrdtRequest'sloppyQuorum
                  (\ x__ y__ -> x__{_GetCrdtRequest'sloppyQuorum = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' GetCrdtRequest "replicas"
+instance Lens.Labels.HasLens' GetCrdtRequest "nodes"
            (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetCrdtRequest'replicas
-                 (\ x__ y__ -> x__{_GetCrdtRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _GetCrdtRequest'nodes
+                 (\ x__ y__ -> x__{_GetCrdtRequest'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' GetCrdtRequest "maybe'replicas"
+instance Lens.Labels.HasLens' GetCrdtRequest "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetCrdtRequest'replicas
-                 (\ x__ y__ -> x__{_GetCrdtRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _GetCrdtRequest'nodes
+                 (\ x__ y__ -> x__{_GetCrdtRequest'nodes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' GetCrdtRequest "includeContext"
            (Prelude.Bool)
@@ -2948,13 +2947,13 @@ instance Data.ProtoLens.Message GetCrdtRequest where
                             ((Lens.Labels.proxy#) ::
                                (Lens.Labels.Proxy#) "maybe'sloppyQuorum")))
                       :: Data.ProtoLens.FieldDescriptor GetCrdtRequest
-                replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+                nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor GetCrdtRequest
                 includeContext__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "include_context"
@@ -2976,7 +2975,7 @@ instance Data.ProtoLens.Message GetCrdtRequest where
                  (Data.ProtoLens.Tag 7, notfoundOk__field_descriptor),
                  (Data.ProtoLens.Tag 8, timeout__field_descriptor),
                  (Data.ProtoLens.Tag 9, sloppyQuorum__field_descriptor),
-                 (Data.ProtoLens.Tag 10, replicas__field_descriptor),
+                 (Data.ProtoLens.Tag 10, nodes__field_descriptor),
                  (Data.ProtoLens.Tag 11, includeContext__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _GetCrdtRequest'_unknownFields
@@ -2992,7 +2991,7 @@ instance Data.ProtoLens.Message GetCrdtRequest where
                            _GetCrdtRequest'notfoundOk = Prelude.Nothing,
                            _GetCrdtRequest'timeout = Prelude.Nothing,
                            _GetCrdtRequest'sloppyQuorum = Prelude.Nothing,
-                           _GetCrdtRequest'replicas = Prelude.Nothing,
+                           _GetCrdtRequest'nodes = Prelude.Nothing,
                            _GetCrdtRequest'includeContext = Prelude.Nothing,
                            _GetCrdtRequest'_unknownFields = ([])}
 instance Control.DeepSeq.NFData GetCrdtRequest where
@@ -3008,7 +3007,7 @@ instance Control.DeepSeq.NFData GetCrdtRequest where
                                   (Control.DeepSeq.deepseq (_GetCrdtRequest'notfoundOk x__)
                                      (Control.DeepSeq.deepseq (_GetCrdtRequest'timeout x__)
                                         (Control.DeepSeq.deepseq (_GetCrdtRequest'sloppyQuorum x__)
-                                           (Control.DeepSeq.deepseq (_GetCrdtRequest'replicas x__)
+                                           (Control.DeepSeq.deepseq (_GetCrdtRequest'nodes x__)
                                               (Control.DeepSeq.deepseq
                                                  (_GetCrdtRequest'includeContext x__)
                                                  (()))))))))))))
@@ -3301,8 +3300,8 @@ instance Control.DeepSeq.NFData GetIndexResponse where
     * 'Proto.Proto.Riak_Fields.maybe'timeout' @:: Lens' GetRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.sloppyQuorum' @:: Lens' GetRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'sloppyQuorum' @:: Lens' GetRequest (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' GetRequest Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' GetRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' GetRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' GetRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' GetRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' GetRequest (Prelude.Maybe Data.ByteString.ByteString)@
  -}
@@ -3319,7 +3318,7 @@ data GetRequest = GetRequest{_GetRequest'bucket ::
                              _GetRequest'deletedContext :: !(Prelude.Maybe Prelude.Bool),
                              _GetRequest'timeout :: !(Prelude.Maybe Data.Word.Word32),
                              _GetRequest'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
-                             _GetRequest'replicas :: !(Prelude.Maybe Data.Word.Word32),
+                             _GetRequest'nodes :: !(Prelude.Maybe Data.Word.Word32),
                              _GetRequest'bucketType ::
                              !(Prelude.Maybe Data.ByteString.ByteString),
                              _GetRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
@@ -3486,21 +3485,20 @@ instance Lens.Labels.HasLens' GetRequest "maybe'sloppyQuorum"
               (Lens.Family2.Unchecked.lens _GetRequest'sloppyQuorum
                  (\ x__ y__ -> x__{_GetRequest'sloppyQuorum = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' GetRequest "replicas"
-           (Data.Word.Word32)
+instance Lens.Labels.HasLens' GetRequest "nodes" (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetRequest'replicas
-                 (\ x__ y__ -> x__{_GetRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _GetRequest'nodes
+                 (\ x__ y__ -> x__{_GetRequest'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' GetRequest "maybe'replicas"
+instance Lens.Labels.HasLens' GetRequest "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _GetRequest'replicas
-                 (\ x__ y__ -> x__{_GetRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _GetRequest'nodes
+                 (\ x__ y__ -> x__{_GetRequest'nodes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' GetRequest "bucketType"
            (Data.ByteString.ByteString)
@@ -3612,13 +3610,13 @@ instance Data.ProtoLens.Message GetRequest where
                             ((Lens.Labels.proxy#) ::
                                (Lens.Labels.Proxy#) "maybe'sloppyQuorum")))
                       :: Data.ProtoLens.FieldDescriptor GetRequest
-                replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+                nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor GetRequest
                 bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
@@ -3641,7 +3639,7 @@ instance Data.ProtoLens.Message GetRequest where
                  (Data.ProtoLens.Tag 9, deletedContext__field_descriptor),
                  (Data.ProtoLens.Tag 10, timeout__field_descriptor),
                  (Data.ProtoLens.Tag 11, sloppyQuorum__field_descriptor),
-                 (Data.ProtoLens.Tag 12, replicas__field_descriptor),
+                 (Data.ProtoLens.Tag 12, nodes__field_descriptor),
                  (Data.ProtoLens.Tag 13, bucketType__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _GetRequest'_unknownFields
@@ -3657,7 +3655,7 @@ instance Data.ProtoLens.Message GetRequest where
                        _GetRequest'deletedContext = Prelude.Nothing,
                        _GetRequest'timeout = Prelude.Nothing,
                        _GetRequest'sloppyQuorum = Prelude.Nothing,
-                       _GetRequest'replicas = Prelude.Nothing,
+                       _GetRequest'nodes = Prelude.Nothing,
                        _GetRequest'bucketType = Prelude.Nothing,
                        _GetRequest'_unknownFields = ([])}
 instance Control.DeepSeq.NFData GetRequest where
@@ -3676,7 +3674,7 @@ instance Control.DeepSeq.NFData GetRequest where
                                            (Control.DeepSeq.deepseq (_GetRequest'timeout x__)
                                               (Control.DeepSeq.deepseq
                                                  (_GetRequest'sloppyQuorum x__)
-                                                 (Control.DeepSeq.deepseq (_GetRequest'replicas x__)
+                                                 (Control.DeepSeq.deepseq (_GetRequest'nodes x__)
                                                     (Control.DeepSeq.deepseq
                                                        (_GetRequest'bucketType x__)
                                                        (()))))))))))))))
@@ -4043,12 +4041,12 @@ instance Control.DeepSeq.NFData HllUpdate where
     * 'Proto.Proto.Riak_Fields.name' @:: Lens' Index Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.schema' @:: Lens' Index Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'schema' @:: Lens' Index (Prelude.Maybe Data.ByteString.ByteString)@
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' Index Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' Index (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' Index Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' Index (Prelude.Maybe Data.Word.Word32)@
  -}
 data Index = Index{_Index'name :: !Data.ByteString.ByteString,
                    _Index'schema :: !(Prelude.Maybe Data.ByteString.ByteString),
-                   _Index'replicas :: !(Prelude.Maybe Data.Word.Word32),
+                   _Index'nodes :: !(Prelude.Maybe Data.Word.Word32),
                    _Index'_unknownFields :: !Data.ProtoLens.FieldSet}
                deriving (Prelude.Eq, Prelude.Ord)
 instance Prelude.Show Index where
@@ -4080,20 +4078,20 @@ instance Lens.Labels.HasLens' Index "maybe'schema"
               (Lens.Family2.Unchecked.lens _Index'schema
                  (\ x__ y__ -> x__{_Index'schema = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' Index "replicas" (Data.Word.Word32)
+instance Lens.Labels.HasLens' Index "nodes" (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _Index'replicas
-                 (\ x__ y__ -> x__{_Index'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _Index'nodes
+                 (\ x__ y__ -> x__{_Index'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' Index "maybe'replicas"
+instance Lens.Labels.HasLens' Index "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _Index'replicas
-                 (\ x__ y__ -> x__{_Index'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _Index'nodes
+                 (\ x__ y__ -> x__{_Index'nodes = y__}))
               Prelude.id
 instance Data.ProtoLens.Message Index where
         messageName _ = Data.Text.pack "Index"
@@ -4114,25 +4112,25 @@ instance Data.ProtoLens.Message Index where
                          (Lens.Labels.lensOf'
                             ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'schema")))
                       :: Data.ProtoLens.FieldDescriptor Index
-                replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+                nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor Index
               in
               Data.Map.fromList
                 [(Data.ProtoLens.Tag 1, name__field_descriptor),
                  (Data.ProtoLens.Tag 2, schema__field_descriptor),
-                 (Data.ProtoLens.Tag 3, replicas__field_descriptor)]
+                 (Data.ProtoLens.Tag 3, nodes__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _Index'_unknownFields
               (\ x__ y__ -> x__{_Index'_unknownFields = y__})
         defMessage
           = Index{_Index'name = Data.ProtoLens.fieldDefault,
-                  _Index'schema = Prelude.Nothing, _Index'replicas = Prelude.Nothing,
+                  _Index'schema = Prelude.Nothing, _Index'nodes = Prelude.Nothing,
                   _Index'_unknownFields = ([])}
 instance Control.DeepSeq.NFData Index where
         rnf
@@ -4140,7 +4138,7 @@ instance Control.DeepSeq.NFData Index where
               Control.DeepSeq.deepseq (_Index'_unknownFields x__)
                 (Control.DeepSeq.deepseq (_Index'name x__)
                    (Control.DeepSeq.deepseq (_Index'schema x__)
-                      (Control.DeepSeq.deepseq (_Index'replicas x__) (()))))
+                      (Control.DeepSeq.deepseq (_Index'nodes x__) (()))))
 {- | Fields :
 
     * 'Proto.Proto.Riak_Fields.bucket' @:: Lens' Link Data.ByteString.ByteString@
@@ -5717,8 +5715,8 @@ instance Control.DeepSeq.NFData PutIndexRequest where
     * 'Proto.Proto.Riak_Fields.maybe'asis' @:: Lens' PutRequest (Prelude.Maybe Prelude.Bool)@
     * 'Proto.Proto.Riak_Fields.sloppyQuorum' @:: Lens' PutRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'sloppyQuorum' @:: Lens' PutRequest (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' PutRequest Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' PutRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' PutRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' PutRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.bucketType' @:: Lens' PutRequest Data.ByteString.ByteString@
     * 'Proto.Proto.Riak_Fields.maybe'bucketType' @:: Lens' PutRequest (Prelude.Maybe Data.ByteString.ByteString)@
  -}
@@ -5737,7 +5735,7 @@ data PutRequest = PutRequest{_PutRequest'bucket ::
                              _PutRequest'timeout :: !(Prelude.Maybe Data.Word.Word32),
                              _PutRequest'asis :: !(Prelude.Maybe Prelude.Bool),
                              _PutRequest'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
-                             _PutRequest'replicas :: !(Prelude.Maybe Data.Word.Word32),
+                             _PutRequest'nodes :: !(Prelude.Maybe Data.Word.Word32),
                              _PutRequest'bucketType ::
                              !(Prelude.Maybe Data.ByteString.ByteString),
                              _PutRequest'_unknownFields :: !Data.ProtoLens.FieldSet}
@@ -5949,21 +5947,20 @@ instance Lens.Labels.HasLens' PutRequest "maybe'sloppyQuorum"
               (Lens.Family2.Unchecked.lens _PutRequest'sloppyQuorum
                  (\ x__ y__ -> x__{_PutRequest'sloppyQuorum = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' PutRequest "replicas"
-           (Data.Word.Word32)
+instance Lens.Labels.HasLens' PutRequest "nodes" (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _PutRequest'replicas
-                 (\ x__ y__ -> x__{_PutRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _PutRequest'nodes
+                 (\ x__ y__ -> x__{_PutRequest'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' PutRequest "maybe'replicas"
+instance Lens.Labels.HasLens' PutRequest "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _PutRequest'replicas
-                 (\ x__ y__ -> x__{_PutRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _PutRequest'nodes
+                 (\ x__ y__ -> x__{_PutRequest'nodes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' PutRequest "bucketType"
            (Data.ByteString.ByteString)
@@ -6099,13 +6096,13 @@ instance Data.ProtoLens.Message PutRequest where
                             ((Lens.Labels.proxy#) ::
                                (Lens.Labels.Proxy#) "maybe'sloppyQuorum")))
                       :: Data.ProtoLens.FieldDescriptor PutRequest
-                replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+                nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor PutRequest
                 bucketType__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "bucket_type"
@@ -6131,7 +6128,7 @@ instance Data.ProtoLens.Message PutRequest where
                  (Data.ProtoLens.Tag 12, timeout__field_descriptor),
                  (Data.ProtoLens.Tag 13, asis__field_descriptor),
                  (Data.ProtoLens.Tag 14, sloppyQuorum__field_descriptor),
-                 (Data.ProtoLens.Tag 15, replicas__field_descriptor),
+                 (Data.ProtoLens.Tag 15, nodes__field_descriptor),
                  (Data.ProtoLens.Tag 16, bucketType__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _PutRequest'_unknownFields
@@ -6150,7 +6147,7 @@ instance Data.ProtoLens.Message PutRequest where
                        _PutRequest'timeout = Prelude.Nothing,
                        _PutRequest'asis = Prelude.Nothing,
                        _PutRequest'sloppyQuorum = Prelude.Nothing,
-                       _PutRequest'replicas = Prelude.Nothing,
+                       _PutRequest'nodes = Prelude.Nothing,
                        _PutRequest'bucketType = Prelude.Nothing,
                        _PutRequest'_unknownFields = ([])}
 instance Control.DeepSeq.NFData PutRequest where
@@ -6173,7 +6170,7 @@ instance Control.DeepSeq.NFData PutRequest where
                                                        (Control.DeepSeq.deepseq
                                                           (_PutRequest'sloppyQuorum x__)
                                                           (Control.DeepSeq.deepseq
-                                                             (_PutRequest'replicas x__)
+                                                             (_PutRequest'nodes x__)
                                                              (Control.DeepSeq.deepseq
                                                                 (_PutRequest'bucketType x__)
                                                                 (())))))))))))))))))
@@ -7918,8 +7915,8 @@ instance Control.DeepSeq.NFData SetUpdate where
     * 'Proto.Proto.Riak_Fields.maybe'timeout' @:: Lens' UpdateCrdtRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.sloppyQuorum' @:: Lens' UpdateCrdtRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'sloppyQuorum' @:: Lens' UpdateCrdtRequest (Prelude.Maybe Prelude.Bool)@
-    * 'Proto.Proto.Riak_Fields.replicas' @:: Lens' UpdateCrdtRequest Data.Word.Word32@
-    * 'Proto.Proto.Riak_Fields.maybe'replicas' @:: Lens' UpdateCrdtRequest (Prelude.Maybe Data.Word.Word32)@
+    * 'Proto.Proto.Riak_Fields.nodes' @:: Lens' UpdateCrdtRequest Data.Word.Word32@
+    * 'Proto.Proto.Riak_Fields.maybe'nodes' @:: Lens' UpdateCrdtRequest (Prelude.Maybe Data.Word.Word32)@
     * 'Proto.Proto.Riak_Fields.includeContext' @:: Lens' UpdateCrdtRequest Prelude.Bool@
     * 'Proto.Proto.Riak_Fields.maybe'includeContext' @:: Lens' UpdateCrdtRequest (Prelude.Maybe Prelude.Bool)@
  -}
@@ -7944,7 +7941,7 @@ data UpdateCrdtRequest = UpdateCrdtRequest{_UpdateCrdtRequest'bucket
                                            !(Prelude.Maybe Data.Word.Word32),
                                            _UpdateCrdtRequest'sloppyQuorum ::
                                            !(Prelude.Maybe Prelude.Bool),
-                                           _UpdateCrdtRequest'replicas ::
+                                           _UpdateCrdtRequest'nodes ::
                                            !(Prelude.Maybe Data.Word.Word32),
                                            _UpdateCrdtRequest'includeContext ::
                                            !(Prelude.Maybe Prelude.Bool),
@@ -8109,21 +8106,21 @@ instance Lens.Labels.HasLens' UpdateCrdtRequest
               (Lens.Family2.Unchecked.lens _UpdateCrdtRequest'sloppyQuorum
                  (\ x__ y__ -> x__{_UpdateCrdtRequest'sloppyQuorum = y__}))
               Prelude.id
-instance Lens.Labels.HasLens' UpdateCrdtRequest "replicas"
+instance Lens.Labels.HasLens' UpdateCrdtRequest "nodes"
            (Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _UpdateCrdtRequest'replicas
-                 (\ x__ y__ -> x__{_UpdateCrdtRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _UpdateCrdtRequest'nodes
+                 (\ x__ y__ -> x__{_UpdateCrdtRequest'nodes = y__}))
               (Data.ProtoLens.maybeLens Data.ProtoLens.fieldDefault)
-instance Lens.Labels.HasLens' UpdateCrdtRequest "maybe'replicas"
+instance Lens.Labels.HasLens' UpdateCrdtRequest "maybe'nodes"
            (Prelude.Maybe Data.Word.Word32)
          where
         lensOf' _
           = (Prelude..)
-              (Lens.Family2.Unchecked.lens _UpdateCrdtRequest'replicas
-                 (\ x__ y__ -> x__{_UpdateCrdtRequest'replicas = y__}))
+              (Lens.Family2.Unchecked.lens _UpdateCrdtRequest'nodes
+                 (\ x__ y__ -> x__{_UpdateCrdtRequest'nodes = y__}))
               Prelude.id
 instance Lens.Labels.HasLens' UpdateCrdtRequest "includeContext"
            (Prelude.Bool)
@@ -8234,13 +8231,13 @@ instance Data.ProtoLens.Message UpdateCrdtRequest where
                             ((Lens.Labels.proxy#) ::
                                (Lens.Labels.Proxy#) "maybe'sloppyQuorum")))
                       :: Data.ProtoLens.FieldDescriptor UpdateCrdtRequest
-                replicas__field_descriptor
-                  = Data.ProtoLens.FieldDescriptor "replicas"
+                nodes__field_descriptor
+                  = Data.ProtoLens.FieldDescriptor "nodes"
                       (Data.ProtoLens.ScalarField Data.ProtoLens.UInt32Field ::
                          Data.ProtoLens.FieldTypeDescriptor Data.Word.Word32)
                       (Data.ProtoLens.OptionalField
                          (Lens.Labels.lensOf'
-                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'replicas")))
+                            ((Lens.Labels.proxy#) :: (Lens.Labels.Proxy#) "maybe'nodes")))
                       :: Data.ProtoLens.FieldDescriptor UpdateCrdtRequest
                 includeContext__field_descriptor
                   = Data.ProtoLens.FieldDescriptor "include_context"
@@ -8264,7 +8261,7 @@ instance Data.ProtoLens.Message UpdateCrdtRequest where
                  (Data.ProtoLens.Tag 9, returnBody__field_descriptor),
                  (Data.ProtoLens.Tag 10, timeout__field_descriptor),
                  (Data.ProtoLens.Tag 11, sloppyQuorum__field_descriptor),
-                 (Data.ProtoLens.Tag 12, replicas__field_descriptor),
+                 (Data.ProtoLens.Tag 12, nodes__field_descriptor),
                  (Data.ProtoLens.Tag 13, includeContext__field_descriptor)]
         unknownFields
           = Lens.Family2.Unchecked.lens _UpdateCrdtRequest'_unknownFields
@@ -8282,7 +8279,7 @@ instance Data.ProtoLens.Message UpdateCrdtRequest where
                               _UpdateCrdtRequest'returnBody = Prelude.Nothing,
                               _UpdateCrdtRequest'timeout = Prelude.Nothing,
                               _UpdateCrdtRequest'sloppyQuorum = Prelude.Nothing,
-                              _UpdateCrdtRequest'replicas = Prelude.Nothing,
+                              _UpdateCrdtRequest'nodes = Prelude.Nothing,
                               _UpdateCrdtRequest'includeContext = Prelude.Nothing,
                               _UpdateCrdtRequest'_unknownFields = ([])}
 instance Control.DeepSeq.NFData UpdateCrdtRequest where
@@ -8302,7 +8299,7 @@ instance Control.DeepSeq.NFData UpdateCrdtRequest where
                                               (Control.DeepSeq.deepseq
                                                  (_UpdateCrdtRequest'sloppyQuorum x__)
                                                  (Control.DeepSeq.deepseq
-                                                    (_UpdateCrdtRequest'replicas x__)
+                                                    (_UpdateCrdtRequest'nodes x__)
                                                     (Control.DeepSeq.deepseq
                                                        (_UpdateCrdtRequest'includeContext x__)
                                                        (()))))))))))))))

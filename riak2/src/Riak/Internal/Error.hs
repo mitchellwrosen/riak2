@@ -29,8 +29,8 @@ data Error :: Op -> Type where
        !Text
     -> Error 'SearchOp
 
-  InvalidReplicasError ::
-       MayReturnInvalidReplicas op ~ 'True
+  InvalidNodesError ::
+       MayReturnInvalidNodes op ~ 'True
     => !Word32
     -> Error op
 
@@ -69,10 +69,10 @@ type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist _ = 'False
 
 -- | @{n_val_violation,_}@
-type family MayReturnInvalidReplicas (op :: Op) :: Bool where
-  MayReturnInvalidReplicas 'GetOp = 'True
-  MayReturnInvalidReplicas 'PutOp = 'True
-  MayReturnInvalidReplicas _ = 'False
+type family MayReturnInvalidNodes (op :: Op) :: Bool where
+  MayReturnInvalidNodes 'GetOp = 'True
+  MayReturnInvalidNodes 'PutOp = 'True
+  MayReturnInvalidNodes _ = 'False
 
 isBucketTypeDoesNotExistError :: ByteString -> Bool
 isBucketTypeDoesNotExistError =
@@ -84,8 +84,8 @@ isIndexDoesNotExistError msg =
   ByteString.isPrefixOf "No index <<\"" msg &&
     ByteString.isSuffixOf "\">> found." msg
 
-isInvalidReplicasError :: ByteString -> Bool
-isInvalidReplicasError =
+isInvalidNodesError :: ByteString -> Bool
+isInvalidNodesError =
   ByteString.isPrefixOf "{n_val_violation"
 
 isSearchFailedError :: ByteString -> Bool

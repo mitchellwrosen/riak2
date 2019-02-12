@@ -48,10 +48,10 @@ import qualified ByteString
 data GetOpts
   = GetOpts
   { basicQuorum :: !Bool
+  , nodes :: !(Maybe Quorum)
   , notfoundOk :: !(Maybe Bool)
   , pr :: !(Maybe Quorum)
   , r :: !(Maybe Quorum)
-  , replicas :: !(Maybe Quorum)
   , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   } deriving stock (Generic, Show)
 
@@ -60,18 +60,18 @@ instance Default GetOpts where
   def =
     GetOpts
       { basicQuorum = False
+      , nodes = Nothing
       , notfoundOk = Nothing
       , pr = Nothing
       , r = Nothing
-      , replicas = Nothing
       , timeout = Nothing
       }
 
 data PutOpts
   = PutOpts
   { dw :: !(Maybe Quorum)
+  , nodes :: !(Maybe Quorum)
   , pw :: !(Maybe Quorum)
-  , replicas :: !(Maybe Quorum)
   , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   , w :: !(Maybe Quorum)
   } deriving stock (Generic, Show)
@@ -81,8 +81,8 @@ instance Default PutOpts where
   def =
     PutOpts
       { dw = Nothing
+      , nodes = Nothing
       , pw = Nothing
-      , replicas = Nothing
       , timeout = Nothing
       , w = Nothing
       }
@@ -90,10 +90,10 @@ instance Default PutOpts where
 data DeleteOpts
   = DeleteOpts
   { dw :: !(Maybe Quorum)
+  , nodes :: !(Maybe Quorum)
   , pr :: !(Maybe Quorum)
   , pw :: !(Maybe Quorum)
   , r :: !(Maybe Quorum)
-  , replicas :: !(Maybe Quorum)
   , timeout :: !(Maybe Word32)
   , w :: !(Maybe Quorum)
   } deriving stock (Generic, Show)
@@ -103,10 +103,10 @@ instance Default DeleteOpts where
   def =
     DeleteOpts
       { dw = Nothing
+      , nodes = Nothing
       , pr = Nothing
       , pw = Nothing
       , r = Nothing
-      , replicas = Nothing
       , timeout = Nothing
       , w = Nothing
       }
@@ -219,24 +219,24 @@ doGet handle request =
       Handle.ErrorRiak err
         | isBucketTypeDoesNotExistError err ->
             BucketTypeDoesNotExistError (request ^. L.bucketType)
-        | isInvalidReplicasError err ->
-            InvalidReplicasError (request ^. L.replicas)
+        | isInvalidNodesError err ->
+            InvalidNodesError (request ^. L.nodes)
         | otherwise ->
             UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
 makeGetRequest
     key
-    GetOpts { basicQuorum, notfoundOk, pr, r, replicas, timeout } =
+    GetOpts { basicQuorum, nodes, notfoundOk, pr, r, timeout } =
 
   Proto.defMessage
     & Key.setProto key
     & L.deletedContext .~ True
     & L.maybe'basicQuorum .~ defFalse basicQuorum
+    & L.maybe'nodes .~ (Quorum.toWord32 <$> nodes)
     & L.maybe'notfoundOk .~ notfoundOk
     & L.maybe'pr .~ (Quorum.toWord32 <$> pr)
     & L.maybe'r .~ (Quorum.toWord32 <$> r)
-    & L.maybe'replicas .~ (Quorum.toWord32 <$> replicas)
     & L.maybe'timeout .~ timeout
 
 
@@ -331,8 +331,8 @@ doPut handle request =
       Handle.ErrorRiak err
         | isBucketTypeDoesNotExistError err ->
             BucketTypeDoesNotExistError (request ^. L.bucketType)
-        | isInvalidReplicasError err ->
-            InvalidReplicasError (request ^. L.replicas)
+        | isInvalidNodesError err ->
+            InvalidNodesError (request ^. L.nodes)
         | otherwise ->
             UnknownError (decodeUtf8 err)
 
@@ -342,7 +342,7 @@ makePutRequest ::
   -> Proto.PutRequest
 makePutRequest
      Object { content = Content { charset, encoding, indexes, metadata, type', value }, context, key }
-     PutOpts { dw, pw, replicas, timeout, w } =
+     PutOpts { dw, nodes, pw, timeout, w } =
   Proto.defMessage
     & Key.setMaybeProto key
     & L.content .~
@@ -359,8 +359,8 @@ makePutRequest
           then Nothing
           else Just (unContext context))
     & L.maybe'dw .~ (Quorum.toWord32 <$> dw)
+    & L.maybe'nodes .~ (Quorum.toWord32 <$> nodes)
     & L.maybe'pw .~ (Quorum.toWord32 <$> pw)
-    & L.maybe'replicas .~ (Quorum.toWord32 <$> replicas)
     & L.maybe'w .~ (Quorum.toWord32 <$> w)
     & L.maybe'timeout .~ timeout
 
@@ -374,7 +374,7 @@ delete ::
 delete
     handle
     Object { context, key }
-    DeleteOpts { dw, pr, pw, r, replicas, timeout, w } = liftIO $
+    DeleteOpts { dw, nodes, pr, pw, r, timeout, w } = liftIO $
 
   first parseDeleteError <$> Handle.delete handle request
 
@@ -384,10 +384,10 @@ delete
       Proto.defMessage
         & Key.setProto key
         & L.maybe'dw .~ (Quorum.toWord32 <$> dw)
+        & L.maybe'nodes .~ (Quorum.toWord32 <$> nodes)
         & L.maybe'pr .~ (Quorum.toWord32 <$> pr)
         & L.maybe'pw .~ (Quorum.toWord32 <$> pw)
         & L.maybe'r .~ (Quorum.toWord32 <$> r)
-        & L.maybe'replicas .~ (Quorum.toWord32 <$> replicas)
         & L.maybe'timeout .~ timeout
         & L.maybe'w .~ (Quorum.toWord32 <$> w)
         & L.context .~ unContext context
