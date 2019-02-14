@@ -1,5 +1,6 @@
 module Riak.Internal.Error where
 
+import Riak.Internal.IndexName (IndexName)
 import Riak.Internal.Prelude
 
 import qualified Riak.Handle.Signature as Handle
@@ -26,7 +27,7 @@ data Error :: Op -> Type where
 
   -- | The search index does not exist.
   IndexDoesNotExistError ::
-       !Text
+       !IndexName
     -> Error 'SearchOp
 
   InvalidNodesError ::

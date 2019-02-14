@@ -9,7 +9,8 @@ import qualified Text
 -- the character '/'.
 newtype IndexName
   = IndexName { unIndexName :: Text }
-  deriving stock (Show)
+  deriving stock (Eq)
+  deriving newtype (Show)
 
 makeIndexName :: Text -> Maybe IndexName
 makeIndexName name = do

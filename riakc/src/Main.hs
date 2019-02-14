@@ -425,12 +425,12 @@ putIndexParser =
 searchParser :: Parser (Handle -> IO ())
 searchParser =
   doSearch
-    <$> indexArgument
+    <$> indexNameArgument
     <*> queryArgument
 
   where
     doSearch ::
-         Text
+         IndexName
       -> Text
       -> Handle
       -> IO ()
@@ -445,10 +445,6 @@ searchParser =
           putStrLn ("Max score: " ++ show maxScore)
           putStrLn ("Num found: " ++ show numFound)
           for_ documents printDocument
-
-    indexArgument :: Parser Text
-    indexArgument =
-      strArgument (help "Search index" <> metavar "INDEX")
 
     queryArgument :: Parser Text
     queryArgument =

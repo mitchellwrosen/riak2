@@ -2,7 +2,7 @@
 -- * <https://docs.basho.com/riak/kv/2.2.3/developing/usage/search/>
 -- * <https://docs.basho.com/riak/kv/2.2.3/developing/usage/searching-data-types/>
 --
--- Search examples:
+-- CRDT search examples:
 --
 -- * Counters
 --
@@ -36,8 +36,9 @@ module Riak.Search
   , SearchResults(..)
   ) where
 
-import Libriak.Handle        (Handle)
+import Libriak.Handle          (Handle)
 import Riak.Internal.Error
+import Riak.Internal.IndexName (IndexName(..))
 import Riak.Internal.Prelude
 
 import qualified Libriak.Handle           as Handle
@@ -52,13 +53,17 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 data SearchResults
   = SearchResults
   { documents :: ![[(ByteString, ByteString)]]
+    -- ^ Search results
   , maxScore :: !Float
   , numFound :: !Word32
+    -- ^ Number of search results (not all of which may have been returned,
+    -- per @rows@).
   } deriving stock (Generic, Show)
 
 data SearchOpts
   = SearchOpts
   { fieldList :: ![ByteString]
+    -- ^ The fields to return (the empty list means all fields).
   , filter :: !(Maybe ByteString)
   , presort :: !(Maybe ByteString)
   , rows :: !(Maybe Word32)
@@ -81,7 +86,7 @@ instance Default SearchOpts where
 search ::
      MonadIO m
   => Handle -- ^
-  -> Text -- ^ Search index
+  -> IndexName -- ^ Search index
   -> ByteString -- ^ Search query
   -> SearchOpts -- ^ Search options
   -> m (Either (Error 'SearchOp) SearchResults)
@@ -99,7 +104,7 @@ search
     request =
       Proto.defMessage
         & Proto.fl .~ fieldList
-        & Proto.index .~ encodeUtf8 index
+        & Proto.index .~ encodeUtf8 (unIndexName index)
         & Proto.maybe'filter .~ filter
         & Proto.maybe'presort .~ presort
         & Proto.maybe'rows .~ rows
@@ -117,7 +122,7 @@ search
             IndexDoesNotExistError index
         | isSearchFailedError err ->
             SearchFailedError
-        | err == "Unknown message code: 27" ->
+        | isUnknownMessageCode err ->
             SearchNotEnabledError
         | otherwise ->
             UnknownError (decodeUtf8 err)

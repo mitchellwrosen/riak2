@@ -9,6 +9,8 @@ import Riak.Internal.SecondaryIndex (SecondaryIndex)
 import Data.Time          (UTCTime(..))
 import Data.Time.Calendar (Day(..))
 
+import qualified HashMap
+
 
 -- | Object content.
 data Content a
@@ -17,7 +19,7 @@ data Content a
   , encoding :: !(Maybe ByteString) -- ^ Content encoding
   , indexes :: ![SecondaryIndex] -- ^ Secondary indexes
   , lastModified :: !UTCTime -- ^ Last modified.
-  , metadata :: ![(ByteString, ByteString)] -- ^ User metadata
+  , metadata :: !(HashMap ByteString ByteString) -- ^ User metadata
   , type' :: !(Maybe ByteString) -- ^ Content type
   , ttl :: !(Maybe Word32) -- ^ Time to live. Unused on write. TODO NominalDiffTime
   , value :: !a -- ^ Value
@@ -38,7 +40,7 @@ newContent value =
     , encoding = Nothing
     , indexes = []
     , lastModified = UTCTime (ModifiedJulianDay 0) 0
-    , metadata = []
+    , metadata = HashMap.empty
     , ttl = Nothing
     , type' = Nothing
     , value = value

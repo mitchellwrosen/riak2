@@ -58,7 +58,7 @@ setBucketTypeIndex ::
   -> IndexName -- ^ Index name
   -> m (Either Handle.Error ())
 setBucketTypeIndex handle (BucketType bucketType) (IndexName index) =
-  liftIO (setBucketType handle request)
+  liftIO (Handle.setBucketType handle request)
 
   where
     request :: Proto.RpbSetBucketTypeReq
@@ -68,13 +68,6 @@ setBucketTypeIndex handle (BucketType bucketType) (IndexName index) =
             (Proto.defMessage
               & Proto.searchIndex .~ encodeUtf8 index)
         & Proto.type' .~ bucketType
-
-setBucketType ::
-     Handle
-  -> Proto.RpbSetBucketTypeReq
-  -> IO (Either Handle.Error ())
-setBucketType handle request =
-  Handle.setBucketType handle request
 
 -- | List all of the buckets in a bucket type.
 --

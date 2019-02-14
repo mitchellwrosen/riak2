@@ -2,23 +2,24 @@
 -- requested?
 
 module Riak.Object
-  ( -- * Get object
+  ( -- * Object operations
     get
+  , put
+  , delete
+    -- ** Get variants
   , getHead
   , getIfModified
   , getHeadIfModified
-  , GetOpts(..)
-    -- * Put object
-  , put
+    -- ** Put variants
   , putGet
   , putGetHead
-  , PutOpts(..)
-    -- * Delete object
-  , delete
-  , DeleteOpts(..)
     -- * Object
   , Object(..)
   , newObject
+    -- * Options
+  , GetOpts(..)
+  , PutOpts(..)
+  , DeleteOpts(..)
   ) where
 
 import Libriak.Handle        (Handle)
@@ -35,6 +36,7 @@ import Riak.Internal.Sibling (Sibling)
 import qualified Libriak.Handle               as Handle
 import qualified Libriak.Proto                as Proto
 import qualified Riak.Internal.Key            as Key
+import qualified Riak.Internal.Proto.Content  as Proto.Content
 import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
 import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
@@ -351,11 +353,11 @@ makePutRequest
     & Key.setMaybeProto key
     & Proto.content .~
         (Proto.defMessage
+          & Proto.Content.setMetadata metadata
           & Proto.indexes .~ map SecondaryIndex.toPair indexes
           & Proto.maybe'charset .~ charset
           & Proto.maybe'contentEncoding .~ encoding
           & Proto.maybe'contentType .~ type'
-          & Proto.usermeta .~ map Proto.Pair.fromTuple metadata
           & Proto.value .~ value
         )
     & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
