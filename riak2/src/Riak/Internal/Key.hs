@@ -1,5 +1,6 @@
 module Riak.Internal.Key where
 
+import Riak.Internal.Bucket  (Bucket(..))
 import Riak.Internal.Prelude
 
 import qualified Libriak.Proto as Proto
@@ -17,6 +18,18 @@ data Key
   = Key !ByteString !ByteString !ByteString
   deriving stock (Eq, Generic, Show)
   deriving anyclass (Hashable)
+
+-- | Use 'generatedKey' to ask Riak to generate a random key when writing a new
+-- object or data type.
+generatedKey ::
+     Bucket -- ^
+  -> Key
+generatedKey (Bucket bucketType bucket) =
+  Key bucketType bucket ByteString.empty
+
+isGeneratedKey :: Key -> Bool
+isGeneratedKey (Key _ _ key) =
+  ByteString.null key
 
 setProto ::
      ( Proto.HasLens' a "bucket" ByteString

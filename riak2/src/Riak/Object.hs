@@ -1,3 +1,6 @@
+-- TODO timeout variants since Riak will only return {error, timeout} if one was
+-- requested?
+
 module Riak.Object
   ( -- * Object
     Object(..)
@@ -44,6 +47,8 @@ import Data.Text.Encoding    (decodeUtf8)
 import qualified ByteString
 
 
+-- TODO better names for pr/r
+-- TODO basicQuorum/notfoundOk -> NotfoundBehavior
 data GetOpts
   = GetOpts
   { basicQuorum :: !Bool

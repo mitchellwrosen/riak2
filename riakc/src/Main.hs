@@ -202,19 +202,37 @@ getCounterParser :: Parser (Handle -> IO ())
 getCounterParser =
   doGetCounter
     <$> keyArgument
+    <*> nodesOption
+    <*> rOption
+    <*> prOption
   where
     doGetCounter ::
          Key
+      -> Maybe Quorum
+      -> Maybe Quorum
+      -> Maybe Quorum
       -> Handle
       -> IO ()
-    doGetCounter key handle =
-      getConvergentCounter handle key >>= \case
+    doGetCounter key nodes r pr handle =
+      getConvergentCounter handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
 
         Right val ->
           print val
+
+      where
+        opts :: GetOpts
+        opts =
+          GetOpts
+            { basicQuorum = False
+            , nodes = nodes
+            , notfoundOk = Nothing
+            , pr = pr
+            , r = r
+            , timeout = Nothing
+            }
 
 getMapParser :: Parser (Handle -> IO ())
 getMapParser =
@@ -322,8 +340,6 @@ putParser =
             , w = w
             }
 
-
-
 searchParser :: Parser (Handle -> IO ())
 searchParser =
   doSearch
@@ -366,6 +382,10 @@ updateCounterParser =
   doUpdateCounter
     <$> bucketOrKeyArgument
     <*> amountArgument
+    <*> nodesOption
+    <*> wOption
+    <*> dwOption
+    <*> pwOption
 
   where
     amountArgument :: Parser Int64
@@ -375,10 +395,14 @@ updateCounterParser =
     doUpdateCounter ::
          Either Bucket Key
       -> Int64
+      -> Maybe Quorum
+      -> Maybe Quorum
+      -> Maybe Quorum
+      -> Maybe Quorum
       -> Handle
       -> IO ()
-    doUpdateCounter bucketOrKey amount handle = do
-      updateConvergentCounter handle operation >>= \case
+    doUpdateCounter bucketOrKey amount nodes w dw pw handle = do
+      updateConvergentCounter handle operation opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -396,6 +420,16 @@ updateCounterParser =
                   Right key -> key
             , value =
                 amount
+            }
+
+        opts :: PutOpts
+        opts =
+          PutOpts
+            { dw = dw
+            , nodes = nodes
+            , pw = pw
+            , timeout = Nothing
+            , w = w
             }
 
 updateMapParser :: Parser (Handle -> IO ())
