@@ -4,19 +4,11 @@
 
 This package contains high-level Riak bindings.
 
-### [`libriak`](./libriak)
+### [`libriak`](./libriak) / [`libriak-internal`](./libriak-internal)
 
 ![libriak-src-sloc](./etc/libriak-src-sloc.svg) ![libriak-test-sloc](./etc/libriak-test-sloc.svg)
 
-This package re-exports all of [`libriak-internal`](./libriak-internal),
-and defines the ["Riak handle"](./libriak/src/Riak/Handle/Signature.hsig)
-Backpack signature.
-
-### [`libriak-internal`](./libriak-internal)
-
-![libriak-internal-src-sloc](./etc/libriak-internal-src-sloc.svg) ![libriak-internal-test-sloc](./etc/libriak-internal-test-sloc.svg)
-
-This package contains low-level Riak bindings:
+These packages contain low-level Riak bindings:
 
 * Protobuf data types generated from
   [`riak.proto`](./libriak-internal/proto/riak.proto) by
@@ -28,6 +20,19 @@ This package contains low-level Riak bindings:
 
 * A [`Riak.Connection`](./libriak-internal/src/Riak/Connection.hs) socket
   wrapper capable of sending and receiving length-prefixed packets.
+
+* The the ["Riak handle"](./libriak/src/Riak/Handle/Signature.hsig) Backpack
+  signature.
+
+They are intended to be a fully usable interface to Riak, fully faithful to the
+exposed protobuf API. If you want to build a high level Riak library, you should
+be happy building it on top of `libriak`.
+
+As for why there is an `-internal` package: it is not possible for one package
+to both define a Backpack signature, and provide a module intended to satisfy
+that signature. If you are defining a new handle, you must depend on
+`libriak-internal`, which includes the core types you need. Otherwise, use
+`libriak`, which re-exports all of `libriak-internal`.
 
 ### [`riak2-handle-impl-exclusive`](./riak2-handle-impl-exclusive)
 
