@@ -35,6 +35,11 @@ data Error :: Op -> Type where
     => !Word32
     -> Error op
 
+  -- | The schema is invalid.
+  InvalidSchemaError ::
+       !Text
+    -> Error 'PutSchemaOp
+
   -- | The search failed. Typically, this means the query was malformed. Check
   -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
   SearchFailedError ::
@@ -66,8 +71,10 @@ data Op
   | DeleteIndexOp
   | GetOp
   | GetIndexOp
+  | GetSchemaOp
   | PutOp
   | PutIndexOp
+  | PutSchemaOp
   | SearchOp
 
 -- | @no_type@
@@ -86,7 +93,9 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
 type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
   MayReturnSearchNotEnabled 'DeleteIndexOp = 'True
   MayReturnSearchNotEnabled 'GetIndexOp = 'True
+  MayReturnSearchNotEnabled 'GetSchemaOp = 'True
   MayReturnSearchNotEnabled 'PutIndexOp = 'True
+  MayReturnSearchNotEnabled 'PutSchemaOp = 'True
   MayReturnSearchNotEnabled 'SearchOp = 'True
   MayReturnSearchNotEnabled _ = 'False
 
@@ -111,6 +120,10 @@ isNotfound =
 isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =
   (== "Schema not found")
+
+isInvalidSchemaError :: ByteString -> Bool
+isInvalidSchemaError =
+  ByteString.isPrefixOf "Error storing schema"
 
 isSearchFailedError :: ByteString -> Bool
 isSearchFailedError =

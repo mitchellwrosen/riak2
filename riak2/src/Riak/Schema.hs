@@ -6,6 +6,7 @@ module Riak.Schema
   ) where
 
 import Libriak.Handle        (Handle)
+import Riak.Internal.Error
 import Riak.Internal.Prelude
 
 import qualified Libriak.Handle as Handle
@@ -19,8 +20,8 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 data Schema
   = Schema
   { name :: !Text
-  , content :: !ByteString -- TODO schema contents are Text?
-  }
+  , content :: !ByteString
+  } deriving stock (Generic, Show)
 
 -- | The default search schema @"_yz_default"@.
 defaultSchema :: Text
@@ -32,7 +33,7 @@ getSchema ::
      MonadIO m
   => Handle -- ^
   -> Text -- ^
-  -> m (Either Handle.Error (Maybe Schema))
+  -> m (Either (Error 'GetSchemaOp) (Maybe Schema))
 getSchema handle name = liftIO $
   fromResponse <$>
     Handle.getSchema
@@ -42,11 +43,18 @@ getSchema handle name = liftIO $
   where
     fromResponse ::
          Either Handle.Error Proto.RpbYokozunaSchema
-      -> Either Handle.Error (Maybe Schema)
+      -> Either (Error 'GetSchemaOp) (Maybe Schema)
     fromResponse = \case
-      -- TODO text "notfound" string
-      Left err ->
-        Left err
+      Left (Handle.ErrorHandle err) ->
+        Left (HandleError err)
+
+      Left (Handle.ErrorRiak err)
+        | isNotfound err ->
+            Right Nothing
+        | isUnknownMessageCode err ->
+            Left SearchNotEnabledError
+        | otherwise ->
+            Left (UnknownError (decodeUtf8 err))
 
       Right schema ->
         Right (Just (fromProto schema))
@@ -56,9 +64,24 @@ putSchema ::
      MonadIO m
   => Handle -- ^
   -> Schema -- ^
-  -> m (Either Handle.Error ())
-putSchema handle schema =
-  liftIO (Handle.putSchema handle (toProto schema))
+  -> m (Either (Error 'PutSchemaOp) ())
+putSchema handle schema = liftIO $
+  first parsePutSchemaError <$>
+    Handle.putSchema handle (toProto schema)
+
+  where
+    parsePutSchemaError :: Handle.Error -> Error 'PutSchemaOp
+    parsePutSchemaError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | isInvalidSchemaError err ->
+            InvalidSchemaError (decodeUtf8 err)
+        | isUnknownMessageCode err ->
+            SearchNotEnabledError
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
 fromProto :: Proto.RpbYokozunaSchema -> Schema
 fromProto schema =

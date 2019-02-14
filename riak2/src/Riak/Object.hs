@@ -37,7 +37,6 @@ import qualified Libriak.Handle               as Handle
 import qualified Libriak.Proto                as Proto
 import qualified Riak.Internal.Key            as Key
 import qualified Riak.Internal.Proto.Content  as Proto.Content
-import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
 import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
 

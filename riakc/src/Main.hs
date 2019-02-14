@@ -23,6 +23,7 @@ import Options.Applicative hiding (infoParser)
 import System.Exit         (ExitCode(..), exitFailure, exitWith)
 import Text.Read           (readMaybe)
 
+import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
 import qualified Data.Text              as Text
@@ -110,10 +111,12 @@ commandParser =
       , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
       , command "get-index" (info getIndexParser (progDesc "Get an index, or all indexes"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
+      , command "get-schema" (info getSchemaParser (progDesc "Get a schema"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
       , command "put-index" (info putIndexParser (progDesc "Put an index"))
+      , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
       , command "search" (info searchParser (progDesc "Perform a search"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
@@ -304,6 +307,24 @@ getMapParser =
         Right val ->
           print val
 
+getSchemaParser :: Parser (Handle -> IO ())
+getSchemaParser =
+  doGetSchema
+    <$> schemaNameArgument
+  where
+    doGetSchema ::
+         Text
+      -> Handle
+      -> IO ()
+    doGetSchema name handle =
+      getSchema handle name >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
+
 infoParser :: Parser (Handle -> IO ())
 infoParser =
   pure $ \handle ->
@@ -421,6 +442,26 @@ putIndexParser =
             { nodes = nodes
             , timeout = Nothing
             }
+
+putSchemaParser :: Parser (Handle -> IO ())
+putSchemaParser =
+  doPutSchema
+    <$> schemaNameArgument
+  where
+    doPutSchema ::
+         Text
+      -> Handle
+      -> IO ()
+    doPutSchema name handle = do
+      content <- ByteString.readFile (Text.unpack name)
+
+      putSchema handle Schema { name, content } >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right () ->
+          pure ()
 
 searchParser :: Parser (Handle -> IO ())
 searchParser =
@@ -758,6 +799,10 @@ rOption =
     (option
       (eitherReader parseQuorum)
       (help "Read quorum" <> long "r" <> metavar "QUORUM"))
+
+schemaNameArgument :: Parser Text
+schemaNameArgument =
+  strArgument (help "Schema name" <> metavar "SCHEMA")
 
 wOption :: Parser (Maybe Quorum)
 wOption =
