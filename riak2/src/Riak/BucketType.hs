@@ -2,7 +2,7 @@ module Riak.BucketType
   ( BucketType(..)
     -- ** Bucket type properties
   , getBucketType
-  -- , setBucketType
+  , setBucketTypeIndex
     -- ** Full traversals
   , listBuckets
   , streamBuckets
@@ -11,6 +11,7 @@ module Riak.BucketType
 import Libriak.Handle                 (Handle)
 import Riak.Bucket                    (Bucket(..))
 import Riak.Internal.BucketProperties (BucketProperties)
+import Riak.Internal.IndexName        (IndexName(..))
 import Riak.Internal.Prelude
 
 import qualified Libriak.Handle                 as Handle
@@ -19,8 +20,8 @@ import qualified Riak.Internal.BucketProperties as BucketProperties
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~))
-import Data.Default.Class (Default(..))
 import Data.Hashable      (Hashable)
+import Data.Text.Encoding (encodeUtf8)
 
 import qualified Control.Foldl as Foldl
 
@@ -49,15 +50,28 @@ getBucketType handle (BucketType bucketType) = liftIO $
     fromResponse =
       BucketProperties.fromProto
 
--- | Set bucket type properties.
---
--- /Note/: You may not increase the @hllPrecision@ property.
---
--- TODO better set bucket type properties type
--- TODO don't allow setting n
-setBucketType
-  :: Handle -- ^
-  -> Proto.RpbSetBucketTypeReq -- ^
+-- | Set the index of a bucket type.
+setBucketTypeIndex ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> IndexName -- ^ Index name
+  -> m (Either Handle.Error ())
+setBucketTypeIndex handle (BucketType bucketType) (IndexName index) =
+  liftIO (setBucketType handle request)
+
+  where
+    request :: Proto.RpbSetBucketTypeReq
+    request =
+      Proto.defMessage
+        & Proto.props .~
+            (Proto.defMessage
+              & Proto.searchIndex .~ encodeUtf8 index)
+        & Proto.type' .~ bucketType
+
+setBucketType ::
+     Handle
+  -> Proto.RpbSetBucketTypeReq
   -> IO (Either Handle.Error ())
 setBucketType handle request =
   Handle.setBucketType handle request
@@ -71,8 +85,8 @@ setBucketType handle request =
 -- production cluster.
 --
 -- /See also/: 'streamBuckets'
-listBuckets
-  :: MonadIO m
+listBuckets ::
+     MonadIO m
   => Handle -- ^
   -> BucketType -- ^
   -> m (Either Handle.Error [Bucket])
@@ -85,8 +99,8 @@ listBuckets handle bucketType =
 -- production cluster.
 --
 -- /See also/: 'listBuckets'
-streamBuckets
-  :: Handle -- ^
+streamBuckets ::
+     Handle -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> IO (Either Handle.Error r)

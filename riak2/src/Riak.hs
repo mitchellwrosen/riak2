@@ -26,7 +26,7 @@ module Riak
     -- * Bucket type operations
     -- ** Bucket type properties
   , getBucketType
-  -- , setBucketType
+  , setBucketTypeIndex
     -- ** Full bucket traversals
   , listBuckets
   , streamBuckets
@@ -80,6 +80,9 @@ module Riak
   , GetOpts(..)
   , Handle
   , Index(..)
+  , IndexName
+  , makeIndexName
+  , unsafeMakeIndexName
   , Key(..)
   , generatedKey
   , MapReduceFunction(..)
@@ -87,10 +90,12 @@ module Riak
   , NotfoundBehavior(..)
   , Object(..)
   , newObject
+  , PutIndexOpts(..)
   , PutOpts(..)
   , Quorum(..)
   , RangeQuery(..)
   , Schema(..)
+  , defaultSchema
   , SearchOpts(..)
   , SearchResults(..)
   , SecondaryIndex(..)

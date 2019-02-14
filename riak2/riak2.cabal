@@ -177,6 +177,7 @@ library
     Riak.Internal.ErlangTerm
     Riak.Internal.Error
     Riak.Internal.ExactQuery
+    Riak.Internal.IndexName
     Riak.Internal.Key
     Riak.Internal.MapReduceFunction
     Riak.Internal.MapReduceInput

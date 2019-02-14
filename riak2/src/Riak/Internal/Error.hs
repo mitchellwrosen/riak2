@@ -42,7 +42,11 @@ data Error :: Op -> Type where
   -- | A search was attempted, but either search is disabled in @riak.conf@, or
   -- the yokozuna service is not yet up.
   SearchNotEnabledError ::
-       Error 'SearchOp
+       MayReturnSearchNotEnabled op ~ 'True
+    => Error op
+
+  SchemaDoesNotExistError ::
+       Error 'PutIndexOp
 
   HandleError ::
        !Handle.Error
@@ -58,8 +62,11 @@ deriving stock instance Show (Error op)
 -- | Operations used to index the 'Error' type.
 data Op
   = DeleteOp
+  | DeleteIndexOp
   | GetOp
+  | GetIndexOp
   | PutOp
+  | PutIndexOp
   | SearchOp
 
 -- | @no_type@
@@ -72,7 +79,15 @@ type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
 type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'GetOp = 'True
   MayReturnInvalidNodes 'PutOp = 'True
+  MayReturnInvalidNodes 'PutIndexOp = 'True
   MayReturnInvalidNodes _ = 'False
+
+type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
+  MayReturnSearchNotEnabled 'DeleteIndexOp = 'True
+  MayReturnSearchNotEnabled 'GetIndexOp = 'True
+  MayReturnSearchNotEnabled 'PutIndexOp = 'True
+  MayReturnSearchNotEnabled 'SearchOp = 'True
+  MayReturnSearchNotEnabled _ = 'False
 
 isBucketTypeDoesNotExistError :: ByteString -> Bool
 isBucketTypeDoesNotExistError =
@@ -88,10 +103,18 @@ isInvalidNodesError :: ByteString -> Bool
 isInvalidNodesError =
   ByteString.isPrefixOf "{n_val_violation"
 
+isNotfound :: ByteString -> Bool
+isNotfound =
+  (== "notfound")
+
+isSchemaDoesNotExistError :: ByteString -> Bool
+isSchemaDoesNotExistError =
+  (== "Schema not found")
+
 isSearchFailedError :: ByteString -> Bool
 isSearchFailedError =
   (== "Query unsuccessful check the logs.")
 
-isSearchNotEnabledError :: ByteString -> Bool
-isSearchNotEnabledError =
-  (== "Unknown message code: 27")
+isUnknownMessageCode :: ByteString -> Bool
+isUnknownMessageCode =
+  ByteString.isPrefixOf "Unknown message code:"

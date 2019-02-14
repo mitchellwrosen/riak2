@@ -1,5 +1,6 @@
 module Riak.Schema
   ( Schema(..)
+  , defaultSchema
   , getSchema
   , putSchema
   ) where
@@ -20,6 +21,11 @@ data Schema
   { name :: !Text
   , content :: !ByteString -- TODO schema contents are Text?
   }
+
+-- | The default search schema @"_yz_default"@.
+defaultSchema :: Text
+defaultSchema =
+  "_yz_default"
 
 -- | Put a Solr schema.
 getSchema ::

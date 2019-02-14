@@ -16,8 +16,6 @@ import qualified Riak.Internal.Quorum as Quorum
 
 import Control.Lens ((.~), (^.))
 
-import qualified ByteString
-
 
 -- | An eventually-convergent counter.
 --

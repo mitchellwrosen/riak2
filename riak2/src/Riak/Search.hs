@@ -117,7 +117,7 @@ search
             IndexDoesNotExistError index
         | isSearchFailedError err ->
             SearchFailedError
-        | isSearchNotEnabledError err ->
+        | err == "Unknown message code: 27" ->
             SearchNotEnabledError
         | otherwise ->
             UnknownError (decodeUtf8 err)

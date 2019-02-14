@@ -2,23 +2,23 @@
 -- requested?
 
 module Riak.Object
-  ( -- * Object
-    Object(..)
-  , newObject
-    -- ** Get object
-  , get
+  ( -- * Get object
+    get
   , getHead
   , getIfModified
   , getHeadIfModified
   , GetOpts(..)
-    -- ** Put object
+    -- * Put object
   , put
   , putGet
   , putGetHead
   , PutOpts(..)
-    -- ** Delete object
+    -- * Delete object
   , delete
   , DeleteOpts(..)
+    -- * Object
+  , Object(..)
+  , newObject
   ) where
 
 import Libriak.Handle        (Handle)

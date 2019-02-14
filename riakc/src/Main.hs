@@ -1,3 +1,5 @@
+{-# OPTIONS_GHC -fno-warn-name-shadowing #-}
+
 module Main where
 
 import Riak
@@ -5,7 +7,6 @@ import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..))
 import Riak.Handle.Impl.Managed   (Handle)
 
 import qualified Riak.Handle.Impl.Managed as Handle hiding (Config)
-import qualified Riak.Object              as Object
 import qualified Riak.ServerInfo          as ServerInfo
 
 import Data.ByteString     (ByteString)
@@ -17,6 +18,7 @@ import Data.Text           (Text)
 import Data.Text.Encoding  (decodeUtf8, encodeUtf8)
 import Data.Word
 import Net.IPv4            (IPv4, ipv4)
+import Numeric.Natural     (Natural)
 import Options.Applicative hiding (infoParser)
 import System.Exit         (ExitCode(..), exitFailure, exitWith)
 import Text.Read           (readMaybe)
@@ -102,13 +104,16 @@ commandParser =
   hsubparser
     (mconcat
       [ command "delete" (info deleteParser (progDesc "Delete an object"))
+      , command "delete-index" (info deleteIndexParser (progDesc "Delete an index"))
       , command "get" (info getParser (progDesc "Get an object"))
       , command "get-bucket-type" (info getBucketTypeParser (progDesc "Get a bucket type"))
       , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
+      , command "get-index" (info getIndexParser (progDesc "Get an index, or all indexes"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
+      , command "put-index" (info putIndexParser (progDesc "Put an index"))
       , command "search" (info searchParser (progDesc "Perform a search"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
@@ -127,7 +132,7 @@ deleteParser =
       -> IO ()
     doDelete key context handle =
       -- TODO riakc delete options
-      Object.delete handle object def >>= \case
+      delete handle object def >>= \case
         Left err -> do
           print err
           exitFailure
@@ -143,6 +148,24 @@ deleteParser =
             , context = fromMaybe newContext context
             , key = key
             }
+
+deleteIndexParser :: Parser (Handle -> IO ())
+deleteIndexParser =
+  doDeleteIndex
+    <$> indexNameArgument
+  where
+    doDeleteIndex ::
+         IndexName
+      -> Handle
+      -> IO ()
+    doDeleteIndex index handle =
+      deleteIndex handle index >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right () ->
+          pure ()
 
 getParser :: Parser (Handle -> IO ())
 getParser =
@@ -160,7 +183,7 @@ getParser =
       -> Handle
       -> IO ()
     doGet key nodes r pr handle =
-      Object.get handle key opts >>= \case
+      get handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -234,6 +257,35 @@ getCounterParser =
             , timeout = Nothing
             }
 
+getIndexParser :: Parser (Handle -> IO ())
+getIndexParser =
+  doGetIndex
+    <$> optional indexNameArgument
+  where
+    doGetIndex ::
+         Maybe IndexName
+      -> Handle
+      -> IO ()
+    doGetIndex name handle =
+      case name of
+        Nothing ->
+          getIndexes handle >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right indexes ->
+              for_ indexes print
+
+        Just name ->
+          getIndex handle name >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right index ->
+              print index
+
 getMapParser :: Parser (Handle -> IO ())
 getMapParser =
   doGetMap
@@ -304,7 +356,7 @@ putParser =
       -> Handle
       -> IO ()
     doPut bucketOrKey val type' context nodes w dw pw handle =
-      Object.put handle object opts >>= \case
+      put handle object opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -338,6 +390,36 @@ putParser =
             , pw = pw
             , timeout = Nothing
             , w = w
+            }
+
+putIndexParser :: Parser (Handle -> IO ())
+putIndexParser =
+  doPutIndex
+    <$> indexNameArgument
+    <*> optional (option auto (help "Nodes" <> long "nodes" <> metavar "NODES"))
+    <*> optional (strOption (help "Schema name" <> long "schema" <> metavar "SCHEMA"))
+  where
+    doPutIndex ::
+         IndexName
+      -> Maybe Natural
+      -> Maybe Text
+      -> Handle
+      -> IO ()
+    doPutIndex index nodes schema handle =
+      putIndex handle index (fromMaybe defaultSchema schema) opts >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right () ->
+          pure ()
+
+      where
+        opts :: PutIndexOpts
+        opts =
+          PutIndexOpts
+            { nodes = nodes
+            , timeout = Nothing
             }
 
 searchParser :: Parser (Handle -> IO ())
@@ -496,6 +578,17 @@ contextOption =
 dwOption :: Parser (Maybe Quorum)
 dwOption =
   optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
+
+indexNameArgument :: Parser IndexName
+indexNameArgument =
+  argument (eitherReader parseIndexName) (help "Index name" <> metavar "INDEX")
+  where
+    parseIndexName :: String -> Either String IndexName
+    parseIndexName name =
+      maybe
+        (Left "Invalid index name.")
+        Right
+        (makeIndexName (Text.pack name))
 
 keyArgument :: Parser Key
 keyArgument =
