@@ -11,8 +11,7 @@ import Riak.Internal.Prelude
 
 import qualified Libriak.Handle as Handle
 
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Proto as Proto
 
 import Control.Lens       ((.~), (^.))
 import Data.List          (head)
@@ -39,7 +38,7 @@ getIndex handle name = liftIO $
 
   where
     fromResponse ::
-         Either Handle.Error [Proto.Index]
+         Either Handle.Error [Proto.RpbYokozunaIndex]
       -> Either Handle.Error (Maybe Index)
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
@@ -52,8 +51,8 @@ getIndex handle name = liftIO $
       Right (head -> index) ->
         Right $ Just $ Index
           { name = name
-          , nodes = index ^. L.maybe'nodes
-          , schema = decodeUtf8 (index ^. L.schema)
+          , nodes = index ^. Proto.maybe'nVal
+          , schema = decodeUtf8 (index ^. Proto.schema)
           }
 
 -- | Get all Solr indexes.
@@ -66,7 +65,7 @@ getIndexes handle =
 
   where
     fromResponse ::
-         Either Handle.Error [Proto.Index]
+         Either Handle.Error [Proto.RpbYokozunaIndex]
       -> Either Handle.Error [Index]
     fromResponse = \case
       -- TODO test that riak returns "notfound" here instead of an empty list
@@ -88,12 +87,12 @@ putIndex handle index = liftIO $
   Handle.putIndex handle request
 
   where
-    request :: Proto.PutIndexRequest
+    request :: Proto.RpbYokozunaIndexPutReq
     request =
       Proto.defMessage
-        & L.index .~ toProto index
+        & Proto.index .~ toProto index
         -- TODO put index timeout
-        -- & L.maybe'timeout .~ undefined
+        -- & Proto.maybe'timeout .~ undefined
 
 -- | Delete a Solr index.
 deleteIndex ::
@@ -104,17 +103,17 @@ deleteIndex ::
 deleteIndex handle name = liftIO $
   Handle.deleteIndex handle (encodeUtf8 name)
 
-fromProto :: Proto.Index -> Index
+fromProto :: Proto.RpbYokozunaIndex -> Index
 fromProto index =
   Index
-    { name = decodeUtf8 (index ^. L.name)
-    , nodes = index ^. L.maybe'nodes
-    , schema = decodeUtf8 (index ^. L.schema)
+    { name = decodeUtf8 (index ^. Proto.name)
+    , nodes = index ^. Proto.maybe'nVal
+    , schema = decodeUtf8 (index ^. Proto.schema)
     }
 
-toProto :: Index -> Proto.Index
+toProto :: Index -> Proto.RpbYokozunaIndex
 toProto Index { name, nodes, schema } =
   Proto.defMessage
-    & L.maybe'nodes .~ nodes
-    & L.name .~ encodeUtf8 name
-    & L.schema .~ encodeUtf8 schema
+    & Proto.maybe'nVal .~ nodes
+    & Proto.name .~ encodeUtf8 name
+    & Proto.schema .~ encodeUtf8 schema

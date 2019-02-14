@@ -23,7 +23,6 @@ import Riak.Internal.Utils      (bs2int)
 
 import qualified Libriak.Handle                    as Handle
 import qualified Libriak.Proto                     as Proto
-import qualified Libriak.Proto.Lens                as L
 import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
@@ -42,16 +41,16 @@ getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either Handle.Error Proto.BucketProperties)
+  -> m (Either Handle.Error Proto.RpbBucketProps)
 getBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.getBucket handle request
 
   where
-    request :: Proto.GetBucketRequest
+    request :: Proto.RpbGetBucketReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
+        & Proto.bucket .~ bucket
+        & Proto.type' .~ bucketType
 
 -- | Set bucket properties.
 --
@@ -59,7 +58,7 @@ getBucket handle (Bucket bucketType bucket) = liftIO $
 -- TODO don't allow setting n
 setBucket
   :: Handle -- ^
-  -> Proto.SetBucketRequest -- ^
+  -> Proto.RpbSetBucketReq -- ^
   -> IO (Either Handle.Error ())
 setBucket handle request =
   Handle.setBucket handle request
@@ -74,11 +73,11 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.resetBucket handle request
 
   where
-    request :: Proto.ResetBucketRequest
+    request :: Proto.RpbResetBucketReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
+        & Proto.bucket .~ bucket
+        & Proto.type' .~ bucketType
 
 -- | Perform an exact query on a secondary index.
 --
@@ -92,22 +91,22 @@ queryExact handle query@(ExactQuery { value }) keyFold =
   doIndex
     handle
     request
-    (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
+    (Foldl.handlesM (Proto.keys . folded . to (Key bucketType bucket)) keyFold)
 
   where
     Bucket bucketType bucket =
       ExactQuery.bucket query
 
-    request :: Proto.SecondaryIndexRequest
+    request :: Proto.RpbIndexReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.index .~ ExactQuery.name query
-        & L.key .~ SecondaryIndexValue.encode value
-        & L.maxResults .~ 50
-        & L.stream .~ True
-        & L.type' .~ Proto.SecondaryIndexRequest'exact
+        & Proto.bucket .~ bucket
+        & Proto.index .~ ExactQuery.name query
+        & Proto.key .~ SecondaryIndexValue.encode value
+        & Proto.maxResults .~ 50
+        & Proto.qtype .~ Proto.RpbIndexReq'eq
+        & Proto.stream .~ True
+        & Proto.type' .~ bucketType
 
 -- | Perform a range query on a secondary index.
 --
@@ -122,49 +121,49 @@ queryRange handle query keyFold =
   doIndex
     handle
     request
-    (Foldl.handlesM (L.results . folded . to fromResult) keyFold)
+    (Foldl.handlesM (Proto.results . folded . to fromResult) keyFold)
 
   where
     Bucket bucketType bucket =
       RangeQuery.bucket query
 
-    request :: Proto.SecondaryIndexRequest
+    request :: Proto.RpbIndexReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.index .~ RangeQuery.name query
-        & L.maxResults .~ 50 -- TODO configure page size
-        & L.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.max query)
-        & L.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.min query)
-        & L.returnTerms .~ True
-        & L.stream .~ True
-        & L.type' .~ Proto.SecondaryIndexRequest'range
+        & Proto.bucket .~ bucket
+        & Proto.index .~ RangeQuery.name query
+        & Proto.maxResults .~ 50 -- TODO configure page size
+        & Proto.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.max query)
+        & Proto.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.min query)
+        & Proto.returnTerms .~ True
+        & Proto.qtype .~ Proto.RpbIndexReq'range
+        & Proto.stream .~ True
+        & Proto.type' .~ bucketType
 
-    fromResult :: Proto.Pair -> (a, Key)
+    fromResult :: Proto.RpbPair -> (a, Key)
     fromResult pair =
       ( case RangeQuery.min query of
-          SecondaryIndexValue.Binary{}  -> pair ^. L.key
-          SecondaryIndexValue.Integer{} -> bs2int (pair ^. L.key)
-      , Key bucketType bucket (pair ^. L.value)
+          SecondaryIndexValue.Binary{}  -> pair ^. Proto.key
+          SecondaryIndexValue.Integer{} -> bs2int (pair ^. Proto.key)
+      , Key bucketType bucket (pair ^. Proto.value)
       )
 
 doIndex ::
      forall r.
      Handle
-  -> Proto.SecondaryIndexRequest
-  -> FoldM IO Proto.SecondaryIndexResponse r
+  -> Proto.RpbIndexReq
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either Handle.Error r)
 doIndex handle =
   loop
 
   where
     loop ::
-         Proto.SecondaryIndexRequest
-      -> FoldM IO Proto.SecondaryIndexResponse r
+         Proto.RpbIndexReq
+      -> FoldM IO Proto.RpbIndexResp r
       -> IO (Either Handle.Error r)
     loop request responseFold = do
-      result :: Either Handle.Error (FoldM IO Proto.SecondaryIndexResponse r, Maybe ByteString) <-
+      result :: Either Handle.Error (FoldM IO Proto.RpbIndexResp r, Maybe ByteString) <-
         doIndexPage
           handle
           request
@@ -181,13 +180,13 @@ doIndex handle =
 
             Just continuation ->
               loop
-                (request & L.continuation .~ continuation)
+                (request & Proto.continuation .~ continuation)
                 nextResponseFold
 
 doIndexPage ::
      Handle
-  -> Proto.SecondaryIndexRequest
-  -> FoldM IO Proto.SecondaryIndexResponse r
+  -> Proto.RpbIndexReq
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either Handle.Error (r, Maybe ByteString))
 doIndexPage handle request fold =
   Handle.secondaryIndex
@@ -198,10 +197,10 @@ doIndexPage handle request fold =
       <*> continuation)
 
   where
-    continuation :: FoldM IO Proto.SecondaryIndexResponse (Maybe ByteString)
+    continuation :: FoldM IO Proto.RpbIndexResp (Maybe ByteString)
     continuation =
       Foldl.last
-        & lmap (view L.maybe'continuation)
+        & lmap (view Proto.maybe'continuation)
         & Foldl.generalize
         & fmap join
 
@@ -243,14 +242,14 @@ streamKeys handle (Bucket bucketType bucket) keyFold =
   Handle.listKeys
     handle
     request
-    (Foldl.handlesM (L.keys . folded . to (Key bucketType bucket)) keyFold)
+    (Foldl.handlesM (Proto.keys . folded . to (Key bucketType bucket)) keyFold)
 
   where
-    request :: Proto.ListKeysRequest
+    request :: Proto.RpbListKeysReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
+        & Proto.bucket .~ bucket
+        & Proto.type' .~ bucketType
         -- TODO stream keys timeout
 
 

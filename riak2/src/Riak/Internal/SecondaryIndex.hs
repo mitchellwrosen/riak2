@@ -1,6 +1,6 @@
 module Riak.Internal.SecondaryIndex where
 
-import Libriak.Proto                     (Pair)
+import Libriak.Proto                     (RpbPair)
 import Riak.Internal.Panic
 import Riak.Internal.Prelude
 import Riak.Internal.SecondaryIndexValue (SecondaryIndexValue)
@@ -49,7 +49,7 @@ integer ::
 integer index value =
   SecondaryIndex index (SecondaryIndexValue.Integer value)
 
-fromPair :: Pair -> SecondaryIndex
+fromPair :: RpbPair -> SecondaryIndex
 fromPair =
   Pair.toTuple >>> \case
     (ByteString.stripSuffix "_bin" -> Just k, v) ->
@@ -64,7 +64,7 @@ fromPair =
         , ("value", v)
         )
 
-toPair :: SecondaryIndex -> Pair
+toPair :: SecondaryIndex -> RpbPair
 toPair = \case
   SecondaryIndex k (SecondaryIndexValue.Binary v) ->
     Pair.fromTuple (k <> "_bin", v)

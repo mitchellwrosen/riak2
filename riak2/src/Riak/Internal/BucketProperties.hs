@@ -4,7 +4,6 @@ import Riak.Internal.Prelude
 import Riak.Internal.Quorum  (Quorum(..))
 
 import qualified Libriak.Proto        as Proto
-import qualified Libriak.Proto.Lens   as L
 import qualified Riak.Internal.Quorum as Quorum
 
 import Control.Lens       ((^.))
@@ -37,9 +36,9 @@ data ObjectBucketProperties
   , dw :: !Quorum
   , nodes :: !Quorum
   , notfoundBehavior :: !NotfoundBehavior
-  , postcommitHooks :: ![Proto.CommitHook]
+  , postcommitHooks :: ![Proto.RpbCommitHook]
   , pr :: !Quorum
-  , precommitHooks :: ![Proto.CommitHook]
+  , precommitHooks :: ![Proto.RpbCommitHook]
   , pw :: !Quorum
   , r :: !Quorum
   , index :: !(Maybe Text) -- ^ Search index
@@ -68,30 +67,30 @@ data NotfoundBehavior
   | NotfoundSkippedBasic -- only a quorum of vnodes are queried
   deriving stock (Show)
 
-fromProto :: Proto.BucketProperties -> BucketProperties
+fromProto :: Proto.RpbBucketProps -> BucketProperties
 fromProto props =
-  case props ^. L.maybe'datatype of
+  case props ^. Proto.maybe'datatype of
     Nothing ->
       BucketPropertiesObject ObjectBucketProperties
         { conflictResolution =
-            case (props ^. L.allowMult, props ^. L.lastWriteWins) of
+            case (props ^. Proto.allowMult, props ^. Proto.lastWriteWins) of
               (True, _)      -> CreateSiblings
               (False, False) -> UseTimestamps
               (False, True)  -> LastWriteWins
-        , dw = Quorum.fromWord32 (props ^. L.dw)
-        , nodes = Quorum.fromWord32 (props ^. L.nodes)
+        , dw = Quorum.fromWord32 (props ^. Proto.dw)
+        , nodes = Quorum.fromWord32 (props ^. Proto.nVal)
         , notfoundBehavior =
-            case (fromMaybe True (props ^. L.maybe'notfoundOk), props ^. L.basicQuorum) of
+            case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
               (True, _)      -> NotfoundCounts
               (False, False) -> NotfoundSkipped
               (False, True)  -> NotfoundSkippedBasic
-        , postcommitHooks = props ^. L.postcommit
-        , pr = Quorum.fromWord32 (props ^. L.pr)
-        , precommitHooks = props ^. L.precommit
-        , pw = Quorum.fromWord32 (props ^. L.pw)
-        , r = Quorum.fromWord32 (props ^. L.r)
-        , index = decodeUtf8 <$> (props ^. L.maybe'searchIndex)
-        , w = Quorum.fromWord32 (props ^. L.w)
+        , postcommitHooks = props ^. Proto.postcommit
+        , pr = Quorum.fromWord32 (props ^. Proto.pr)
+        , precommitHooks = props ^. Proto.precommit
+        , pw = Quorum.fromWord32 (props ^. Proto.pw)
+        , r = Quorum.fromWord32 (props ^. Proto.r)
+        , index = decodeUtf8 <$> (props ^. Proto.maybe'searchIndex)
+        , w = Quorum.fromWord32 (props ^. Proto.w)
         }
 
     _ ->

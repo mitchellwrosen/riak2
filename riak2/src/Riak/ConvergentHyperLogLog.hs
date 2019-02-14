@@ -14,7 +14,6 @@ import Riak.Key              (Key(..))
 
 import qualified Libriak.Handle     as Handle
 import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
 
 import Control.Lens ((.~), (^.))
 
@@ -51,31 +50,31 @@ getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
     (Handle.getCrdt handle request)
 
   where
-    request :: Proto.GetCrdtRequest
+    request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.key .~ key
+        & Proto.bucket .~ bucket
+        & Proto.key .~ key
+        & Proto.type' .~ bucketType
 
         -- TODO get hll opts
-        -- & L.maybe'basicQuorum .~ undefined
-        -- & L.maybe'nVal .~ undefined
-        -- & L.maybe'notfoundOk .~ undefined
-        -- & L.maybe'pr .~ undefined
-        -- & L.maybe'r .~ undefined
-        -- & L.maybe'sloppyQuorum .~ undefined
-        -- & L.maybe'timeout .~ undefined
+        -- & Proto.maybe'basicQuorum .~ undefined
+        -- & Proto.maybe'nVal .~ undefined
+        -- & Proto.maybe'notfoundOk .~ undefined
+        -- & Proto.maybe'pr .~ undefined
+        -- & Proto.maybe'r .~ undefined
+        -- & Proto.maybe'sloppyQuorum .~ undefined
+        -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
-         Proto.GetCrdtResponse
+         Proto.DtFetchResp
       -> Maybe (ConvergentHyperLogLog Word64)
     fromResponse response = do
-      crdt :: Proto.Crdt <-
-        response ^. L.maybe'value
+      crdt :: Proto.DtValue <-
+        response ^. Proto.maybe'value
       pure ConvergentHyperLogLog
         { key = k
-        , value = crdt ^. L.hll
+        , value = crdt ^. Proto.hllValue
         }
 
 -- | Update a HyperLogLog.
@@ -92,21 +91,21 @@ updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = lift
     (Handle.updateCrdt handle request)
 
   where
-    request :: Proto.UpdateCrdtRequest
+    request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.maybe'key .~
+        & Proto.bucket .~ bucket
+        & Proto.maybe'key .~
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.update .~
+        & Proto.op .~
             (Proto.defMessage
-              & L.hllUpdate .~
+              & Proto.hllOp .~
                   (Proto.defMessage
-                    & L.adds .~ value))
-        & L.returnBody .~ True
+                    & Proto.adds .~ value))
+        & Proto.returnBody .~ True
+        & Proto.type' .~ bucketType
 
 -- TODO map update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -119,12 +118,12 @@ updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = lift
     Key bucketType bucket k =
       key
 
-    fromResponse :: Proto.UpdateCrdtResponse -> ConvergentHyperLogLog Word64
+    fromResponse :: Proto.DtUpdateResp -> ConvergentHyperLogLog Word64
     fromResponse response =
       ConvergentHyperLogLog
         { key =
             if ByteString.null k
-              then Key bucketType bucket (response ^. L.key)
+              then Key bucketType bucket (response ^. Proto.key)
               else key
-        , value = response ^. L.hll
+        , value = response ^. Proto.hllValue
         }

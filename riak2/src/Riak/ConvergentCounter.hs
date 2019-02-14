@@ -8,9 +8,8 @@ import Libriak.Handle        (Handle)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
 
 import Control.Lens ((.~), (^.))
 
@@ -42,29 +41,29 @@ getConvergentCounter handle k@(Key bucketType bucket key) = liftIO $
     (Handle.getCrdt handle request)
 
   where
-    request :: Proto.GetCrdtRequest
+    request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.key .~ key
+        & Proto.bucket .~ bucket
+        & Proto.key .~ key
+        & Proto.type' .~ bucketType
 
         -- TODO get counter opts
-        -- & L.maybe'basicQuorum .~ undefined
-        -- & L.maybe'nVal .~ undefined
-        -- & L.maybe'notfoundOk .~ undefined
-        -- & L.maybe'pr .~ undefined
-        -- & L.maybe'r .~ undefined
-        -- & L.maybe'sloppyQuorum .~ undefined
-        -- & L.maybe'timeout .~ undefined
+        -- & Proto.maybe'basicQuorum .~ undefined
+        -- & Proto.maybe'nVal .~ undefined
+        -- & Proto.maybe'notfoundOk .~ undefined
+        -- & Proto.maybe'pr .~ undefined
+        -- & Proto.maybe'r .~ undefined
+        -- & Proto.maybe'sloppyQuorum .~ undefined
+        -- & Proto.maybe'timeout .~ undefined
 
-    fromResponse :: Proto.GetCrdtResponse -> Maybe ConvergentCounter
+    fromResponse :: Proto.DtFetchResp -> Maybe ConvergentCounter
     fromResponse response = do
-      crdt :: Proto.Crdt <-
-        response ^. L.maybe'value
+      crdt :: Proto.DtValue <-
+        response ^. Proto.maybe'value
       pure ConvergentCounter
         { key = k
-        , value = crdt ^. L.counter
+        , value = crdt ^. Proto.counterValue
         }
 
 -- | Update a counter.
@@ -84,21 +83,22 @@ updateConvergentCounter handle (ConvergentCounter { key, value }) = liftIO $
     (Handle.updateCrdt handle request)
 
   where
-    request :: Proto.UpdateCrdtRequest
+    request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.maybe'key .~
+        & Proto.bucket .~ bucket
+        & Proto.maybe'key .~
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.update .~
+        & Proto.op .~
             (Proto.defMessage
-              & L.counterUpdate .~
+              & Proto.counterOp .~
                   (Proto.defMessage
-                    & L.increment .~ value))
-        & L.returnBody .~ True
+                    & Proto.increment .~ value))
+        & Proto.returnBody .~ True
+        & Proto.type' .~ bucketType
+
 -- TODO counter update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
 -- _DtUpdateReq'dw :: !(Prelude.Maybe Data.Word.Word32),
@@ -110,13 +110,13 @@ updateConvergentCounter handle (ConvergentCounter { key, value }) = liftIO $
     Key bucketType bucket k =
       key
 
-    fromResponse :: Proto.UpdateCrdtResponse -> ConvergentCounter
+    fromResponse :: Proto.DtUpdateResp -> ConvergentCounter
     fromResponse response =
       ConvergentCounter
         { key =
             if ByteString.null k
-              then Key bucketType bucket (response ^. L.key)
+              then Key bucketType bucket (response ^. Proto.key)
               else key
         , value =
-            response ^. L.counter
+            response ^. Proto.counterValue
         }

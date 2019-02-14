@@ -3,17 +3,17 @@ module Riak.Internal.Proto.Pair where
 import Libriak.Proto
 import Riak.Internal.Prelude
 
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Proto as Proto
 
 import Control.Lens ((.~), (^.))
 
 
-fromTuple :: (ByteString, ByteString) -> Pair
+fromTuple :: (ByteString, ByteString) -> RpbPair
 fromTuple (key, value) =
   defMessage
-    & L.key .~ key
-    & L.value .~ value
+    & Proto.key .~ key
+    & Proto.value .~ value
 
-toTuple :: Pair -> (ByteString, ByteString)
+toTuple :: RpbPair -> (ByteString, ByteString)
 toTuple pair =
-  (pair ^. L.key, pair ^. L.value)
+  (pair ^. Proto.key, pair ^. Proto.value)

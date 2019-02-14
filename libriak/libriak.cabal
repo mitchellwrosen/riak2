@@ -28,7 +28,6 @@ library
 
   reexported-modules:
     Libriak.Proto,
-    Libriak.Proto.Lens,
     Libriak.Request,
     Libriak.Response
 

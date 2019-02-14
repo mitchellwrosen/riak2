@@ -6,9 +6,8 @@ module Riak.ServerInfo
 import Libriak.Handle        (Handle)
 import Riak.Internal.Prelude
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -31,9 +30,9 @@ getServerInfo handle = liftIO $
     (Handle.getServerInfo handle)
 
   where
-    fromResponse :: Proto.GetServerInfoResponse -> ServerInfo
+    fromResponse :: Proto.RpbGetServerInfoResp -> ServerInfo
     fromResponse response =
       ServerInfo
-        { name = decodeUtf8 (response ^. L.node)
-        , version = decodeUtf8 (response ^. L.version)
+        { name = decodeUtf8 (response ^. Proto.node)
+        , version = decodeUtf8 (response ^. Proto.serverVersion)
         }

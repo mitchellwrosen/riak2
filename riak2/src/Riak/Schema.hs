@@ -7,9 +7,8 @@ module Riak.Schema
 import Libriak.Handle        (Handle)
 import Riak.Internal.Prelude
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
 
 import Control.Lens       ((.~), (^.))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -36,7 +35,7 @@ getSchema handle name = liftIO $
 
   where
     fromResponse ::
-         Either Handle.Error Proto.Schema
+         Either Handle.Error Proto.RpbYokozunaSchema
       -> Either Handle.Error (Maybe Schema)
     fromResponse = \case
       -- TODO text "notfound" string
@@ -55,15 +54,15 @@ putSchema ::
 putSchema handle schema =
   liftIO (Handle.putSchema handle (toProto schema))
 
-fromProto :: Proto.Schema -> Schema
+fromProto :: Proto.RpbYokozunaSchema -> Schema
 fromProto schema =
   Schema
-    { name = decodeUtf8 (schema ^. L.name)
-    , content = schema ^. L.content
+    { name = decodeUtf8 (schema ^. Proto.name)
+    , content = schema ^. Proto.content
     }
 
-toProto :: Schema -> Proto.Schema
+toProto :: Schema -> Proto.RpbYokozunaSchema
 toProto Schema { name, content } =
   Proto.defMessage
-    & L.content .~ content
-    & L.name .~ encodeUtf8 name
+    & Proto.content .~ content
+    & Proto.name .~ encodeUtf8 name

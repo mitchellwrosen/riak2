@@ -20,7 +20,6 @@ import Riak.Internal.Prelude
 
 import qualified Libriak.Handle               as Handle
 import qualified Libriak.Proto                as Proto
-import qualified Libriak.Proto.Lens           as L
 import qualified Riak.Internal.ErlangTerm     as ErlangTerm
 import qualified Riak.Internal.MapReduceInput as MapReduceInput
 import qualified Riak.Internal.MapReducePhase as MapReducePhase
@@ -43,7 +42,7 @@ mapReduceBucket ::
   => Handle -- ^
   -> Bucket -- ^
   -> [MapReducePhase]
-  -> FoldM IO Proto.MapReduceResponse r -- ^
+  -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either Handle.Error r)
 mapReduceBucket handle bucket phases responseFold =
   liftIO (mapReduce_ handle (MapReduceInputBucket bucket) phases responseFold)
@@ -54,7 +53,7 @@ mapReduceKeys ::
   => Handle -- ^
   -> [Key] -- ^
   -> [MapReducePhase]
-  -> FoldM IO Proto.MapReduceResponse r -- ^
+  -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either Handle.Error r)
 mapReduceKeys handle keys phases responseFold =
   liftIO (mapReduce_ handle (MapReduceInputKeys keys) phases responseFold)
@@ -63,17 +62,17 @@ mapReduce_ ::
      Handle
   -> MapReduceInput
   -> [MapReducePhase]
-  -> FoldM IO Proto.MapReduceResponse r
+  -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either Handle.Error r)
 mapReduce_ handle input phases responseFold =
   Handle.mapReduce handle request responseFold
 
   where
-    request :: Proto.MapReduceRequest
+    request :: Proto.RpbMapRedReq
     request =
       Proto.defMessage
-        & L.contentType .~ "application/x-erlang-binary"
-        & L.request .~ ErlangTerm.build (makeMapReduceErlangTerm input phases)
+        & Proto.contentType .~ "application/x-erlang-binary"
+        & Proto.request .~ ErlangTerm.build (makeMapReduceErlangTerm input phases)
 
 -- [{inputs, Inputs}, {query, Query}, {timeout, Timeout}]
 --

@@ -31,7 +31,6 @@ import Riak.Internal.Sibling (Sibling)
 
 import qualified Libriak.Handle               as Handle
 import qualified Libriak.Proto                as Proto
-import qualified Libriak.Proto.Lens           as L
 import qualified Riak.Internal.Key            as Key
 import qualified Riak.Internal.Proto.Pair     as Proto.Pair
 import qualified Riak.Internal.Quorum         as Quorum
@@ -128,7 +127,7 @@ get handle key opts = liftIO $
     (doGet handle request)
 
   where
-    request :: Proto.GetRequest
+    request :: Proto.RpbGetReq
     request =
       makeGetRequest key opts
 
@@ -147,10 +146,10 @@ getHead handle key opts = liftIO $
     ((fmap.map) (() <$)  . fromGetResponse key)
     (doGet handle request)
   where
-    request :: Proto.GetRequest
+    request :: Proto.RpbGetReq
     request =
       makeGetRequest key opts
-        & L.head .~ True
+        & Proto.head .~ True
 
 -- | Get an object if it has been modified since the given version.
 --
@@ -165,16 +164,16 @@ getIfModified ::
 getIfModified handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     (\response ->
-      if response ^. L.unchanged
+      if response ^. Proto.unchanged
         then Nothing
         else Just (fromGetResponse key response))
     (doGet handle request)
 
   where
-    request :: Proto.GetRequest
+    request :: Proto.RpbGetReq
     request =
       makeGetRequest key opts
-        & L.ifModified .~ unContext context
+        & Proto.ifModified .~ unContext context
 
 -- | Get an object's metadata if it has been modified since the given version.
 --
@@ -191,22 +190,22 @@ getHeadIfModified handle Object { context, key } opts = liftIO $
     fromResponse
     (doGet handle request)
   where
-    request :: Proto.GetRequest
+    request :: Proto.RpbGetReq
     request =
       makeGetRequest key opts
-        & L.head .~ True
-        & L.ifModified .~ unContext context
+        & Proto.head .~ True
+        & Proto.ifModified .~ unContext context
 
-    fromResponse :: Proto.GetResponse -> Maybe (Object [Sibling ()])
+    fromResponse :: Proto.RpbGetResp -> Maybe (Object [Sibling ()])
     fromResponse response =
-      if response ^. L.unchanged
+      if response ^. Proto.unchanged
         then Nothing
         else Just (map (() <$) <$> fromGetResponse key response)
 
 doGet ::
      Handle
-  -> Proto.GetRequest
-  -> IO (Either (Error 'GetOp) Proto.GetResponse)
+  -> Proto.RpbGetReq
+  -> IO (Either (Error 'GetOp) Proto.RpbGetResp)
 doGet handle request =
   first parseGetError <$>
     Handle.get handle request
@@ -218,26 +217,26 @@ doGet handle request =
 
       Handle.ErrorRiak err
         | isBucketTypeDoesNotExistError err ->
-            BucketTypeDoesNotExistError (request ^. L.bucketType)
+            BucketTypeDoesNotExistError (request ^. Proto.type')
         | isInvalidNodesError err ->
-            InvalidNodesError (request ^. L.nodes)
+            InvalidNodesError (request ^. Proto.nVal)
         | otherwise ->
             UnknownError (decodeUtf8 err)
 
-makeGetRequest :: Key -> GetOpts -> Proto.GetRequest
+makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest
     key
     GetOpts { basicQuorum, nodes, notfoundOk, pr, r, timeout } =
 
   Proto.defMessage
     & Key.setProto key
-    & L.deletedContext .~ True
-    & L.maybe'basicQuorum .~ defFalse basicQuorum
-    & L.maybe'nodes .~ (Quorum.toWord32 <$> nodes)
-    & L.maybe'notfoundOk .~ notfoundOk
-    & L.maybe'pr .~ (Quorum.toWord32 <$> pr)
-    & L.maybe'r .~ (Quorum.toWord32 <$> r)
-    & L.maybe'timeout .~ timeout
+    & Proto.deletedvclock .~ True
+    & Proto.maybe'basicQuorum .~ defFalse basicQuorum
+    & Proto.maybe'notfoundOk .~ notfoundOk
+    & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+    & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
+    & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
+    & Proto.maybe'timeout .~ timeout
 
 
 -- | Put an object and return its key.
@@ -253,17 +252,17 @@ put handle object opts =
     fromResponse
     (doPut handle request)
   where
-    request :: Proto.PutRequest
+    request :: Proto.RpbPutReq
     request =
       makePutRequest object opts
 
     key@(Key bucketType bucket k) =
       object ^. field @"key"
 
-    fromResponse :: Proto.PutResponse -> Key
+    fromResponse :: Proto.RpbPutResp -> Key
     fromResponse response =
       if ByteString.null k
-        then Key bucketType bucket (response ^. L.key)
+        then Key bucketType bucket (response ^. Proto.key)
         else key
 
 -- | Put an object and return it.
@@ -287,10 +286,10 @@ putGet handle object opts = liftIO $
     (doPut handle request)
 
   where
-    request :: Proto.PutRequest
+    request :: Proto.RpbPutReq
     request =
       makePutRequest object opts
-        & L.returnBody .~ True
+        & Proto.returnBody .~ True
 
 -- | Put an object and return its metadata.
 --
@@ -310,15 +309,15 @@ putGetHead handle object opts = liftIO $
     (doPut handle request)
 
   where
-    request :: Proto.PutRequest
+    request :: Proto.RpbPutReq
     request =
       makePutRequest object opts
-        & L.returnHead .~ True
+        & Proto.returnHead .~ True
 
 doPut ::
      Handle
-  -> Proto.PutRequest
-  -> IO (Either (Error 'PutOp) Proto.PutResponse)
+  -> Proto.RpbPutReq
+  -> IO (Either (Error 'PutOp) Proto.RpbPutResp)
 doPut handle request =
   first parsePutError <$> Handle.put handle request
 
@@ -330,39 +329,39 @@ doPut handle request =
 
       Handle.ErrorRiak err
         | isBucketTypeDoesNotExistError err ->
-            BucketTypeDoesNotExistError (request ^. L.bucketType)
+            BucketTypeDoesNotExistError (request ^. Proto.type')
         | isInvalidNodesError err ->
-            InvalidNodesError (request ^. L.nodes)
+            InvalidNodesError (request ^. Proto.nVal)
         | otherwise ->
             UnknownError (decodeUtf8 err)
 
 makePutRequest ::
      Object (Content ByteString)
   -> PutOpts
-  -> Proto.PutRequest
+  -> Proto.RpbPutReq
 makePutRequest
      Object { content = Content { charset, encoding, indexes, metadata, type', value }, context, key }
      PutOpts { dw, nodes, pw, timeout, w } =
   Proto.defMessage
     & Key.setMaybeProto key
-    & L.content .~
+    & Proto.content .~
         (Proto.defMessage
-          & L.indexes .~ map SecondaryIndex.toPair indexes
-          & L.maybe'charset .~ charset
-          & L.maybe'contentEncoding .~ encoding
-          & L.maybe'contentType .~ type'
-          & L.usermeta .~ map Proto.Pair.fromTuple metadata
-          & L.value .~ value
+          & Proto.indexes .~ map SecondaryIndex.toPair indexes
+          & Proto.maybe'charset .~ charset
+          & Proto.maybe'contentEncoding .~ encoding
+          & Proto.maybe'contentType .~ type'
+          & Proto.usermeta .~ map Proto.Pair.fromTuple metadata
+          & Proto.value .~ value
         )
-    & L.maybe'context .~
+    & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
+    & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+    & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
+    & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
+    & Proto.maybe'timeout .~ timeout
+    & Proto.maybe'vclock .~
         (if ByteString.null (unContext context)
           then Nothing
           else Just (unContext context))
-    & L.maybe'dw .~ (Quorum.toWord32 <$> dw)
-    & L.maybe'nodes .~ (Quorum.toWord32 <$> nodes)
-    & L.maybe'pw .~ (Quorum.toWord32 <$> pw)
-    & L.maybe'w .~ (Quorum.toWord32 <$> w)
-    & L.maybe'timeout .~ timeout
 
 -- | Delete an object.
 delete ::
@@ -379,18 +378,18 @@ delete
   first parseDeleteError <$> Handle.delete handle request
 
   where
-    request :: Proto.DeleteRequest
+    request :: Proto.RpbDelReq
     request =
       Proto.defMessage
         & Key.setProto key
-        & L.maybe'dw .~ (Quorum.toWord32 <$> dw)
-        & L.maybe'nodes .~ (Quorum.toWord32 <$> nodes)
-        & L.maybe'pr .~ (Quorum.toWord32 <$> pr)
-        & L.maybe'pw .~ (Quorum.toWord32 <$> pw)
-        & L.maybe'r .~ (Quorum.toWord32 <$> r)
-        & L.maybe'timeout .~ timeout
-        & L.maybe'w .~ (Quorum.toWord32 <$> w)
-        & L.context .~ unContext context
+        & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
+        & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+        & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
+        & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
+        & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
+        & Proto.maybe'timeout .~ timeout
+        & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
+        & Proto.vclock .~ unContext context
 
     parseDeleteError :: Handle.Error -> Error 'DeleteOp
     parseDeleteError = \case

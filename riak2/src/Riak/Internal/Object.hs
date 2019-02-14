@@ -6,7 +6,6 @@ import Riak.Internal.Sibling (Sibling(..))
 import Riak.Key              (Key(..))
 
 import qualified Libriak.Proto         as Proto
-import qualified Libriak.Proto.Lens    as L
 import qualified Riak.Internal.Sibling as Sibling
 
 import Control.Lens ((^.))
@@ -34,11 +33,14 @@ newObject key content =
     }
 
 -- | Parse an object from a get response.
-fromGetResponse :: Key -> Proto.GetResponse -> Object [Sibling ByteString]
+fromGetResponse ::
+     Key
+  -> Proto.RpbGetResp
+  -> Object [Sibling ByteString]
 fromGetResponse key response =
   Object
-    { content = map Sibling.fromProtoContent (response ^. L.content)
-    , context = Context (response ^. L.context)
+    { content = map Sibling.fromProtoContent (response ^. Proto.content)
+    , context = Context (response ^. Proto.vclock)
     , key = key
     }
 
@@ -47,12 +49,12 @@ fromGetResponse key response =
 -- Assumes that either @return_body@ or @return_head@ was set on the request.
 fromPutResponse ::
      Key
-  -> Proto.PutResponse
+  -> Proto.RpbPutResp
   -> Object (NonEmpty (Sibling ByteString))
 fromPutResponse k@(Key bucketType bucket key) response =
   Object
-    { content = List1.fromList (map Sibling.fromProtoContent (response ^. L.content))
-    , context = Context (response ^. L.context)
+    { content = List1.fromList (map Sibling.fromProtoContent (response ^. Proto.content))
+    , context = Context (response ^. Proto.vclock)
     , key = key'
     }
 
@@ -60,5 +62,5 @@ fromPutResponse k@(Key bucketType bucket key) response =
     key' :: Key
     key' =
       if ByteString.null key
-        then Key bucketType bucket (response ^. L.key)
+        then Key bucketType bucket (response ^. Proto.key)
         else k

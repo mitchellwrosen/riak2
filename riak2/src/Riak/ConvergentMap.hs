@@ -15,7 +15,6 @@ import Riak.Key                    (Key(..))
 
 import qualified Libriak.Handle              as Handle
 import qualified Libriak.Proto               as Proto
-import qualified Libriak.Proto.Lens          as L
 import qualified Riak.Internal.ConvergentSet as ConvergentSet
 
 import Control.Lens ((%~), (.~), (^.))
@@ -86,32 +85,32 @@ getConvergentMap handle k@(Key bucketType bucket key) = liftIO $
     (Handle.getCrdt handle request)
 
   where
-    request :: Proto.GetCrdtRequest
+    request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.key .~ key
+        & Proto.bucket .~ bucket
+        & Proto.key .~ key
+        & Proto.type' .~ bucketType
 
         -- TODO get map opts
-        -- & L.maybe'basicQuorum .~ undefined
-        -- & L.maybe'nVal .~ undefined
-        -- & L.maybe'notfoundOk .~ undefined
-        -- & L.maybe'pr .~ undefined
-        -- & L.maybe'r .~ undefined
-        -- & L.maybe'sloppyQuorum .~ undefined
-        -- & L.maybe'timeout .~ undefined
+        -- & Proto.maybe'basicQuorum .~ undefined
+        -- & Proto.maybe'nVal .~ undefined
+        -- & Proto.maybe'notfoundOk .~ undefined
+        -- & Proto.maybe'pr .~ undefined
+        -- & Proto.maybe'r .~ undefined
+        -- & Proto.maybe'sloppyQuorum .~ undefined
+        -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
-         Proto.GetCrdtResponse
+         Proto.DtFetchResp
       -> Maybe (ConvergentMap ConvergentMapValue)
     fromResponse response = do
-      crdt :: Proto.Crdt <-
-        response ^. L.maybe'value
+      crdt :: Proto.DtValue <-
+        response ^. Proto.maybe'value
       pure ConvergentMap
-        { context = Context (response ^. L.context)
+        { context = Context (response ^. Proto.context)
         , key = k
-        , value = fromProtoValues (crdt ^. L.map)
+        , value = fromProtoMapEntries (crdt ^. Proto.mapValue)
         }
 
 -- | Update a map.
@@ -128,23 +127,23 @@ updateConvergentMap handle (ConvergentMap { context, key, value }) = liftIO $
     (Handle.updateCrdt handle request)
 
   where
-    request :: Proto.UpdateCrdtRequest
+    request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.maybe'context .~
+        & Proto.bucket .~ bucket
+        & Proto.maybe'context .~
             (if ByteString.null (unContext context)
               then Nothing
               else Just (unContext context))
-        & L.maybe'key .~
+        & Proto.maybe'key .~
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.update .~
+        & Proto.op .~
             (Proto.defMessage
-              & L.mapUpdate .~ toProtoUpdate value)
-        & L.returnBody .~ True
+              & Proto.mapOp .~ toProtoMapOp value)
+        & Proto.returnBody .~ True
+        & Proto.type' .~ bucketType
 
 -- TODO map update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -157,121 +156,121 @@ updateConvergentMap handle (ConvergentMap { context, key, value }) = liftIO $
     Key bucketType bucket k =
       key
 
-    fromResponse :: Proto.UpdateCrdtResponse -> ConvergentMap ConvergentMapValue
+    fromResponse :: Proto.DtUpdateResp -> ConvergentMap ConvergentMapValue
     fromResponse response =
       ConvergentMap
-        { context = Context (response ^. L.context)
+        { context = Context (response ^. Proto.context)
         , key =
             if ByteString.null k
-              then Key bucketType bucket (response ^. L.key)
+              then Key bucketType bucket (response ^. Proto.key)
               else key
-        , value = fromProtoValues (response ^. L.map)
+        , value = fromProtoMapEntries (response ^. Proto.mapValue)
         }
 
-fromProtoValues :: [Proto.MapValue] -> ConvergentMapValue
-fromProtoValues =
-  foldMap fromProtoValue
+fromProtoMapEntries :: [Proto.MapEntry] -> ConvergentMapValue
+fromProtoMapEntries =
+  foldMap fromProtoMapEntry
 
-fromProtoValue :: Proto.MapValue -> ConvergentMapValue
-fromProtoValue entry =
-  case entry ^. L.field . L.type' of
-    Proto.MapKey'COUNTER ->
-      mempty { counters = HashMap.singleton name (entry ^. L.counter) }
+fromProtoMapEntry :: Proto.MapEntry -> ConvergentMapValue
+fromProtoMapEntry entry =
+  case entry ^. Proto.field . Proto.type' of
+    Proto.MapField'COUNTER ->
+      mempty { counters = HashMap.singleton name (entry ^. Proto.counterValue) }
 
-    Proto.MapKey'FLAG ->
-      mempty { flags = HashMap.singleton name (entry ^. L.flag) }
+    Proto.MapField'FLAG ->
+      mempty { flags = HashMap.singleton name (entry ^. Proto.flagValue) }
 
-    Proto.MapKey'MAP ->
-      mempty { maps = HashMap.singleton name (fromProtoValues (entry ^. L.map)) }
+    Proto.MapField'MAP ->
+      mempty { maps = HashMap.singleton name (fromProtoMapEntries (entry ^. Proto.mapValue)) }
 
-    Proto.MapKey'REGISTER ->
-      mempty { registers = HashMap.singleton name (entry ^. L.register) }
+    Proto.MapField'REGISTER ->
+      mempty { registers = HashMap.singleton name (entry ^. Proto.registerValue) }
 
-    Proto.MapKey'SET ->
-      mempty { sets = HashMap.singleton name (HashSet.fromList (entry ^. L.set)) }
+    Proto.MapField'SET ->
+      mempty { sets = HashMap.singleton name (HashSet.fromList (entry ^. Proto.setValue)) }
 
   where
     name :: ByteString
     name =
-      entry ^. L.field . L.name
+      entry ^. Proto.field . Proto.name
 
-toProtoUpdate :: [ConvergentMapUpdate] -> Proto.MapUpdate
-toProtoUpdate =
-  ($ Proto.defMessage) . appEndo . foldMap (coerce toEndoProtoUpdate)
+toProtoMapOp :: [ConvergentMapUpdate] -> Proto.MapOp
+toProtoMapOp =
+  ($ Proto.defMessage) . appEndo . foldMap (coerce toEndoProtoMapOp)
 
-toEndoProtoUpdate :: ConvergentMapUpdate -> Proto.MapUpdate -> Proto.MapUpdate
-toEndoProtoUpdate = \case
+toEndoProtoMapOp :: ConvergentMapUpdate -> Proto.MapOp -> Proto.MapOp
+toEndoProtoMapOp = \case
   RemoveCounter name ->
-    L.removes %~ (mapkey name Proto.MapKey'COUNTER :)
+    Proto.removes %~ (mapfield name Proto.MapField'COUNTER :)
 
   RemoveFlag name ->
-    L.removes %~ (mapkey name Proto.MapKey'FLAG :)
+    Proto.removes %~ (mapfield name Proto.MapField'FLAG :)
 
   RemoveMap name ->
-    L.removes %~ (mapkey name Proto.MapKey'MAP :)
+    Proto.removes %~ (mapfield name Proto.MapField'MAP :)
 
   RemoveRegister name ->
-    L.removes %~ (mapkey name Proto.MapKey'REGISTER :)
+    Proto.removes %~ (mapfield name Proto.MapField'REGISTER :)
 
   RemoveSet name ->
-    L.removes %~ (mapkey name Proto.MapKey'SET :)
+    Proto.removes %~ (mapfield name Proto.MapField'SET :)
 
   UpdateCounter name value ->
     let
-      update :: Proto.MapValueUpdate
+      update :: Proto.MapUpdate
       update =
         Proto.defMessage
-          & L.field .~ mapkey name Proto.MapKey'COUNTER
-          & L.counterUpdate .~ (Proto.defMessage & L.increment .~ value)
+          & Proto.field .~ mapfield name Proto.MapField'COUNTER
+          & Proto.counterOp .~ (Proto.defMessage & Proto.increment .~ value)
     in
-      L.updates %~ (update :)
+      Proto.updates %~ (update :)
 
   UpdateFlag name value ->
     let
-      update :: Proto.MapValueUpdate
+      update :: Proto.MapUpdate
       update =
         Proto.defMessage
-          & L.field .~ mapkey name Proto.MapKey'FLAG
-          & L.flagUpdate .~
+          & Proto.field .~ mapfield name Proto.MapField'FLAG
+          & Proto.flagOp .~
               case value of
-                False -> Proto.MapValueUpdate'DISABLE
-                True  -> Proto.MapValueUpdate'ENABLE
+                False -> Proto.MapUpdate'DISABLE
+                True  -> Proto.MapUpdate'ENABLE
     in
-      L.updates %~ (update :)
+      Proto.updates %~ (update :)
 
   UpdateMap name value ->
     let
-      update :: Proto.MapValueUpdate
+      update :: Proto.MapUpdate
       update =
         Proto.defMessage
-          & L.field .~ mapkey name Proto.MapKey'MAP
-          & L.mapUpdate .~ toProtoUpdate value
+          & Proto.field .~ mapfield name Proto.MapField'MAP
+          & Proto.mapOp .~ toProtoMapOp value
     in
-      L.updates %~ (update :)
+      Proto.updates %~ (update :)
 
   UpdateRegister name value ->
     let
-      update :: Proto.MapValueUpdate
+      update :: Proto.MapUpdate
       update =
         Proto.defMessage
-          & L.field .~ mapkey name Proto.MapKey'REGISTER
-          & L.registerUpdate .~ value
+          & Proto.field .~ mapfield name Proto.MapField'REGISTER
+          & Proto.registerOp .~ value
     in
-      L.updates %~ (update :)
+      Proto.updates %~ (update :)
 
   UpdateSet name value ->
     let
-      update :: Proto.MapValueUpdate
+      update :: Proto.MapUpdate
       update =
         Proto.defMessage
-          & L.field .~ mapkey name Proto.MapKey'SET
-          & L.setUpdate .~ ConvergentSet.toProtoUpdate value
+          & Proto.field .~ mapfield name Proto.MapField'SET
+          & Proto.setOp .~ ConvergentSet.toProtoSetOp value
     in
-      L.updates %~ (update :)
+      Proto.updates %~ (update :)
 
   where
-    mapkey :: ByteString -> Proto.MapKey'MapKeyType -> Proto.MapKey
-    mapkey name type' =
+    mapfield :: ByteString -> Proto.MapField'MapFieldType -> Proto.MapField
+    mapfield name type' =
       Proto.defMessage
-        & L.name .~ name
-        & L.type' .~ type'
+        & Proto.name .~ name
+        & Proto.type' .~ type'

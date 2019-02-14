@@ -16,54 +16,54 @@ import qualified Data.ProtoLens as Proto
 
 
 data Request
-  = RequestDelete DeleteRequest
-  | RequestDeleteIndex DeleteIndexRequest
-  | RequestGet GetRequest
-  | RequestGetBucket GetBucketRequest
-  | RequestGetBucketType GetBucketTypeRequest
-  | RequestGetCrdt GetCrdtRequest
-  | RequestGetIndex GetIndexRequest
-  | RequestGetServerInfo GetServerInfoRequest
-  | RequestGetSchema GetSchemaRequest
-  | RequestListBuckets ListBucketsRequest
-  | RequestListKeys ListKeysRequest
-  | RequestMapReduce MapReduceRequest
-  | RequestPing PingRequest
-  | RequestPut PutRequest
-  | RequestPutIndex PutIndexRequest
-  | RequestPutSchema PutSchemaRequest
-  | RequestResetBucket ResetBucketRequest
-  | RequestSearch SearchRequest
-  | RequestSecondaryIndex SecondaryIndexRequest
-  | RequestSetBucket SetBucketRequest
-  | RequestSetBucketType SetBucketTypeRequest
-  | RequestUpdateCrdt UpdateCrdtRequest
+  = ReqDtFetch DtFetchReq
+  | ReqDtUpdate DtUpdateReq
+  | ReqRpbDel RpbDelReq
+  | ReqRpbGet RpbGetReq
+  | ReqRpbGetBucket RpbGetBucketReq
+  | ReqRpbGetBucketType RpbGetBucketTypeReq
+  | ReqRpbGetServerInfo RpbGetServerInfoReq
+  | ReqRpbIndex RpbIndexReq
+  | ReqRpbListBuckets RpbListBucketsReq
+  | ReqRpbListKeys RpbListKeysReq
+  | ReqRpbMapRed RpbMapRedReq
+  | ReqRpbPing RpbPingReq
+  | ReqRpbPut RpbPutReq
+  | ReqRpbResetBucket RpbResetBucketReq
+  | ReqRpbSearchQuery RpbSearchQueryReq
+  | ReqRpbSetBucket RpbSetBucketReq
+  | ReqRpbSetBucketType RpbSetBucketTypeReq
+  | ReqRpbYokozunaIndexDelete RpbYokozunaIndexDeleteReq
+  | ReqRpbYokozunaIndexGet RpbYokozunaIndexGetReq
+  | ReqRpbYokozunaIndexPut RpbYokozunaIndexPutReq
+  | ReqRpbYokozunaSchemaGet RpbYokozunaSchemaGetReq
+  | ReqRpbYokozunaSchemaPut RpbYokozunaSchemaPutReq
   deriving stock (Show)
 
 encodeRequest :: Request -> [ByteArray]
 encodeRequest = \case
-  RequestDelete         request -> go 13 request
-  RequestDeleteIndex    request -> go 57 request
-  RequestGet            request -> go  9 request
-  RequestGetBucket      request -> go 19 request
-  RequestGetBucketType  request -> go 31 request
-  RequestGetCrdt        request -> go 80 request
-  RequestGetIndex       request -> go 54 request
-  RequestGetSchema      request -> go 58 request
-  RequestGetServerInfo  request -> go  7 request
-  RequestListBuckets    request -> go 15 request
-  RequestListKeys       request -> go 17 request
-  RequestMapReduce      request -> go 23 request
-  RequestPing           request -> go  1 request
-  RequestPut            request -> go 11 request
-  RequestPutIndex       request -> go 56 request
-  RequestPutSchema      request -> go 60 request
-  RequestResetBucket    request -> go 29 request
-  RequestSearch         request -> go 27 request
-  RequestSecondaryIndex request -> go 25 request
-  RequestSetBucket      request -> go 21 request
-  RequestSetBucketType  request -> go 32 request
-  RequestUpdateCrdt     request -> go 82 request
+  ReqDtFetch                request -> go 80 request
+  ReqDtUpdate               request -> go 82 request
+  ReqRpbDel                 request -> go 13 request
+  ReqRpbGet                 request -> go  9 request
+  ReqRpbGetBucket           request -> go 19 request
+  ReqRpbGetBucketType       request -> go 31 request
+  ReqRpbGetServerInfo       request -> go  7 request
+  ReqRpbIndex               request -> go 25 request
+  ReqRpbListBuckets         request -> go 15 request
+  ReqRpbListKeys            request -> go 17 request
+  ReqRpbMapRed              request -> go 23 request
+  ReqRpbPing                request -> go  1 request
+  ReqRpbPut                 request -> go 11 request
+  ReqRpbResetBucket         request -> go 29 request
+  ReqRpbSearchQuery         request -> go 27 request
+  ReqRpbSetBucket           request -> go 21 request
+  ReqRpbSetBucketType       request -> go 32 request
+  ReqRpbYokozunaIndexDelete request -> go 57 request
+  ReqRpbYokozunaIndexGet    request -> go 54 request
+  ReqRpbYokozunaIndexPut    request -> go 56 request
+  ReqRpbYokozunaSchemaGet   request -> go 58 request
+  ReqRpbYokozunaSchemaPut   request -> go 60 request
 
   where
     go :: Proto.Message a => Word8 -> a -> [ByteArray]

@@ -1,7 +1,7 @@
 module Libriak.Proto
   ( DecodeError(..)
-  , module Proto.Proto.Riak
     -- ** Re-exports
+  , module Data.Riak.Proto
   , defMessage
   , HasLens'
   ) where
@@ -11,7 +11,7 @@ import Data.ByteString        (ByteString)
 import Data.ProtoLens.Message (defMessage)
 import Data.Word              (Word8)
 import Lens.Labels            (HasLens')
-import Proto.Proto.Riak
+import Data.Riak.Proto
 
 data DecodeError
   = ProtobufDecodeError !ByteString !String

@@ -7,7 +7,6 @@ import Control.Lens ((^.))
 import Data.Time    (UTCTime)
 
 import qualified Libriak.Proto                as Proto
-import qualified Libriak.Proto.Lens           as L
 import qualified Riak.Internal.Proto.Content  as Proto.Content
 import qualified Riak.Internal.SecondaryIndex as SecondaryIndex
 
@@ -16,20 +15,20 @@ data Sibling a
   | Tombstone !UTCTime
   deriving stock (Eq, Functor, Show)
 
-fromProtoContent :: Proto.Content -> Sibling ByteString
+fromProtoContent :: Proto.RpbContent -> Sibling ByteString
 fromProtoContent content =
-  if content ^. L.deleted
+  if content ^. Proto.deleted
     then
       Tombstone (Proto.Content.lastModified content)
 
     else
       Sibling Content
-        { charset = content ^. L.maybe'charset
-        , encoding = content ^. L.maybe'contentEncoding
-        , indexes = map SecondaryIndex.fromPair (content ^. L.indexes)
+        { charset = content ^. Proto.maybe'charset
+        , encoding = content ^. Proto.maybe'contentEncoding
+        , indexes = map SecondaryIndex.fromPair (content ^. Proto.indexes)
         , lastModified = Proto.Content.lastModified content
         , metadata = Proto.Content.metadata content
-        , ttl = content ^. L.maybe'ttl
-        , type' = content ^. L.maybe'contentType
-        , value = content ^. L.value
+        , ttl = content ^. Proto.maybe'ttl
+        , type' = content ^. Proto.maybe'contentType
+        , value = content ^. Proto.value
         }

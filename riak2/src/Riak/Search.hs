@@ -42,7 +42,6 @@ import Riak.Internal.Prelude
 
 import qualified Libriak.Handle           as Handle
 import qualified Libriak.Proto            as Proto
-import qualified Libriak.Proto.Lens       as L
 import qualified Riak.Internal.Proto.Pair as Proto.Pair
 
 import Control.Lens       ((.~), (^.))
@@ -96,17 +95,17 @@ search
     Handle.search handle request
 
   where
-    request :: Proto.SearchRequest
+    request :: Proto.RpbSearchQueryReq
     request =
       Proto.defMessage
-        & L.fieldList .~ fieldList
-        & L.index .~ encodeUtf8 index
-        & L.maybe'filter .~ filter
-        & L.maybe'presort .~ presort
-        & L.maybe'rows .~ rows
-        & L.maybe'sort .~ sort
-        & L.maybe'start .~ start
-        & L.query .~ query
+        & Proto.fl .~ fieldList
+        & Proto.index .~ encodeUtf8 index
+        & Proto.maybe'filter .~ filter
+        & Proto.maybe'presort .~ presort
+        & Proto.maybe'rows .~ rows
+        & Proto.maybe'sort .~ sort
+        & Proto.maybe'start .~ start
+        & Proto.q .~ query
 
     parseSearchError :: Handle.Error -> Error 'SearchOp
     parseSearchError = \case
@@ -123,14 +122,14 @@ search
         | otherwise ->
             UnknownError (decodeUtf8 err)
 
-    fromResponse :: Proto.SearchResponse -> SearchResults
+    fromResponse :: Proto.RpbSearchQueryResp -> SearchResults
     fromResponse response =
       SearchResults
-        { documents = map fromDocument (response ^. L.docs)
-        , maxScore = response ^. L.maxScore
-        , numFound = response ^. L.numFound
+        { documents = map fromProtoSearchDoc (response ^. Proto.docs)
+        , maxScore = response ^. Proto.maxScore
+        , numFound = response ^. Proto.numFound
         }
 
-    fromDocument :: Proto.Document -> [(ByteString, ByteString)]
-    fromDocument doc =
-      map Proto.Pair.toTuple (doc ^. L.fields)
+    fromProtoSearchDoc :: Proto.RpbSearchDoc -> [(ByteString, ByteString)]
+    fromProtoSearchDoc doc =
+      map Proto.Pair.toTuple (doc ^. Proto.fields)

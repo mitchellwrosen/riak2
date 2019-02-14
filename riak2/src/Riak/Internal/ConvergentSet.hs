@@ -5,9 +5,8 @@ import Riak.Internal.Context (Context(..))
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Proto.Lens as L
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
 
 import Control.Lens ((.~), (^.))
 
@@ -43,32 +42,32 @@ getConvergentSet handle k@(Key bucketType bucket key) = liftIO $
     (Handle.getCrdt handle request)
 
   where
-    request :: Proto.GetCrdtRequest
+    request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.key .~ key
+        & Proto.bucket .~ bucket
+        & Proto.key .~ key
+        & Proto.type' .~ bucketType
 
         -- TODO get set opts
-        -- & L.maybe'basicQuorum .~ undefined
-        -- & L.maybe'nVal .~ undefined
-        -- & L.maybe'notfoundOk .~ undefined
-        -- & L.maybe'pr .~ undefined
-        -- & L.maybe'r .~ undefined
-        -- & L.maybe'sloppyQuorum .~ undefined
-        -- & L.maybe'timeout .~ undefined
+        -- & Proto.maybe'basicQuorum .~ undefined
+        -- & Proto.maybe'nVal .~ undefined
+        -- & Proto.maybe'notfoundOk .~ undefined
+        -- & Proto.maybe'pr .~ undefined
+        -- & Proto.maybe'r .~ undefined
+        -- & Proto.maybe'sloppyQuorum .~ undefined
+        -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
-         Proto.GetCrdtResponse
+         Proto.DtFetchResp
       -> Maybe (ConvergentSet (HashSet ByteString))
     fromResponse response = do
-      crdt :: Proto.Crdt <-
-        response ^. L.maybe'value
+      crdt :: Proto.DtValue <-
+        response ^. Proto.maybe'value
       pure ConvergentSet
-        { context = Context (response ^. L.context)
+        { context = Context (response ^. Proto.context)
         , key = k
-        , value = HashSet.fromList (crdt ^. L.set)
+        , value = HashSet.fromList (crdt ^. Proto.setValue)
         }
 
 -- | Update a set.
@@ -85,23 +84,23 @@ updateConvergentSet handle (ConvergentSet { context, key, value }) = liftIO $
     (Handle.updateCrdt handle request)
 
   where
-    request :: Proto.UpdateCrdtRequest
+    request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & L.bucket .~ bucket
-        & L.bucketType .~ bucketType
-        & L.maybe'context .~
+        & Proto.bucket .~ bucket
+        & Proto.maybe'context .~
             (if ByteString.null (unContext context)
               then Nothing
               else Just (unContext context))
-        & L.maybe'key .~
+        & Proto.maybe'key .~
             (if ByteString.null k
               then Nothing
               else Just k)
-        & L.update .~
+        & Proto.op .~
             (Proto.defMessage
-              & L.setUpdate .~ toProtoUpdate value)
-        & L.returnBody .~ True
+              & Proto.setOp .~ toProtoSetOp value)
+        & Proto.returnBody .~ True
+        & Proto.type' .~ bucketType
 
 -- TODO set update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -115,23 +114,23 @@ updateConvergentSet handle (ConvergentSet { context, key, value }) = liftIO $
       key
 
     fromResponse ::
-         Proto.UpdateCrdtResponse
+         Proto.DtUpdateResp
       -> ConvergentSet (HashSet ByteString)
     fromResponse response =
       ConvergentSet
-        { context = Context (response ^. L.context)
+        { context = Context (response ^. Proto.context)
         , key =
             if ByteString.null k
-              then Key bucketType bucket (response ^. L.key)
+              then Key bucketType bucket (response ^. Proto.key)
               else key
-        , value = HashSet.fromList (response ^. L.set)
+        , value = HashSet.fromList (response ^. Proto.setValue)
         }
 
-toProtoUpdate :: [ConvergentSetUpdate] -> Proto.SetUpdate
-toProtoUpdate updates =
+toProtoSetOp :: [ConvergentSetUpdate] -> Proto.SetOp
+toProtoSetOp updates =
   Proto.defMessage
-    & L.adds .~ adds
-    & L.removes .~ removes
+    & Proto.adds .~ adds
+    & Proto.removes .~ removes
 
   where
     adds :: [ByteString]

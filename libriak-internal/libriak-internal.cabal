@@ -18,7 +18,7 @@ library
     lens-labels,
     primitive,
     proto-lens ^>= 0.4.0,
-    proto-lens-runtime ^>= 0.4.0,
+    riak-protobuf ^>= 1.0.0,
     sockets == 0.1.0.0
 
   default-extensions:
@@ -44,7 +44,6 @@ library
   exposed-modules:
     Libriak.Connection
     Libriak.Proto
-    Libriak.Proto.Lens
     Libriak.Request
     Libriak.Response
 
@@ -54,10 +53,10 @@ library
 
   hs-source-dirs:
     src
-    src-proto
 
   other-modules:
-    Proto.Proto.Riak
-    Proto.Proto.Riak_Fields
     Libriak.Internal.Connection
     Libriak.Internal.Utils
+
+  reexported-modules:
+    Data.Riak.Proto

@@ -20,24 +20,24 @@ import qualified Data.ProtoLens           as Proto
 
 
 data Response
-  = ResponseDelete DeleteResponse
-  | ResponseError ErrorResponse
-  | ResponseGet GetResponse
-  | ResponseGetBucket GetBucketResponse
-  | ResponseGetCrdt GetCrdtResponse
-  | ResponseGetIndex GetIndexResponse
-  | ResponseGetServerInfo GetServerInfoResponse
-  | ResponseGetSchema GetSchemaResponse
-  | ResponseListBuckets ListBucketsResponse
-  | ResponseListKeys ListKeysResponse
-  | ResponseMapReduce MapReduceResponse
-  | ResponsePing PingResponse
-  | ResponsePut PutResponse
-  | ResponseResetBucket ResetBucketResponse
-  | ResponseSearch SearchResponse
-  | ResponseSecondaryIndex SecondaryIndexResponse
-  | ResponseSetBucket SetBucketResponse
-  | ResponseUpdateCrdt UpdateCrdtResponse
+  = RespDtFetch DtFetchResp
+  | RespDtUpdate DtUpdateResp
+  | RespRpbDel RpbDelResp
+  | RespRpbError RpbErrorResp
+  | RespRpbGet RpbGetResp
+  | RespRpbGetBucket RpbGetBucketResp
+  | RespRpbGetServerInfo RpbGetServerInfoResp
+  | RespRpbIndex RpbIndexResp
+  | RespRpbListBuckets RpbListBucketsResp
+  | RespRpbListKeys RpbListKeysResp
+  | RespRpbMapRed RpbMapRedResp
+  | RespRpbPing RpbPingResp
+  | RespRpbPut RpbPutResp
+  | RespRpbResetBucket RpbResetBucketResp
+  | RespRpbSearchQuery RpbSearchQueryResp
+  | RespRpbSetBucket RpbSetBucketResp
+  | RespRpbYokozunaIndexGet RpbYokozunaIndexGetResp
+  | RespRpbYokozunaSchemaGet RpbYokozunaSchemaGetResp
   deriving stock (Show)
 
 -- | Parse a response, which consists of a 1-byte message code and a payload.
@@ -61,25 +61,25 @@ parseResponse bytes =
 decode :: Word8 -> ByteString -> Either DecodeError Response
 decode code bytes =
   case code of
-    0    -> decode' ResponseError
-    2    -> Right (ResponsePing Proto.defMessage)
-    8    -> decode' ResponseGetServerInfo
-    10   -> decode' ResponseGet
-    12   -> decode' ResponsePut
-    14   -> Right (ResponseDelete Proto.defMessage)
-    16   -> decode' ResponseListBuckets
-    18   -> decode' ResponseListKeys
-    20   -> decode' ResponseGetBucket
-    22   -> Right (ResponseSetBucket Proto.defMessage)
-    24   -> decode' ResponseMapReduce
-    26   -> decode' ResponseSecondaryIndex
-    28   -> decode' ResponseSearch
-    30   -> Right (ResponseResetBucket Proto.defMessage)
-    55   -> decode' ResponseGetIndex
-    59   -> decode' ResponseGetSchema
-    81   -> decode' ResponseGetCrdt
-    83   -> decode' ResponseUpdateCrdt
-    _    -> Left (UnknownMessageCode code bytes)
+    0  -> decode' RespRpbError
+    2  -> Right (RespRpbPing Proto.defMessage)
+    8  -> decode' RespRpbGetServerInfo
+    10 -> decode' RespRpbGet
+    12 -> decode' RespRpbPut
+    14 -> Right (RespRpbDel Proto.defMessage)
+    16 -> decode' RespRpbListBuckets
+    18 -> decode' RespRpbListKeys
+    20 -> decode' RespRpbGetBucket
+    22 -> Right (RespRpbSetBucket Proto.defMessage)
+    24 -> decode' RespRpbMapRed
+    26 -> decode' RespRpbIndex
+    28 -> decode' RespRpbSearchQuery
+    30 -> Right (RespRpbResetBucket Proto.defMessage)
+    55 -> decode' RespRpbYokozunaIndexGet
+    59 -> decode' RespRpbYokozunaSchemaGet
+    81 -> decode' RespDtFetch
+    83 -> decode' RespDtUpdate
+    _  -> Left (UnknownMessageCode code bytes)
 
   where
     decode' ::

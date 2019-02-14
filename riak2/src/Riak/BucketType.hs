@@ -15,7 +15,6 @@ import Riak.Internal.Prelude
 
 import qualified Libriak.Handle                 as Handle
 import qualified Libriak.Proto                  as Proto
-import qualified Libriak.Proto.Lens             as L
 import qualified Riak.Internal.BucketProperties as BucketProperties
 
 import Control.Foldl      (FoldM(..))
@@ -46,7 +45,7 @@ getBucketType handle (BucketType bucketType) = liftIO $
     (Handle.getBucketType handle bucketType)
 
   where
-    fromResponse :: Proto.BucketProperties -> BucketProperties
+    fromResponse :: Proto.RpbBucketProps -> BucketProperties
     fromResponse =
       BucketProperties.fromProto
 
@@ -58,7 +57,7 @@ getBucketType handle (BucketType bucketType) = liftIO $
 -- TODO don't allow setting n
 setBucketType
   :: Handle -- ^
-  -> Proto.SetBucketTypeRequest -- ^
+  -> Proto.RpbSetBucketTypeReq -- ^
   -> IO (Either Handle.Error ())
 setBucketType handle request =
   Handle.setBucketType handle request
@@ -98,17 +97,17 @@ streamBuckets handle (BucketType bucketType) bucketFold =
     (makeResponseFold bucketType bucketFold)
 
   where
-    request :: Proto.ListBucketsRequest
+    request :: Proto.RpbListBucketsReq
     request =
       Proto.defMessage
-        & L.bucketType .~ bucketType
-        & L.stream .~ True
+        & Proto.stream .~ True
+        & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
 
 makeResponseFold ::
      Monad m
   => ByteString
   -> FoldM m Bucket r
-  -> FoldM m Proto.ListBucketsResponse r
+  -> FoldM m Proto.RpbListBucketsResp r
 makeResponseFold bucketType =
-  Foldl.handlesM (L.buckets . folded . to (Bucket bucketType))
+  Foldl.handlesM (Proto.buckets . folded . to (Bucket bucketType))

@@ -56,7 +56,7 @@ main = do
       replicateM_ threads $ forkIO $ do
         chopCherryTree cherryTree
 
-        _ <- exchange handle (RequestPing Proto.defMessage)
+        _ <- exchange handle (ReqRpbPing Proto.defMessage)
 
         putMVar doneVar ()
 
