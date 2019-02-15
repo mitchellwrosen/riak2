@@ -112,6 +112,7 @@ commandParser =
       , command "get-index" (info getIndexParser (progDesc "Get an index, or all indexes"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
       , command "get-schema" (info getSchemaParser (progDesc "Get a schema"))
+      , command "get-set" (info getSetParser (progDesc "Get a set"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
@@ -120,6 +121,7 @@ commandParser =
       , command "search" (info searchParser (progDesc "Perform a search"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
+      , command "update-set" (info updateSetParser (progDesc "Update a set"))
       ])
 
 deleteParser :: Parser (Handle -> IO ())
@@ -318,6 +320,24 @@ getSchemaParser =
       -> IO ()
     doGetSchema name handle =
       getSchema handle name >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
+
+getSetParser :: Parser (Handle -> IO ())
+getSetParser =
+  doGetSet
+    <$> keyArgument
+  where
+    doGetSet ::
+         Key
+      -> Handle
+      -> IO ()
+    doGetSet key handle =
+      getConvergentSet handle key >>= \case
         Left err -> do
           print err
           exitFailure
@@ -556,7 +576,7 @@ updateMapParser =
   doUpdateMap
     <$> bucketOrKeyArgument
     <*> contextOption
-    <*> mapUpdateOptions
+    <*> many mapUpdateOption
 
   where
     doUpdateMap ::
@@ -586,56 +606,6 @@ updateMapParser =
             , value = updates
             }
 
---------------------------------------------------------------------------------
--- Arguments/options
---------------------------------------------------------------------------------
-
-bucketTypeArgument :: Parser BucketType
-bucketTypeArgument =
-  BucketType . encodeUtf8 <$>
-    strArgument (help "Bucket type" <> metavar "TYPE")
-
-bucketOrKeyArgument :: Parser (Either Bucket Key)
-bucketOrKeyArgument =
-  argument
-    (Right <$> eitherReader parseKey <|> Left <$> eitherReader parseBucket)
-    (help "Bucket or key" <> metavar "TYPE/BUCKET(/KEY)")
-
-contextOption :: Parser (Maybe Context)
-contextOption =
-  optional
-    (option
-      (eitherReader parseContext)
-      (long "context" <> help "Causal context"))
-  where
-    parseContext :: String -> Either String Context
-    parseContext =
-      fmap unsafeMakeContext . Base64.decode . Latin1.pack
-
-dwOption :: Parser (Maybe Quorum)
-dwOption =
-  optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
-
-indexNameArgument :: Parser IndexName
-indexNameArgument =
-  argument (eitherReader parseIndexName) (help "Index name" <> metavar "INDEX")
-  where
-    parseIndexName :: String -> Either String IndexName
-    parseIndexName name =
-      maybe
-        (Left "Invalid index name.")
-        Right
-        (makeIndexName (Text.pack name))
-
-keyArgument :: Parser Key
-keyArgument =
-  argument (eitherReader parseKey) keyMod
-
-mapUpdateOptions :: Parser [ConvergentMapUpdate]
-mapUpdateOptions =
-  many mapUpdateOption
-
-  where
     mapUpdateOption :: Parser ConvergentMapUpdate
     mapUpdateOption =
       asum
@@ -739,7 +709,7 @@ mapUpdateOptions =
         (help "Add an element to a set" <> long "remove-elem" <> metavar "PATH/VALUE")
 
     parseUpdateSet ::
-         (ByteString -> ConvergentSetUpdate)
+        (ByteString -> ConvergentSetUpdate)
       -> String
       -> Either String ConvergentMapUpdate
     parseUpdateSet toUpdate update =
@@ -754,7 +724,7 @@ mapUpdateOptions =
           Left "Expected: 'path/value'"
 
     makeMapUpdate ::
-         (String -> ConvergentMapUpdate)
+        (String -> ConvergentMapUpdate)
       -> [String]
       -> ConvergentMapUpdate
     makeMapUpdate onLeaf =
@@ -771,6 +741,105 @@ mapUpdateOptions =
 
           p:ps ->
             UpdateMap (Latin1.pack p) [loop ps]
+
+
+updateSetParser :: Parser (Handle -> IO ())
+updateSetParser =
+  doUpdateSet
+    <$> bucketOrKeyArgument
+    <*> contextOption
+    <*> many setUpdateOption
+
+  where
+    doUpdateSet ::
+         Either Bucket Key
+      -> Maybe Context
+      -> [ConvergentSetUpdate]
+      -> Handle
+      -> IO ()
+    doUpdateSet bucketOrKey context updates handle = do
+      updateConvergentSet handle operation >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right val ->
+          print val
+
+      where
+        operation :: ConvergentSet [ConvergentSetUpdate]
+        operation =
+          ConvergentSet
+            { context = fromMaybe newContext context
+            , key =
+                case bucketOrKey of
+                  Left bucket -> generatedKey bucket
+                  Right key -> key
+            , value = updates
+            }
+
+    setUpdateOption :: Parser ConvergentSetUpdate
+    setUpdateOption =
+      asum
+        [ addElemOption
+        , removeElemOption
+        ]
+
+    addElemOption :: Parser ConvergentSetUpdate
+    addElemOption =
+      Add <$>
+        strOption (help "Add an element" <> long "add" <> metavar "VALUE")
+
+    removeElemOption :: Parser ConvergentSetUpdate
+    removeElemOption =
+      Remove <$>
+        strOption (help "Remove an element" <> long "remove" <> metavar "VALUE")
+
+
+--------------------------------------------------------------------------------
+-- Arguments/options
+--------------------------------------------------------------------------------
+
+bucketTypeArgument :: Parser BucketType
+bucketTypeArgument =
+  BucketType . encodeUtf8 <$>
+    strArgument (help "Bucket type" <> metavar "TYPE")
+
+bucketOrKeyArgument :: Parser (Either Bucket Key)
+bucketOrKeyArgument =
+  argument
+    (Right <$> eitherReader parseKey <|> Left <$> eitherReader parseBucket)
+    (help "Bucket or key" <> metavar "TYPE/BUCKET(/KEY)")
+
+contextOption :: Parser (Maybe Context)
+contextOption =
+  optional
+    (option
+      (eitherReader parseContext)
+      (long "context" <> help "Causal context"))
+  where
+    parseContext :: String -> Either String Context
+    parseContext =
+      fmap unsafeMakeContext . Base64.decode . Latin1.pack
+
+dwOption :: Parser (Maybe Quorum)
+dwOption =
+  optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
+
+indexNameArgument :: Parser IndexName
+indexNameArgument =
+  argument (eitherReader parseIndexName) (help "Index name" <> metavar "INDEX")
+  where
+    parseIndexName :: String -> Either String IndexName
+    parseIndexName name =
+      maybe
+        (Left "Invalid index name.")
+        Right
+        (makeIndexName (Text.pack name))
+
+keyArgument :: Parser Key
+keyArgument =
+  argument (eitherReader parseKey) keyMod
 
 nodesOption :: Parser (Maybe Quorum)
 nodesOption =

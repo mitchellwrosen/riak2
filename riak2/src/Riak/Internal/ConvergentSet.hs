@@ -73,6 +73,10 @@ getConvergentSet handle k@(Key bucketType bucket key) = liftIO $
 -- | Update a set.
 --
 -- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
+--
+-- TODO If the context is missing and there is a remove op, get the set first,
+-- check to see it has the element to be removed, and don't include that update
+-- if not. Then we don't ever have to deal with '{precondition,{not_present'
 updateConvergentSet ::
      MonadIO m
   => Handle -- ^
