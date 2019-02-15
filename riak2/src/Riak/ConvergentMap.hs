@@ -9,7 +9,6 @@ module Riak.ConvergentMap
 import Libriak.Handle              (Handle)
 import Riak.Context                (Context)
 import Riak.Internal.Context       (Context(..))
-import Riak.Internal.ConvergentSet (ConvergentSetUpdate)
 import Riak.Internal.Error
 import Riak.Internal.Prelude
 import Riak.Key                    (Key(..))
@@ -72,7 +71,7 @@ data ConvergentMapUpdate
   | UpdateFlag ByteString Bool
   | UpdateMap ByteString [ConvergentMapUpdate]
   | UpdateRegister ByteString ByteString
-  | UpdateSet ByteString [ConvergentSetUpdate]
+  -- | UpdateSet ByteString [ConvergentSetUpdate]
   deriving stock (Eq, Show)
 
 
@@ -266,15 +265,15 @@ toEndoProtoMapOp = \case
     in
       Proto.updates %~ (update :)
 
-  UpdateSet name value ->
-    let
-      update :: Proto.MapUpdate
-      update =
-        Proto.defMessage
-          & Proto.field .~ mapfield name Proto.MapField'SET
-          & Proto.setOp .~ ConvergentSet.toProtoSetOp value
-    in
-      Proto.updates %~ (update :)
+  -- UpdateSet name value ->
+  --   let
+  --     update :: Proto.MapUpdate
+  --     update =
+  --       Proto.defMessage
+  --         & Proto.field .~ mapfield name Proto.MapField'SET
+  --         & Proto.setOp .~ ConvergentSet.toProtoSetOp value
+  --   in
+  --     Proto.updates %~ (update :)
 
   where
     mapfield :: ByteString -> Proto.MapField'MapFieldType -> Proto.MapField

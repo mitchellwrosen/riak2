@@ -1,14 +1,16 @@
 module Riak.Internal.ConvergentSet where
 
 import Libriak.Handle        (Handle)
-import Riak.Internal.Context (Context(..))
+import Riak.Internal.Context (Context(..), newContext)
+import Riak.Internal.Key     (Key(..), isGeneratedKey)
 import Riak.Internal.Prelude
-import Riak.Key              (Key(..))
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
+import qualified Libriak.Handle    as Handle
+import qualified Libriak.Proto     as Proto
+import qualified Riak.Internal.Key as Key
 
-import Control.Lens ((.~), (^.))
+import Control.Lens          (Lens', (.~), (^.))
+import Data.Generics.Product (field)
 
 import qualified ByteString
 import qualified HashSet
@@ -16,27 +18,45 @@ import qualified HashSet
 
 -- | An eventually-convergent set.
 --
--- Sets must be stored in a bucket type with the __@datatype = set@__ property.
+-- Sets must be stored in a bucket type with the__@datatype = set@__ property.
 data ConvergentSet a
   = ConvergentSet
-  { context :: !Context -- ^ Causal context
-  , key :: !Key -- ^
-  , value :: !a -- ^
-  } deriving stock (Functor, Generic, Show)
+  { _context :: !Context
+  , _key :: !Key
+  , _newValue :: !(HashSet a)
+  , _oldValue :: !(HashSet a)
+  } deriving stock (Generic, Show)
 
--- | A set update.
-data ConvergentSetUpdate
-  = Add ByteString
-  | Remove ByteString
-  deriving stock (Eq, Show)
+-- | Create a new convergent set.
+newConvergentSet ::
+     Key -- ^
+  -> HashSet a -- ^
+  -> ConvergentSet a
+newConvergentSet key contents =
+  ConvergentSet
+    { _context = newContext
+    , _key = key
+    , _newValue = contents
+    , _oldValue = HashSet.empty
+    }
 
--- | Get a set.
+-- | A lens onto the key of a convergent set.
+convergentSetKey :: Lens' (ConvergentSet a) Key
+convergentSetKey =
+  field @"_key"
+
+-- | A lens onto the value of a convergent set.
+convergentSetValue :: Lens' (ConvergentSet a) (HashSet a)
+convergentSetValue =
+  field @"_newValue"
+
+-- | Get a convergent set.
 getConvergentSet ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either Handle.Error (Maybe (ConvergentSet (HashSet ByteString))))
-getConvergentSet handle k@(Key bucketType bucket key) = liftIO $
+  -> m (Either Handle.Error (Maybe (ConvergentSet ByteString)))
+getConvergentSet handle key = liftIO $
   (fmap.fmap)
     fromResponse
     (Handle.getCrdt handle request)
@@ -45,9 +65,7 @@ getConvergentSet handle k@(Key bucketType bucket key) = liftIO $
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.key .~ key
-        & Proto.type' .~ bucketType
+        & Key.setProto key
 
         -- TODO get set opts
         -- & Proto.maybe'basicQuorum .~ undefined
@@ -60,29 +78,30 @@ getConvergentSet handle k@(Key bucketType bucket key) = liftIO $
 
     fromResponse ::
          Proto.DtFetchResp
-      -> Maybe (ConvergentSet (HashSet ByteString))
+      -> Maybe (ConvergentSet ByteString)
     fromResponse response = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
+
+      let
+        value :: HashSet ByteString
+        value =
+          HashSet.fromList (crdt ^. Proto.setValue)
+
       pure ConvergentSet
-        { context = Context (response ^. Proto.context)
-        , key = k
-        , value = HashSet.fromList (crdt ^. Proto.setValue)
+        { _context = Context (response ^. Proto.context)
+        , _key = key
+        , _newValue = value
+        , _oldValue = value
         }
 
--- | Update a set.
---
--- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
---
--- TODO If the context is missing and there is a remove op, get the set first,
--- check to see it has the element to be removed, and don't include that update
--- if not. Then we don't ever have to deal with '{precondition,{not_present'
-updateConvergentSet ::
+-- | Put a convergent set.
+putConvergentSet ::
      MonadIO m
   => Handle -- ^
-  -> ConvergentSet [ConvergentSetUpdate] -- ^
-  -> m (Either Handle.Error (ConvergentSet (HashSet ByteString)))
-updateConvergentSet handle (ConvergentSet { context, key, value }) = liftIO $
+  -> ConvergentSet ByteString -- ^
+  -> m (Either Handle.Error (ConvergentSet ByteString))
+putConvergentSet handle set@(ConvergentSet { _context, _key }) = liftIO $
   (fmap.fmap)
     fromResponse
     (Handle.updateCrdt handle request)
@@ -91,20 +110,15 @@ updateConvergentSet handle (ConvergentSet { context, key, value }) = liftIO $
     request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
+        & Key.setMaybeProto _key
         & Proto.maybe'context .~
-            (if ByteString.null (unContext context)
+            (if ByteString.null (unContext _context)
               then Nothing
-              else Just (unContext context))
-        & Proto.maybe'key .~
-            (if ByteString.null k
-              then Nothing
-              else Just k)
+              else Just (unContext _context))
         & Proto.op .~
             (Proto.defMessage
-              & Proto.setOp .~ toProtoSetOp value)
+              & Proto.setOp .~ calculateSetOp set)
         & Proto.returnBody .~ True
-        & Proto.type' .~ bucketType
 
 -- TODO set update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -114,24 +128,31 @@ updateConvergentSet handle (ConvergentSet { context, key, value }) = liftIO $
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
-    Key bucketType bucket k =
-      key
-
     fromResponse ::
          Proto.DtUpdateResp
-      -> ConvergentSet (HashSet ByteString)
+      -> ConvergentSet ByteString
     fromResponse response =
       ConvergentSet
-        { context = Context (response ^. Proto.context)
-        , key =
-            if ByteString.null k
-              then Key bucketType bucket (response ^. Proto.key)
-              else key
-        , value = HashSet.fromList (response ^. Proto.setValue)
+        { _context = Context (response ^. Proto.context)
+        , _key =
+            if isGeneratedKey _key
+              then
+                case _key of
+                  Key bucketType bucket _ ->
+                    Key bucketType bucket (response ^. Proto.key)
+              else
+                _key
+        , _newValue = value
+        , _oldValue = value
         }
 
-toProtoSetOp :: [ConvergentSetUpdate] -> Proto.SetOp
-toProtoSetOp updates =
+      where
+        value :: HashSet ByteString
+        value =
+          HashSet.fromList (response ^. Proto.setValue)
+
+calculateSetOp :: ConvergentSet ByteString -> Proto.SetOp
+calculateSetOp ConvergentSet { _newValue, _oldValue } =
   Proto.defMessage
     & Proto.adds .~ adds
     & Proto.removes .~ removes
@@ -139,8 +160,8 @@ toProtoSetOp updates =
   where
     adds :: [ByteString]
     adds =
-      [ value | Add value <- updates ]
+      HashSet.toList (HashSet.difference _newValue _oldValue)
 
     removes :: [ByteString]
     removes =
-      [ value | Remove value <- updates ]
+      HashSet.toList (HashSet.difference _oldValue _newValue)

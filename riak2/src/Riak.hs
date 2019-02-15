@@ -22,7 +22,7 @@ module Riak
   , updateConvergentMap
     -- * Set operations
   , getConvergentSet
-  , updateConvergentSet
+  , putConvergentSet
     -- * Bucket type operations
     -- ** Bucket type properties
   , getBucketType
@@ -72,8 +72,10 @@ module Riak
   , ConvergentMap(..)
   , ConvergentMapUpdate(..)
   , ConvergentMapValue(..)
-  , ConvergentSet(..)
-  , ConvergentSetUpdate(..)
+  , ConvergentSet
+  , convergentSetKey
+  , convergentSetValue
+  , newConvergentSet
   , ErlangTerm(..)
   , ExactQuery(..)
   , DeleteOpts(..)

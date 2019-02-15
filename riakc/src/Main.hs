@@ -618,8 +618,8 @@ updateMapParser =
         , disableFlagOption
         , enableFlagOption
         , setRegisterOption
-        , addElemOption
-        , removeElemOption
+        -- , addElemOption
+        -- , removeElemOption
         ]
 
     removeCounterOption :: Parser ConvergentMapUpdate
@@ -696,32 +696,32 @@ updateMapParser =
               Left "Expected: 'path/value'"
 
 
-    addElemOption :: Parser ConvergentMapUpdate
-    addElemOption =
-      option
-        (eitherReader (parseUpdateSet Add))
-        (help "Add an element to a set" <> long "add-elem" <> metavar "PATH/VALUE")
+    -- addElemOption :: Parser ConvergentMapUpdate
+    -- addElemOption =
+    --   option
+    --     (eitherReader (parseUpdateSet Add))
+    --     (help "Add an element to a set" <> long "add-elem" <> metavar "PATH/VALUE")
 
-    removeElemOption :: Parser ConvergentMapUpdate
-    removeElemOption =
-      option
-        (eitherReader (parseUpdateSet Remove))
-        (help "Add an element to a set" <> long "remove-elem" <> metavar "PATH/VALUE")
+    -- removeElemOption :: Parser ConvergentMapUpdate
+    -- removeElemOption =
+    --   option
+    --     (eitherReader (parseUpdateSet Remove))
+    --     (help "Add an element to a set" <> long "remove-elem" <> metavar "PATH/VALUE")
 
-    parseUpdateSet ::
-        (ByteString -> ConvergentSetUpdate)
-      -> String
-      -> Either String ConvergentMapUpdate
-    parseUpdateSet toUpdate update =
-      case splitOn "/" update of
-        [ path, val ] ->
-          Right
-            (makeMapUpdate
-              (\name -> UpdateSet (Latin1.pack name) [toUpdate (Latin1.pack val)])
-              (splitOn "." path))
+    -- parseUpdateSet ::
+    --     (ByteString -> ConvergentSetUpdate)
+    --   -> String
+    --   -> Either String ConvergentMapUpdate
+    -- parseUpdateSet toUpdate update =
+    --   case splitOn "/" update of
+    --     [ path, val ] ->
+    --       Right
+    --         (makeMapUpdate
+    --           (\name -> UpdateSet (Latin1.pack name) [toUpdate (Latin1.pack val)])
+    --           (splitOn "." path))
 
-        _ ->
-          Left "Expected: 'path/value'"
+    --     _ ->
+    --       Left "Expected: 'path/value'"
 
     makeMapUpdate ::
         (String -> ConvergentMapUpdate)
@@ -745,55 +745,56 @@ updateMapParser =
 
 updateSetParser :: Parser (Handle -> IO ())
 updateSetParser =
-  doUpdateSet
-    <$> bucketOrKeyArgument
-    <*> contextOption
-    <*> many setUpdateOption
+  undefined
+  -- doUpdateSet
+  --   <$> bucketOrKeyArgument
+  --   <*> contextOption
+  --   <*> many setUpdateOption
 
-  where
-    doUpdateSet ::
-         Either Bucket Key
-      -> Maybe Context
-      -> [ConvergentSetUpdate]
-      -> Handle
-      -> IO ()
-    doUpdateSet bucketOrKey context updates handle = do
-      updateConvergentSet handle operation >>= \case
-        Left err -> do
-          print err
-          exitFailure
+  -- where
+  --   doUpdateSet ::
+  --        Either Bucket Key
+  --     -> Maybe Context
+  --     -> [ConvergentSetUpdate]
+  --     -> Handle
+  --     -> IO ()
+  --   doUpdateSet bucketOrKey context updates handle = do
+  --     updateConvergentSet handle operation >>= \case
+  --       Left err -> do
+  --         print err
+  --         exitFailure
 
-        Right val ->
-          print val
+  --       Right val ->
+  --         print val
 
-      where
-        operation :: ConvergentSet [ConvergentSetUpdate]
-        operation =
-          ConvergentSet
-            { context = fromMaybe newContext context
-            , key =
-                case bucketOrKey of
-                  Left bucket -> generatedKey bucket
-                  Right key -> key
-            , value = updates
-            }
+  --     where
+  --       operation :: ConvergentSet [ConvergentSetUpdate]
+  --       operation =
+  --         ConvergentSet
+  --           { context = fromMaybe newContext context
+  --           , key =
+  --               case bucketOrKey of
+  --                 Left bucket -> generatedKey bucket
+  --                 Right key -> key
+  --           , value = updates
+  --           }
 
-    setUpdateOption :: Parser ConvergentSetUpdate
-    setUpdateOption =
-      asum
-        [ addElemOption
-        , removeElemOption
-        ]
+  --   setUpdateOption :: Parser ConvergentSetUpdate
+  --   setUpdateOption =
+  --     asum
+  --       [ addElemOption
+  --       , removeElemOption
+  --       ]
 
-    addElemOption :: Parser ConvergentSetUpdate
-    addElemOption =
-      Add <$>
-        strOption (help "Add an element" <> long "add" <> metavar "VALUE")
+  --   addElemOption :: Parser ConvergentSetUpdate
+  --   addElemOption =
+  --     Add <$>
+  --       strOption (help "Add an element" <> long "add" <> metavar "VALUE")
 
-    removeElemOption :: Parser ConvergentSetUpdate
-    removeElemOption =
-      Remove <$>
-        strOption (help "Remove an element" <> long "remove" <> metavar "VALUE")
+  --   removeElemOption :: Parser ConvergentSetUpdate
+  --   removeElemOption =
+  --     Remove <$>
+  --       strOption (help "Remove an element" <> long "remove" <> metavar "VALUE")
 
 
 --------------------------------------------------------------------------------

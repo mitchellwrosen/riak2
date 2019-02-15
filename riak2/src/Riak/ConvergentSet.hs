@@ -1,8 +1,10 @@
 module Riak.ConvergentSet
-  ( ConvergentSet(..)
+  ( ConvergentSet
+  , convergentSetKey
+  , convergentSetValue
+  , newConvergentSet
   , getConvergentSet
-  , updateConvergentSet
-  , ConvergentSetUpdate(..)
+  , putConvergentSet
   ) where
 
 import Riak.Internal.ConvergentSet
