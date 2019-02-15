@@ -4,10 +4,6 @@ name: libriak-internal
 version: 0.1.0
 build-type: Simple
 
-extra-source-files:
-  proto/riak.proto
-  generate-proto.sh
-
 library
   build-depends:
     attoparsec,

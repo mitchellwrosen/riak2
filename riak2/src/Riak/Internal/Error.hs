@@ -40,6 +40,13 @@ data Error :: Op -> Type where
        !Text
     -> Error 'PutSchemaOp
 
+  -- | A removal of a map field was attempted, but the field doesn't exist.
+  -- Carries an ugly fragment of the Riak error message that should be useful in
+  -- determining which field it is.
+  MapFieldDoesNotExistError ::
+       !ByteString
+    -> Error 'UpdateMapOp
+
   -- | The search failed. Typically, this means the query was malformed. Check
   -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
   SearchFailedError ::
@@ -54,10 +61,13 @@ data Error :: Op -> Type where
   SchemaDoesNotExistError ::
        Error 'PutIndexOp
 
+  -- | An error was returned by the underlying handle, not Riak itself.
   HandleError ::
        !Handle.Error
     -> Error op
 
+  -- | An error was returned by Riak, but this library couldn't parse it. Please
+  -- file an issue!
   UnknownError ::
        !Text
     -> Error op
@@ -76,6 +86,7 @@ data Op
   | PutIndexOp
   | PutSchemaOp
   | SearchOp
+  | UpdateMapOp
 
 -- | @no_type@
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
@@ -113,17 +124,23 @@ isInvalidNodesError :: ByteString -> Bool
 isInvalidNodesError =
   ByteString.isPrefixOf "{n_val_violation"
 
+isInvalidSchemaError :: ByteString -> Bool
+isInvalidSchemaError =
+  ByteString.isPrefixOf "Error storing schema"
+
 isNotfound :: ByteString -> Bool
 isNotfound =
   (== "notfound")
 
+isMapFieldDoesNotExistError :: ByteString -> Maybe ByteString
+isMapFieldDoesNotExistError bytes0 = do
+  bytes1 <- ByteString.stripPrefix "{precondition,{not_present," bytes0
+  -- At least give back an error with balanced { }
+  ByteString.stripSuffix "}}" bytes1
+
 isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =
   (== "Schema not found")
-
-isInvalidSchemaError :: ByteString -> Bool
-isInvalidSchemaError =
-  ByteString.isPrefixOf "Error storing schema"
 
 isSearchFailedError :: ByteString -> Bool
 isSearchFailedError =

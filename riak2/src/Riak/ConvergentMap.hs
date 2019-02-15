@@ -10,15 +10,18 @@ import Libriak.Handle              (Handle)
 import Riak.Context                (Context)
 import Riak.Internal.Context       (Context(..))
 import Riak.Internal.ConvergentSet (ConvergentSetUpdate)
+import Riak.Internal.Error
 import Riak.Internal.Prelude
 import Riak.Key                    (Key(..))
 
 import qualified Libriak.Handle              as Handle
 import qualified Libriak.Proto               as Proto
 import qualified Riak.Internal.ConvergentSet as ConvergentSet
+import qualified Riak.Internal.Key           as Key
 
-import Control.Lens ((%~), (.~), (^.))
-import Data.Monoid  (Endo(..))
+import Control.Lens       ((%~), (.~), (^.))
+import Data.Monoid        (Endo(..))
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified ByteString
 import qualified HashMap
@@ -120,30 +123,24 @@ updateConvergentMap ::
      MonadIO m
   => Handle -- ^
   -> ConvergentMap [ConvergentMapUpdate] -- ^
-  -> m (Either Handle.Error (ConvergentMap ConvergentMapValue))
+  -> m (Either (Error 'UpdateMapOp) (ConvergentMap ConvergentMapValue))
 updateConvergentMap handle (ConvergentMap { context, key, value }) = liftIO $
-  (fmap.fmap)
-    fromResponse
-    (Handle.updateCrdt handle request)
+  bimap parseUpdateMapError fromResponse <$>
+    Handle.updateCrdt handle request
 
   where
     request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
+        & Key.setMaybeProto key
         & Proto.maybe'context .~
             (if ByteString.null (unContext context)
               then Nothing
               else Just (unContext context))
-        & Proto.maybe'key .~
-            (if ByteString.null k
-              then Nothing
-              else Just k)
         & Proto.op .~
             (Proto.defMessage
               & Proto.mapOp .~ toProtoMapOp value)
         & Proto.returnBody .~ True
-        & Proto.type' .~ bucketType
 
 -- TODO map update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -155,6 +152,17 @@ updateConvergentMap handle (ConvergentMap { context, key, value }) = liftIO $
 
     Key bucketType bucket k =
       key
+
+    parseUpdateMapError :: Handle.Error -> Error 'UpdateMapOp
+    parseUpdateMapError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | Just err' <- isMapFieldDoesNotExistError err ->
+            MapFieldDoesNotExistError err'
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
     fromResponse :: Proto.DtUpdateResp -> ConvergentMap ConvergentMapValue
     fromResponse response =

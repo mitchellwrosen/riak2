@@ -159,6 +159,9 @@ putIndex_ handle index schema nodes timeout =
             UnknownError (decodeUtf8 err)
 
 -- | Delete a Solr index.
+--
+-- This function swallows @"notfound"@ errors from Riak thrown when you try to
+-- delete an index that doesn't exist. Feedback welcome on this decision.
 deleteIndex ::
      MonadIO m
   => Handle -- ^
@@ -176,7 +179,7 @@ deleteIndex handle name = liftIO $
 
       Left (Handle.ErrorRiak err)
         | isNotfound err ->
-            Right () -- Just don't care that we deleted a missing index?
+            Right ()
         | isUnknownMessageCode err ->
             Left SearchNotEnabledError
         | otherwise ->
