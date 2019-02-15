@@ -9,8 +9,10 @@ import Riak.Handle.Impl.Managed   (Handle)
 import qualified Riak.Handle.Impl.Managed as Handle hiding (Config)
 import qualified Riak.ServerInfo          as ServerInfo
 
+import Control.Lens        ((.~), (^.))
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
+import Data.Function       ((&))
 import Data.Int            (Int64)
 import Data.List.Split     (splitOn)
 import Data.Maybe          (fromMaybe)
@@ -26,6 +28,7 @@ import Text.Read           (readMaybe)
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
+import qualified Data.HashSet           as HashSet
 import qualified Data.Text              as Text
 import qualified Data.Text.IO           as Text
 import qualified Net.IPv4               as IPv4
@@ -118,10 +121,10 @@ commandParser =
       , command "put" (info putParser (progDesc "Put an object"))
       , command "put-index" (info putIndexParser (progDesc "Put an index"))
       , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
+      , command "put-set" (info putSetParser (progDesc "Put a set"))
       , command "search" (info searchParser (progDesc "Perform a search"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
       , command "update-map" (info updateMapParser (progDesc "Update a map"))
-      , command "update-set" (info updateSetParser (progDesc "Update a set"))
       ])
 
 deleteParser :: Parser (Handle -> IO ())
@@ -342,8 +345,11 @@ getSetParser =
           print err
           exitFailure
 
-        Right val ->
-          print val
+        Right Nothing ->
+          putStrLn "Not found"
+
+        Right (Just set) ->
+          print (HashSet.toList (set ^. convergentSetValue))
 
 infoParser :: Parser (Handle -> IO ())
 infoParser =
@@ -462,6 +468,89 @@ putIndexParser =
             { nodes = nodes
             , timeout = Nothing
             }
+
+putSetParser :: Parser (Handle -> IO ())
+putSetParser =
+  doPutSet
+    <$> bucketOrKeyArgument
+    <*> many (strArgument (help "Set element" <> metavar "VALUE"))
+
+  where
+    doPutSet ::
+         Either Bucket Key
+      -> [ByteString]
+      -> Handle
+      -> IO ()
+    doPutSet bucketOrKey (HashSet.fromList -> value) handle =
+      case bucketOrKey of
+        Left bucket ->
+          putConvergentSet handle (newConvergentSet (generatedKey bucket) value) >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right _ ->
+              pure ()
+
+        Right key ->
+          getConvergentSet handle key >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right Nothing ->
+              putConvergentSet handle (newConvergentSet key value) >>= \case
+                Left err -> do
+                  print err
+                  exitFailure
+
+                Right _ ->
+                  pure ()
+
+            Right (Just set) ->
+              putConvergentSet handle (set & convergentSetValue .~ value) >>= \case
+                Left err -> do
+                  print err
+                  exitFailure
+
+                Right _ ->
+                  pure ()
+
+      -- updateConvergentSet handle operation >>= \case
+
+      --   Right val ->
+      --     print val
+
+  --     where
+  --       operation :: ConvergentSet [ConvergentSetUpdate]
+  --       operation =
+  --         ConvergentSet
+  --           { context = fromMaybe newContext context
+  --           , key =
+  --               case bucketOrKey of
+  --                 Left bucket -> generatedKey bucket
+  --                 Right key -> key
+  --           , value = updates
+  --           }
+
+  --   setUpdateOption :: Parser ConvergentSetUpdate
+  --   setUpdateOption =
+  --     asum
+  --       [ addElemOption
+  --       , removeElemOption
+  --       ]
+
+  --   addElemOption :: Parser ConvergentSetUpdate
+  --   addElemOption =
+  --     Add <$>
+  --       strOption (help "Add an element" <> long "add" <> metavar "VALUE")
+
+  --   removeElemOption :: Parser ConvergentSetUpdate
+  --   removeElemOption =
+  --     Remove <$>
+  --       strOption (help "Remove an element" <> long "remove" <> metavar "VALUE")
+
+
 
 putSchemaParser :: Parser (Handle -> IO ())
 putSchemaParser =
@@ -741,60 +830,6 @@ updateMapParser =
 
           p:ps ->
             UpdateMap (Latin1.pack p) [loop ps]
-
-
-updateSetParser :: Parser (Handle -> IO ())
-updateSetParser =
-  undefined
-  -- doUpdateSet
-  --   <$> bucketOrKeyArgument
-  --   <*> contextOption
-  --   <*> many setUpdateOption
-
-  -- where
-  --   doUpdateSet ::
-  --        Either Bucket Key
-  --     -> Maybe Context
-  --     -> [ConvergentSetUpdate]
-  --     -> Handle
-  --     -> IO ()
-  --   doUpdateSet bucketOrKey context updates handle = do
-  --     updateConvergentSet handle operation >>= \case
-  --       Left err -> do
-  --         print err
-  --         exitFailure
-
-  --       Right val ->
-  --         print val
-
-  --     where
-  --       operation :: ConvergentSet [ConvergentSetUpdate]
-  --       operation =
-  --         ConvergentSet
-  --           { context = fromMaybe newContext context
-  --           , key =
-  --               case bucketOrKey of
-  --                 Left bucket -> generatedKey bucket
-  --                 Right key -> key
-  --           , value = updates
-  --           }
-
-  --   setUpdateOption :: Parser ConvergentSetUpdate
-  --   setUpdateOption =
-  --     asum
-  --       [ addElemOption
-  --       , removeElemOption
-  --       ]
-
-  --   addElemOption :: Parser ConvergentSetUpdate
-  --   addElemOption =
-  --     Add <$>
-  --       strOption (help "Add an element" <> long "add" <> metavar "VALUE")
-
-  --   removeElemOption :: Parser ConvergentSetUpdate
-  --   removeElemOption =
-  --     Remove <$>
-  --       strOption (help "Remove an element" <> long "remove" <> metavar "VALUE")
 
 
 --------------------------------------------------------------------------------

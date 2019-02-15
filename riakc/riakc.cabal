@@ -19,6 +19,7 @@ executable riakc
     , riak2-handle-impl-managed
     , split
     , text
+    , unordered-containers
 
   default-extensions:
     DataKinds
