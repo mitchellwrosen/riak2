@@ -1,0 +1,40 @@
+cabal-version: 2.4
+
+name: riak2-benchmarks
+version: 0.1.0
+build-type: Simple
+
+executable riak2-benchmarks
+  build-depends:
+      base
+    , bytestring
+    , data-default-class
+    , ip
+    , riak2
+    , riak2-handle-impl-exclusive
+    , riak2-handle-impl-pipeline
+    , optparse-applicative
+
+  default-extensions:
+    OverloadedStrings
+
+  default-language:
+    Haskell2010
+
+  ghc-options:
+    -Wall
+    -rtsopts
+    -threaded
+    "-with-rtsopts=-N"
+
+  hs-source-dirs:
+    src
+
+  main-is:
+    Main.hs
+
+  mixins:
+    riak2 (Riak as Riak.WithExclusiveHandle)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive),
+    riak2 (Riak as Riak.WithPipelineHandle)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline)

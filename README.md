@@ -66,3 +66,9 @@ that upgrades a handle to automatically reconnect and retry on failure.
 ![riakc-src-sloc](./etc/riakc-src-sloc.svg)
 
 This package contains an command-line Riak client.
+
+### [`riak2-benchmarks`](./riak2-benchmarks)
+
+![riak2-benchmarks-src-sloc](./etc/riak2-benchmarks-src-sloc.svg)
+
+Misc benchmarks.
