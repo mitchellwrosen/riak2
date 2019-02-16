@@ -52,7 +52,7 @@ import qualified Data.ByteString as ByteString
 -- TODO basicQuorum/notfoundOk -> NotfoundBehavior
 data GetOpts
   = GetOpts
-  { basicQuorum :: !Bool
+  { basicQuorum :: !(Maybe Bool)
   , nodes :: !(Maybe Quorum)
   , notfoundOk :: !(Maybe Bool)
   , pr :: !(Maybe Quorum)
@@ -64,7 +64,7 @@ instance Default GetOpts where
   def :: GetOpts
   def =
     GetOpts
-      { basicQuorum = False
+      { basicQuorum = Nothing
       , nodes = Nothing
       , notfoundOk = Nothing
       , pr = Nothing
@@ -237,7 +237,7 @@ makeGetRequest
   Proto.defMessage
     & Key.setProto key
     & Proto.deletedvclock .~ True
-    & Proto.maybe'basicQuorum .~ defFalse basicQuorum
+    & Proto.maybe'basicQuorum .~ basicQuorum
     & Proto.maybe'notfoundOk .~ notfoundOk
     & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
     & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
@@ -404,8 +404,3 @@ delete
 
       Handle.ErrorRiak err ->
         UnknownError (decodeUtf8 err)
-
-defFalse :: Bool -> Maybe Bool
-defFalse = \case
-  False -> Nothing
-  True -> Just True

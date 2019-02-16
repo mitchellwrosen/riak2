@@ -52,7 +52,7 @@ getConvergentCounter
       Proto.defMessage
         & Proto.bucket .~ bucket
         & Proto.key .~ key
-        & Proto.maybe'basicQuorum .~ (if basicQuorum then Just True else Nothing)
+        & Proto.maybe'basicQuorum .~ basicQuorum
         & Proto.maybe'notfoundOk .~ notfoundOk
         & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
         & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
