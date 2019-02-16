@@ -45,7 +45,7 @@ import Data.Default.Class    (Default(..))
 import Data.Generics.Product (field)
 import Data.Text.Encoding    (decodeUtf8)
 
-import qualified ByteString
+import qualified Data.ByteString as ByteString
 
 
 -- TODO better names for pr/r

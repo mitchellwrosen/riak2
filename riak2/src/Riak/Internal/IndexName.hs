@@ -2,7 +2,7 @@ module Riak.Internal.IndexName where
 
 import Riak.Internal.Prelude
 
-import qualified Text
+import qualified Data.Text as Text
 
 
 -- | An valid index name contains ASCII characters in the range @32-127@, less

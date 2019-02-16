@@ -8,7 +8,8 @@ import Riak.Internal.Prelude
 
 import Control.Exception (throw, throwIO)
 
-import qualified Text
+import qualified Data.Text as Text
+
 
 data Panic
   = forall a. Panicked a => Panic !Text a

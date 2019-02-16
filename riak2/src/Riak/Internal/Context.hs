@@ -2,7 +2,7 @@ module Riak.Internal.Context where
 
 import Riak.Internal.Prelude
 
-import qualified ByteString
+import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
 

@@ -9,10 +9,13 @@ import Riak.Handle.Impl.Managed   (Handle)
 import qualified Riak.Handle.Impl.Managed as Handle hiding (Config)
 import qualified Riak.ServerInfo          as ServerInfo
 
-import Control.Lens        ((.~), (^.))
+import Control.Arrow       ((***))
+import Control.Lens        (view, (.~), (^.))
 import Data.ByteString     (ByteString)
 import Data.Foldable       (asum, for_)
 import Data.Function       ((&))
+import Data.HashMap.Strict (HashMap)
+import Data.HashSet        (HashSet)
 import Data.Int            (Int64)
 import Data.List.Split     (splitOn)
 import Data.Maybe          (fromMaybe)
@@ -28,7 +31,9 @@ import Text.Read           (readMaybe)
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
+import qualified Data.HashMap.Strict    as HashMap
 import qualified Data.HashSet           as HashSet
+import qualified Data.List              as List
 import qualified Data.Text              as Text
 import qualified Data.Text.IO           as Text
 import qualified Net.IPv4               as IPv4
@@ -120,11 +125,11 @@ commandParser =
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
       , command "put-index" (info putIndexParser (progDesc "Put an index"))
+      , command "put-map" (info putMapParser (progDesc "Put a map"))
       , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
       , command "put-set" (info putSetParser (progDesc "Put a set"))
       , command "search" (info searchParser (progDesc "Perform a search"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
-      , command "update-map" (info updateMapParser (progDesc "Update a map"))
       ])
 
 deleteParser :: Parser (Handle -> IO ())
@@ -309,8 +314,54 @@ getMapParser =
           print err
           exitFailure
 
-        Right val ->
-          print val
+        Right Nothing ->
+          putStrLn "Not found"
+
+        Right (Just (view convergentMapValue -> val)) ->
+          for_ (List.sortOn fst (valuePairs val)) $ \(k, v) ->
+            putStrLn (k ++ " = " ++ v)
+
+    valuePairs :: ConvergentMapValue -> [(String, String)]
+    valuePairs ConvergentMapValue { counters, flags, maps, registers, sets } =
+      mconcat
+        [ counterPairs counters
+        , flagPairs flags
+        , mapPairs maps
+        , registerPairs registers
+        , setPairs sets
+        ]
+
+    counterPairs :: HashMap ByteString Int64 -> [(String, String)]
+    counterPairs =
+      map (Text.unpack . decodeUtf8 *** show) . HashMap.toList
+
+    flagPairs :: HashMap ByteString Bool -> [(String, String)]
+    flagPairs =
+      map (Text.unpack . decodeUtf8 *** show) . HashMap.toList
+
+    mapPairs :: HashMap ByteString ConvergentMapValue -> [(String, String)]
+    mapPairs m = do
+      (k, v) <- HashMap.toList m
+      (k', v') <- valuePairs v
+      pure (Text.unpack (decodeUtf8 k) ++ "." ++ k', v')
+
+    registerPairs :: HashMap ByteString ByteString -> [(String, String)]
+    registerPairs =
+      map (Text.unpack . decodeUtf8 *** Text.unpack . decodeUtf8) .
+        HashMap.toList
+
+    setPairs :: HashMap ByteString (HashSet ByteString) -> [(String, String)]
+    setPairs =
+      map (f *** g) . HashMap.toList
+
+      where
+        f :: ByteString -> String
+        f =
+          Text.unpack . decodeUtf8
+
+        g :: HashSet ByteString -> String
+        g =
+          show . map f . List.sort . HashSet.toList
 
 getSchemaParser :: Parser (Handle -> IO ())
 getSchemaParser =
@@ -481,16 +532,10 @@ putSetParser =
       -> [ByteString]
       -> Handle
       -> IO ()
-    doPutSet bucketOrKey (HashSet.fromList -> value) handle =
+    doPutSet bucketOrKey value handle =
       case bucketOrKey of
         Left bucket ->
-          putConvergentSet handle (newConvergentSet (generatedKey bucket) value) >>= \case
-            Left err -> do
-              print err
-              exitFailure
-
-            Right _ ->
-              pure ()
+          go (newConvergentSet (generatedKey bucket) HashSet.empty)
 
         Right key ->
           getConvergentSet handle key >>= \case
@@ -499,56 +544,266 @@ putSetParser =
               exitFailure
 
             Right Nothing ->
-              putConvergentSet handle (newConvergentSet key value) >>= \case
-                Left err -> do
-                  print err
-                  exitFailure
-
-                Right _ ->
-                  pure ()
+              go (newConvergentSet key HashSet.empty)
 
             Right (Just set) ->
-              putConvergentSet handle (set & convergentSetValue .~ value) >>= \case
-                Left err -> do
-                  print err
-                  exitFailure
+              go set
+      where
+        go :: ConvergentSet ByteString -> IO ()
+        go set =
+          putConvergentSet handle  set' >>= \case
+            Left err -> do
+              print err
+              exitFailure
 
-                Right _ ->
-                  pure ()
+            Right _ ->
+              pure ()
 
-      -- updateConvergentSet handle operation >>= \case
+          where
+            set' :: ConvergentSet ByteString
+            set' =
+              set & convergentSetValue .~ HashSet.fromList value
 
-      --   Right val ->
-      --     print val
+putMapParser :: Parser (Handle -> IO ())
+putMapParser =
+  doPutMap
+    <$> bucketOrKeyArgument
+    <*> (combineValues <$> many mapValueOption)
 
-  --     where
-  --       operation :: ConvergentSet [ConvergentSetUpdate]
-  --       operation =
-  --         ConvergentSet
-  --           { context = fromMaybe newContext context
-  --           , key =
-  --               case bucketOrKey of
-  --                 Left bucket -> generatedKey bucket
-  --                 Right key -> key
-  --           , value = updates
-  --           }
+  where
+    doPutMap ::
+         Either Bucket Key
+      -> ConvergentMapValue
+      -> Handle
+      -> IO ()
+    doPutMap bucketOrKey value handle =
+      case bucketOrKey of
+        Left bucket ->
+          go (newConvergentMap (generatedKey bucket) emptyConvergentMapValue)
 
-  --   setUpdateOption :: Parser ConvergentSetUpdate
-  --   setUpdateOption =
-  --     asum
-  --       [ addElemOption
-  --       , removeElemOption
-  --       ]
+        Right key ->
+          getConvergentMap handle key >>= \case
+            Left err -> do
+              print err
+              exitFailure
 
-  --   addElemOption :: Parser ConvergentSetUpdate
-  --   addElemOption =
-  --     Add <$>
-  --       strOption (help "Add an element" <> long "add" <> metavar "VALUE")
+            Right Nothing ->
+              go (newConvergentMap key emptyConvergentMapValue)
 
-  --   removeElemOption :: Parser ConvergentSetUpdate
-  --   removeElemOption =
-  --     Remove <$>
-  --       strOption (help "Remove an element" <> long "remove" <> metavar "VALUE")
+            Right (Just oldMap) ->
+              go oldMap
+
+      where
+        go :: ConvergentMap ConvergentMapValue -> IO ()
+        go oldMap =
+          putConvergentMap handle newMap >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right _ ->
+              pure ()
+
+          where
+            newMap :: ConvergentMap ConvergentMapValue
+            newMap =
+              oldMap
+                & convergentMapValue .~ value
+
+    combineValues :: [ConvergentMapValue] -> ConvergentMapValue
+    combineValues =
+      foldr step emptyConvergentMapValue
+      where
+        step ::
+             ConvergentMapValue
+          -> ConvergentMapValue
+          -> ConvergentMapValue
+        step val acc =
+          ConvergentMapValue
+            { counters  = combineCounters  (counters  val) (counters  acc)
+            , flags     = combineFlags     (flags     val) (flags     acc)
+            , maps      = combineMaps      (maps      val) (maps      acc)
+            , registers = combineRegisters (registers val) (registers acc)
+            , sets      = combineSets      (sets      val) (sets      acc)
+            }
+
+        combineCounters ::
+             HashMap ByteString Int64
+          -> HashMap ByteString Int64
+          -> HashMap ByteString Int64
+        combineCounters =
+          HashMap.unionWith (+)
+
+        combineFlags ::
+             HashMap ByteString Bool
+          -> HashMap ByteString Bool
+          -> HashMap ByteString Bool
+        combineFlags =
+          HashMap.union
+
+        combineMaps ::
+             HashMap ByteString ConvergentMapValue
+          -> HashMap ByteString ConvergentMapValue
+          -> HashMap ByteString ConvergentMapValue
+        combineMaps =
+          HashMap.unionWith step
+
+        combineRegisters ::
+             HashMap ByteString ByteString
+          -> HashMap ByteString ByteString
+          -> HashMap ByteString ByteString
+        combineRegisters =
+          HashMap.union
+
+        combineSets ::
+             HashMap ByteString (HashSet ByteString)
+          -> HashMap ByteString (HashSet ByteString)
+          -> HashMap ByteString (HashSet ByteString)
+        combineSets =
+          HashMap.unionWith HashSet.union
+
+    mapValueOption :: Parser ConvergentMapValue
+    mapValueOption =
+      asum
+        [ counterOption
+        , enabledFlagOption
+        , disabledFlagOption
+        , registerOption
+        , setOption
+        ]
+
+    counterOption :: Parser ConvergentMapValue
+    counterOption =
+      option
+        (eitherReader parseCounter)
+        (help "Counter" <> long "counter" <> metavar "PATH/VALUE")
+
+      where
+        parseCounter :: String -> Either String ConvergentMapValue
+        parseCounter update =
+          case splitOn "/" update of
+            [ path, readMaybe -> Just val ] ->
+              Right
+                (makeMapValue
+                  (\name -> toCounterValue name val)
+                  (splitOn "." path))
+
+            _ ->
+              Left "Expected: 'path/value'"
+
+          where
+            toCounterValue :: String -> Int64 -> ConvergentMapValue
+            toCounterValue name val =
+              emptyConvergentMapValue
+                { counters =
+                    HashMap.singleton (Latin1.pack name) val
+                }
+
+    enabledFlagOption :: Parser ConvergentMapValue
+    enabledFlagOption =
+      makeMapValue toFlagValue . splitOn "." <$>
+        strOption
+          (help "Enabled flag" <> long "enabled-flag" <> metavar "PATH")
+
+      where
+        toFlagValue :: String -> ConvergentMapValue
+        toFlagValue name =
+          emptyConvergentMapValue
+            { flags =
+                HashMap.singleton (Latin1.pack name) True
+            }
+
+    disabledFlagOption :: Parser ConvergentMapValue
+    disabledFlagOption =
+      makeMapValue toFlagValue . splitOn "." <$>
+        strOption
+          (help "Disabled flag" <> long "disabled-flag" <> metavar "PATH")
+
+      where
+        toFlagValue :: String -> ConvergentMapValue
+        toFlagValue name =
+          emptyConvergentMapValue
+            { flags =
+                HashMap.singleton (Latin1.pack name) False
+            }
+
+    registerOption :: Parser ConvergentMapValue
+    registerOption =
+      option
+        (eitherReader parseRegister)
+        (help "Register" <> long "register" <> metavar "PATH/VALUE")
+
+      where
+        parseRegister :: String -> Either String ConvergentMapValue
+        parseRegister update =
+          case splitOn "/" update of
+            [ path, val ] ->
+              Right
+                (makeMapValue
+                  (\name -> toRegisterValue name val)
+                  (splitOn "." path))
+
+            _ ->
+              Left "Expected: 'path/value'"
+
+          where
+            toRegisterValue :: String -> String -> ConvergentMapValue
+            toRegisterValue name val =
+              emptyConvergentMapValue
+                { registers =
+                    HashMap.singleton (Latin1.pack name) (Latin1.pack val)
+                }
+
+    setOption :: Parser ConvergentMapValue
+    setOption =
+      option
+        (eitherReader parseElem)
+        (help "Set element" <> long "elem" <> metavar "PATH/VALUE")
+
+      where
+        parseElem :: String -> Either String ConvergentMapValue
+        parseElem update =
+          case splitOn "/" update of
+            [ path, val ] ->
+              Right
+                (makeMapValue
+                  (\name -> toSetValue name val)
+                  (splitOn "." path))
+
+            _ ->
+              Left "Expected: 'path/value'"
+
+          where
+            toSetValue :: String -> String -> ConvergentMapValue
+            toSetValue name val =
+              emptyConvergentMapValue
+                { sets =
+                    HashMap.singleton
+                      (Latin1.pack name)
+                      (HashSet.singleton (Latin1.pack val))
+                }
+
+    makeMapValue ::
+         (String -> ConvergentMapValue)
+      -> [String]
+      -> ConvergentMapValue
+    makeMapValue onLeaf =
+      loop
+
+      where
+        loop :: [String] -> ConvergentMapValue
+        loop = \case
+          [] ->
+            undefined
+
+          [leaf] ->
+            onLeaf leaf
+
+          p:ps ->
+            emptyConvergentMapValue
+              { maps =
+                  HashMap.singleton (Latin1.pack p) (loop ps)
+              }
 
 
 
@@ -660,185 +915,13 @@ updateCounterParser =
             , w = w
             }
 
-updateMapParser :: Parser (Handle -> IO ())
-updateMapParser =
-  doUpdateMap
-    <$> bucketOrKeyArgument
-    <*> contextOption
-    <*> many mapUpdateOption
-
-  where
-    doUpdateMap ::
-         Either Bucket Key
-      -> Maybe Context
-      -> [ConvergentMapUpdate]
-      -> Handle
-      -> IO ()
-    doUpdateMap bucketOrKey context updates handle = do
-      updateConvergentMap handle operation >>= \case
-        Left err -> do
-          print err
-          exitFailure
-
-        Right val ->
-          print val
-
-      where
-        operation :: ConvergentMap [ConvergentMapUpdate]
-        operation =
-          ConvergentMap
-            { context = fromMaybe newContext context
-            , key =
-                case bucketOrKey of
-                  Left bucket -> generatedKey bucket
-                  Right key -> key
-            , value = updates
-            }
-
-    mapUpdateOption :: Parser ConvergentMapUpdate
-    mapUpdateOption =
-      asum
-        [ removeCounterOption
-        , removeFlagOption
-        , removeMapOption
-        , removeRegisterOption
-        , removeSetOption
-        , updateCounterOption
-        , disableFlagOption
-        , enableFlagOption
-        , setRegisterOption
-        -- , addElemOption
-        -- , removeElemOption
-        ]
-
-    removeCounterOption :: Parser ConvergentMapUpdate
-    removeCounterOption =
-      makeMapUpdate (RemoveCounter . Latin1.pack) . splitOn "." <$>
-        strOption (help "Remove a counter" <> long "remove-counter" <> metavar "PATH")
-
-    removeFlagOption :: Parser ConvergentMapUpdate
-    removeFlagOption =
-      makeMapUpdate (RemoveFlag . Latin1.pack) . splitOn "." <$>
-        strOption (help "Remove a flag" <> long "remove-flag" <> metavar "PATH")
-
-    removeMapOption :: Parser ConvergentMapUpdate
-    removeMapOption =
-      makeMapUpdate (RemoveMap . Latin1.pack) . splitOn "." <$>
-        strOption (help "Remove a map" <> long "remove-map" <> metavar "PATH")
-
-    removeRegisterOption :: Parser ConvergentMapUpdate
-    removeRegisterOption =
-      makeMapUpdate (RemoveRegister . Latin1.pack) . splitOn "." <$>
-        strOption (help "Remove a register" <> long "remove-register" <> metavar "PATH")
-
-    removeSetOption :: Parser ConvergentMapUpdate
-    removeSetOption =
-      makeMapUpdate (RemoveSet . Latin1.pack) . splitOn "." <$>
-        strOption (help "Remove a set" <> long "remove-set" <> metavar "PATH")
-
-    updateCounterOption :: Parser ConvergentMapUpdate
-    updateCounterOption =
-      option
-        (eitherReader parseUpdateCounter)
-        (help "Update a counter" <> long "update-counter" <> metavar "PATH/AMOUNT")
-
-      where
-        parseUpdateCounter :: String -> Either String ConvergentMapUpdate
-        parseUpdateCounter update =
-          case splitOn "/" update of
-            [ path, readMaybe -> Just val ] ->
-              Right
-                (makeMapUpdate
-                  (\name -> UpdateCounter (Latin1.pack name) val)
-                  (splitOn "." path))
-
-            _ ->
-              Left "Expected: 'path/amount'"
-
-    disableFlagOption :: Parser ConvergentMapUpdate
-    disableFlagOption =
-      makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) False) . splitOn "." <$>
-        strOption (help "Disable a flag" <> long "disable-flag" <> metavar "PATH")
-
-    enableFlagOption :: Parser ConvergentMapUpdate
-    enableFlagOption =
-      makeMapUpdate (\name -> UpdateFlag (Latin1.pack name) True) . splitOn "." <$>
-        strOption (help "Enable a flag" <> long "enable-flag" <> metavar "PATH")
-
-    setRegisterOption :: Parser ConvergentMapUpdate
-    setRegisterOption =
-      option
-        (eitherReader parseSetRegister)
-        (help "Set a register" <> long "set-register" <> metavar "PATH/VALUE")
-
-      where
-        parseSetRegister :: String -> Either String ConvergentMapUpdate
-        parseSetRegister update =
-          case splitOn "/" update of
-            [ path, val ] ->
-              Right
-                (makeMapUpdate
-                  (\name -> UpdateRegister (Latin1.pack name) (Latin1.pack val))
-                  (splitOn "." path))
-
-            _ ->
-              Left "Expected: 'path/value'"
-
-
-    -- addElemOption :: Parser ConvergentMapUpdate
-    -- addElemOption =
-    --   option
-    --     (eitherReader (parseUpdateSet Add))
-    --     (help "Add an element to a set" <> long "add-elem" <> metavar "PATH/VALUE")
-
-    -- removeElemOption :: Parser ConvergentMapUpdate
-    -- removeElemOption =
-    --   option
-    --     (eitherReader (parseUpdateSet Remove))
-    --     (help "Add an element to a set" <> long "remove-elem" <> metavar "PATH/VALUE")
-
-    -- parseUpdateSet ::
-    --     (ByteString -> ConvergentSetUpdate)
-    --   -> String
-    --   -> Either String ConvergentMapUpdate
-    -- parseUpdateSet toUpdate update =
-    --   case splitOn "/" update of
-    --     [ path, val ] ->
-    --       Right
-    --         (makeMapUpdate
-    --           (\name -> UpdateSet (Latin1.pack name) [toUpdate (Latin1.pack val)])
-    --           (splitOn "." path))
-
-    --     _ ->
-    --       Left "Expected: 'path/value'"
-
-    makeMapUpdate ::
-        (String -> ConvergentMapUpdate)
-      -> [String]
-      -> ConvergentMapUpdate
-    makeMapUpdate onLeaf =
-      loop
-
-      where
-        loop :: [String] -> ConvergentMapUpdate
-        loop = \case
-          [] ->
-            undefined
-
-          [leaf] ->
-            onLeaf leaf
-
-          p:ps ->
-            UpdateMap (Latin1.pack p) [loop ps]
-
-
 --------------------------------------------------------------------------------
 -- Arguments/options
 --------------------------------------------------------------------------------
 
 bucketTypeArgument :: Parser BucketType
 bucketTypeArgument =
-  BucketType . encodeUtf8 <$>
+  encodeUtf8 <$>
     strArgument (help "Bucket type" <> metavar "TYPE")
 
 bucketOrKeyArgument :: Parser (Either Bucket Key)

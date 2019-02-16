@@ -2,6 +2,8 @@ module Riak.Internal.ConvergentSet where
 
 import Libriak.Handle        (Handle)
 import Riak.Internal.Context (Context(..), newContext)
+import Riak.Internal.Crdt    (parseGetCrdtError, parseUpdateCrdtError)
+import Riak.Internal.Error
 import Riak.Internal.Key     (Key(..), isGeneratedKey)
 import Riak.Internal.Prelude
 
@@ -12,8 +14,8 @@ import qualified Riak.Internal.Key as Key
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
 
-import qualified ByteString
-import qualified HashSet
+import qualified Data.ByteString as ByteString
+import qualified Data.HashSet    as HashSet
 
 
 -- | An eventually-convergent set.
@@ -55,11 +57,10 @@ getConvergentSet ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either Handle.Error (Maybe (ConvergentSet ByteString)))
-getConvergentSet handle key = liftIO $
-  (fmap.fmap)
-    fromResponse
-    (Handle.getCrdt handle request)
+  -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentSet ByteString)))
+getConvergentSet handle key@(Key bucketType _ _) = liftIO $
+  bimap (parseGetCrdtError bucketType) fromResponse <$>
+    Handle.getCrdt handle request
 
   where
     request :: Proto.DtFetchReq
@@ -100,24 +101,26 @@ putConvergentSet ::
      MonadIO m
   => Handle -- ^
   -> ConvergentSet ByteString -- ^
-  -> m (Either Handle.Error (ConvergentSet ByteString))
-putConvergentSet handle set@(ConvergentSet { _context, _key }) = liftIO $
-  (fmap.fmap)
-    fromResponse
-    (Handle.updateCrdt handle request)
+  -> m (Either (Error 'UpdateCrdtOp) (ConvergentSet ByteString))
+putConvergentSet
+    handle
+    (ConvergentSet context key@(Key bucketType _ _) newValue oldValue) = liftIO $
+
+  bimap (parseUpdateCrdtError bucketType) fromResponse <$>
+    Handle.updateCrdt handle request
 
   where
     request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & Key.setMaybeProto _key
+        & Key.setMaybeProto key
         & Proto.maybe'context .~
-            (if ByteString.null (unContext _context)
+            (if ByteString.null (unContext context)
               then Nothing
-              else Just (unContext _context))
+              else Just (unContext context))
         & Proto.op .~
             (Proto.defMessage
-              & Proto.setOp .~ calculateSetOp set)
+              & Proto.setOp .~ calculateSetOp newValue oldValue)
         & Proto.returnBody .~ True
 
 -- TODO set update opts
@@ -135,13 +138,13 @@ putConvergentSet handle set@(ConvergentSet { _context, _key }) = liftIO $
       ConvergentSet
         { _context = Context (response ^. Proto.context)
         , _key =
-            if isGeneratedKey _key
+            if isGeneratedKey key
               then
-                case _key of
+                case key of
                   Key bucketType bucket _ ->
                     Key bucketType bucket (response ^. Proto.key)
               else
-                _key
+                key
         , _newValue = value
         , _oldValue = value
         }
@@ -151,8 +154,8 @@ putConvergentSet handle set@(ConvergentSet { _context, _key }) = liftIO $
         value =
           HashSet.fromList (response ^. Proto.setValue)
 
-calculateSetOp :: ConvergentSet ByteString -> Proto.SetOp
-calculateSetOp ConvergentSet { _newValue, _oldValue } =
+calculateSetOp :: HashSet ByteString -> HashSet ByteString -> Proto.SetOp
+calculateSetOp newValue oldValue =
   Proto.defMessage
     & Proto.adds .~ adds
     & Proto.removes .~ removes
@@ -160,8 +163,8 @@ calculateSetOp ConvergentSet { _newValue, _oldValue } =
   where
     adds :: [ByteString]
     adds =
-      HashSet.toList (HashSet.difference _newValue _oldValue)
+      HashSet.toList (HashSet.difference newValue oldValue)
 
     removes :: [ByteString]
     removes =
-      HashSet.toList (HashSet.difference _oldValue _newValue)
+      HashSet.toList (HashSet.difference oldValue newValue)

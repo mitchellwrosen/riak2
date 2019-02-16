@@ -1,5 +1,5 @@
 module Riak.BucketType
-  ( BucketType(..)
+  ( BucketType
     -- ** Bucket type properties
   , getBucketType
   , setBucketTypeIndex
@@ -29,10 +29,8 @@ import qualified Control.Foldl as Foldl
 -- | A bucket type.
 --
 -- /Note/: Must be UTF-8 encoded.
-newtype BucketType
-  = BucketType ByteString
-  deriving stock (Eq, Show)
-  deriving newtype (Hashable)
+type BucketType
+  = ByteString
 
 -- | Get bucket type properties.
 getBucketType ::
@@ -40,7 +38,7 @@ getBucketType ::
   => Handle -- ^
   -> BucketType -- ^
   -> m (Either Handle.Error BucketProperties)
-getBucketType handle (BucketType bucketType) = liftIO $
+getBucketType handle bucketType = liftIO $
   (fmap.fmap)
     fromResponse
     (Handle.getBucketType handle bucketType)
@@ -57,7 +55,7 @@ setBucketTypeIndex ::
   -> BucketType -- ^
   -> IndexName -- ^ Index name
   -> m (Either Handle.Error ())
-setBucketTypeIndex handle (BucketType bucketType) (IndexName index) =
+setBucketTypeIndex handle bucketType (IndexName index) =
   liftIO (Handle.setBucketType handle request)
 
   where
@@ -97,7 +95,7 @@ streamBuckets ::
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> IO (Either Handle.Error r)
-streamBuckets handle (BucketType bucketType) bucketFold =
+streamBuckets handle bucketType bucketFold =
   Handle.listBuckets
     handle
     request

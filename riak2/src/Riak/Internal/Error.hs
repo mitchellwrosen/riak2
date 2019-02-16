@@ -5,9 +5,11 @@ import Riak.Internal.Prelude
 
 import qualified Riak.Handle.Signature as Handle
 
-import ByteString
+import qualified Data.ByteString as ByteString
+
 
 -- TODO "Key cannot be zero-length" when putting with empty key
+-- TODO "Error no bucket type"
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.
@@ -39,13 +41,6 @@ data Error :: Op -> Type where
   InvalidSchemaError ::
        !Text
     -> Error 'PutSchemaOp
-
-  -- | A removal of a map field was attempted, but the field doesn't exist.
-  -- Carries an ugly fragment of the Riak error message that should be useful in
-  -- determining which field it is.
-  MapFieldDoesNotExistError ::
-       !ByteString
-    -> Error 'UpdateMapOp
 
   -- | The search failed. Typically, this means the query was malformed. Check
   -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
@@ -82,16 +77,19 @@ data Op
   | GetOp
   | GetIndexOp
   | GetSchemaOp
+  | GetCrdtOp
   | PutOp
   | PutIndexOp
   | PutSchemaOp
   | SearchOp
-  | UpdateMapOp
+  | UpdateCrdtOp
 
 -- | @no_type@
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True
+  MayReturnBucketTypeDoesNotExist 'GetCrdtOp = 'True
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
+  MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 
 -- | @{n_val_violation,_}@
@@ -113,6 +111,10 @@ type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
 isBucketTypeDoesNotExistError :: ByteString -> Bool
 isBucketTypeDoesNotExistError =
   (== "no_type")
+
+isCrdtBucketTypeDoesNotExistError :: ByteString -> Bool
+isCrdtBucketTypeDoesNotExistError =
+  ByteString.isPrefixOf "Error no bucket type `<<\""
 
 -- No index <<"foo">> found.
 isIndexDoesNotExistError :: ByteString -> Bool

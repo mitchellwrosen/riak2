@@ -11,16 +11,16 @@ module Riak
   , putGetHead
     -- ** Delete object
   , delete
-    -- * Counter operations
+    -- * Convergent counter operations
   , getConvergentCounter
   , updateConvergentCounter
-    -- * HyperLogLog operations
+    -- * Convergent HyperLogLog operations
   , getConvergentHyperLogLog
   , updateConvergentHyperLogLog
-    -- * Map operations
+    -- * Convergent map operations
   , getConvergentMap
-  , updateConvergentMap
-    -- * Set operations
+  , putConvergentMap
+    -- * Convergent set operations
   , getConvergentSet
   , putConvergentSet
     -- * Bucket type operations
@@ -60,7 +60,7 @@ module Riak
     -- * Types
   , Bucket(..)
   , BucketProperties(..)
-  , BucketType(..)
+  , BucketType
   , ConflictResolution(..)
   , Content(..)
   , newContent
@@ -69,13 +69,16 @@ module Riak
   , unsafeMakeContext
   , ConvergentCounter(..)
   , ConvergentHyperLogLog(..)
-  , ConvergentMap(..)
-  , ConvergentMapUpdate(..)
+  , ConvergentMap
+  , newConvergentMap
+  , convergentMapKey
+  , convergentMapValue
   , ConvergentMapValue(..)
+  , emptyConvergentMapValue
   , ConvergentSet
+  , newConvergentSet
   , convergentSetKey
   , convergentSetValue
-  , newConvergentSet
   , ErlangTerm(..)
   , ExactQuery(..)
   , DeleteOpts(..)

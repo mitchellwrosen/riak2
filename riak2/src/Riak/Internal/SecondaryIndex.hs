@@ -9,7 +9,7 @@ import Riak.Internal.Utils
 import qualified Riak.Internal.Proto.Pair          as Pair
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 
-import qualified ByteString
+import qualified Data.ByteString as ByteString
 
 
 -- TODO Index values should be a set

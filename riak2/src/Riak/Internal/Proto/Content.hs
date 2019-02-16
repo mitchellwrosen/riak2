@@ -10,7 +10,7 @@ import Data.List             (foldl')
 import Data.Time             (NominalDiffTime, UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
-import qualified HashMap
+import qualified Data.HashMap.Strict as HashMap
 
 
 lastModified :: Proto.RpbContent -> UTCTime

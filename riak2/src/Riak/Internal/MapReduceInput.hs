@@ -15,7 +15,7 @@ import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 
-import qualified Vector
+import qualified Data.Vector as Vector
 
 
 data MapReduceInput

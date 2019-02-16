@@ -9,7 +9,7 @@ import Riak.Internal.SecondaryIndex (SecondaryIndex)
 import Data.Time          (UTCTime(..))
 import Data.Time.Calendar (Day(..))
 
-import qualified HashMap
+import qualified Data.HashMap.Strict as HashMap
 
 
 -- | Object content.

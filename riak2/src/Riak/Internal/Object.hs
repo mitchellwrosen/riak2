@@ -10,7 +10,7 @@ import qualified Riak.Internal.Sibling as Sibling
 
 import Control.Lens ((^.))
 
-import qualified ByteString
+import qualified Data.ByteString    as ByteString
 import qualified Data.List.NonEmpty as List1
 
 

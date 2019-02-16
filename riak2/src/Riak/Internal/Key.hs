@@ -8,7 +8,7 @@ import qualified Libriak.Proto as Proto
 import Control.Lens  ((.~))
 import Data.Hashable (Hashable)
 
-import qualified ByteString
+import qualified Data.ByteString as ByteString
 
 
 -- | A bucket type, bucket, and key.

@@ -12,12 +12,12 @@ import Libriak.Handle        (Handle)
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
 
 import Control.Lens ((.~), (^.))
 
-import qualified ByteString
+import qualified Data.ByteString as ByteString
 
 
 -- | An eventually-convergent HyperLogLog, which provides an approximate

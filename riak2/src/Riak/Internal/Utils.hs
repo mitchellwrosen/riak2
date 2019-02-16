@@ -5,8 +5,8 @@ import Riak.Internal.Prelude
 
 import Data.Maybe (fromJust)
 
-import qualified ByteString
-import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.ByteString              as ByteString
+import qualified Data.ByteString.Char8        as Latin1
 import qualified Data.ByteString.Lex.Integral as ByteString
 
 

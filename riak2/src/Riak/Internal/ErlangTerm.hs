@@ -24,15 +24,16 @@ import Data.Bits
 import Data.ByteString.Builder    (Builder)
 import Data.Int
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
+import Data.Vector                (Vector)
 import Data.Word
-import Vector                     (Vector)
 
-import qualified ByteString
 import qualified Data.Attoparsec.ByteString as Atto
+import qualified Data.ByteString            as ByteString
 import qualified Data.ByteString.Builder    as Builder
 import qualified Data.ByteString.Lazy       as LazyByteString
-import qualified Text
-import qualified Vector
+import qualified Data.Text                  as Text
+import qualified Data.Vector                as Vector
+
 
 -- TODO ErlSmallAtomUtf8
 data ErlangTerm

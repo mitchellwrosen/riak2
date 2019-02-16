@@ -27,7 +27,7 @@ import qualified Riak.Internal.MapReducePhase as MapReducePhase
 import Control.Foldl (FoldM)
 import Control.Lens  ((.~))
 
-import qualified Vector
+import qualified Data.Vector as Vector
 
 
 -- | Perform a MapReduce job over all keys in a bucket.

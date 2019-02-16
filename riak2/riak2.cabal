@@ -173,6 +173,7 @@ library
     Riak.Internal.Bucket
     Riak.Internal.BucketProperties
     Riak.Internal.Context
+    Riak.Internal.ConvergentMap
     Riak.Internal.ConvergentSet
     Riak.Internal.Crdt
     Riak.Internal.ErlangTerm
@@ -194,12 +195,6 @@ library
     Riak.Internal.SecondaryIndexValue
     Riak.Internal.Sibling
     Riak.Internal.Utils
-
-  mixins:
-    bytestring (Data.ByteString as ByteString, Data.ByteString.Builder, Data.ByteString.Char8, Data.ByteString.Lazy),
-    text (Data.Text as Text, Data.Text.Encoding),
-    unordered-containers (Data.HashMap.Strict as HashMap, Data.HashSet as HashSet),
-    vector (Data.Vector as Vector)
 
 test-suite tests
   build-depends:
