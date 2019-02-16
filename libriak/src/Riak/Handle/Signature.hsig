@@ -3,7 +3,7 @@ signature Riak.Handle.Signature where
 import Libriak.Request  (Request)
 import Libriak.Response (Response)
 
-import Foreign.C     (CInt)
+import Socket.Stream.IPv4 (CloseException, ConnectException)
 
 
 -- | Riak handle.
@@ -12,19 +12,31 @@ data Handle
 -- | Riak handle configuration.
 data HandleConfig
 
--- | An error caused by some problem with the underlying handle. The error
--- should be recoverable, and not necessarily unexpected, such as a "remote
--- shutdown" due to Riak being restarted, or even a "connection refused".
+-- | An error caused by some problem with an active handle.
 data HandleError
 
 instance Eq HandleError
 instance Show HandleError
 
+-- | An error caused during initial handle setup.
+data HandleSetupError
 
+instance Eq HandleSetupError
+instance Show HandleSetupError
+
+-- | An error caused during graceful handle teardown.
+data HandleTeardownError
+
+instance Eq HandleTeardownError
+instance Show HandleTeardownError
+
+
+-- | Attempt to setup a handle.
 withHandle ::
      HandleConfig
+  -> (Maybe HandleTeardownError -> a -> IO b)
   -> (Handle -> IO a)
-  -> IO (Either CInt a)
+  -> IO (Either HandleSetupError b)
 
 -- | Send a request and receive the response (a single message).
 --

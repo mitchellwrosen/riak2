@@ -11,15 +11,20 @@ module Libriak.Internal.Connection
     -- * Re-exports
   , Endpoint(..)
   , SocketException(..)
-  , Context(..)
-  , Reason(..)
+  , ConnectException(..)
+  , SendException(..)
+  , ReceiveException(..)
+  , CloseException(..)
+  , Interruptibility(..)
   ) where
 
 import Control.Monad.Primitive  (RealWorld)
 import Data.Bits                (unsafeShiftL, unsafeShiftR, (.|.))
 import Data.Primitive.ByteArray
 import Data.Word                (Word32, Word8)
-import Socket.Stream.IPv4       (Context(..), Endpoint(..), Reason(..),
+import Socket.Stream.IPv4       (CloseException(..), ConnectException(..),
+                                 Endpoint(..), Interruptibility(..),
+                                 ReceiveException(..), SendException(..),
                                  SocketException(..))
 
 import qualified Socket.Stream.IPv4 as Socket
@@ -43,14 +48,15 @@ data Connection
 -- /Throws/. This function will never throw an exception.
 withConnection ::
      Endpoint
+  -> (Maybe CloseException -> a -> IO b)
   -> (Connection -> IO a)
-  -> IO (Either SocketException a)
-withConnection endpoint callback = do
-  Socket.withConnection endpoint $ \connection -> do
+  -> IO (Either (ConnectException 'Uninterruptible) b)
+withConnection endpoint onTeardown onSuccess = do
+  Socket.withConnection endpoint onTeardown $ \connection -> do
     sendbuf :: MutableByteArray RealWorld <-
       newByteArray gSendBufferSize
 
-    callback Connection
+    onSuccess Connection
       { connection = connection
       , sendbuf = sendbuf
       }
@@ -62,7 +68,7 @@ withConnection endpoint callback = do
 send ::
      Connection -- ^ Connection
   -> [ByteArray] -- ^ Payload
-  -> IO (Either SocketException ())
+  -> IO (Either (SendException 'Uninterruptible) ())
 send conn payload = do
   lenBytes :: ByteArray <-
     bigEndianWord32ByteArray (fromIntegral payloadLen)
@@ -83,12 +89,18 @@ send conn payload = do
       writeByteArray mbytes 3 (fromIntegral (             word   ) :: Word8)
       unsafeFreezeByteArray mbytes
 
-sendall :: Connection -> [ByteArray] -> IO (Either SocketException ())
+sendall ::
+     Connection
+  -> [ByteArray]
+  -> IO (Either (SendException 'Uninterruptible) ())
 sendall Connection { sendbuf, connection } =
   loop 0
 
   where
-    loop :: Int -> [ByteArray] -> IO (Either SocketException ())
+    loop ::
+         Int
+      -> [ByteArray]
+      -> IO (Either (SendException 'Uninterruptible) ())
     loop !buffered = \case
       [] ->
         Socket.sendMutableByteArraySlice connection sendbuf 0 buffered
@@ -180,7 +192,9 @@ sendall Connection { sendbuf, connection } =
 -- TODO benchmark receive
 --
 -- /Throws/. This function will never throw an exception.
-receive :: Connection -> IO (Either SocketException ByteArray)
+receive ::
+     Connection
+  -> IO (Either (ReceiveException 'Uninterruptible) ByteArray)
 receive Connection { connection } =
   receiveBigEndianWord32 connection >>= \case
     Left err ->
@@ -189,7 +203,9 @@ receive Connection { connection } =
     Right len ->
       Socket.receiveByteArray connection (fromIntegral len)
 
-receiveBigEndianWord32 :: Socket.Connection -> IO (Either SocketException Word32)
+receiveBigEndianWord32 ::
+     Socket.Connection
+  -> IO (Either (ReceiveException 'Uninterruptible) Word32)
 receiveBigEndianWord32 connection =
   fmap parse <$> Socket.receiveByteArray connection 4
 

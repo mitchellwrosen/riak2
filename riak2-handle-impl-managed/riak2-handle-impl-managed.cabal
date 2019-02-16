@@ -15,6 +15,7 @@ library
     BangPatterns
     DeriveAnyClass
     DerivingStrategies
+    EmptyDataDeriving
     LambdaCase
     NamedFieldPuns
     ScopedTypeVariables

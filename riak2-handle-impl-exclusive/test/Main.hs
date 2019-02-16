@@ -52,7 +52,7 @@ main = do
   cherryTree <- newCherryTree threads
 
   result <-
-    withHandle config $ \handle -> do
+    withHandle config (\Nothing -> pure) $ \handle -> do
       replicateM_ threads $ forkIO $ do
         chopCherryTree cherryTree
 
@@ -66,8 +66,9 @@ main = do
   shouldBeSendRecv (reverse actions)
 
   case result of
-    Left errno ->
-      exitWith (ExitFailure (fromIntegral errno))
+    Left err -> do
+      print err
+      exitFailure
 
     Right () ->
       pure ()

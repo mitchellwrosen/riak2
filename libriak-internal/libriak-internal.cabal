@@ -7,7 +7,7 @@ build-type: Simple
 library
   build-depends:
     attoparsec,
-    base,
+    base ^>= 4.11 || ^>= 4.12,
     bytestring,
     foldl,
     lens,
@@ -15,10 +15,11 @@ library
     primitive,
     proto-lens ^>= 0.4.0,
     riak-protobuf ^>= 1.0.0,
-    sockets == 0.1.0.0
+    sockets ^>= 0.1.1,
 
   default-extensions:
     BangPatterns
+    DataKinds
     DefaultSignatures
     DeriveAnyClass
     DeriveFunctor

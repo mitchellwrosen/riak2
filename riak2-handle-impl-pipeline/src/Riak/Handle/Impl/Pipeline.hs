@@ -5,23 +5,26 @@ module Riak.Handle.Impl.Pipeline
   , withHandle
   , exchange
   , stream
+  , HandleSetupError(..)
   , HandleError(..)
+  , HandleTeardownError
     -- ** Re-exports
   , Endpoint(..)
   , DecodeError(..)
   ) where
 
-import Libriak.Connection (Connection, Endpoint(..), ReceiveError(..),
-                           SocketException(..), withConnection)
+import Libriak.Connection (ConnectException(..), Connection, Endpoint(..),
+                           Interruptibility(..), ReceiveError(..),
+                           ReceiveException(..), SendException(..),
+                           withConnection)
 import Libriak.Request    (Request)
 import Libriak.Response   (DecodeError(..), Response)
 
 import qualified Libriak.Connection as Connection
 
 import Control.Concurrent.MVar
-import Control.Exception.Safe  (Exception, finally, throwIO)
+import Control.Exception.Safe  (finally, throwIO)
 import Data.Coerce             (coerce)
-import Foreign.C               (CInt)
 
 
 data Handle
@@ -53,26 +56,33 @@ instance Semigroup EventHandlers where
     EventHandlers (a1 <> a2) (b1 <> b2)
 
 data HandleError
-  = RemoteShutdown
-  | SendError !CInt
-  | ReceiveError !CInt
+  = LocalShutdown -- ^ The socket write channel is shut down.
+  | RemoteReset -- ^ The remote peer reset the connection.
+  | RemoteShutdown -- ^ The remote peer's write channel is shut down.
   deriving stock (Eq, Show)
 
--- | During connection teardown, Riak unexpectedly sent more data.
-data RemoteNotShutdown
-  = RemoteNotShutdown
-  deriving stock (Show)
-  deriving anyclass (Exception)
+data HandleSetupError
+  = ConnectionFirewalled
+  | ConnectionRefused
+  | ConnectionTimedOut
+  | NetworkUnreachable
+  | NoEphemeralPortsAvailable
+  | TooManyOpenFiles
+  deriving stock (Eq, Show)
+
+data HandleTeardownError
+  deriving stock (Eq, Show)
+
 
 -- | Acquire a handle.
 --
--- /Throws/. If, during connection teardown, Riak unexpectedly sends more data,
--- throws 'RemoteNotShutdown'.
+-- /Throws/. This function will never throw an exception.
 withHandle ::
      HandleConfig
+  -> (Maybe HandleTeardownError -> a -> IO b)
   -> (Handle -> IO a)
-  -> IO (Either CInt a)
-withHandle HandleConfig { endpoint, handlers } k = do
+  -> IO (Either HandleSetupError b)
+withHandle HandleConfig { endpoint, handlers } onTeardown onSuccess = do
   sync :: Synchronized <-
     newSynchronized
 
@@ -80,8 +90,8 @@ withHandle HandleConfig { endpoint, handlers } k = do
     newRelay
 
   result <-
-    withConnection endpoint $ \connection ->
-      k Handle
+    withConnection endpoint (\_ -> onTeardown Nothing) $ \connection ->
+      onSuccess Handle
         { connection = connection
         , sync = sync
         , relay = relay
@@ -90,7 +100,7 @@ withHandle HandleConfig { endpoint, handlers } k = do
 
   case result of
     Left err ->
-      socketExceptionToConnectError err
+      pure (Left (connectErrorToSetupError err))
 
     Right value ->
       pure (Right value)
@@ -107,7 +117,7 @@ send Handle { connection, handlers } request = do
 
   Connection.send connection request >>= \case
     Left err ->
-      socketExceptionToHandleError SendError err
+      pure (Left (sendErrorToHandleError err))
 
     Right () ->
       pure (Right ())
@@ -120,8 +130,12 @@ receive ::
   -> IO (Either HandleError Response)
 receive Handle { connection, handlers } =
   Connection.receive connection >>= \case
-    Left (ReceiveErrorSocket err) -> do
-      response <- socketExceptionToHandleError ReceiveError err
+    Left (ReceiveErrorSocket recvErr) -> do
+      let
+        response :: Either HandleError Response
+        response =
+          Left (recvErrorToHandleError recvErr)
+
       onReceive handlers response
       pure response
 
@@ -196,38 +210,26 @@ stream handle@(Handle { sync }) request value0 step =
             Right result ->
               pure (Right result)
 
-socketExceptionToConnectError :: SocketException -> IO (Either CInt a)
-socketExceptionToConnectError = \case
-  SocketException _ (Connection.ErrorCode errno) ->
-    pure (Left errno)
 
-  SocketException _ Connection.RemoteNotShutdown ->
-    throwIO RemoteNotShutdown
+connectErrorToSetupError ::
+     ConnectException 'Uninterruptible
+  -> HandleSetupError
+connectErrorToSetupError = \case
+  ConnectEphemeralPortsExhausted -> NoEphemeralPortsAvailable
+  ConnectFileDescriptorLimit     -> TooManyOpenFiles
+  ConnectFirewalled              -> ConnectionFirewalled
+  ConnectNetworkUnreachable      -> NetworkUnreachable
+  ConnectRefused                 -> ConnectionRefused
+  ConnectTimeout                 -> ConnectionTimedOut
 
-  SocketException _ Connection.MessageTruncated{} -> undefined
-  SocketException _ Connection.NegativeBytesRequested -> undefined
-  SocketException _ Connection.OptionValueSize -> undefined
-  SocketException _ Connection.RemoteShutdown -> undefined
-  SocketException _ Connection.SocketAddressFamily -> undefined
-  SocketException _ Connection.SocketAddressSize -> undefined
+sendErrorToHandleError :: SendException 'Uninterruptible -> HandleError
+sendErrorToHandleError = \case
+  SendReset    -> RemoteReset
+  SendShutdown -> LocalShutdown
 
-socketExceptionToHandleError ::
-     (CInt -> HandleError)
-  -> SocketException
-  -> IO (Either HandleError a)
-socketExceptionToHandleError fromErrno = \case
-  SocketException _ Connection.RemoteShutdown ->
-    pure (Left RemoteShutdown)
-
-  SocketException _ (Connection.ErrorCode errno) ->
-    pure (Left (fromErrno errno))
-
-  SocketException _ Connection.RemoteNotShutdown -> undefined
-  SocketException _ Connection.MessageTruncated{} -> undefined
-  SocketException _ Connection.NegativeBytesRequested -> undefined
-  SocketException _ Connection.OptionValueSize -> undefined
-  SocketException _ Connection.SocketAddressFamily -> undefined
-  SocketException _ Connection.SocketAddressSize -> undefined
+recvErrorToHandleError :: ReceiveException 'Uninterruptible -> HandleError
+recvErrorToHandleError = \case
+  ReceiveShutdown -> RemoteShutdown
 
 
 newtype Synchronized

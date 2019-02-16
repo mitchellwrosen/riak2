@@ -11,9 +11,11 @@ library
     libriak-internal
 
   default-extensions:
+    DataKinds
     DeriveAnyClass
     DerivingStrategies
     DuplicateRecordFields
+    EmptyDataDeriving
     LambdaCase
     NamedFieldPuns
     ScopedTypeVariables

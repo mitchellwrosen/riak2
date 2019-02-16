@@ -26,7 +26,7 @@ import Data.Word
 import Net.IPv4            (IPv4, ipv4)
 import Numeric.Natural     (Natural)
 import Options.Applicative hiding (infoParser)
-import System.Exit         (ExitCode(..), exitFailure, exitWith)
+import System.Exit         (exitFailure)
 import Text.Read           (readMaybe)
 
 import qualified Control.Foldl          as Foldl
@@ -75,9 +75,10 @@ main = do
               }
         }
 
-  Handle.withHandle config run >>= \case
-    Left errno ->
-      exitWith (ExitFailure (fromIntegral errno))
+  Handle.withHandle config (const pure) run >>= \case
+    Left err -> do
+      print err
+      exitFailure
 
     Right () ->
       pure ()

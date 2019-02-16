@@ -9,7 +9,9 @@ module Riak.Handle.Impl.Managed
   , withHandle
   , exchange
   , stream
-  , HandleError(..)
+  , HandleSetupError
+  , HandleError
+  , HandleTeardownError
   ) where
 
 import Libriak.Request  (Request)
@@ -23,7 +25,6 @@ import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
 import Control.Exception.Safe (Exception(..), SomeException, bracket, catchAny)
 import Control.Monad          (when)
-import Foreign.C              (CInt)
 import Numeric.Natural        (Natural)
 
 
@@ -39,8 +40,15 @@ data Handle
 type HandleConfig
   = Handle.HandleConfig
 
+-- TODO managed handle errors
+
 data HandleError
-  = HandleError
+  deriving stock (Eq, Show)
+
+data HandleSetupError
+  deriving stock (Eq, Show)
+
+data HandleTeardownError
   deriving stock (Eq, Show)
 
 data HandleCrashed
@@ -59,9 +67,10 @@ instance Exception HandleCrashed where
 -- 'HandleCrashed' exception.
 withHandle ::
      HandleConfig
+  -> (Maybe HandleTeardownError -> a -> IO b)
   -> (Handle -> IO a)
-  -> IO (Either CInt a)
-withHandle config k = do
+  -> IO (Either HandleSetupError b)
+withHandle config onTeardown onSuccess = do
   handleVar :: TMVar (Handle.Handle, Natural) <-
     newEmptyTMVarIO
 
@@ -76,12 +85,14 @@ withHandle config k = do
       unmask (manager config handleVar errorVar) `catchAny` \e ->
         throwTo threadId (HandleCrashed e))
     killThread
-    (\_ ->
-      Right <$>
-        k Handle
+    (\_ -> do
+      result <-
+        onSuccess Handle
           { handleVar = handleVar
           , errorVar = errorVar
-          })
+          }
+
+      Right <$> onTeardown Nothing result)
 
 -- The manager thread:
 --
@@ -102,18 +113,10 @@ manager config handleVar errorVar =
 
   where
     loop :: Natural -> IO a
-    loop !generation =
-      Handle.withHandle config runUntilError >>= \case
+    loop !generation = do
+      Handle.withHandle config (\_ -> pure) runUntilError >>= \case
         Left connectErr -> do
-          putStrLn ("Manager thread (dis)connect error: " ++ show connectErr)
-
-          -- Annoying... withHandle disconnecting on a broken socket connection
-          -- is hiding the actual handle error that caused it. Whatever, read it
-          -- out of the TMVar.
-          atomically (tryReadTMVar errorVar) >>= \case
-            Nothing -> putStrLn "Manager thread handle error: <none>"
-            Just handleErr -> putStrLn ("Manager thread handle error: " ++ show handleErr)
-
+          putStrLn ("Manager thread connect error: " ++ show connectErr)
           threadDelay 1000000
           loop (generation+1)
 
