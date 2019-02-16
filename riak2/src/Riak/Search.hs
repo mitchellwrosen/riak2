@@ -96,8 +96,10 @@ search
     query
     SearchOpts { fieldList, filter, presort, rows, sort, start } = liftIO $
 
-  bimap parseSearchError fromResponse <$>
-    Handle.search handle request
+  fromHandleResult
+    (Left . parseSearchError index)
+    fromResponse
+    (Handle.search handle request)
 
   where
     request :: Proto.RpbSearchQueryReq
@@ -112,21 +114,6 @@ search
         & Proto.maybe'start .~ start
         & Proto.q .~ query
 
-    parseSearchError :: Handle.Error -> Error 'SearchOp
-    parseSearchError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err
-        | isIndexDoesNotExistError err ->
-            IndexDoesNotExistError index
-        | isSearchFailedError err ->
-            SearchFailedError
-        | isUnknownMessageCode err ->
-            SearchNotEnabledError
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
-
     fromResponse :: Proto.RpbSearchQueryResp -> SearchResults
     fromResponse response =
       SearchResults
@@ -138,3 +125,14 @@ search
     fromProtoSearchDoc :: Proto.RpbSearchDoc -> [(ByteString, ByteString)]
     fromProtoSearchDoc doc =
       map Proto.Pair.toTuple (doc ^. Proto.fields)
+
+parseSearchError :: IndexName -> ByteString -> Error 'SearchOp
+parseSearchError index err
+  | isIndexDoesNotExistError err =
+      IndexDoesNotExistError index
+  | isSearchFailedError err =
+      SearchFailedError
+  | isUnknownMessageCode err =
+      SearchNotEnabledError
+  | otherwise =
+      UnknownError (decodeUtf8 err)

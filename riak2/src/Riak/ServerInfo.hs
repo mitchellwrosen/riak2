@@ -23,9 +23,9 @@ data ServerInfo
 getServerInfo ::
      MonadIO m
   => Handle -- ^
-  -> m (Either Handle.Error ServerInfo)
+  -> m (Either Handle.HandleError (Either ByteString ServerInfo))
 getServerInfo handle = liftIO $
-  (fmap.fmap)
+  (fmap.fmap.fmap)
     fromResponse
     (Handle.getServerInfo handle)
 

@@ -62,27 +62,21 @@ getIndex ::
   -> IndexName -- ^
   -> m (Either (Error 'GetIndexOp) (Maybe Index))
 getIndex handle (IndexName name) = liftIO $
-  fromResponse <$>
-    Handle.getIndex handle (Just (encodeUtf8 name))
+  fromHandleResult
+    parseGetIndexError
+    (Just . fromProto . head)
+    (Handle.getIndex handle (Just (encodeUtf8 name)))
 
-  where
-    fromResponse ::
-         Either Handle.Error [Proto.RpbYokozunaIndex]
-      -> Either (Error 'GetIndexOp) (Maybe Index)
-    fromResponse = \case
-      Left (Handle.ErrorHandle err) ->
-        Left (HandleError err)
-
-      Left (Handle.ErrorRiak err)
-        | isNotfound err ->
-            Right Nothing
-        | isUnknownMessageCode err ->
-            Left SearchNotEnabledError
-        | otherwise ->
-            Left (UnknownError (decodeUtf8 err))
-
-      Right (head -> index) ->
-        Right (Just (fromProto index))
+parseGetIndexError ::
+     ByteString
+  -> Either (Error 'GetIndexOp) (Maybe Index)
+parseGetIndexError err
+  | isNotfound err =
+      Right Nothing
+  | isUnknownMessageCode err =
+      Left SearchNotEnabledError
+  | otherwise =
+      Left (UnknownError (decodeUtf8 err))
 
 -- | Get all Solr indexes.
 getIndexes ::
@@ -90,24 +84,17 @@ getIndexes ::
   => Handle -- ^
   -> m (Either (Error 'GetIndexOp) [Index])
 getIndexes handle = liftIO $
-  fromResponse <$> Handle.getIndex handle Nothing
+  fromHandleResult
+    (Left . parseGetIndexesError)
+    (map fromProto)
+    (Handle.getIndex handle Nothing)
 
-  where
-    fromResponse ::
-         Either Handle.Error [Proto.RpbYokozunaIndex]
-      -> Either (Error 'GetIndexOp) [Index]
-    fromResponse = \case
-      Left (Handle.ErrorHandle err) ->
-        Left (HandleError err)
-
-      Left (Handle.ErrorRiak err)
-        | isUnknownMessageCode err ->
-            Left SearchNotEnabledError
-        | otherwise ->
-            Left (UnknownError (decodeUtf8 err))
-
-      Right indexes ->
-        Right (map fromProto indexes)
+parseGetIndexesError :: ByteString -> Error 'GetIndexOp
+parseGetIndexesError err
+  | isUnknownMessageCode err =
+      SearchNotEnabledError
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 -- | Put a Solr index.
 --
@@ -132,7 +119,10 @@ putIndex_ ::
   -> Maybe Word32
   -> IO (Either (Error 'PutIndexOp) ())
 putIndex_ handle index schema nodes timeout =
-  first parsePutIndexError <$> Handle.putIndex handle request
+  fromHandleResult
+    (Left . parsePutIndexError)
+    id
+    (Handle.putIndex handle request)
 
   where
     request :: Proto.RpbYokozunaIndexPutReq
@@ -145,18 +135,14 @@ putIndex_ handle index schema nodes timeout =
               & Proto.schema .~ encodeUtf8 schema)
         & Proto.maybe'timeout .~ timeout
 
-    parsePutIndexError :: Handle.Error -> Error 'PutIndexOp
-    parsePutIndexError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err
-        | isSchemaDoesNotExistError err ->
-            SchemaDoesNotExistError
-        | isUnknownMessageCode err ->
-            SearchNotEnabledError
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
+parsePutIndexError :: ByteString -> Error 'PutIndexOp
+parsePutIndexError err
+  | isSchemaDoesNotExistError err =
+      SchemaDoesNotExistError
+  | isUnknownMessageCode err =
+      SearchNotEnabledError
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 -- | Delete a Solr index.
 --
@@ -168,25 +154,21 @@ deleteIndex ::
   -> IndexName -- ^
   -> m (Either (Error 'DeleteIndexOp) ())
 deleteIndex handle name = liftIO $
-  fromResponse <$>
-    Handle.deleteIndex handle (encodeUtf8 (unIndexName name))
+  fromHandleResult
+    parseDeleteIndexError
+    id
+    (Handle.deleteIndex handle (encodeUtf8 (unIndexName name)))
 
-  where
-    fromResponse :: Either Handle.Error () -> Either (Error 'DeleteIndexOp) ()
-    fromResponse = \case
-      Left (Handle.ErrorHandle err) ->
-        Left (HandleError err)
-
-      Left (Handle.ErrorRiak err)
-        | isNotfound err ->
-            Right ()
-        | isUnknownMessageCode err ->
-            Left SearchNotEnabledError
-        | otherwise ->
-            Left (UnknownError (decodeUtf8 err))
-
-      Right () ->
-        Right ()
+parseDeleteIndexError ::
+     ByteString
+  -> Either (Error 'DeleteIndexOp) ()
+parseDeleteIndexError err
+  | isNotfound err =
+      Right ()
+  | isUnknownMessageCode err =
+      Left SearchNotEnabledError
+  | otherwise =
+      Left (UnknownError (decodeUtf8 err))
 
 fromProto :: Proto.RpbYokozunaIndex -> Index
 fromProto index =

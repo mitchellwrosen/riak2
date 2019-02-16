@@ -67,8 +67,10 @@ getConvergentSet ::
   -> Key -- ^
   -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentSet ByteString)))
 getConvergentSet handle key@(Key bucketType _ _) = liftIO $
-  bimap (parseGetCrdtError bucketType) fromResponse <$>
-    Handle.getCrdt handle request
+  fromHandleResult
+    (parseGetCrdtError bucketType)
+    fromResponse
+    (Handle.getCrdt handle request)
 
   where
     request :: Proto.DtFetchReq
@@ -114,8 +116,10 @@ putConvergentSet
     handle
     (ConvergentSet context key@(Key bucketType _ _) newValue oldValue) = liftIO $
 
-  bimap (parseUpdateCrdtError bucketType) fromResponse <$>
-    Handle.updateCrdt handle request
+  fromHandleResult
+    (parseUpdateCrdtError bucketType)
+    fromResponse
+    (Handle.updateCrdt handle request)
 
   where
     request :: Proto.DtUpdateReq

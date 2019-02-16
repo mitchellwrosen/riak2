@@ -3,8 +3,8 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..),
-                                   Handle, withHandle)
+import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..), Handle,
+                                   HandleConfig(..), withHandle)
 
 import Control.Lens
 import Data.Either           (isRight)
@@ -35,9 +35,9 @@ main = do
       pure ()
 
   where
-    config :: Config
+    config :: HandleConfig
     config =
-      Config
+      HandleConfig
         { endpoint =
             Endpoint
               { address = ipv4 127 0 0 1
@@ -55,7 +55,7 @@ integrationTests :: Handle -> [TestTree]
 integrationTests handle =
   [ testGroup "Riak"
     [ testCase "ping" $ do
-        ping handle `shouldReturn` Right ()
+        ping handle `shouldReturn` Right (Right ())
     ]
 
   , testGroup "Riak.Object"
@@ -181,10 +181,10 @@ integrationTests handle =
   , testGroup "Riak.ServerInfo"
     [ testCase "getServerInfo" $ do
         getServerInfo handle `shouldReturn`
-          Right ServerInfo
+          Right (Right ServerInfo
             { name = "riak@172.17.0.2"
             , version = "2.2.3"
-            }
+            })
     ]
   ]
 

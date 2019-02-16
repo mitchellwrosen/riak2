@@ -5,11 +5,11 @@
 
 module Riak.Handle.Impl.Managed
   ( Handle
-  , Config
+  , HandleConfig
   , withHandle
   , exchange
   , stream
-  , Error(..)
+  , HandleError(..)
   ) where
 
 import Libriak.Request  (Request)
@@ -32,15 +32,15 @@ data Handle
   { handleVar :: !(TMVar (Handle.Handle, Natural))
     -- ^ The handle, and which "generation" it is (when 0 dies, 1 replaces it,
     -- etc.
-  , errorVar :: !(TMVar Handle.Error)
+  , errorVar :: !(TMVar Handle.HandleError)
     -- ^ The last error some client received when trying to use the handle.
   }
 
-type Config
-  = Handle.Config
+type HandleConfig
+  = Handle.HandleConfig
 
-data Error
-  = Error
+data HandleError
+  = HandleError
   deriving stock (Eq, Show)
 
 data HandleCrashed
@@ -58,14 +58,14 @@ instance Exception HandleCrashed where
 -- /Throws/. If the background manager thread crashes, throws an asynchronous
 -- 'HandleCrashed' exception.
 withHandle ::
-     Config
+     HandleConfig
   -> (Handle -> IO a)
   -> IO (Either CInt a)
 withHandle config k = do
   handleVar :: TMVar (Handle.Handle, Natural) <-
     newEmptyTMVarIO
 
-  errorVar :: TMVar Handle.Error <-
+  errorVar :: TMVar Handle.HandleError <-
     newEmptyTMVarIO
 
   threadId :: ThreadId <-
@@ -93,9 +93,9 @@ withHandle config k = do
 -- handle (if available), use it, and if anything goes wrong, write to the error
 -- TMVar and retry when a new connection is established.
 manager ::
-     Config
+     HandleConfig
   -> TMVar (Handle.Handle, Natural)
-  -> TMVar Handle.Error
+  -> TMVar Handle.HandleError
   -> IO a
 manager config handleVar errorVar =
   loop 0
@@ -123,7 +123,7 @@ manager config handleVar errorVar =
           loop (generation+1)
 
       where
-        runUntilError :: Handle.Handle -> IO Handle.Error
+        runUntilError :: Handle.Handle -> IO Handle.HandleError
         runUntilError handle = do
           -- Clear out any previous errors, and put the healthy handle for
           -- clients to use
@@ -142,12 +142,12 @@ manager config handleVar errorVar =
 exchange ::
      Handle
   -> Request
-  -> IO (Either Error Response)
+  -> IO (Either HandleError Response)
 exchange Handle { handleVar, errorVar } request =
   loop 0
 
   where
-    loop :: Natural -> IO (Either Error Response)
+    loop :: Natural -> IO (Either HandleError Response)
     loop !healthyGen = do
       (handle, gen) <-
         waitForGen healthyGen handleVar
@@ -171,12 +171,12 @@ stream ::
   -> Request -- ^
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either Error r)
+  -> IO (Either HandleError r)
 stream Handle { handleVar, errorVar } request value step =
   loop 0
 
   where
-    loop :: Natural -> IO (Either Error r)
+    loop :: Natural -> IO (Either HandleError r)
     loop !healthyGen = do
       (handle, gen) <-
         waitForGen healthyGen handleVar

@@ -37,9 +37,9 @@ getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either Handle.Error BucketProperties)
+  -> m (Either Handle.HandleError (Either ByteString BucketProperties))
 getBucketType handle bucketType = liftIO $
-  (fmap.fmap)
+  (fmap.fmap.fmap)
     fromResponse
     (Handle.getBucketType handle bucketType)
 
@@ -54,7 +54,7 @@ setBucketTypeIndex ::
   => Handle -- ^
   -> BucketType -- ^
   -> IndexName -- ^ Index name
-  -> m (Either Handle.Error ())
+  -> m (Either Handle.HandleError (Either ByteString ()))
 setBucketTypeIndex handle bucketType (IndexName index) =
   liftIO (Handle.setBucketType handle request)
 
@@ -97,11 +97,13 @@ streamBuckets ::
   -> FoldM IO Bucket r -- ^
   -> m (Either (Error 'ListBucketsOp) r)
 streamBuckets handle bucketType bucketFold = liftIO $
-  first parseListBucketsError <$>
-    Handle.listBuckets
+  fromHandleResult
+    (Left . parseListBucketsError bucketType)
+    id
+    (Handle.listBuckets
       handle
       request
-      (makeResponseFold bucketType bucketFold)
+      (makeResponseFold bucketType bucketFold))
 
   where
     request :: Proto.RpbListBucketsReq
@@ -111,16 +113,12 @@ streamBuckets handle bucketType bucketFold = liftIO $
         & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
 
-    parseListBucketsError :: Handle.Error -> Error 'ListBucketsOp
-    parseListBucketsError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err
-        | isBucketTypeDoesNotExistError_List err ->
-            BucketTypeDoesNotExistError bucketType
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
+parseListBucketsError :: ByteString -> ByteString -> Error 'ListBucketsOp
+parseListBucketsError bucketType err
+  | isBucketTypeDoesNotExistError_List err =
+      BucketTypeDoesNotExistError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 makeResponseFold ::
      Monad m

@@ -142,6 +142,7 @@ import Riak.Sibling
 import qualified Libriak.Handle as Handle
 
 import Control.Monad.IO.Class (MonadIO, liftIO)
+import Data.ByteString        (ByteString)
 import Data.Default.Class     (def)
 
 
@@ -149,6 +150,6 @@ import Data.Default.Class     (def)
 ping ::
      MonadIO m
   => Handle -- ^
-  -> m (Either Handle.Error ())
+  -> m (Either Handle.HandleError (Either ByteString ()))
 ping handle =
   liftIO (Handle.ping handle)

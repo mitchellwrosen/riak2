@@ -213,21 +213,19 @@ doGet ::
   -> Proto.RpbGetReq
   -> IO (Either (Error 'GetOp) Proto.RpbGetResp)
 doGet handle request =
-  first parseGetError <$>
-    Handle.get handle request
-  where
-    parseGetError :: Handle.Error -> Error 'GetOp
-    parseGetError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
+  fromHandleResult
+    (Left . parseGetError request)
+    id
+    (Handle.get handle request)
 
-      Handle.ErrorRiak err
-        | isBucketTypeDoesNotExistError err ->
-            BucketTypeDoesNotExistError (request ^. Proto.type')
-        | isInvalidNodesError err ->
-            InvalidNodesError (request ^. Proto.nVal)
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
+parseGetError :: Proto.RpbGetReq -> ByteString -> Error 'GetOp
+parseGetError request err
+  | isBucketTypeDoesNotExistError err =
+      BucketTypeDoesNotExistError (request ^. Proto.type')
+  | isInvalidNodesError err =
+      InvalidNodesError (request ^. Proto.nVal)
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest
@@ -325,21 +323,19 @@ doPut ::
   -> Proto.RpbPutReq
   -> IO (Either (Error 'PutOp) Proto.RpbPutResp)
 doPut handle request =
-  first parsePutError <$> Handle.put handle request
+  fromHandleResult
+    (Left . parsePutError request)
+    id
+    (Handle.put handle request)
 
-  where
-    parsePutError :: Handle.Error -> Error 'PutOp
-    parsePutError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err
-        | isBucketTypeDoesNotExistError err ->
-            BucketTypeDoesNotExistError (request ^. Proto.type')
-        | isInvalidNodesError err ->
-            InvalidNodesError (request ^. Proto.nVal)
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
+parsePutError :: Proto.RpbPutReq -> ByteString -> Error 'PutOp
+parsePutError request err
+  | isBucketTypeDoesNotExistError err =
+      BucketTypeDoesNotExistError (request ^. Proto.type')
+  | isInvalidNodesError err =
+      InvalidNodesError (request ^. Proto.nVal)
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 makePutRequest ::
      Object (Content ByteString)
@@ -381,7 +377,10 @@ delete
     Object { context, key }
     DeleteOpts { dw, nodes, pr, pw, r, timeout, w } = liftIO $
 
-  first parseDeleteError <$> Handle.delete handle request
+  fromHandleResult
+    (Left . parseDeleteError)
+    id
+    (Handle.delete handle request)
 
   where
     request :: Proto.RpbDelReq
@@ -397,10 +396,6 @@ delete
         & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
         & Proto.vclock .~ unContext context
 
-    parseDeleteError :: Handle.Error -> Error 'DeleteOp
-    parseDeleteError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err ->
-        UnknownError (decodeUtf8 err)
+parseDeleteError :: ByteString -> Error 'DeleteOp
+parseDeleteError err =
+  UnknownError (decodeUtf8 err)

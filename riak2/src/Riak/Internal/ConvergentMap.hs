@@ -63,8 +63,10 @@ getConvergentMap ::
   -> Key -- ^
   -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentMap ConvergentMapValue)))
 getConvergentMap handle key@(Key bucketType _ _) = liftIO $
-  bimap (parseGetCrdtError bucketType) fromResponse <$>
-    Handle.getCrdt handle request
+  fromHandleResult
+    (parseGetCrdtError bucketType)
+    fromResponse
+    (Handle.getCrdt handle request)
 
   where
     request :: Proto.DtFetchReq
@@ -109,8 +111,11 @@ putConvergentMap ::
 putConvergentMap
     handle
     (ConvergentMap context key@(Key bucketType _ _) newValue oldValue) = liftIO $
-  bimap (parseUpdateCrdtError bucketType) fromResponse <$>
-    Handle.updateCrdt handle request
+
+  fromHandleResult
+    (parseUpdateCrdtError bucketType)
+    fromResponse
+    (Handle.updateCrdt handle request)
 
   where
     request :: Proto.DtUpdateReq
@@ -134,7 +139,9 @@ putConvergentMap
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
-    fromResponse :: Proto.DtUpdateResp -> ConvergentMap ConvergentMapValue
+    fromResponse ::
+         Proto.DtUpdateResp
+      -> ConvergentMap ConvergentMapValue
     fromResponse response =
       ConvergentMap
         { _context = Context (response ^. Proto.context)

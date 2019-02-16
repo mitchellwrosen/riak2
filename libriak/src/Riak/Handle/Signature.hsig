@@ -10,19 +10,19 @@ import Foreign.C     (CInt)
 data Handle
 
 -- | Riak handle configuration.
-data Config
+data HandleConfig
 
 -- | An error caused by some problem with the underlying handle. The error
 -- should be recoverable, and not necessarily unexpected, such as a "remote
 -- shutdown" due to Riak being restarted, or even a "connection refused".
-data Error
+data HandleError
 
-instance Eq Error
-instance Show Error
+instance Eq HandleError
+instance Show HandleError
 
 
 withHandle ::
-     Config
+     HandleConfig
   -> (Handle -> IO a)
   -> IO (Either CInt a)
 
@@ -32,7 +32,7 @@ withHandle ::
 exchange ::
      Handle
   -> Request
-  -> IO (Either Error Response)
+  -> IO (Either HandleError Response)
 
 -- | Send a request and stream the response (one or more messages).
 --
@@ -43,4 +43,4 @@ stream ::
   -> Request
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either Error r)
+  -> IO (Either HandleError r)

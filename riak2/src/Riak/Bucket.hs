@@ -43,7 +43,7 @@ getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either Handle.Error Proto.RpbBucketProps)
+  -> m (Either Handle.HandleError (Either ByteString Proto.RpbBucketProps))
 getBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.getBucket handle request
 
@@ -61,7 +61,7 @@ getBucket handle (Bucket bucketType bucket) = liftIO $
 setBucket
   :: Handle -- ^
   -> Proto.RpbSetBucketReq -- ^
-  -> IO (Either Handle.Error ())
+  -> IO (Either Handle.HandleError (Either ByteString ()))
 setBucket handle request =
   Handle.setBucket handle request
 
@@ -70,7 +70,7 @@ resetBucket ::
      MonadIO m
   => Handle
   -> Bucket
-  -> m (Either Handle.Error ())
+  -> m (Either Handle.HandleError (Either ByteString ()))
 resetBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.resetBucket handle request
 
@@ -88,7 +88,7 @@ queryExact
   :: Handle -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either Handle.Error r)
+  -> IO (Either Handle.HandleError (Either ByteString r))
 queryExact handle query@(ExactQuery { value }) keyFold =
   doIndex
     handle
@@ -118,7 +118,7 @@ queryRange
      Handle -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Either Handle.Error r)
+  -> IO (Either Handle.HandleError (Either ByteString r))
 queryRange handle query keyFold =
   doIndex
     handle
@@ -155,7 +155,7 @@ doIndex ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either Handle.Error r)
+  -> IO (Either Handle.HandleError (Either ByteString r))
 doIndex handle =
   loop
 
@@ -163,9 +163,9 @@ doIndex handle =
     loop ::
          Proto.RpbIndexReq
       -> FoldM IO Proto.RpbIndexResp r
-      -> IO (Either Handle.Error r)
+      -> IO (Either Handle.HandleError (Either ByteString r))
     loop request responseFold = do
-      result :: Either Handle.Error (FoldM IO Proto.RpbIndexResp r, Maybe ByteString) <-
+      result :: Either Handle.HandleError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
           handle
           request
@@ -175,10 +175,13 @@ doIndex handle =
         Left err ->
           pure (Left err)
 
-        Right (nextResponseFold, continuation) ->
+        Right (Left err) ->
+          pure (Right (Left err))
+
+        Right (Right (nextResponseFold, continuation)) ->
           case continuation of
             Nothing ->
-              Right <$> extractM nextResponseFold
+              Right . Right <$> extractM nextResponseFold
 
             Just continuation -> do
               loop
@@ -189,7 +192,7 @@ doIndexPage ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either Handle.Error (r, Maybe ByteString))
+  -> IO (Either Handle.HandleError (Either ByteString (r, Maybe ByteString)))
 doIndexPage handle request fold =
   Handle.secondaryIndex
     handle
@@ -242,13 +245,20 @@ streamKeys ::
   -> FoldM IO Key r -- ^
   -> m (Either (Error 'ListKeysOp) r)
 streamKeys handle (Bucket bucketType bucket) keyFold = liftIO $
-  first parseListKeysError <$>
-    Handle.listKeys
-      handle
-      request
-      (Foldl.handlesM (Proto.keys . folded . to (Key bucketType bucket)) keyFold)
+  fromHandleResult
+    (Left . parseListKeysError bucketType)
+    id
+    doRequest
 
   where
+    doRequest =
+      Handle.listKeys
+        handle
+        request
+        (Foldl.handlesM
+          (Proto.keys . folded . to (Key bucketType bucket))
+          keyFold)
+
     request :: Proto.RpbListKeysReq
     request =
       Proto.defMessage
@@ -256,16 +266,12 @@ streamKeys handle (Bucket bucketType bucket) keyFold = liftIO $
         & Proto.type' .~ bucketType
         -- TODO stream keys timeout
 
-    parseListKeysError :: Handle.Error -> Error 'ListKeysOp
-    parseListKeysError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err
-        | isBucketTypeDoesNotExistError_List err ->
-            BucketTypeDoesNotExistError bucketType
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
+parseListKeysError :: ByteString -> ByteString -> Error 'ListKeysOp
+parseListKeysError bucketType err
+  | isBucketTypeDoesNotExistError_List err =
+      BucketTypeDoesNotExistError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 
 extractM :: Monad m => FoldM m a r -> m r

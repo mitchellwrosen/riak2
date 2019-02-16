@@ -23,9 +23,9 @@ main = do
     newIORef []
 
   let
-    config :: Config
+    config :: HandleConfig
     config =
-      Config
+      HandleConfig
         { endpoint =
             Endpoint
               { address = ipv4 127 0 0 1

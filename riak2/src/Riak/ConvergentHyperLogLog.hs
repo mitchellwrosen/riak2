@@ -2,6 +2,7 @@
 -- * <http://docs.basho.com/riak/kv/2.2.3/developing/data-types/hyperloglogs/>
 -- * <http://basho.com/posts/technical/what-in-the-hell-is-hyperloglog/>
 -- * <https://github.com/basho/riak_kv/blob/develop/docs/hll/hll.pdf>
+
 module Riak.ConvergentHyperLogLog
   ( ConvergentHyperLogLog(..)
   , getConvergentHyperLogLog
@@ -9,15 +10,16 @@ module Riak.ConvergentHyperLogLog
   ) where
 
 import Libriak.Handle        (Handle)
+import Riak.Internal.Crdt
+import Riak.Internal.Error
+import Riak.Internal.Key     (Key(..), isGeneratedKey)
 import Riak.Internal.Prelude
-import Riak.Key              (Key(..))
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
+import qualified Libriak.Handle    as Handle
+import qualified Libriak.Proto     as Proto
+import qualified Riak.Internal.Key as Key
 
 import Control.Lens ((.~), (^.))
-
-import qualified Data.ByteString as ByteString
 
 
 -- | An eventually-convergent HyperLogLog, which provides an approximate
@@ -43,9 +45,10 @@ getConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either Handle.Error (Maybe (ConvergentHyperLogLog Word64)))
-getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
-  (fmap.fmap)
+  -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentHyperLogLog Word64)))
+getConvergentHyperLogLog handle key@(Key bucketType _ _) = liftIO $
+  fromHandleResult
+    (parseGetCrdtError bucketType)
     fromResponse
     (Handle.getCrdt handle request)
 
@@ -53,9 +56,7 @@ getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.key .~ key
-        & Proto.type' .~ bucketType
+        & Key.setProto key
 
         -- TODO get hll opts
         -- & Proto.maybe'basicQuorum .~ undefined
@@ -72,8 +73,9 @@ getConvergentHyperLogLog handle k@(Key bucketType bucket key) = liftIO $
     fromResponse response = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
+
       pure ConvergentHyperLogLog
-        { key = k
+        { key = key
         , value = crdt ^. Proto.hllValue
         }
 
@@ -84,9 +86,13 @@ updateConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
-  -> m (Either Handle.Error (ConvergentHyperLogLog Word64))
-updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = liftIO $
-  (fmap.fmap)
+  -> m (Either (Error 'UpdateCrdtOp) (ConvergentHyperLogLog Word64))
+updateConvergentHyperLogLog
+    handle
+    (ConvergentHyperLogLog key@(Key bucketType _ _) value) = liftIO $
+
+  fromHandleResult
+    (parseUpdateCrdtError bucketType)
     fromResponse
     (Handle.updateCrdt handle request)
 
@@ -94,18 +100,13 @@ updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = lift
     request :: Proto.DtUpdateReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.maybe'key .~
-            (if ByteString.null k
-              then Nothing
-              else Just k)
+        & Key.setMaybeProto key
         & Proto.op .~
             (Proto.defMessage
               & Proto.hllOp .~
                   (Proto.defMessage
                     & Proto.adds .~ value))
         & Proto.returnBody .~ True
-        & Proto.type' .~ bucketType
 
 -- TODO map update opts
 -- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
@@ -115,15 +116,17 @@ updateConvergentHyperLogLog handle (ConvergentHyperLogLog { key, value }) = lift
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
-    Key bucketType bucket k =
-      key
-
     fromResponse :: Proto.DtUpdateResp -> ConvergentHyperLogLog Word64
     fromResponse response =
       ConvergentHyperLogLog
         { key =
-            if ByteString.null k
-              then Key bucketType bucket (response ^. Proto.key)
-              else key
-        , value = response ^. Proto.hllValue
+            if isGeneratedKey key
+              then
+                case key of
+                  Key bucketType bucket _ ->
+                    Key bucketType bucket (response ^. Proto.key)
+              else
+                key
+        , value =
+            response ^. Proto.hllValue
         }

@@ -35,29 +35,21 @@ getSchema ::
   -> Text -- ^
   -> m (Either (Error 'GetSchemaOp) (Maybe Schema))
 getSchema handle name = liftIO $
-  fromResponse <$>
-    Handle.getSchema
-      handle
-      (encodeUtf8 name)
+  fromHandleResult
+    parseGetSchemaError
+    (Just . fromProto)
+    (Handle.getSchema handle (encodeUtf8 name))
 
-  where
-    fromResponse ::
-         Either Handle.Error Proto.RpbYokozunaSchema
-      -> Either (Error 'GetSchemaOp) (Maybe Schema)
-    fromResponse = \case
-      Left (Handle.ErrorHandle err) ->
-        Left (HandleError err)
-
-      Left (Handle.ErrorRiak err)
-        | isNotfound err ->
-            Right Nothing
-        | isUnknownMessageCode err ->
-            Left SearchNotEnabledError
-        | otherwise ->
-            Left (UnknownError (decodeUtf8 err))
-
-      Right schema ->
-        Right (Just (fromProto schema))
+parseGetSchemaError ::
+     ByteString
+  -> Either (Error 'GetSchemaOp) (Maybe Schema)
+parseGetSchemaError err
+  | isNotfound err =
+      Right Nothing
+  | isUnknownMessageCode err =
+      Left SearchNotEnabledError
+  | otherwise =
+      Left (UnknownError (decodeUtf8 err))
 
 -- | Get a Solr schema.
 putSchema ::
@@ -66,22 +58,21 @@ putSchema ::
   -> Schema -- ^
   -> m (Either (Error 'PutSchemaOp) ())
 putSchema handle schema = liftIO $
-  first parsePutSchemaError <$>
-    Handle.putSchema handle (toProto schema)
+  fromHandleResult
+    (Left . parsePutSchemaError)
+    id
+    (Handle.putSchema handle (toProto schema))
 
-  where
-    parsePutSchemaError :: Handle.Error -> Error 'PutSchemaOp
-    parsePutSchemaError = \case
-      Handle.ErrorHandle err ->
-        HandleError err
-
-      Handle.ErrorRiak err
-        | isInvalidSchemaError err ->
-            InvalidSchemaError (decodeUtf8 err)
-        | isUnknownMessageCode err ->
-            SearchNotEnabledError
-        | otherwise ->
-            UnknownError (decodeUtf8 err)
+parsePutSchemaError ::
+     ByteString
+  -> Error 'PutSchemaOp
+parsePutSchemaError err
+  | isInvalidSchemaError err =
+      InvalidSchemaError (decodeUtf8 err)
+  | isUnknownMessageCode err =
+      SearchNotEnabledError
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 fromProto :: Proto.RpbYokozunaSchema -> Schema
 fromProto schema =

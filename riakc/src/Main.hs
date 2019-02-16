@@ -3,10 +3,11 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Exclusive (Config(..), Endpoint(..), EventHandlers(..))
+import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..),
+                                   HandleConfig(..))
 import Riak.Handle.Impl.Managed   (Handle)
 
-import qualified Riak.Handle.Impl.Managed as Handle hiding (Config)
+import qualified Riak.Handle.Impl.Managed as Handle hiding (HandleConfig)
 import qualified Riak.ServerInfo          as ServerInfo
 
 import Control.Arrow       ((***))
@@ -53,9 +54,9 @@ main = do
         (progDesc "Riak command-line client")))
 
   let
-    config :: Config
+    config :: HandleConfig
     config =
-      Config
+      HandleConfig
         { endpoint =
             Endpoint
               { address = host
@@ -412,7 +413,11 @@ infoParser =
         print err
         exitFailure
 
-      Right ServerInfo { name, version } -> do
+      Right (Left err) -> do
+        Text.putStrLn (decodeUtf8 err)
+        exitFailure
+
+      Right (Right (ServerInfo name version)) -> do
         Text.putStrLn (name <> " " <> version)
 
 listParser :: Parser (Handle -> IO ())
@@ -462,7 +467,11 @@ pingParser =
         print err
         exitFailure
 
-      Right () ->
+      Right (Left err) -> do
+        Text.putStrLn (decodeUtf8 err)
+        exitFailure
+
+      Right (Right ()) ->
         pure ()
 
 putParser :: Parser (Handle -> IO ())

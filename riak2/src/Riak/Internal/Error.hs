@@ -57,7 +57,7 @@ data Error :: Op -> Type where
 
   -- | An error was returned by the underlying handle, not Riak itself.
   HandleError ::
-       !Handle.Error
+       !Handle.HandleError
     -> Error op
 
   -- | An error was returned by Riak, but this library couldn't parse it. Please
@@ -158,3 +158,21 @@ isSearchFailedError =
 isUnknownMessageCode :: ByteString -> Bool
 isUnknownMessageCode =
   ByteString.isPrefixOf "Unknown message code:"
+
+-- Parse a response from a handle operation, for the common case that Riak
+-- errors map to errors, and Riak successes map to successes.
+fromHandleResult ::
+     (ByteString -> Either (Error op) resp')
+  -> (resp -> resp')
+  -> IO (Either Handle.HandleError (Either ByteString resp))
+  -> IO (Either (Error op) resp')
+fromHandleResult fromErr fromOk =
+  fmap $ \case
+    Left err ->
+      Left (HandleError err)
+
+    Right (Left err) ->
+      fromErr err
+
+    Right (Right response) ->
+      Right (fromOk response)

@@ -1,11 +1,11 @@
 module Riak.Handle.Impl.Pipeline
   ( Handle
-  , Config(..)
+  , HandleConfig(..)
   , EventHandlers(..)
   , withHandle
   , exchange
   , stream
-  , Error(..)
+  , HandleError(..)
     -- ** Re-exports
   , Endpoint(..)
   , DecodeError(..)
@@ -32,8 +32,8 @@ data Handle
   , handlers :: !EventHandlers
   }
 
-data Config
-  = Config
+data HandleConfig
+  = HandleConfig
   { endpoint :: !Endpoint
   , handlers :: !EventHandlers
   }
@@ -41,7 +41,7 @@ data Config
 data EventHandlers
   = EventHandlers
   { onSend :: Request -> IO ()
-  , onReceive :: Either Error Response -> IO ()
+  , onReceive :: Either HandleError Response -> IO ()
   }
 
 instance Monoid EventHandlers where
@@ -52,7 +52,7 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 <> EventHandlers a2 b2 =
     EventHandlers (a1 <> a2) (b1 <> b2)
 
-data Error
+data HandleError
   = RemoteShutdown
   | SendError !CInt
   | ReceiveError !CInt
@@ -69,10 +69,10 @@ data RemoteNotShutdown
 -- /Throws/. If, during connection teardown, Riak unexpectedly sends more data,
 -- throws 'RemoteNotShutdown'.
 withHandle ::
-     Config
+     HandleConfig
   -> (Handle -> IO a)
   -> IO (Either CInt a)
-withHandle Config { endpoint, handlers } k = do
+withHandle HandleConfig { endpoint, handlers } k = do
   sync :: Synchronized <-
     newSynchronized
 
@@ -101,13 +101,13 @@ withHandle Config { endpoint, handlers } k = do
 send ::
      Handle
   -> Request
-  -> IO (Either Error ())
+  -> IO (Either HandleError ())
 send Handle { connection, handlers } request = do
   onSend handlers request
 
   Connection.send connection request >>= \case
     Left err ->
-      socketExceptionToError SendError err
+      socketExceptionToHandleError SendError err
 
     Right () ->
       pure (Right ())
@@ -117,11 +117,11 @@ send Handle { connection, handlers } request = do
 -- /Throws/. If response decoding fails, throws 'DecodeError'.
 receive ::
      Handle -- ^
-  -> IO (Either Error Response)
+  -> IO (Either HandleError Response)
 receive Handle { connection, handlers } =
   Connection.receive connection >>= \case
     Left (ReceiveErrorSocket err) -> do
-      response <- socketExceptionToError ReceiveError err
+      response <- socketExceptionToHandleError ReceiveError err
       onReceive handlers response
       pure response
 
@@ -139,7 +139,7 @@ receive Handle { connection, handlers } =
 exchange ::
      Handle -- ^
   -> Request -- ^
-  -> IO (Either Error Response)
+  -> IO (Either HandleError Response)
 exchange handle@(Handle { sync, relay }) request = do
   synchronized sync doSend >>= \case
     Left err ->
@@ -149,7 +149,7 @@ exchange handle@(Handle { sync, relay }) request = do
       withBaton baton (receive handle)
 
   where
-    doSend :: IO (Either Error Baton)
+    doSend :: IO (Either HandleError Baton)
     doSend =
       send handle request >>= \case
         Left err ->
@@ -166,7 +166,7 @@ stream ::
   -> Request -- ^
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either Error r)
+  -> IO (Either HandleError r)
 stream handle@(Handle { sync }) request value0 step =
   -- Riak request handling state machine is odd. Streaming responses are
   -- special; when one is active, no other requests can be serviced on this
@@ -183,7 +183,7 @@ stream handle@(Handle { sync }) request value0 step =
         consume value0
 
   where
-    consume :: x -> IO (Either Error r)
+    consume :: x -> IO (Either HandleError r)
     consume value =
       receive handle >>= \case
         Left err ->
@@ -211,11 +211,11 @@ socketExceptionToConnectError = \case
   SocketException _ Connection.SocketAddressFamily -> undefined
   SocketException _ Connection.SocketAddressSize -> undefined
 
-socketExceptionToError ::
-     (CInt -> Error)
+socketExceptionToHandleError ::
+     (CInt -> HandleError)
   -> SocketException
-  -> IO (Either Error a)
-socketExceptionToError fromErrno = \case
+  -> IO (Either HandleError a)
+socketExceptionToHandleError fromErrno = \case
   SocketException _ Connection.RemoteShutdown ->
     pure (Left RemoteShutdown)
 

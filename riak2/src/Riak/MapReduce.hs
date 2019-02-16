@@ -43,7 +43,7 @@ mapReduceBucket ::
   -> Bucket -- ^
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either Handle.Error r)
+  -> m (Either Handle.HandleError (Either ByteString r))
 mapReduceBucket handle bucket phases responseFold =
   liftIO (mapReduce_ handle (MapReduceInputBucket bucket) phases responseFold)
 
@@ -54,7 +54,7 @@ mapReduceKeys ::
   -> [Key] -- ^
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either Handle.Error r)
+  -> m (Either Handle.HandleError (Either ByteString r))
 mapReduceKeys handle keys phases responseFold =
   liftIO (mapReduce_ handle (MapReduceInputKeys keys) phases responseFold)
 
@@ -63,7 +63,7 @@ mapReduce_ ::
   -> MapReduceInput
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either Handle.Error r)
+  -> IO (Either Handle.HandleError (Either ByteString r))
 mapReduce_ handle input phases responseFold =
   Handle.mapReduce handle request responseFold
 

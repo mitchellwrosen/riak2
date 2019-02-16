@@ -5,6 +5,8 @@ module Riak.ConvergentCounter
   ) where
 
 import Libriak.Handle        (Handle)
+import Riak.Internal.Crdt
+import Riak.Internal.Error
 import Riak.Internal.Prelude
 import Riak.Key              (Key(..))
 import Riak.Object           (GetOpts(..), PutOpts(..))
@@ -36,13 +38,14 @@ getConvergentCounter ::
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either Handle.Error (Maybe ConvergentCounter))
+  -> m (Either (Error 'GetCrdtOp) (Maybe ConvergentCounter))
 getConvergentCounter
     handle
-    key
+    key@(Key bucketType _ _)
     (GetOpts basicQuorum nodes notfoundOk pr r timeout) = liftIO $
 
-  (fmap.fmap)
+  fromHandleResult
+    (parseGetCrdtError bucketType)
     fromResponse
     (Handle.getCrdt handle request)
 
@@ -78,12 +81,14 @@ updateConvergentCounter ::
   => Handle -- ^
   -> ConvergentCounter -- ^
   -> PutOpts -- ^
-  -> m (Either Handle.Error ConvergentCounter)
+  -> m (Either (Error 'UpdateCrdtOp) ConvergentCounter)
 updateConvergentCounter
     handle
-    (ConvergentCounter key value)
+    (ConvergentCounter key@(Key bucketType _ _) value)
     (PutOpts dw nodes pw timeout w) = liftIO $
-  (fmap.fmap)
+
+  fromHandleResult
+    (parseUpdateCrdtError bucketType)
     fromResponse
     (Handle.updateCrdt handle request)
 
@@ -104,7 +109,9 @@ updateConvergentCounter
                     & Proto.increment .~ value))
         & Proto.returnBody .~ True
 
-    fromResponse :: Proto.DtUpdateResp -> ConvergentCounter
+    fromResponse ::
+         Proto.DtUpdateResp
+      -> ConvergentCounter
     fromResponse response =
       ConvergentCounter
         { key =
