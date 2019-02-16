@@ -4,15 +4,15 @@ module Main where
 
 import Riak
 import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..), Handle,
-                                   HandleConfig(..), withHandle)
+                                   HandleConfig(..), HandleSetupError(..),
+                                   withHandle)
 
 import Control.Lens
 import Data.Either           (isRight)
 import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
-import Foreign.C             (CInt)
 import Net.IPv4              (ipv4)
-import System.Exit           (ExitCode(..), exitWith)
+import System.Exit           (exitFailure)
 import Test.Tasty
 import Test.Tasty.HUnit
 
@@ -21,15 +21,18 @@ import qualified Data.ByteString.Random as ByteString
 
 main :: IO ()
 main = do
-  result :: Either CInt () <-
-    withHandle config
+  result :: Either HandleSetupError () <-
+    withHandle
+      config
+      (\Nothing -> pure)
       (\handle ->
         defaultMain
           (testGroup "Riak integration tests" (integrationTests handle)))
 
   case result of
-    Left errno ->
-      exitWith (ExitFailure (fromIntegral errno))
+    Left err -> do
+      print err
+      exitFailure
 
     Right () ->
       pure ()
