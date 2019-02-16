@@ -19,9 +19,9 @@ module Libriak.Internal.Connection
   ) where
 
 import Control.Monad.Primitive  (RealWorld)
-import Data.Bits                (unsafeShiftL, unsafeShiftR, (.|.))
 import Data.Primitive.ByteArray
-import Data.Word                (Word32, Word8)
+import Data.Word                (Word32, byteSwap32)
+import GHC.ByteOrder            (ByteOrder(..), targetByteOrder)
 import Socket.Stream.IPv4       (CloseException(..), ConnectException(..),
                                  Endpoint(..), Interruptibility(..),
                                  ReceiveException(..), SendException(..),
@@ -82,12 +82,9 @@ send conn payload = do
 
     bigEndianWord32ByteArray :: Word32 -> IO ByteArray
     bigEndianWord32ByteArray word = do
-      mbytes <- newByteArray 4
-      writeByteArray mbytes 0 (fromIntegral (unsafeShiftR word 24) :: Word8)
-      writeByteArray mbytes 1 (fromIntegral (unsafeShiftR word 16) :: Word8)
-      writeByteArray mbytes 2 (fromIntegral (unsafeShiftR word  8) :: Word8)
-      writeByteArray mbytes 3 (fromIntegral (             word   ) :: Word8)
-      unsafeFreezeByteArray mbytes
+      bytes <- newByteArray 4
+      writeByteArray bytes 0 (swap32 word)
+      unsafeFreezeByteArray bytes
 
 sendall ::
      Connection
@@ -212,15 +209,10 @@ receiveBigEndianWord32 connection =
   where
     parse :: ByteArray -> Word32
     parse bytes =
-      unsafeShiftL (fromIntegral w0 :: Word32) 24 .|.
-      unsafeShiftL (fromIntegral w1 :: Word32) 16 .|.
-      unsafeShiftL (fromIntegral w2 :: Word32)  8 .|.
-                   (fromIntegral w3 :: Word32)
+      swap32 (indexByteArray bytes 0)
 
-      where
-        w0, w1, w2, w3 :: Word8
-        w0 = indexByteArray bytes 0
-        w1 = indexByteArray bytes 1
-        w2 = indexByteArray bytes 2
-        w3 = indexByteArray bytes 3
-
+swap32 :: Word32 -> Word32
+swap32 =
+  case targetByteOrder of
+    BigEndian -> id
+    LittleEndian -> byteSwap32
