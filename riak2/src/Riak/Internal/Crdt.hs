@@ -19,7 +19,7 @@ parseGetCrdtError bucketType = \case
     HandleError err
 
   Handle.ErrorRiak err
-    | isCrdtBucketTypeDoesNotExistError err ->
+    | isBucketTypeDoesNotExistError_Crdt err ->
         BucketTypeDoesNotExistError bucketType
     | otherwise ->
         UnknownError (decodeUtf8 err)
@@ -33,7 +33,7 @@ parseUpdateCrdtError bucketType = \case
     HandleError err
 
   Handle.ErrorRiak err
-    | isCrdtBucketTypeDoesNotExistError err ->
+    | isBucketTypeDoesNotExistError_Crdt err ->
         BucketTypeDoesNotExistError bucketType
     | otherwise ->
         UnknownError (decodeUtf8 err)

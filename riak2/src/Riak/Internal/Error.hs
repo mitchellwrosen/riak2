@@ -77,6 +77,8 @@ data Op
   | GetIndexOp
   | GetSchemaOp
   | GetCrdtOp
+  | ListBucketsOp
+  | ListKeysOp
   | PutOp
   | PutIndexOp
   | PutSchemaOp
@@ -87,6 +89,8 @@ data Op
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True
   MayReturnBucketTypeDoesNotExist 'GetCrdtOp = 'True
+  MayReturnBucketTypeDoesNotExist 'ListBucketsOp = 'True
+  MayReturnBucketTypeDoesNotExist 'ListKeysOp = 'True
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
   MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
@@ -111,9 +115,13 @@ isBucketTypeDoesNotExistError :: ByteString -> Bool
 isBucketTypeDoesNotExistError =
   (== "no_type")
 
-isCrdtBucketTypeDoesNotExistError :: ByteString -> Bool
-isCrdtBucketTypeDoesNotExistError =
+isBucketTypeDoesNotExistError_Crdt :: ByteString -> Bool
+isBucketTypeDoesNotExistError_Crdt =
   ByteString.isPrefixOf "Error no bucket type `<<\""
+
+isBucketTypeDoesNotExistError_List :: ByteString -> Bool
+isBucketTypeDoesNotExistError_List =
+  ByteString.isPrefixOf "No bucket-type named"
 
 -- No index <<"foo">> found.
 isIndexDoesNotExistError :: ByteString -> Bool

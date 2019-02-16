@@ -39,7 +39,7 @@ getConvergentCounter ::
   -> m (Either Handle.Error (Maybe ConvergentCounter))
 getConvergentCounter
     handle
-    k@(Key bucketType bucket key)
+    key
     (GetOpts basicQuorum nodes notfoundOk pr r timeout) = liftIO $
 
   (fmap.fmap)
@@ -50,22 +50,20 @@ getConvergentCounter
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.key .~ key
+        & Key.setProto key
         & Proto.maybe'basicQuorum .~ basicQuorum
         & Proto.maybe'notfoundOk .~ notfoundOk
         & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
         & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
         & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
         & Proto.maybe'timeout .~ timeout
-        & Proto.type' .~ bucketType
 
     fromResponse :: Proto.DtFetchResp -> Maybe ConvergentCounter
     fromResponse response = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
       pure ConvergentCounter
-        { key = k
+        { key = key
         , value = crdt ^. Proto.counterValue
         }
 

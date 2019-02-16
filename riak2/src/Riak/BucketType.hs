@@ -11,6 +11,7 @@ module Riak.BucketType
 import Libriak.Handle                 (Handle)
 import Riak.Bucket                    (Bucket(..))
 import Riak.Internal.BucketProperties (BucketProperties)
+import Riak.Internal.Error
 import Riak.Internal.IndexName        (IndexName(..))
 import Riak.Internal.Prelude
 
@@ -20,8 +21,7 @@ import qualified Riak.Internal.BucketProperties as BucketProperties
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~))
-import Data.Hashable      (Hashable)
-import Data.Text.Encoding (encodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
 import qualified Control.Foldl as Foldl
 
@@ -80,9 +80,9 @@ listBuckets ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either Handle.Error [Bucket])
+  -> m (Either (Error 'ListBucketsOp) [Bucket])
 listBuckets handle bucketType =
-  liftIO (streamBuckets handle bucketType (Foldl.generalize Foldl.list))
+  streamBuckets handle bucketType (Foldl.generalize Foldl.list)
 
 -- | Stream all of the buckets in a bucket type.
 --
@@ -91,15 +91,17 @@ listBuckets handle bucketType =
 --
 -- /See also/: 'listBuckets'
 streamBuckets ::
-     Handle -- ^
+     MonadIO m
+     => Handle -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
-  -> IO (Either Handle.Error r)
-streamBuckets handle bucketType bucketFold =
-  Handle.listBuckets
-    handle
-    request
-    (makeResponseFold bucketType bucketFold)
+  -> m (Either (Error 'ListBucketsOp) r)
+streamBuckets handle bucketType bucketFold = liftIO $
+  first parseListBucketsError <$>
+    Handle.listBuckets
+      handle
+      request
+      (makeResponseFold bucketType bucketFold)
 
   where
     request :: Proto.RpbListBucketsReq
@@ -108,6 +110,17 @@ streamBuckets handle bucketType bucketFold =
         & Proto.stream .~ True
         & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
+
+    parseListBucketsError :: Handle.Error -> Error 'ListBucketsOp
+    parseListBucketsError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | isBucketTypeDoesNotExistError_List err ->
+            BucketTypeDoesNotExistError bucketType
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
 makeResponseFold ::
      Monad m

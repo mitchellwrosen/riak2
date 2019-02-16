@@ -28,6 +28,7 @@ import Options.Applicative hiding (infoParser)
 import System.Exit         (ExitCode(..), exitFailure, exitWith)
 import Text.Read           (readMaybe)
 
+import qualified Control.Foldl          as Foldl
 import qualified Data.ByteString        as ByteString
 import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
@@ -122,6 +123,7 @@ commandParser =
       , command "get-schema" (info getSchemaParser (progDesc "Get a schema"))
       , command "get-set" (info getSetParser (progDesc "Get a set"))
       , command "info" (info infoParser (progDesc "Get Riak info"))
+      , command "list" (info listParser (progDesc "List buckets/keys"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
       , command "put-index" (info putIndexParser (progDesc "Put an index"))
@@ -208,7 +210,7 @@ getParser =
         opts :: GetOpts
         opts =
           GetOpts
-            { basicQuorum = False
+            { basicQuorum = Nothing
             , nodes = nodes
             , notfoundOk = Nothing
             , pr = pr
@@ -262,7 +264,7 @@ getCounterParser =
         opts :: GetOpts
         opts =
           GetOpts
-            { basicQuorum = False
+            { basicQuorum = Nothing
             , nodes = nodes
             , notfoundOk = Nothing
             , pr = pr
@@ -412,6 +414,45 @@ infoParser =
 
       Right ServerInfo { name, version } -> do
         Text.putStrLn (name <> " " <> version)
+
+listParser :: Parser (Handle -> IO ())
+listParser =
+  doList
+    <$> bucketTypeOrBucketArgument
+
+  where
+    doList ::
+         Either BucketType Bucket
+      -> Handle
+      -> IO ()
+    doList bucketTypeOrBucket handle =
+      case bucketTypeOrBucket of
+        Left bucketType ->
+          streamBuckets handle bucketType (Foldl.mapM_ printBucket) >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right () ->
+              pure ()
+
+        Right bucket ->
+          streamKeys handle bucket (Foldl.mapM_ printKey) >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right () ->
+              pure ()
+
+      where
+        printBucket :: Bucket -> IO ()
+        printBucket (Bucket _ bucket) =
+          Text.putStrLn (decodeUtf8 bucket)
+
+        printKey :: Key -> IO ()
+        printKey (Key _ _ key) =
+          Text.putStrLn (decodeUtf8 key)
 
 pingParser :: Parser (Handle -> IO ())
 pingParser =
@@ -919,16 +960,22 @@ updateCounterParser =
 -- Arguments/options
 --------------------------------------------------------------------------------
 
-bucketTypeArgument :: Parser BucketType
-bucketTypeArgument =
-  encodeUtf8 <$>
-    strArgument (help "Bucket type" <> metavar "TYPE")
-
 bucketOrKeyArgument :: Parser (Either Bucket Key)
 bucketOrKeyArgument =
   argument
     (Right <$> eitherReader parseKey <|> Left <$> eitherReader parseBucket)
     (help "Bucket or key" <> metavar "TYPE/BUCKET(/KEY)")
+
+bucketTypeArgument :: Parser BucketType
+bucketTypeArgument =
+  encodeUtf8 <$>
+    strArgument (help "Bucket type" <> metavar "TYPE")
+
+bucketTypeOrBucketArgument :: Parser (Either BucketType Bucket)
+bucketTypeOrBucketArgument =
+  argument
+    ((Right <$> eitherReader parseBucket) <|> (Left . encodeUtf8 <$> str))
+    (help "Bucket type or bucket" <> metavar "TYPE(/BUCKET)")
 
 contextOption :: Parser (Maybe Context)
 contextOption =

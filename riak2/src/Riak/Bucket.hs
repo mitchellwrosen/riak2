@@ -15,6 +15,7 @@ module Riak.Bucket
 
 import Libriak.Handle           (Handle)
 import Riak.Internal.Bucket     (Bucket(..))
+import Riak.Internal.Error
 import Riak.Internal.ExactQuery (ExactQuery(..))
 import Riak.Internal.Key        (Key(..))
 import Riak.Internal.Prelude
@@ -27,9 +28,10 @@ import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 
-import Control.Foldl   (FoldM(..))
-import Control.Lens    (folded, to, view, (.~), (^.))
-import Data.Profunctor (lmap)
+import Control.Foldl      (FoldM(..))
+import Control.Lens       (folded, to, view, (.~), (^.))
+import Data.Profunctor    (lmap)
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified Control.Foldl as Foldl
 
@@ -178,7 +180,7 @@ doIndex handle =
             Nothing ->
               Right <$> extractM nextResponseFold
 
-            Just continuation ->
+            Just continuation -> do
               loop
                 (request & Proto.continuation .~ continuation)
                 nextResponseFold
@@ -220,9 +222,9 @@ listKeys ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either Handle.Error [Key])
+  -> m (Either (Error 'ListKeysOp) [Key])
 listKeys handle bucket =
-  liftIO (streamKeys handle bucket (Foldl.generalize Foldl.list))
+  streamKeys handle bucket (Foldl.generalize Foldl.list)
 
 -- | Stream all of the keys in a bucket.
 --
@@ -233,16 +235,18 @@ listKeys handle bucket =
 -- 'Riak.ExactQuery.inBucket' query.
 --
 -- /See also/: 'listKeys'
-streamKeys
-  :: Handle -- ^
+streamKeys ::
+     MonadIO m
+  => Handle -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either Handle.Error r)
-streamKeys handle (Bucket bucketType bucket) keyFold =
-  Handle.listKeys
-    handle
-    request
-    (Foldl.handlesM (Proto.keys . folded . to (Key bucketType bucket)) keyFold)
+  -> m (Either (Error 'ListKeysOp) r)
+streamKeys handle (Bucket bucketType bucket) keyFold = liftIO $
+  first parseListKeysError <$>
+    Handle.listKeys
+      handle
+      request
+      (Foldl.handlesM (Proto.keys . folded . to (Key bucketType bucket)) keyFold)
 
   where
     request :: Proto.RpbListKeysReq
@@ -251,6 +255,17 @@ streamKeys handle (Bucket bucketType bucket) keyFold =
         & Proto.bucket .~ bucket
         & Proto.type' .~ bucketType
         -- TODO stream keys timeout
+
+    parseListKeysError :: Handle.Error -> Error 'ListKeysOp
+    parseListKeysError = \case
+      Handle.ErrorHandle err ->
+        HandleError err
+
+      Handle.ErrorRiak err
+        | isBucketTypeDoesNotExistError_List err ->
+            BucketTypeDoesNotExistError bucketType
+        | otherwise ->
+            UnknownError (decodeUtf8 err)
 
 
 extractM :: Monad m => FoldM m a r -> m r
