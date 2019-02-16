@@ -13,3 +13,4 @@ module Riak.ConvergentMap
   ) where
 
 import Riak.Internal.ConvergentMap
+import Riak.Internal.ConvergentMapValue

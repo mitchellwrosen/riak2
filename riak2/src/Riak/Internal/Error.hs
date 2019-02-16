@@ -9,7 +9,6 @@ import qualified Data.ByteString as ByteString
 
 
 -- TODO "Key cannot be zero-length" when putting with empty key
--- TODO "Error no bucket type"
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.

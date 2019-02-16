@@ -1,4 +1,12 @@
-module Riak.Internal.ConvergentSet where
+module Riak.Internal.ConvergentSet
+  ( ConvergentSet(..)
+  , newConvergentSet
+  , convergentSetKey
+  , convergentSetValue
+  , getConvergentSet
+  , putConvergentSet
+  , toProto
+  ) where
 
 import Libriak.Handle        (Handle)
 import Riak.Internal.Context (Context(..), newContext)
@@ -120,7 +128,7 @@ putConvergentSet
               else Just (unContext context))
         & Proto.op .~
             (Proto.defMessage
-              & Proto.setOp .~ calculateSetOp newValue oldValue)
+              & Proto.setOp .~ toProto newValue oldValue)
         & Proto.returnBody .~ True
 
 -- TODO set update opts
@@ -154,8 +162,11 @@ putConvergentSet
         value =
           HashSet.fromList (response ^. Proto.setValue)
 
-calculateSetOp :: HashSet ByteString -> HashSet ByteString -> Proto.SetOp
-calculateSetOp newValue oldValue =
+toProto ::
+     HashSet ByteString -- ^ New value
+  -> HashSet ByteString -- ^ Old value
+  -> Proto.SetOp -- ^ Delta
+toProto newValue oldValue =
   Proto.defMessage
     & Proto.adds .~ adds
     & Proto.removes .~ removes
