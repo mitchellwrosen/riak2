@@ -149,7 +149,7 @@ receive Handle { connection, handlers } =
 
 -- | Send a request and receive the response (a single message).
 --
--- /Throws/. If Riak closes the connection, throws 'RemoteShutdown'.
+-- /Throws/. If response decoding fails, throws 'DecodeError'.
 exchange ::
      Handle -- ^
   -> Request -- ^
@@ -174,6 +174,8 @@ exchange handle@(Handle { sync, relay }) request = do
 
 
 -- | Send a request and stream the response (one or more messages).
+--
+-- /Throws/. If response decoding fails, throws 'DecodeError'.
 stream ::
      ∀ r x.
      Handle -- ^

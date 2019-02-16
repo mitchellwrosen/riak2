@@ -61,6 +61,14 @@ This package contains a "modifier"
 implementation, i.e. it is both parameterized by and implements the signature,
 that upgrades a handle to automatically reconnect and retry on failure.
 
+### [`riak2-handle-impl-striped`](./riak2-handle-impl-striped)
+
+![riak2-handle-impl-striped-src-sloc](./etc/riak2-handle-impl-striped-src-sloc.svg) ![riak2-handle-impl-striped-test-sloc](./etc/riak2-handle-impl-striped-test-sloc.svg)
+
+This package contains another "modifier"
+["Riak handle"](./libriak/src/Riak/Interface/Signature.hsig)
+implementation that upgrades a handle to an array of handles.
+
 ### [`riakc`](./riakc)
 
 ![riakc-src-sloc](./etc/riakc-src-sloc.svg)
