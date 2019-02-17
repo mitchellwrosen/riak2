@@ -25,3 +25,17 @@ source-repository-package
   type: git
   location: https://github.com/andrewthad/sockets.git
   tag: ce96e3ae85ef0dae2810831ca18c1ee1c41692bf
+
+allow-newer:
+  directory:time
+  riak:time
+  unix:time
+
+constraints:
+  time == 1.9.2
+
+max-backjumps:
+  4000
+
+reorder-goals:
+  True

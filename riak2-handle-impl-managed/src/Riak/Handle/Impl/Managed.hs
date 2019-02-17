@@ -6,10 +6,11 @@
 module Riak.Handle.Impl.Managed
   ( Handle
   , HandleConfig(..)
+  , ReconnectSettings(..)
   , withHandle
   , exchange
   , stream
-  , HandleCrashed(..)
+  , ManagedHandleCrashed(..)
     -- ** Re-exports
   , ConnectError(..)
   , ConnectionError(..)
@@ -25,9 +26,12 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
-import Control.Exception.Safe (Exception(..), SomeException, bracket, catchAny)
+import Control.Exception.Safe (Exception(..), SomeException, bracket, catchAny,
+                               tryAny)
 import Control.Monad          (when)
-import Data.Time              (NominalDiffTime)
+import Data.Fixed             (Fixed(..))
+import Data.Time.Clock        (NominalDiffTime, UTCTime, diffUTCTime,
+                               getCurrentTime, nominalDiffTimeToSeconds)
 import Numeric.Natural        (Natural)
 
 
@@ -44,38 +48,55 @@ data HandleConfig
   = HandleConfig
   { innerConfig :: !Handle.HandleConfig
     -- ^ The inner handle's config.
-  , onConnectionRefused :: !(Maybe ReconnectSettings)
-    -- ^ How to behave when the connection to Riak is refused. 'Nothing' means
-    -- don't reconnect.
+  , reconnectSettings ::
+      !(Either ConnectError ConnectionError -> Maybe ReconnectSettings)
+    -- ^ How to behave when an error occurs. 'Nothing' means don't reconnect.
+  , onReconnectAttempt :: !(Either ConnectError ConnectionError -> IO ())
+    -- ^ A function called just before a reconnect attempt is made.
   }
 
 data ReconnectSettings
   = ReconnectSettings
   { initialDelay :: !NominalDiffTime
     -- ^ How long to delay before reconnecting for the first time.
-  , reconnectForUpTo :: !NominalDiffTime
+  , retryFor :: !NominalDiffTime
     -- ^ Attempt to reconnect periodically until this amount of time has passed.
   }
 
-data HandleCrashed
-  = HandleCrashed SomeException
+newtype ManagedHandleCrashed
+  = ManagedHandleCrashed SomeException
   deriving stock (Show)
 
-instance Exception HandleCrashed where
+instance Exception ManagedHandleCrashed where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
+
+newtype ManagedHandleConnectionError
+  = ManagedHandleConnectionError (Either ConnectError ConnectionError)
+  deriving stock (Show)
+
+instance Exception ManagedHandleConnectionError where
+  toException = asyncExceptionToException
+  fromException = asyncExceptionFromException
+
 
 -- | Acquire a handle.
 --
 -- /Throws/. Whatever the underlying handle might throw during its 'withHandle'.
 --
--- /Throws/. If the background manager thread crashes, throws an asynchronous
--- 'HandleCrashed' exception.
+-- /Throws/. If the background manager thread crashes, which indicates there is
+-- a bug in the library, throws an asynchronous 'ManagedHandleCrashed'
+-- exception.
+--
+-- /Throws/. If the background manager thread ends gracefully due to the
+-- provided reconnect settings, throws asynchronous
+-- 'ManagedHandleConnectionError' with the connection error that ultimately
+-- caused the teardown.
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
   -> IO (Either ConnectError a)
-withHandle HandleConfig { innerConfig, onConnectionRefused } onSuccess = do
+withHandle config onSuccess = do
   handleVar :: TMVar (Handle.Handle, Natural) <-
     newEmptyTMVarIO
 
@@ -87,8 +108,12 @@ withHandle HandleConfig { innerConfig, onConnectionRefused } onSuccess = do
 
   bracket
     (forkIOWithUnmask $ \unmask ->
-      unmask (manager innerConfig handleVar errorVar) `catchAny` \e ->
-        throwTo threadId (HandleCrashed e))
+      tryAny (unmask (manager config handleVar errorVar)) >>= \case
+        Left err ->
+          throwTo threadId (ManagedHandleCrashed err)
+        Right err ->
+          throwTo threadId (ManagedHandleConnectionError err)
+    )
     killThread
     (\_ -> do
       Right <$>
@@ -106,43 +131,65 @@ withHandle HandleConfig { innerConfig, onConnectionRefused } onSuccess = do
 -- Meanwhile, users of this handle (via exchange/stream) grab the underlying
 -- handle (if available), use it, and if anything goes wrong, write to the error
 -- TMVar and retry when a new connection is established.
+--
+-- Returns with the error that caused the manager thread to ultimately shut
+-- down, per the reconnect settings.
 manager ::
-     Handle.HandleConfig
+     HandleConfig
   -> TMVar (Handle.Handle, Natural)
   -> TMVar ConnectionError
-  -> IO a
-manager config handleVar errorVar =
+  -> IO (Either ConnectError ConnectionError)
+manager
+     (HandleConfig innerConfig reconnectSettings onReconnectAttempt)
+     handleVar
+     errorVar =
+
   loop 0
 
   where
-    loop :: Natural -> IO a
+    loop :: Natural -> IO (Either ConnectError ConnectionError)
     loop !generation = do
-      Handle.withHandle config runUntilError >>= \case
+      Handle.withHandle innerConfig (runUntilError generation) >>= \case
         Left connectErr -> do
           putStrLn ("Manager thread connect error: " ++ show connectErr)
-          threadDelay 1000000
-          loop (generation+1)
 
-        Right handleErr -> do
-          putStrLn ("Manager thread handle error: " ++ show handleErr)
-          threadDelay 1000000
-          loop (generation+1)
+          case reconnectSettings (Left connectErr) of
+            Nothing -> do
+              putStrLn "Manager thread shutting down"
+              pure (Left connectErr)
 
-      where
-        runUntilError :: Handle.Handle -> IO ConnectionError
-        runUntilError handle = do
-          -- Clear out any previous errors, and put the healthy handle for
-          -- clients to use
-          atomically $ do
-            _ <- tryTakeTMVar errorVar
-            putTMVar handleVar (handle, generation)
+            Just (ReconnectSettings initialDelay retryFor) -> do
+              sleep 1
+              loop (generation+1)
 
-          -- When a client records an error, remove the handle so no more
-          -- clients use it (don't bother clearing out the error var yet)
-          atomically $ do
-            err <- readTMVar errorVar
-            _ <- takeTMVar handleVar
-            pure err
+        Right connectionErr -> do
+          putStrLn ("Manager thread connection error: " ++ show connectionErr)
+
+          case reconnectSettings (Right connectionErr) of
+            Nothing -> do
+              putStrLn "Manager thread shutting down"
+              pure (Right connectionErr)
+
+            Just (ReconnectSettings initialDelay retryFor) -> do
+              sleep 1
+              loop (generation+1)
+
+    runUntilError :: Natural -> Handle.Handle -> IO ConnectionError
+    runUntilError generation handle = do
+      -- Clear out any previous errors, and put the healthy handle for
+      -- clients to use
+      atomically $ do
+        _ <- tryTakeTMVar errorVar
+        putTMVar handleVar (handle, generation)
+
+      -- When a client records an error, remove the handle so no more
+      -- clients use it (don't bother clearing out the error var yet)
+      atomically $ do
+        err <- readTMVar errorVar
+        _ <- takeTMVar handleVar
+        pure err
+
+
 
 -- | Send a request and receive the response (a single message).
 exchange ::
@@ -209,3 +256,9 @@ waitForGen healthyGen handleVar =
     (handle, gen) <- readTMVar handleVar
     when (gen < healthyGen) retry
     pure (handle, gen)
+
+sleep :: NominalDiffTime -> IO ()
+sleep seconds =
+  case nominalDiffTimeToSeconds seconds of
+    MkFixed picoseconds ->
+      threadDelay (fromIntegral (picoseconds `div` 1000000))

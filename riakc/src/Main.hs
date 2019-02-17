@@ -57,14 +57,14 @@ main = do
     config :: Handle.Managed.HandleConfig
     config =
       Handle.Managed.HandleConfig
-        { Handle.Managed.innerConfig =
+        { innerConfig =
             Handle.Exclusive.HandleConfig
-              { Handle.Exclusive.endpoint =
+              { endpoint =
                   Endpoint
                     { address = host
                     , port = port
                     }
-              , Handle.Exclusive.handlers =
+              , handlers =
                   Handle.Exclusive.EventHandlers
                     { onSend =
                         if verbose
@@ -76,8 +76,20 @@ main = do
                           else mempty
                     }
               }
-        , Handle.Managed.onConnectionRefused =
-            Nothing
+        , reconnectSettings =
+            \case
+              Left connectErr ->
+                Just Handle.Managed.ReconnectSettings
+                  { initialDelay = 1
+                  , retryFor = 5
+                  }
+              Right connectionErr ->
+                Just Handle.Managed.ReconnectSettings
+                  { initialDelay = 1
+                  , retryFor = 5
+                  }
+        , onReconnectAttempt =
+            mempty
         }
 
   Handle.Managed.withHandle config run >>= \case

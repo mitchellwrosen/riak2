@@ -2,7 +2,6 @@ module Libriak.Proto
   ( DecodeError(..)
     -- ** Re-exports
   , module Data.Riak.Proto
-  , defMessage
   , HasLens'
   ) where
 

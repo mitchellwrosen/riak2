@@ -10,7 +10,7 @@ library
     libriak,
     safe-exceptions,
     stm,
-    time,
+    time ^>= 1.9.1,
 
   default-extensions:
     BangPatterns
