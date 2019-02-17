@@ -5,8 +5,11 @@ set -e
 badge src $(cloc --json riak2/src | jq .Haskell.code) :blue .svg > ./etc/riak2-src-sloc.svg
 badge test $(cloc --json riak2/test | jq .Haskell.code) :blue .svg > ./etc/riak2-test-sloc.svg
 
-badge src $(cloc --json libriak/src libriak-internal/src | jq .Haskell.code) :blue .svg > ./etc/libriak-src-sloc.svg
-badge test $(cloc --json libriak/test libriak-internal/test | jq .Haskell.code) :blue .svg > ./etc/libriak-test-sloc.svg
+badge src $(cloc --json libriak/src | jq .Haskell.code) :blue .svg > ./etc/libriak-src-sloc.svg
+badge test $(cloc --json libriak/test | jq .Haskell.code) :blue .svg > ./etc/libriak-test-sloc.svg
+
+badge src $(cloc --json libriak-internal/src | jq .Haskell.code) :blue .svg > ./etc/libriak-internal-src-sloc.svg
+badge test $(cloc --json libriak-internal/test | jq .Haskell.code) :blue .svg > ./etc/libriak-internal-test-sloc.svg
 
 badge src $(cloc --json riak2-handle-impl-exclusive/src | jq .Haskell.code) :blue .svg > ./etc/riak2-handle-impl-exclusive-src-sloc.svg
 badge test $(cloc --json riak2-handle-impl-exclusive/test | jq .Haskell.code) :blue .svg > ./etc/riak2-handle-impl-exclusive-test-sloc.svg
