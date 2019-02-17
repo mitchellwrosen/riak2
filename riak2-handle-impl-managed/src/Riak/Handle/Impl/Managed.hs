@@ -9,9 +9,8 @@ module Riak.Handle.Impl.Managed
   , withHandle
   , exchange
   , stream
-  , HandleSetupError
+  , HandleConnectError
   , HandleError
-  , HandleTeardownError
   ) where
 
 import Libriak.Request  (Request)
@@ -45,10 +44,7 @@ type HandleConfig
 data HandleError
   deriving stock (Eq, Show)
 
-data HandleSetupError
-  deriving stock (Eq, Show)
-
-data HandleTeardownError
+data HandleConnectError
   deriving stock (Eq, Show)
 
 data HandleCrashed
@@ -67,10 +63,9 @@ instance Exception HandleCrashed where
 -- 'HandleCrashed' exception.
 withHandle ::
      HandleConfig
-  -> (Maybe HandleTeardownError -> a -> IO b)
   -> (Handle -> IO a)
-  -> IO (Either HandleSetupError b)
-withHandle config onTeardown onSuccess = do
+  -> IO (Either HandleConnectError a)
+withHandle config onSuccess = do
   handleVar :: TMVar (Handle.Handle, Natural) <-
     newEmptyTMVarIO
 
@@ -86,13 +81,11 @@ withHandle config onTeardown onSuccess = do
         throwTo threadId (HandleCrashed e))
     killThread
     (\_ -> do
-      result <-
+      Right <$>
         onSuccess Handle
           { handleVar = handleVar
           , errorVar = errorVar
-          }
-
-      Right <$> onTeardown Nothing result)
+          })
 
 -- The manager thread:
 --
@@ -114,7 +107,7 @@ manager config handleVar errorVar =
   where
     loop :: Natural -> IO a
     loop !generation = do
-      Handle.withHandle config (\_ -> pure) runUntilError >>= \case
+      Handle.withHandle config runUntilError >>= \case
         Left connectErr -> do
           putStrLn ("Manager thread connect error: " ++ show connectErr)
           threadDelay 1000000

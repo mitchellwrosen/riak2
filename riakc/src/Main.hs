@@ -75,7 +75,7 @@ main = do
               }
         }
 
-  Handle.withHandle config (const pure) run >>= \case
+  Handle.withHandle config run >>= \case
     Left err -> do
       print err
       exitFailure

@@ -19,24 +19,17 @@ instance Eq HandleError
 instance Show HandleError
 
 -- | An error caused during initial handle setup.
-data HandleSetupError
+data HandleConnectError
 
-instance Eq HandleSetupError
-instance Show HandleSetupError
-
--- | An error caused during graceful handle teardown.
-data HandleTeardownError
-
-instance Eq HandleTeardownError
-instance Show HandleTeardownError
+instance Eq HandleConnectError
+instance Show HandleConnectError
 
 
 -- | Attempt to setup a handle.
 withHandle ::
      HandleConfig
-  -> (Maybe HandleTeardownError -> a -> IO b)
   -> (Handle -> IO a)
-  -> IO (Either HandleSetupError b)
+  -> IO (Either HandleConnectError a)
 
 -- | Send a request and receive the response (a single message).
 --

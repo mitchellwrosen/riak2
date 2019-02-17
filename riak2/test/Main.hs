@@ -4,7 +4,7 @@ module Main where
 
 import Riak
 import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..), Handle,
-                                   HandleConfig(..), HandleSetupError(..),
+                                   HandleConfig(..), HandleConnectError(..),
                                    withHandle)
 
 import Control.Lens
@@ -21,10 +21,9 @@ import qualified Data.ByteString.Random as ByteString
 
 main :: IO ()
 main = do
-  result :: Either HandleSetupError () <-
+  result :: Either HandleConnectError () <-
     withHandle
       config
-      (\Nothing -> pure)
       (\handle ->
         defaultMain
           (testGroup "Riak integration tests" (integrationTests handle)))

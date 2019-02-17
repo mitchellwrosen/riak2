@@ -5,9 +5,8 @@ module Riak.Handle.Impl.Exclusive
   , withHandle
   , exchange
   , stream
-  , HandleSetupError(..)
+  , HandleConnectError(..)
   , HandleError(..)
-  , HandleTeardownError
     -- ** Re-exports
   , Endpoint(..)
   , DecodeError(..)
@@ -59,7 +58,7 @@ data HandleError
   | RemoteShutdown -- ^ The remote peer's write channel is shut down.
   deriving stock (Eq, Show)
 
-data HandleSetupError
+data HandleConnectError
   = ConnectionFirewalled
   | ConnectionRefused
   | ConnectionTimedOut
@@ -68,24 +67,20 @@ data HandleSetupError
   | TooManyOpenFiles
   deriving stock (Eq, Show)
 
-data HandleTeardownError
-  deriving stock (Eq, Show)
-
 
 -- | Acquire a handle.
 --
 -- /Throws/. This function will never throw an exception.
 withHandle ::
      HandleConfig
-  -> (Maybe HandleTeardownError -> a -> IO b)
   -> (Handle -> IO a)
-  -> IO (Either HandleSetupError b)
-withHandle HandleConfig { endpoint, handlers } onTeardown onSuccess = do
+  -> IO (Either HandleConnectError a)
+withHandle HandleConfig { endpoint, handlers } onSuccess = do
   lock :: MVar () <-
     newMVar ()
 
   result <-
-    withConnection endpoint (\_ -> onTeardown Nothing) $ \connection ->
+    withConnection endpoint (const pure) $ \connection ->
       onSuccess Handle
         { connection = connection
         , lock = lock
@@ -94,7 +89,7 @@ withHandle HandleConfig { endpoint, handlers } onTeardown onSuccess = do
 
   case result of
     Left err ->
-      pure (Left (connectErrorToSetupError err))
+      pure (Left (fromConnectException err))
 
     Right value ->
       pure (Right value)
@@ -111,7 +106,7 @@ send Handle { connection, handlers } request = do
 
   Connection.send connection request >>= \case
     Left err ->
-      pure (Left (sendErrorToHandleError err))
+      pure (Left (fromSendException err))
 
     Right () ->
       pure (Right ())
@@ -128,7 +123,7 @@ receive Handle { connection, handlers } =
       let
         response :: Either HandleError Response
         response =
-          Left (recvErrorToHandleError recvErr)
+          Left (fromReceiveException recvErr)
 
       onReceive handlers response
       pure response
@@ -190,10 +185,10 @@ stream handle request value0 step =
             Right result ->
               pure (Right result)
 
-connectErrorToSetupError ::
+fromConnectException ::
      ConnectException 'Uninterruptible
-  -> HandleSetupError
-connectErrorToSetupError = \case
+  -> HandleConnectError
+fromConnectException = \case
   ConnectEphemeralPortsExhausted -> NoEphemeralPortsAvailable
   ConnectFileDescriptorLimit     -> TooManyOpenFiles
   ConnectFirewalled              -> ConnectionFirewalled
@@ -201,11 +196,11 @@ connectErrorToSetupError = \case
   ConnectRefused                 -> ConnectionRefused
   ConnectTimeout                 -> ConnectionTimedOut
 
-sendErrorToHandleError :: SendException 'Uninterruptible -> HandleError
-sendErrorToHandleError = \case
+fromSendException :: SendException 'Uninterruptible -> HandleError
+fromSendException = \case
   SendReset    -> RemoteReset
   SendShutdown -> LocalShutdown
 
-recvErrorToHandleError :: ReceiveException 'Uninterruptible -> HandleError
-recvErrorToHandleError = \case
+fromReceiveException :: ReceiveException 'Uninterruptible -> HandleError
+fromReceiveException = \case
   ReceiveShutdown -> RemoteShutdown

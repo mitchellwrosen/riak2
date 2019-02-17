@@ -52,7 +52,7 @@ main = do
   cherryTree <- newCherryTree threads
 
   result <-
-    withHandle config (\Nothing -> pure) $ \handle -> do
+    withHandle config $ \handle -> do
       replicateM_ threads $ forkIO $ do
         chopCherryTree cherryTree
 
