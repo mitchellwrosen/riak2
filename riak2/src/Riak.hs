@@ -27,6 +27,7 @@ module Riak
     -- ** Bucket type properties
   , getBucketType
   , setBucketTypeIndex
+  , unsetBucketTypeIndex
     -- ** Full bucket traversals
   , listBuckets
   , streamBuckets
@@ -34,6 +35,7 @@ module Riak
     -- ** Bucket properties
   , getBucket
   , setBucketIndex
+  , unsetBucketIndex
   , resetBucket
     -- ** Secondary index search
   , queryExact

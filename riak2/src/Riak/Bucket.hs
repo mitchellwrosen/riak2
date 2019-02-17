@@ -4,6 +4,7 @@ module Riak.Bucket
     -- ** Properties
   , getBucket
   , setBucketIndex
+  , unsetBucketIndex
   , resetBucket
     -- ** Search
   , queryExact
@@ -84,6 +85,15 @@ setBucketIndex handle bucket (IndexName index) =
         & Proto.props .~
             (Proto.defMessage
               & Proto.searchIndex .~ encodeUtf8 index)
+
+-- | Unset the index of a bucket.
+unsetBucketIndex ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> m (Either Handle.HandleError (Either ByteString ()))
+unsetBucketIndex handle bucket =
+  setBucketIndex handle bucket (IndexName "_dont_index")
 
 -- | Set bucket properties.
 setBucket

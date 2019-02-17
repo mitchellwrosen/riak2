@@ -4,6 +4,7 @@ module Riak.BucketType
     -- ** Bucket type properties
   , getBucketType
   , setBucketTypeIndex
+  , unsetBucketTypeIndex
     -- ** Full traversals
   , listBuckets
   , streamBuckets
@@ -79,6 +80,8 @@ setBucketTypeIndex ::
   -> IndexName -- ^ Index name
   -> m (Either (Error 'SetBucketTypeIndexOp) ())
 setBucketTypeIndex handle bucketType index
+  -- Careful changing this code... does it still make sense for
+  -- 'unsetBucketTypeIndex' to share an error type?
   | bucketType == defaultBucketType =
       pure (Left (InvalidBucketTypeError bucketType))
   | otherwise =
@@ -104,6 +107,15 @@ setBucketTypeIndex_ handle bucketType index = liftIO $
             (Proto.defMessage
               & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
         & Proto.type' .~ bucketType
+
+-- | Unset the index of a bucket type.
+unsetBucketTypeIndex ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> m (Either (Error 'SetBucketTypeIndexOp) ())
+unsetBucketTypeIndex handle bucketType =
+  setBucketTypeIndex handle bucketType (IndexName "_dont_index")
 
 parseSetBucketTypeIndexError ::
      ByteString
