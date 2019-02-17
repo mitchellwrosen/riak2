@@ -13,6 +13,7 @@ import Data.Word              (Word8)
 import Lens.Labels            (HasLens')
 import Data.Riak.Proto
 
+-- TODO rename to ProtobufDecodeError
 data DecodeError
   = ProtobufDecodeError !ByteString !String
   | UnknownMessageCode !Word8 !ByteString

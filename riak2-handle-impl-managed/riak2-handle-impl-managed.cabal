@@ -9,7 +9,8 @@ library
     base,
     libriak,
     safe-exceptions,
-    stm
+    stm,
+    time,
 
   default-extensions:
     BangPatterns

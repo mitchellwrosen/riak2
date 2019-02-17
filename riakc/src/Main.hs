@@ -3,12 +3,12 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..),
-                                   HandleConfig(..))
+import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..))
 import Riak.Handle.Impl.Managed   (Handle)
 
-import qualified Riak.Handle.Impl.Managed as Handle hiding (HandleConfig)
-import qualified Riak.ServerInfo          as ServerInfo
+import qualified Riak.Handle.Impl.Exclusive as Handle.Exclusive
+import qualified Riak.Handle.Impl.Managed   as Handle.Managed
+import qualified Riak.ServerInfo            as ServerInfo
 
 import Control.Arrow       ((***))
 import Control.Lens        (view, (.~), (^.))
@@ -54,28 +54,33 @@ main = do
         (progDesc "Riak command-line client")))
 
   let
-    config :: HandleConfig
+    config :: Handle.Managed.HandleConfig
     config =
-      HandleConfig
-        { endpoint =
-            Endpoint
-              { address = host
-              , port = port
+      Handle.Managed.HandleConfig
+        { Handle.Managed.innerConfig =
+            Handle.Exclusive.HandleConfig
+              { Handle.Exclusive.endpoint =
+                  Endpoint
+                    { address = host
+                    , port = port
+                    }
+              , Handle.Exclusive.handlers =
+                  Handle.Exclusive.EventHandlers
+                    { onSend =
+                        if verbose
+                          then \msg -> putStrLn (">>> " ++ show msg)
+                          else mempty
+                    , onReceive =
+                        if verbose
+                          then \msg -> putStrLn ("<<< " ++ show msg)
+                          else mempty
+                    }
               }
-        , handlers =
-            EventHandlers
-              { onSend =
-                  if verbose
-                    then \msg -> putStrLn (">>> " ++ show msg)
-                    else mempty
-              , onReceive =
-                  if verbose
-                    then \msg -> putStrLn ("<<< " ++ show msg)
-                    else mempty
-              }
+        , Handle.Managed.onConnectionRefused =
+            Nothing
         }
 
-  Handle.withHandle config run >>= \case
+  Handle.Managed.withHandle config run >>= \case
     Left err -> do
       print err
       exitFailure

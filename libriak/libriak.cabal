@@ -12,7 +12,7 @@ library
     lens,
     libriak-internal,
     proto-lens ^>= 0.4.0,
-    sockets ^>= 0.1.1,
+    -- sockets ^>= 0.1.1,
 
   default-extensions:
     DeriveAnyClass
@@ -28,9 +28,10 @@ library
     Libriak.Handle
 
   reexported-modules:
+    Libriak.Connection,
     Libriak.Proto,
     Libriak.Request,
-    Libriak.Response
+    Libriak.Response,
 
   hs-source-dirs:
     src

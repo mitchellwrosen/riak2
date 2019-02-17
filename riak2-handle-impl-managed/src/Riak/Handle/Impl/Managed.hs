@@ -5,16 +5,19 @@
 
 module Riak.Handle.Impl.Managed
   ( Handle
-  , HandleConfig
+  , HandleConfig(..)
   , withHandle
   , exchange
   , stream
-  , HandleConnectError
-  , HandleError
+  , HandleCrashed(..)
+    -- ** Re-exports
+  , ConnectError(..)
+  , ConnectionError(..)
   ) where
 
-import Libriak.Request  (Request)
-import Libriak.Response (Response)
+import Libriak.Connection (ConnectError(..), ConnectionError(..))
+import Libriak.Request    (Request)
+import Libriak.Response   (Response)
 
 import qualified Riak.Handle.Signature as Handle
 
@@ -24,6 +27,7 @@ import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
 import Control.Exception.Safe (Exception(..), SomeException, bracket, catchAny)
 import Control.Monad          (when)
+import Data.Time              (NominalDiffTime)
 import Numeric.Natural        (Natural)
 
 
@@ -32,20 +36,26 @@ data Handle
   { handleVar :: !(TMVar (Handle.Handle, Natural))
     -- ^ The handle, and which "generation" it is (when 0 dies, 1 replaces it,
     -- etc.
-  , errorVar :: !(TMVar Handle.HandleError)
+  , errorVar :: !(TMVar ConnectionError)
     -- ^ The last error some client received when trying to use the handle.
   }
 
-type HandleConfig
-  = Handle.HandleConfig
+data HandleConfig
+  = HandleConfig
+  { innerConfig :: !Handle.HandleConfig
+    -- ^ The inner handle's config.
+  , onConnectionRefused :: !(Maybe ReconnectSettings)
+    -- ^ How to behave when the connection to Riak is refused. 'Nothing' means
+    -- don't reconnect.
+  }
 
--- TODO managed handle errors
-
-data HandleError
-  deriving stock (Eq, Show)
-
-data HandleConnectError
-  deriving stock (Eq, Show)
+data ReconnectSettings
+  = ReconnectSettings
+  { initialDelay :: !NominalDiffTime
+    -- ^ How long to delay before reconnecting for the first time.
+  , reconnectForUpTo :: !NominalDiffTime
+    -- ^ Attempt to reconnect periodically until this amount of time has passed.
+  }
 
 data HandleCrashed
   = HandleCrashed SomeException
@@ -64,12 +74,12 @@ instance Exception HandleCrashed where
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
-  -> IO (Either HandleConnectError a)
-withHandle config onSuccess = do
+  -> IO (Either ConnectError a)
+withHandle HandleConfig { innerConfig, onConnectionRefused } onSuccess = do
   handleVar :: TMVar (Handle.Handle, Natural) <-
     newEmptyTMVarIO
 
-  errorVar :: TMVar Handle.HandleError <-
+  errorVar :: TMVar ConnectionError <-
     newEmptyTMVarIO
 
   threadId :: ThreadId <-
@@ -77,7 +87,7 @@ withHandle config onSuccess = do
 
   bracket
     (forkIOWithUnmask $ \unmask ->
-      unmask (manager config handleVar errorVar) `catchAny` \e ->
+      unmask (manager innerConfig handleVar errorVar) `catchAny` \e ->
         throwTo threadId (HandleCrashed e))
     killThread
     (\_ -> do
@@ -97,9 +107,9 @@ withHandle config onSuccess = do
 -- handle (if available), use it, and if anything goes wrong, write to the error
 -- TMVar and retry when a new connection is established.
 manager ::
-     HandleConfig
+     Handle.HandleConfig
   -> TMVar (Handle.Handle, Natural)
-  -> TMVar Handle.HandleError
+  -> TMVar ConnectionError
   -> IO a
 manager config handleVar errorVar =
   loop 0
@@ -119,7 +129,7 @@ manager config handleVar errorVar =
           loop (generation+1)
 
       where
-        runUntilError :: Handle.Handle -> IO Handle.HandleError
+        runUntilError :: Handle.Handle -> IO ConnectionError
         runUntilError handle = do
           -- Clear out any previous errors, and put the healthy handle for
           -- clients to use
@@ -138,12 +148,12 @@ manager config handleVar errorVar =
 exchange ::
      Handle
   -> Request
-  -> IO (Either HandleError Response)
+  -> IO (Either ConnectionError Response)
 exchange Handle { handleVar, errorVar } request =
   loop 0
 
   where
-    loop :: Natural -> IO (Either HandleError Response)
+    loop :: Natural -> IO (Either ConnectionError Response)
     loop !healthyGen = do
       (handle, gen) <-
         waitForGen healthyGen handleVar
@@ -167,12 +177,12 @@ stream ::
   -> Request -- ^
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either HandleError r)
+  -> IO (Either ConnectionError r)
 stream Handle { handleVar, errorVar } request value step =
   loop 0
 
   where
-    loop :: Natural -> IO (Either HandleError r)
+    loop :: Natural -> IO (Either ConnectionError r)
     loop !healthyGen = do
       (handle, gen) <-
         waitForGen healthyGen handleVar

@@ -1,8 +1,7 @@
 module RiakError where
 
-import RiakIndexName (IndexName)
-
-import qualified Riak.Handle.Signature as Handle
+import Libriak.Connection (ConnectionError)
+import RiakIndexName      (IndexName)
 
 import qualified Data.ByteString as ByteString
 
@@ -19,6 +18,8 @@ import qualified Data.ByteString as ByteString
 -- not yet included here will be returned as a generic 'UnknownError'.
 --
 -- If you encounter an 'UnknownError', please open an issue about it!
+--
+-- TODO Err prefix
 data Error :: Op -> Type where
   BucketTypeDoesNotExistError ::
        MayReturnBucketTypeDoesNotExist op ~ 'True
@@ -64,9 +65,9 @@ data Error :: Op -> Type where
   SchemaDoesNotExistError ::
        Error 'PutIndexOp
 
-  -- | An error was returned by the underlying handle, not Riak itself.
-  HandleError ::
-       !Handle.HandleError
+  -- | An error was returned by the underlying connection, not Riak itself.
+  ErrConnection ::
+       !ConnectionError
     -> Error op
 
   -- | An error was returned by Riak, but this library couldn't parse it. Please
@@ -238,12 +239,12 @@ isUnknownMessageCode =
 fromHandleResult ::
      (ByteString -> Either (Error op) resp')
   -> (resp -> resp')
-  -> IO (Either Handle.HandleError (Either ByteString resp))
+  -> IO (Either ConnectionError (Either ByteString resp))
   -> IO (Either (Error op) resp')
 fromHandleResult fromErr fromOk =
   fmap $ \case
     Left err ->
-      Left (HandleError err)
+      Left (ErrConnection err)
 
     Right (Left err) ->
       fromErr err

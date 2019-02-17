@@ -1,9 +1,8 @@
 signature Riak.Handle.Signature where
 
-import Libriak.Request  (Request)
-import Libriak.Response (Response)
-
-import Socket.Stream.IPv4 (CloseException, ConnectException)
+import Libriak.Connection (ConnectError, ConnectionError)
+import Libriak.Request    (Request)
+import Libriak.Response   (Response)
 
 
 -- | Riak handle.
@@ -12,40 +11,24 @@ data Handle
 -- | Riak handle configuration.
 data HandleConfig
 
--- | An error caused by some problem with an active handle.
-data HandleError
-
-instance Eq HandleError
-instance Show HandleError
-
--- | An error caused during initial handle setup.
-data HandleConnectError
-
-instance Eq HandleConnectError
-instance Show HandleConnectError
-
 
 -- | Attempt to setup a handle.
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
-  -> IO (Either HandleConnectError a)
+  -> IO (Either ConnectError a)
 
 -- | Send a request and receive the response (a single message).
---
--- /Throws/. Throws 'Exception' is something truly unexpected occurs.
 exchange ::
      Handle
   -> Request
-  -> IO (Either HandleError Response)
+  -> IO (Either ConnectionError Response)
 
 -- | Send a request and stream the response (one or more messages).
---
--- /Throws/. Throws 'Exception' is something truly unexpected occurs.
 stream ::
      ∀ r x.
      Handle
   -> Request
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either HandleError r)
+  -> IO (Either ConnectionError r)

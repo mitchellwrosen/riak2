@@ -8,21 +8,23 @@ module Riak.Handle.Impl.Striped
   , withHandle
   , exchange
   , stream
-  , HandleConnectError
-  , HandleError
+    -- ** Re-exports
+  , ConnectError(..)
+  , ConnectionError(..)
   ) where
 
-import Libriak.Request  (Request)
-import Libriak.Response (Response)
+import Libriak.Connection (ConnectError(..), ConnectionError(..))
+import Libriak.Request    (Request)
+import Libriak.Response   (Response)
 
 import qualified Riak.Handle.Signature as Handle
 
 import Control.Concurrent
 import Control.Monad              (join, replicateM)
-import Data.Hashable (hash)
 import Control.Monad.Codensity
 import Control.Monad.Trans.Class  (lift)
 import Control.Monad.Trans.Except
+import Data.Hashable              (hash)
 import Data.Vector                (Vector)
 
 import qualified Data.Vector as Vector
@@ -34,12 +36,6 @@ data Handle
 type HandleConfig
   = Handle.HandleConfig
 
-type HandleError
-  = Handle.HandleError
-
-type HandleConnectError
-  = Handle.HandleConnectError
-
 
 -- | Acquire a handle.
 --
@@ -47,36 +43,36 @@ type HandleConnectError
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
-  -> IO (Either HandleConnectError a)
+  -> IO (Either ConnectError a)
 withHandle config onSuccess =
   runExceptT (withHandle_ config (lift . onSuccess))
 
 withHandle_ ::
      HandleConfig
-  -> (Handle -> ExceptT HandleConnectError IO a)
-  -> ExceptT HandleConnectError IO a
+  -> (Handle -> ExceptT ConnectError IO a)
+  -> ExceptT ConnectError IO a
 withHandle_ config onSuccess =
   runCodensity
     (replicateM 10 (acquireHandle config))
     (withHandles onSuccess)
 
 withHandles ::
-     (Handle -> ExceptT HandleConnectError IO a)
+     (Handle -> ExceptT ConnectError IO a)
   -> [Handle.Handle]
-  -> ExceptT HandleConnectError IO a
+  -> ExceptT ConnectError IO a
 withHandles onSuccess handles =
   onSuccess (Handle (Vector.fromList handles))
 
 acquireHandle ::
      HandleConfig
-  -> Codensity (ExceptT HandleConnectError IO) Handle.Handle
+  -> Codensity (ExceptT ConnectError IO) Handle.Handle
 acquireHandle config =
   Codensity acquire
 
   where
     acquire ::
-         (Handle.Handle -> ExceptT HandleConnectError IO a)
-      -> ExceptT HandleConnectError IO a
+         (Handle.Handle -> ExceptT ConnectError IO a)
+      -> ExceptT ConnectError IO a
     acquire k =
       ExceptT
         (join <$>
@@ -86,7 +82,7 @@ acquireHandle config =
 exchange ::
      Handle
   -> Request
-  -> IO (Either HandleError Response)
+  -> IO (Either ConnectionError Response)
 exchange handles request = do
   handle <- randomHandle handles
   Handle.exchange handle request
@@ -98,7 +94,7 @@ stream ::
   -> Request -- ^
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either HandleError r)
+  -> IO (Either ConnectionError r)
 stream handles request value step = do
   handle <- randomHandle handles
   Handle.stream handle request value step

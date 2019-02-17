@@ -3,8 +3,8 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..), Handle,
-                                   HandleConfig(..), HandleConnectError(..),
+import Riak.Handle.Impl.Exclusive (ConnectError(..), Endpoint(..),
+                                   EventHandlers(..), Handle, HandleConfig(..),
                                    withHandle)
 
 import Control.Lens
@@ -21,7 +21,7 @@ import qualified Data.ByteString.Random as ByteString
 
 main :: IO ()
 main = do
-  result :: Either HandleConnectError () <-
+  result :: Either ConnectError () <-
     withHandle
       config
       (\handle ->
