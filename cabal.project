@@ -24,4 +24,4 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/andrewthad/sockets.git
-  tag: 174a42be69a78082b62cc6e1f83883930c68b1c1
+  tag: ce96e3ae85ef0dae2810831ca18c1ee1c41692bf
