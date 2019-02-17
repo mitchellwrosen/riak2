@@ -46,6 +46,11 @@ data Error :: Op -> Type where
        !Text
     -> Error 'PutSchemaOp
 
+  -- | Riak is overloaded.
+  OverloadError ::
+       MayReturnOverload op ~ 'True
+    => Error op
+
   -- | The search failed. Typically, this means the query was malformed. Check
   -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
   SearchFailedError ::
@@ -116,6 +121,12 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'SetBucketTypeIndexOp = 'True
   MayReturnInvalidNodes _ = 'False
 
+type family MayReturnOverload (op :: Op) :: Bool where
+  MayReturnOverload 'DeleteOp = 'True
+  MayReturnOverload 'GetOp = 'True
+  MayReturnOverload 'PutOp = 'True
+  MayReturnOverload _ = 'False
+
 type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
   MayReturnSearchNotEnabled 'DeleteIndexOp = 'True
   MayReturnSearchNotEnabled 'GetIndexOp = 'True
@@ -183,6 +194,10 @@ isMapFieldDoesNotExistError bytes0 = do
   bytes1 <- ByteString.stripPrefix "{precondition,{not_present," bytes0
   -- At least give back an error with balanced { }
   ByteString.stripSuffix "}}" bytes1
+
+isOverloadError :: ByteString -> Bool
+isOverloadError =
+  (== "overload")
 
 isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =

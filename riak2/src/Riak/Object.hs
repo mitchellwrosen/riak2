@@ -224,6 +224,8 @@ parseGetError request err
       BucketTypeDoesNotExistError (request ^. Proto.type')
   | isInvalidNodesError0 err =
       InvalidNodesError
+  | isOverloadError err =
+      OverloadError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -334,6 +336,8 @@ parsePutError request err
       BucketTypeDoesNotExistError (request ^. Proto.type')
   | isInvalidNodesError0 err =
       InvalidNodesError
+  | isOverloadError err =
+      OverloadError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -397,5 +401,8 @@ delete
         & Proto.vclock .~ unContext context
 
 parseDeleteError :: ByteString -> Error 'DeleteOp
-parseDeleteError err =
-  UnknownError (decodeUtf8 err)
+parseDeleteError err
+  | isOverloadError err =
+      OverloadError
+  | otherwise =
+      UnknownError (decodeUtf8 err)
