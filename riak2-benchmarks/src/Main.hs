@@ -2,15 +2,17 @@ module Main where
 
 import Riak.Handle.Impl.Exclusive (Endpoint(..))
 
-import qualified Riak.Handle.Impl.Exclusive as Handle.Exclusive
-import qualified Riak.Handle.Impl.Pipeline  as Handle.Pipeline
+import qualified Riak.Handle.Impl.Exclusive        as Handle.Exclusive
+import qualified Riak.Handle.Impl.Pipeline         as Handle.Pipeline
+import qualified Riak.Handle.Impl.StripedExclusive as Handle.StripedExclusive
 import qualified Riak.WithExclusiveHandle
 import qualified Riak.WithPipelineHandle
+import qualified Riak.WithStripedExclusiveHandle
 
 import Control.Concurrent      (forkIO)
 import Control.Concurrent.MVar
 import Control.Monad           (join, replicateM_)
-import Data.Default.Class      (def)
+import Data.Default.Class      (Default(..))
 import GHC.Clock               (getMonotonicTime)
 import Net.IPv4                (ipv4)
 import Text.Printf             (printf)
@@ -41,6 +43,11 @@ commandParser =
           (Opt.info
             pipelineSocketParser
             (Opt.progDesc "Benchmark pipeline socket handle"))
+      , Opt.command
+          "striped-exclusive-socket"
+          (Opt.info
+            stripedExclusiveSocketParser
+            (Opt.progDesc "Benchmark striped exclusive socket handle"))
       ])
 
 exclusiveSocketParser :: Opt.Parser (IO ())
@@ -57,51 +64,20 @@ exclusiveSocketParser =
           , Handle.Exclusive.handlers =
               mempty
           })
-        doBenchmark
+        (\handle ->
+          runBenchWith
+            (do
+              Right _ <-
+                Riak.WithExclusiveHandle.put
+                  handle
+                  (Riak.WithExclusiveHandle.newObject
+                    (Riak.WithExclusiveHandle.generatedKey
+                      (Riak.WithExclusiveHandle.Bucket "default" "a"))
+                    (Riak.WithExclusiveHandle.newContent ""))
+                  def
+              pure ()))
 
     pure ()
-
-  where
-    doBenchmark :: Handle.Exclusive.Handle -> IO ()
-    doBenchmark handle = do
-      let threads = 100
-      let puts = 100
-
-      doneVar <- newEmptyMVar
-      readyVar <- newEmptyMVar
-      goVar <- newEmptyMVar
-
-      replicateM_ threads $
-        forkIO $ do
-          putMVar readyVar ()
-          readMVar goVar
-
-          replicateM_ puts $ do
-            Right _ <-
-              Riak.WithExclusiveHandle.put
-                handle
-                (Riak.WithExclusiveHandle.newObject
-                  (Riak.WithExclusiveHandle.generatedKey
-                    (Riak.WithExclusiveHandle.Bucket "default" "a"))
-                  (Riak.WithExclusiveHandle.newContent ""))
-                def
-
-            pure ()
-
-          putMVar doneVar ()
-
-      replicateM_ threads (takeMVar readyVar)
-
-      t0 <- getMonotonicTime
-      putMVar goVar ()
-      replicateM_ threads (takeMVar doneVar)
-      t1 <- getMonotonicTime
-
-      printf
-        "%d threads, %d puts each: %.2f puts/second\n"
-        threads
-        puts
-        (fromIntegral (threads * puts) / (t1-t0))
 
 pipelineSocketParser :: Opt.Parser (IO ())
 pipelineSocketParser =
@@ -117,48 +93,77 @@ pipelineSocketParser =
           , Handle.Pipeline.handlers =
               mempty
           })
-        doBenchmark
+        (\handle ->
+          runBenchWith
+            (do
+              Right _ <-
+                Riak.WithPipelineHandle.put
+                  handle
+                  (Riak.WithPipelineHandle.newObject
+                    (Riak.WithPipelineHandle.generatedKey
+                      (Riak.WithPipelineHandle.Bucket "default" "a"))
+                    (Riak.WithPipelineHandle.newContent ""))
+                  def
+              pure ()))
 
     pure ()
 
-  where
-    doBenchmark :: Handle.Pipeline.Handle -> IO ()
-    doBenchmark handle = do
-      let threads = 100
-      let puts = 100
+stripedExclusiveSocketParser :: Opt.Parser (IO ())
+stripedExclusiveSocketParser =
+  pure $ do
+    Right () <-
+      Handle.StripedExclusive.withHandle
+        (Handle.Exclusive.HandleConfig
+          { Handle.Exclusive.endpoint =
+              Endpoint
+                { address = ipv4 127 0 0 1
+                , port = 8087
+                }
+          , Handle.Exclusive.handlers =
+              mempty
+          })
+        (\handle ->
+          runBenchWith
+            (do
+              Right _ <-
+                Riak.WithStripedExclusiveHandle.put
+                  handle
+                  (Riak.WithStripedExclusiveHandle.newObject
+                    (Riak.WithStripedExclusiveHandle.generatedKey
+                      (Riak.WithStripedExclusiveHandle.Bucket "default" "a"))
+                    (Riak.WithStripedExclusiveHandle.newContent ""))
+                  def
+              pure ()))
 
-      doneVar <- newEmptyMVar
-      readyVar <- newEmptyMVar
-      goVar <- newEmptyMVar
+    pure ()
 
-      replicateM_ threads $
-        forkIO $ do
-          putMVar readyVar ()
-          readMVar goVar
+runBenchWith :: IO () -> IO ()
+runBenchWith put = do
+  let threads = 100
+  let puts = 100
 
-          replicateM_ puts $ do
-            Right _ <-
-              Riak.WithPipelineHandle.put
-                handle
-                (Riak.WithPipelineHandle.newObject
-                  (Riak.WithPipelineHandle.generatedKey
-                    (Riak.WithPipelineHandle.Bucket "default" "a"))
-                  (Riak.WithPipelineHandle.newContent ""))
-                def
+  doneVar <- newEmptyMVar
+  readyVar <- newEmptyMVar
+  goVar <- newEmptyMVar
 
-            pure ()
+  replicateM_ threads $
+    forkIO $ do
+      putMVar readyVar ()
+      readMVar goVar
 
-          putMVar doneVar ()
+      replicateM_ puts put
 
-      replicateM_ threads (takeMVar readyVar)
+      putMVar doneVar ()
 
-      t0 <- getMonotonicTime
-      putMVar goVar ()
-      replicateM_ threads (takeMVar doneVar)
-      t1 <- getMonotonicTime
+  replicateM_ threads (takeMVar readyVar)
 
-      printf
-        "%d threads, %d puts each: %.2f puts/second\n"
-        threads
-        puts
-        (fromIntegral (threads * puts) / (t1-t0))
+  t0 <- getMonotonicTime
+  putMVar goVar ()
+  replicateM_ threads (takeMVar doneVar)
+  t1 <- getMonotonicTime
+
+  printf
+    "%d threads, %d puts each: %.2f puts/second\n"
+    threads
+    puts
+    (fromIntegral (threads * puts) / (t1-t0))

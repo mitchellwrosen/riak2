@@ -13,10 +13,12 @@ executable riak2-benchmarks
     , riak2
     , riak2-handle-impl-exclusive
     , riak2-handle-impl-pipeline
+    , riak2-handle-impl-striped
     , optparse-applicative
 
   default-extensions:
     OverloadedStrings
+    ScopedTypeVariables
 
   default-language:
     Haskell2010
@@ -37,4 +39,8 @@ executable riak2-benchmarks
     riak2 (Riak as Riak.WithExclusiveHandle)
       requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive),
     riak2 (Riak as Riak.WithPipelineHandle)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline),
+    riak2 (Riak as Riak.WithStripedExclusiveHandle)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.StripedExclusive),
+    riak2-handle-impl-striped (Riak.Handle.Impl.Striped as Riak.Handle.Impl.StripedExclusive)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)
