@@ -10,6 +10,7 @@ packages:
   riak2-handle-impl-pipeline,
   riak2-handle-impl-striped,
   riakc,
+  ../riak-haskell-client,
   ../riak-haskell-client/protobuf
 
 source-repository-package

@@ -10,6 +10,9 @@ executable riak2-benchmarks
     , bytestring
     , data-default-class
     , ip
+    , lens
+    , riak == 1.2.0.0
+    , riak-protobuf == 1.0.0
     , riak2
     , riak2-handle-impl-exclusive
     , riak2-handle-impl-pipeline
@@ -42,5 +45,9 @@ executable riak2-benchmarks
       requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline),
     riak2 (Riak as Riak.WithStripedExclusiveHandle)
       requires (Riak.Handle.Signature as Riak.Handle.Impl.StripedExclusive),
+    riak2 (Riak as Riak.WithStripedPipelineHandle)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.StripedPipeline),
     riak2-handle-impl-striped (Riak.Handle.Impl.Striped as Riak.Handle.Impl.StripedExclusive)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive),
+    riak2-handle-impl-striped (Riak.Handle.Impl.Striped as Riak.Handle.Impl.StripedPipeline)
+      requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline)
