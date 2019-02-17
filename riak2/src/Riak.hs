@@ -145,32 +145,32 @@ module Riak
   ) where
 
 -- TODO rename Config/Error export them
-import Libriak.Handle             (Handle, UnexpectedResponse(..))
-import Riak.Bucket
-import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
-                                   NotfoundBehavior(..))
-import Riak.BucketType
-import Riak.Content
-import Riak.Context
-import Riak.ConvergentCounter
-import Riak.ConvergentHyperLogLog
-import Riak.ConvergentMap
-import Riak.ConvergentSet
-import Riak.ErlangTerm
-import Riak.Error
-import Riak.ExactQuery            (ExactQuery(..))
-import Riak.Index
-import Riak.Key
-import Riak.MapReduce
-import Riak.Object
-import Riak.Quorum                (Quorum(..))
-import Riak.RangeQuery            (RangeQuery(..))
-import Riak.Schema
-import Riak.Search
-import Riak.SecondaryIndex        (SecondaryIndex(..))
-import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
-import Riak.ServerInfo
-import Riak.Sibling
+import Libriak.Handle            (Handle, UnexpectedResponse(..))
+import RiakBucket
+import RiakBucketProperties      (BucketProperties(..), ConflictResolution(..),
+                                  NotfoundBehavior(..))
+import RiakBucketType
+import RiakContent
+import RiakContext
+import RiakConvergentCounter
+import RiakConvergentHyperLogLog
+import RiakConvergentMap
+import RiakConvergentSet
+import RiakErlangTerm
+import RiakError
+import RiakExactQuery            (ExactQuery(..))
+import RiakIndex
+import RiakKey
+import RiakMapReduce
+import RiakObject
+import RiakQuorum                (Quorum(..))
+import RiakRangeQuery            (RangeQuery(..))
+import RiakSchema
+import RiakSearch
+import RiakSecondaryIndex        (SecondaryIndex(..))
+import RiakSecondaryIndexValue   (SecondaryIndexValue(..))
+import RiakServerInfo
+import RiakSibling
 
 import qualified Libriak.Handle as Handle
 

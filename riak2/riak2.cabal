@@ -72,6 +72,39 @@ description:
 
 library
   build-depends:
+    riak2-internal
+
+  default-language:
+    Haskell2010
+
+  reexported-modules:
+    RiakBucket as Riak.Bucket,
+    RiakBucketProperties as Riak.BucketProperties,
+    RiakBucketType as Riak.BucketType,
+    RiakContent as Riak.Content,
+    RiakContext as Riak.Context,
+    RiakConvergentCounter as Riak.ConvergentCounter,
+    RiakConvergentHyperLogLog as Riak.ConvergentHyperLogLog,
+    RiakConvergentMap as Riak.ConvergentMap,
+    RiakConvergentSet as Riak.ConvergentSet,
+    RiakErlangTerm as Riak.ErlangTerm,
+    RiakError as Riak.Error,
+    RiakExactQuery as Riak.ExactQuery,
+    RiakIndex as Riak.Index,
+    RiakKey as Riak.Key,
+    RiakMapReduce as Riak.MapReduce,
+    RiakObject as Riak.Object,
+    RiakQuorum as Riak.Quorum,
+    RiakRangeQuery as Riak.RangeQuery,
+    RiakSchema as Riak.Schema,
+    RiakSearch as Riak.Search,
+    RiakSecondaryIndex as Riak.SecondaryIndex,
+    RiakSecondaryIndexValue as Riak.SecondaryIndexValue,
+    RiakServerInfo as Riak.ServerInfo,
+    RiakSibling as Riak.Sibling,
+
+library
+  build-depends:
     attoparsec,
     base ^>= 4.11.1 || ^>= 4.12.0,
     base64-bytestring ^>= 1.0.0,
@@ -130,30 +163,30 @@ library
 
   exposed-modules:
     Riak
-    Riak.Bucket
-    Riak.BucketProperties
-    Riak.BucketType
-    Riak.Content
-    Riak.Context
-    Riak.ConvergentCounter
-    Riak.ConvergentHyperLogLog
-    Riak.ConvergentMap
-    Riak.ConvergentSet
-    Riak.ErlangTerm
-    Riak.Error
-    Riak.ExactQuery
-    Riak.Index
-    Riak.Key
-    Riak.MapReduce
-    Riak.Object
-    Riak.Quorum
-    Riak.RangeQuery
-    Riak.Schema
-    Riak.Search
-    Riak.SecondaryIndex
-    Riak.SecondaryIndexValue
-    Riak.ServerInfo
-    Riak.Sibling
+    RiakBucket
+    RiakBucketProperties
+    RiakBucketType
+    RiakContent
+    RiakContext
+    RiakConvergentCounter
+    RiakConvergentHyperLogLog
+    RiakConvergentMap
+    RiakConvergentSet
+    RiakErlangTerm
+    RiakError
+    RiakExactQuery
+    RiakIndex
+    RiakKey
+    RiakMapReduce
+    RiakObject
+    RiakQuorum
+    RiakRangeQuery
+    RiakSchema
+    RiakSearch
+    RiakSecondaryIndex
+    RiakSecondaryIndexValue
+    RiakServerInfo
+    RiakSibling
 
   ghc-options:
     -Weverything
@@ -170,32 +203,32 @@ library
     src
 
   other-modules:
-    Riak.Internal.Bucket
-    Riak.Internal.BucketProperties
-    Riak.Internal.Context
-    Riak.Internal.ConvergentMap
-    Riak.Internal.ConvergentMapValue
-    Riak.Internal.ConvergentSet
-    Riak.Internal.Crdt
-    Riak.Internal.ErlangTerm
-    Riak.Internal.Error
-    Riak.Internal.ExactQuery
-    Riak.Internal.IndexName
-    Riak.Internal.Key
-    Riak.Internal.MapReduceFunction
-    Riak.Internal.MapReduceInput
-    Riak.Internal.MapReducePhase
-    Riak.Internal.Object
-    Riak.Internal.Panic
-    Riak.Internal.Prelude
-    Riak.Internal.Proto.Content
-    Riak.Internal.Proto.Pair
-    Riak.Internal.Quorum
-    Riak.Internal.RangeQuery
-    Riak.Internal.SecondaryIndex
-    Riak.Internal.SecondaryIndexValue
-    Riak.Internal.Sibling
-    Riak.Internal.Utils
+    RiakInternalBucket
+    RiakInternalBucketProperties
+    RiakInternalContext
+    RiakInternalConvergentMap
+    RiakInternalConvergentMapValue
+    RiakInternalConvergentSet
+    RiakInternalCrdt
+    RiakInternalErlangTerm
+    RiakInternalError
+    RiakInternalExactQuery
+    RiakInternalIndexName
+    RiakInternalKey
+    RiakInternalMapReduceFunction
+    RiakInternalMapReduceInput
+    RiakInternalMapReducePhase
+    RiakInternalObject
+    RiakInternalPanic
+    RiakInternalPrelude
+    RiakInternalProtoContent
+    RiakInternalProtoPair
+    RiakInternalQuorum
+    RiakInternalRangeQuery
+    RiakInternalSecondaryIndex
+    RiakInternalSecondaryIndexValue
+    RiakInternalSibling
+    RiakInternalUtils
 
 test-suite tests
   build-depends:
