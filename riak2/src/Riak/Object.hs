@@ -220,10 +220,10 @@ doGet handle request =
 
 parseGetError :: Proto.RpbGetReq -> ByteString -> Error 'GetOp
 parseGetError request err
-  | isBucketTypeDoesNotExistError err =
+  | isBucketTypeDoesNotExistError0 err =
       BucketTypeDoesNotExistError (request ^. Proto.type')
-  | isInvalidNodesError err =
-      InvalidNodesError (request ^. Proto.nVal)
+  | isInvalidNodesError0 err =
+      InvalidNodesError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -330,10 +330,10 @@ doPut handle request =
 
 parsePutError :: Proto.RpbPutReq -> ByteString -> Error 'PutOp
 parsePutError request err
-  | isBucketTypeDoesNotExistError err =
+  | isBucketTypeDoesNotExistError0 err =
       BucketTypeDoesNotExistError (request ^. Proto.type')
-  | isInvalidNodesError err =
-      InvalidNodesError (request ^. Proto.nVal)
+  | isInvalidNodesError0 err =
+      InvalidNodesError
   | otherwise =
       UnknownError (decodeUtf8 err)
 

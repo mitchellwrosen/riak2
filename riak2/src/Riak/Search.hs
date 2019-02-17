@@ -128,7 +128,7 @@ search
 
 parseSearchError :: IndexName -> ByteString -> Error 'SearchOp
 parseSearchError index err
-  | isIndexDoesNotExistError err =
+  | isIndexDoesNotExistError1 err =
       IndexDoesNotExistError index
   | isSearchFailedError err =
       SearchFailedError

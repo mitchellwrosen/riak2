@@ -226,6 +226,7 @@ fromSendException = \case
 
 fromReceiveException :: ReceiveException 'Uninterruptible -> HandleError
 fromReceiveException = \case
+  ReceiveReset -> RemoteReset
   ReceiveShutdown -> RemoteShutdown
 
 

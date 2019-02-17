@@ -16,6 +16,7 @@ import Libriak.Handle          (Handle)
 import Riak.Internal.Error
 import Riak.Internal.IndexName
 import Riak.Internal.Prelude
+import Riak.Schema             (defaultSchema)
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto
@@ -98,6 +99,10 @@ parseGetIndexesError err
 
 -- | Put a Solr index.
 --
+-- /Note/: If you attempt to put an index that already exists, even if you
+-- supply a different @nodes@ or @schema@ value, Riak will ignore the put but
+-- not return an error.
+--
 -- /See also/: 'Riak.Schema.defaultSchema'
 putIndex ::
      MonadIO m
@@ -108,7 +113,7 @@ putIndex ::
   -> m (Either (Error 'PutIndexOp) ())
 putIndex handle index schema (PutIndexOpts nodes timeout) =
   if nodes == Just 0
-    then pure (Left (InvalidNodesError 0))
+    then pure (Left InvalidNodesError)
     else liftIO (putIndex_ handle index schema nodes timeout)
 
 putIndex_ ::
@@ -132,7 +137,10 @@ putIndex_ handle index schema nodes timeout =
             (Proto.defMessage
               & Proto.name .~ encodeUtf8 (unIndexName index)
               & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-              & Proto.schema .~ encodeUtf8 schema)
+              & Proto.maybe'schema .~
+                  (if schema == defaultSchema
+                    then Nothing
+                    else Just (encodeUtf8 schema)))
         & Proto.maybe'timeout .~ timeout
 
 parsePutIndexError :: ByteString -> Error 'PutIndexOp
@@ -144,27 +152,27 @@ parsePutIndexError err
   | otherwise =
       UnknownError (decodeUtf8 err)
 
--- | Delete a Solr index.
+-- | Delete a Solr index. Returns whether or not there was an index to delete.
 --
--- This function swallows @"notfound"@ errors from Riak thrown when you try to
--- delete an index that doesn't exist. Feedback welcome on this decision.
+-- TODO Parse this delete index error:
+-- Can't delete index with associate buckets [{<<\"objects\">>,<<\"foo\">>},\n    {<<\"objects\">>,<<\"bar\">>}]
 deleteIndex ::
      MonadIO m
   => Handle -- ^
   -> IndexName -- ^
-  -> m (Either (Error 'DeleteIndexOp) ())
+  -> m (Either (Error 'DeleteIndexOp) Bool)
 deleteIndex handle name = liftIO $
   fromHandleResult
     parseDeleteIndexError
-    id
+    (\() -> True)
     (Handle.deleteIndex handle (encodeUtf8 (unIndexName name)))
 
 parseDeleteIndexError ::
      ByteString
-  -> Either (Error 'DeleteIndexOp) ()
+  -> Either (Error 'DeleteIndexOp) Bool
 parseDeleteIndexError err
   | isNotfound err =
-      Right ()
+      Right False
   | isUnknownMessageCode err =
       Left SearchNotEnabledError
   | otherwise =

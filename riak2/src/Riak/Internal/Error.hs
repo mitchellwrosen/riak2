@@ -26,15 +26,20 @@ data Error :: Op -> Type where
     => !ByteString
     -> Error op
 
+  -- | The bucket type was "invalid" for some reason (operation-specific).
+  InvalidBucketTypeError ::
+      !ByteString
+    -> Error 'SetBucketTypeIndexOp
+
   -- | The search index does not exist.
   IndexDoesNotExistError ::
-       !IndexName
-    -> Error 'SearchOp
+       MayReturnIndexDoesNotExist op ~ 'True
+    => !IndexName
+    -> Error op
 
   InvalidNodesError ::
        MayReturnInvalidNodes op ~ 'True
-    => !Word32
-    -> Error op
+    => Error op
 
   -- | The schema is invalid.
   InvalidSchemaError ::
@@ -74,6 +79,8 @@ data Op
   = DeleteOp
   | DeleteIndexOp
   | GetOp
+  | GetBucketOp
+  | GetBucketTypeOp
   | GetIndexOp
   | GetSchemaOp
   | GetCrdtOp
@@ -83,16 +90,22 @@ data Op
   | PutIndexOp
   | PutSchemaOp
   | SearchOp
+  | SetBucketTypeIndexOp
   | UpdateCrdtOp
 
--- | @no_type@
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True
   MayReturnBucketTypeDoesNotExist 'GetCrdtOp = 'True
   MayReturnBucketTypeDoesNotExist 'ListBucketsOp = 'True
   MayReturnBucketTypeDoesNotExist 'ListKeysOp = 'True
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
   MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp = 'True
+  MayReturnBucketTypeDoesNotExist _ = 'False
+
+type family MayReturnIndexDoesNotExist (op :: Op) :: Bool where
+  MayReturnBucketTypeDoesNotExist 'SearchOp = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 
 -- | @{n_val_violation,_}@
@@ -100,6 +113,7 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'GetOp = 'True
   MayReturnInvalidNodes 'PutOp = 'True
   MayReturnInvalidNodes 'PutIndexOp = 'True
+  MayReturnInvalidNodes 'SetBucketTypeIndexOp = 'True
   MayReturnInvalidNodes _ = 'False
 
 type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
@@ -111,27 +125,50 @@ type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
   MayReturnSearchNotEnabled 'SearchOp = 'True
   MayReturnSearchNotEnabled _ = 'False
 
-isBucketTypeDoesNotExistError :: ByteString -> Bool
-isBucketTypeDoesNotExistError =
+-- no_type
+isBucketTypeDoesNotExistError0 :: ByteString -> Bool
+isBucketTypeDoesNotExistError0 =
   (== "no_type")
 
-isBucketTypeDoesNotExistError_Crdt :: ByteString -> Bool
-isBucketTypeDoesNotExistError_Crdt =
+-- Error no bucket type `<<"aa">>`
+isBucketTypeDoesNotExistError1 :: ByteString -> Bool
+isBucketTypeDoesNotExistError1 =
   ByteString.isPrefixOf "Error no bucket type `<<\""
 
-isBucketTypeDoesNotExistError_List :: ByteString -> Bool
-isBucketTypeDoesNotExistError_List =
-  ByteString.isPrefixOf "No bucket-type named"
+-- Invalid bucket properties: not_active
+isBucketTypeDoesNotExistError2 :: ByteString -> Bool
+isBucketTypeDoesNotExistError2 =
+  (== "Invalid bucket properties: not_active")
+
+-- Invalid bucket type: <<"foo">>
+isBucketTypeDoesNotExistError3 :: ByteString -> Bool
+isBucketTypeDoesNotExistError3 =
+  ByteString.isPrefixOf "Invalid bucket type: <<\""
+
+-- No bucket-type named 'foo'
+isBucketTypeDoesNotExistError4 :: ByteString -> Bool
+isBucketTypeDoesNotExistError4 =
+  ByteString.isPrefixOf "No bucket-type named '"
+
+-- Invalid bucket properties: [{search_index,<<"foo does not exist">>}]
+isIndexDoesNotExistError0 :: ByteString -> Bool
+isIndexDoesNotExistError0 msg =
+  ByteString.isPrefixOf "Invalid bucket properties: [{search_index,<<\"" msg &&
+    ByteString.isSuffixOf " does not exist\">>}]" msg
 
 -- No index <<"foo">> found.
-isIndexDoesNotExistError :: ByteString -> Bool
-isIndexDoesNotExistError msg =
+isIndexDoesNotExistError1 :: ByteString -> Bool
+isIndexDoesNotExistError1 msg =
   ByteString.isPrefixOf "No index <<\"" msg &&
     ByteString.isSuffixOf "\">> found." msg
 
-isInvalidNodesError :: ByteString -> Bool
-isInvalidNodesError =
+isInvalidNodesError0 :: ByteString -> Bool
+isInvalidNodesError0 =
   ByteString.isPrefixOf "{n_val_violation"
+
+isInvalidNodesError1 :: ByteString -> Bool
+isInvalidNodesError1 =
+  ByteString.isPrefixOf "Invalid bucket properties: [{n_val,"
 
 isInvalidSchemaError :: ByteString -> Bool
 isInvalidSchemaError =

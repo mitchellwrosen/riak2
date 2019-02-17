@@ -13,7 +13,7 @@ parseGetCrdtError ::
   -> ByteString -- ^ Error
   -> Either (Error 'GetCrdtOp) a
 parseGetCrdtError bucketType err
-  | isBucketTypeDoesNotExistError_Crdt err =
+  | isBucketTypeDoesNotExistError1 err =
       Left (BucketTypeDoesNotExistError bucketType)
   | otherwise =
       Left (UnknownError (decodeUtf8 err))
@@ -23,7 +23,7 @@ parseUpdateCrdtError ::
   -> ByteString -- ^ Error
   -> Either (Error 'UpdateCrdtOp) a
 parseUpdateCrdtError bucketType err
-  | isBucketTypeDoesNotExistError_Crdt err =
+  | isBucketTypeDoesNotExistError1 err =
       Left (BucketTypeDoesNotExistError bucketType)
   | otherwise =
       Left (UnknownError (decodeUtf8 err))

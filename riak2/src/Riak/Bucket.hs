@@ -3,7 +3,7 @@ module Riak.Bucket
     Bucket(..)
     -- ** Properties
   , getBucket
-  -- , setBucket
+  , setBucketIndex
   , resetBucket
     -- ** Search
   , queryExact
@@ -13,17 +13,20 @@ module Riak.Bucket
   , streamKeys
   ) where
 
-import Libriak.Handle           (Handle)
-import Riak.Internal.Bucket     (Bucket(..))
+import Libriak.Handle                 (Handle)
+import Riak.Internal.Bucket           (Bucket(..))
+import Riak.Internal.BucketProperties (BucketProperties)
 import Riak.Internal.Error
-import Riak.Internal.ExactQuery (ExactQuery(..))
-import Riak.Internal.Key        (Key(..))
+import Riak.Internal.ExactQuery       (ExactQuery(..))
+import Riak.Internal.IndexName        (IndexName(..))
+import Riak.Internal.Key              (Key(..))
 import Riak.Internal.Prelude
-import Riak.Internal.RangeQuery (RangeQuery)
-import Riak.Internal.Utils      (bs2int)
+import Riak.Internal.RangeQuery       (RangeQuery)
+import Riak.Internal.Utils            (bs2int)
 
 import qualified Libriak.Handle                    as Handle
 import qualified Libriak.Proto                     as Proto
+import qualified Riak.Internal.BucketProperties    as BucketProperties
 import qualified Riak.Internal.ExactQuery          as ExactQuery
 import qualified Riak.Internal.RangeQuery          as RangeQuery
 import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
@@ -31,33 +34,58 @@ import qualified Riak.Internal.SecondaryIndexValue as SecondaryIndexValue
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, view, (.~), (^.))
 import Data.Profunctor    (lmap)
-import Data.Text.Encoding (decodeUtf8)
+import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
 import qualified Control.Foldl as Foldl
 
 
 -- | Get bucket properties.
---
--- TODO BucketProps
 getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either Handle.HandleError (Either ByteString Proto.RpbBucketProps))
-getBucket handle (Bucket bucketType bucket) = liftIO $
-  Handle.getBucket handle request
+  -> m (Either (Error 'GetBucketOp) (Maybe BucketProperties))
+getBucket handle bucket = liftIO $
+  fromHandleResult
+    parseGetBucketError
+    (Just . BucketProperties.fromProto)
+    (Handle.getBucket handle request)
 
   where
     request :: Proto.RpbGetBucketReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.type' .~ bucketType
+        & setProto bucket
+
+parseGetBucketError ::
+     ByteString
+  -> Either (Error 'GetBucketOp) (Maybe BucketProperties)
+parseGetBucketError err
+  | isBucketTypeDoesNotExistError4 err =
+      Right Nothing
+  | otherwise =
+      Left (UnknownError (decodeUtf8 err))
+
+-- | Set the index of a bucket.
+setBucketIndex ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> IndexName -- ^ Index name
+  -> m (Either Handle.HandleError (Either ByteString ()))
+setBucketIndex handle bucket (IndexName index) =
+  liftIO (Handle.setBucket handle request)
+
+  where
+    request :: Proto.RpbSetBucketReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+        & Proto.props .~
+            (Proto.defMessage
+              & Proto.searchIndex .~ encodeUtf8 index)
 
 -- | Set bucket properties.
---
--- TODO better set bucket properties type
--- TODO don't allow setting n
 setBucket
   :: Handle -- ^
   -> Proto.RpbSetBucketReq -- ^
@@ -244,7 +272,7 @@ streamKeys ::
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> m (Either (Error 'ListKeysOp) r)
-streamKeys handle (Bucket bucketType bucket) keyFold = liftIO $
+streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
   fromHandleResult
     (Left . parseListKeysError bucketType)
     id
@@ -262,17 +290,29 @@ streamKeys handle (Bucket bucketType bucket) keyFold = liftIO $
     request :: Proto.RpbListKeysReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.type' .~ bucketType
+        & setProto b
         -- TODO stream keys timeout
 
 parseListKeysError :: ByteString -> ByteString -> Error 'ListKeysOp
 parseListKeysError bucketType err
-  | isBucketTypeDoesNotExistError_List err =
+  | isBucketTypeDoesNotExistError4 err =
       BucketTypeDoesNotExistError bucketType
   | otherwise =
       UnknownError (decodeUtf8 err)
 
+setProto ::
+     ( Proto.HasLens' a "bucket" ByteString
+     , Proto.HasLens' a "maybe'type'" (Maybe ByteString)
+     )
+  => Bucket
+  -> a
+  -> a
+setProto (Bucket bucketType bucket) proto =
+  proto
+    & Proto.bucket .~ bucket
+    & Proto.maybe'type' .~ (do
+        guard (bucketType /= "default")
+        pure bucketType)
 
 extractM :: Monad m => FoldM m a r -> m r
 extractM (FoldM _ x f) =

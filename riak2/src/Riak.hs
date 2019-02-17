@@ -33,7 +33,7 @@ module Riak
     -- * Bucket operations
     -- ** Bucket properties
   , getBucket
-  -- , setBucket
+  , setBucketIndex
   , resetBucket
     -- ** Secondary index search
   , queryExact
@@ -61,6 +61,7 @@ module Riak
   , Bucket(..)
   , BucketProperties(..)
   , BucketType
+  , defaultBucketType
   , ConflictResolution(..)
   , Content(..)
   , newContent

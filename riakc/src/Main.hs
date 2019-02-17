@@ -118,14 +118,14 @@ commandParser =
       [ command "delete" (info deleteParser (progDesc "Delete an object"))
       , command "delete-index" (info deleteIndexParser (progDesc "Delete an index"))
       , command "get" (info getParser (progDesc "Get an object"))
-      , command "get-bucket-type" (info getBucketTypeParser (progDesc "Get a bucket type"))
+      , command "get-bucket" (info getBucketParser (progDesc "Get a bucket type or bucket"))
       , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
       , command "get-index" (info getIndexParser (progDesc "Get an index, or all indexes"))
       , command "get-map" (info getMapParser (progDesc "Get a map"))
       , command "get-schema" (info getSchemaParser (progDesc "Get a schema"))
       , command "get-set" (info getSetParser (progDesc "Get a set"))
-      , command "info" (info infoParser (progDesc "Get Riak info"))
-      , command "list" (info listParser (progDesc "List buckets/keys"))
+      , command "info" (info infoParser (progDesc "Get server info"))
+      , command "list" (info listParser (progDesc "List buckets or keys"))
       , command "ping" (info pingParser (progDesc "Ping Riak"))
       , command "put" (info putParser (progDesc "Put an object"))
       , command "put-index" (info putIndexParser (progDesc "Put an index"))
@@ -133,6 +133,7 @@ commandParser =
       , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
       , command "put-set" (info putSetParser (progDesc "Put a set"))
       , command "search" (info searchParser (progDesc "Perform a search"))
+      , command "set-bucket-index" (info setBucketIndexParser (progDesc "Set a bucket type or bucket's index"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
       ])
 
@@ -181,7 +182,10 @@ deleteIndexParser =
           print err
           exitFailure
 
-        Right () ->
+        Right False ->
+          putStrLn "Not found"
+
+        Right True ->
           pure ()
 
 getParser :: Parser (Handle -> IO ())
@@ -220,23 +224,37 @@ getParser =
             , timeout = Nothing
             }
 
-getBucketTypeParser :: Parser (Handle -> IO ())
-getBucketTypeParser =
-  doGetBucketType
-    <$> bucketTypeArgument
+getBucketParser :: Parser (Handle -> IO ())
+getBucketParser =
+  doGetBucket
+    <$> bucketTypeOrBucketArgument
   where
-    doGetBucketType ::
-         BucketType
+    doGetBucket ::
+         Either BucketType Bucket
       -> Handle
       -> IO ()
-    doGetBucketType bucketType handle =
-      getBucketType handle bucketType >>= \case
-        Left err -> do
-          print err
-          exitFailure
+    doGetBucket bucketTypeOrBucket handle =
+      case bucketTypeOrBucket of
+        Left bucketType ->
+          getBucketType handle bucketType >>= \case
+            Left err -> do
+              print err
+              exitFailure
 
-        Right props ->
-          print props
+            Right Nothing ->
+              putStrLn "Not found"
+
+            Right (Just props) ->
+              print props
+
+        Right bucket ->
+          getBucket handle bucket >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right props ->
+              print props
 
 getCounterParser :: Parser (Handle -> IO ())
 getCounterParser =
@@ -910,6 +928,42 @@ searchParser =
     printDocument :: [(ByteString, ByteString)] -> IO ()
     printDocument =
       print . map (\(key, val) -> (decodeUtf8 key, decodeUtf8 val))
+
+setBucketIndexParser :: Parser (Handle -> IO ())
+setBucketIndexParser =
+  doSetBucketIndex
+    <$> bucketTypeOrBucketArgument
+    <*> indexNameArgument
+
+  where
+    doSetBucketIndex ::
+         Either BucketType Bucket
+      -> IndexName
+      -> Handle
+      -> IO ()
+    doSetBucketIndex bucketTypeOrBucket index handle =
+      case bucketTypeOrBucket of
+        Left bucketType ->
+          setBucketTypeIndex handle bucketType index >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right () ->
+              pure ()
+
+        Right bucket ->
+          setBucketIndex handle bucket index >>= \case
+            Left err -> do
+              print err
+              exitFailure
+
+            Right (Left err) -> do
+              print err
+              exitFailure
+
+            Right (Right ()) ->
+              pure ()
 
 updateCounterParser :: Parser (Handle -> IO ())
 updateCounterParser =

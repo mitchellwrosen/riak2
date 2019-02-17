@@ -1,5 +1,6 @@
 module Riak.BucketType
   ( BucketType
+  , defaultBucketType
     -- ** Bucket type properties
   , getBucketType
   , setBucketTypeIndex
@@ -32,31 +33,68 @@ import qualified Control.Foldl as Foldl
 type BucketType
   = ByteString
 
+-- | The default bucket type.
+defaultBucketType :: BucketType
+defaultBucketType =
+  "default"
+
 -- | Get bucket type properties.
 getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either Handle.HandleError (Either ByteString BucketProperties))
+  -> m (Either (Error 'GetBucketTypeOp) (Maybe BucketProperties))
 getBucketType handle bucketType = liftIO $
-  (fmap.fmap.fmap)
-    fromResponse
+  fromHandleResult
+    parseGetBucketTypeError
+    (Just . BucketProperties.fromProto)
     (Handle.getBucketType handle bucketType)
 
-  where
-    fromResponse :: Proto.RpbBucketProps -> BucketProperties
-    fromResponse =
-      BucketProperties.fromProto
+parseGetBucketTypeError ::
+     ByteString
+  -> Either (Error 'GetBucketTypeOp) (Maybe BucketProperties)
+parseGetBucketTypeError err
+  | isBucketTypeDoesNotExistError3 err =
+      Right Nothing
+  | otherwise =
+      Left (UnknownError (decodeUtf8 err))
 
 -- | Set the index of a bucket type.
+--
+-- If given the default bucket type, returns 'BucketTypeInvalid', because its
+-- properties cannot be changed.
+--
+-- If the search index's @nodes@ value does not match the bucket's, returns
+-- '
+-- properties cannot be changed.
+--
+-- /Note/: If search is not enabled, Riak does not complain if you associate a
+-- bucket type with an index that does exist.
+--
+-- /See also/: 'Riak.Index.putIndex'
 setBucketTypeIndex ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
   -> IndexName -- ^ Index name
-  -> m (Either Handle.HandleError (Either ByteString ()))
-setBucketTypeIndex handle bucketType (IndexName index) =
-  liftIO (Handle.setBucketType handle request)
+  -> m (Either (Error 'SetBucketTypeIndexOp) ())
+setBucketTypeIndex handle bucketType index
+  | bucketType == defaultBucketType =
+      pure (Left (InvalidBucketTypeError bucketType))
+  | otherwise =
+      setBucketTypeIndex_ handle bucketType index
+
+setBucketTypeIndex_ ::
+     MonadIO m
+  => Handle
+  -> BucketType
+  -> IndexName
+  -> m (Either (Error 'SetBucketTypeIndexOp) ())
+setBucketTypeIndex_ handle bucketType index = liftIO $
+  fromHandleResult
+    (Left . parseSetBucketTypeIndexError bucketType index)
+    id
+    (Handle.setBucketType handle request)
 
   where
     request :: Proto.RpbSetBucketTypeReq
@@ -64,8 +102,23 @@ setBucketTypeIndex handle bucketType (IndexName index) =
       Proto.defMessage
         & Proto.props .~
             (Proto.defMessage
-              & Proto.searchIndex .~ encodeUtf8 index)
+              & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
         & Proto.type' .~ bucketType
+
+parseSetBucketTypeIndexError ::
+     ByteString
+  -> IndexName
+  -> ByteString
+  -> Error 'SetBucketTypeIndexOp
+parseSetBucketTypeIndexError bucketType index err
+  | isBucketTypeDoesNotExistError2 err =
+      BucketTypeDoesNotExistError bucketType
+  | isIndexDoesNotExistError0 err =
+      IndexDoesNotExistError index
+  | isInvalidNodesError1 err =
+      InvalidNodesError
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 -- | List all of the buckets in a bucket type.
 --
@@ -115,7 +168,7 @@ streamBuckets handle bucketType bucketFold = liftIO $
 
 parseListBucketsError :: ByteString -> ByteString -> Error 'ListBucketsOp
 parseListBucketsError bucketType err
-  | isBucketTypeDoesNotExistError_List err =
+  | isBucketTypeDoesNotExistError4 err =
       BucketTypeDoesNotExistError bucketType
   | otherwise =
       UnknownError (decodeUtf8 err)
