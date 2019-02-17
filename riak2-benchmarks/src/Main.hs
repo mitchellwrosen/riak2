@@ -57,7 +57,6 @@ exclusiveSocketParser =
           , Handle.Exclusive.handlers =
               mempty
           })
-        (\Nothing -> pure)
         doBenchmark
 
     pure ()
@@ -118,7 +117,6 @@ pipelineSocketParser =
           , Handle.Pipeline.handlers =
               mempty
           })
-        (\Nothing -> pure)
         doBenchmark
 
     pure ()
