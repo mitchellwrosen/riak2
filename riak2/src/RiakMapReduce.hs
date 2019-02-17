@@ -1,29 +1,23 @@
--- |
--- * <https://docs.basho.com/riak/kv/2.2.3/developing/usage/mapreduce/>
--- * <https://docs.basho.com/riak/kv/2.2.3/developing/app-guide/advanced-mapreduce/>
+-- TODO map reduce functions for other input types
+
 module RiakMapReduce
   ( mapReduceBucket
   , mapReduceKeys
-    -- TODO map reduce functions for other input types
-  , MapReducePhase(..)
-  , MapReduceFunction(..)
   ) where
 
-import Libriak.Handle                (Handle)
-import RiakInternalBucket            (Bucket)
+import Libriak.Handle (Handle)
+import RiakBucket     (Bucket)
 
-import RiakInternalErlangTerm        (ErlangTerm(..))
-import RiakInternalKey               (Key)
-import RiakInternalMapReduceFunction (MapReduceFunction(..))
-import RiakInternalMapReduceInput    (MapReduceInput(..))
-import RiakInternalMapReducePhase    (MapReducePhase(..))
-import RiakInternalPrelude
+import RiakErlangTerm     (ErlangTerm(..))
+import RiakKey            (Key)
+import RiakMapReduceInput (MapReduceInput(..))
+import RiakMapReducePhase (MapReducePhase(..))
 
-import qualified Libriak.Handle             as Handle
-import qualified Libriak.Proto              as Proto
-import qualified RiakInternalErlangTerm     as ErlangTerm
-import qualified RiakInternalMapReduceInput as MapReduceInput
-import qualified RiakInternalMapReducePhase as MapReducePhase
+import qualified Libriak.Handle     as Handle
+import qualified Libriak.Proto      as Proto
+import qualified RiakErlangTerm     as ErlangTerm
+import qualified RiakMapReduceInput as MapReduceInput
+import qualified RiakMapReducePhase as MapReducePhase
 
 import Control.Foldl (FoldM)
 import Control.Lens  ((.~))

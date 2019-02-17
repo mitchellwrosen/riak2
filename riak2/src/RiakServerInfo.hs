@@ -1,10 +1,6 @@
-module RiakServerInfo
-  ( ServerInfo(..)
-  , getServerInfo
-  ) where
+module RiakServerInfo where
 
-import Libriak.Handle      (Handle)
-import RiakInternalPrelude
+import Libriak.Handle (Handle)
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto

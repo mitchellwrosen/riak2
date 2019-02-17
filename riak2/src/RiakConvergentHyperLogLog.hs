@@ -9,15 +9,14 @@ module RiakConvergentHyperLogLog
   , updateConvergentHyperLogLog
   ) where
 
-import Libriak.Handle      (Handle)
-import RiakInternalCrdt
-import RiakInternalError
-import RiakInternalKey     (Key(..), isGeneratedKey)
-import RiakInternalPrelude
+import Libriak.Handle (Handle)
+import RiakCrdt
+import RiakError
+import RiakKey        (Key(..), isGeneratedKey)
 
-import qualified Libriak.Handle  as Handle
-import qualified Libriak.Proto   as Proto
-import qualified RiakInternalKey as Key
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
+import qualified RiakKey        as Key
 
 import Control.Lens ((.~), (^.))
 

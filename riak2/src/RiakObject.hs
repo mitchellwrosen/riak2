@@ -1,52 +1,42 @@
 -- TODO timeout variants since Riak will only return {error, timeout} if one was
 -- requested?
 
-module RiakObject
-  ( -- * Object operations
-    get
-  , put
-  , delete
-    -- ** Get variants
-  , getHead
-  , getIfModified
-  , getHeadIfModified
-    -- ** Put variants
-  , putGet
-  , putGetHead
-    -- * Object
-  , Object(..)
-  , newObject
-    -- * Options
-  , GetOpts(..)
-  , PutOpts(..)
-  , DeleteOpts(..)
-  ) where
+module RiakObject where
 
-import Libriak.Handle      (Handle)
-import RiakContent         (Content(..))
-import RiakInternalContext (Context(..))
-import RiakInternalError
-import RiakInternalKey     (Key(..))
-import RiakInternalObject  (Object(..), fromGetResponse, fromPutResponse,
-                            newObject)
-import RiakInternalPrelude
-import RiakInternalQuorum  (Quorum)
-import RiakInternalSibling (Sibling)
+import Libriak.Handle (Handle)
+import RiakContent    (Content(..))
+import RiakContext    (Context(..), newContext)
+import RiakError
+import RiakKey        (Key(..))
+import RiakQuorum     (Quorum)
+import RiakSibling    (Sibling(..))
 
-import qualified Libriak.Handle             as Handle
-import qualified Libriak.Proto              as Proto
-import qualified RiakInternalKey            as Key
-import qualified RiakInternalProtoContent   as Proto.Content
-import qualified RiakInternalQuorum         as Quorum
-import qualified RiakInternalSecondaryIndex as SecondaryIndex
+import qualified Libriak.Handle     as Handle
+import qualified Libriak.Proto      as Proto
+import qualified RiakKey            as Key
+import qualified RiakProtoContent   as Proto.Content
+import qualified RiakQuorum         as Quorum
+import qualified RiakSecondaryIndex as SecondaryIndex
+import qualified RiakSibling        as Sibling
+
 
 import Control.Lens          ((.~), (^.))
 import Data.Default.Class    (Default(..))
 import Data.Generics.Product (field)
 import Data.Text.Encoding    (decodeUtf8)
 
-import qualified Data.ByteString as ByteString
 
+import qualified Data.ByteString    as ByteString
+import qualified Data.List.NonEmpty as List1
+
+
+
+data Object a
+  = Object
+  { content :: !a
+  , context :: !Context -- ^ Causal context
+  , key :: !Key -- ^ Key
+  } deriving stock (Eq, Functor, Generic, Show)
 
 -- TODO better names for pr/r
 -- TODO basicQuorum/notfoundOk -> NotfoundBehavior
@@ -115,6 +105,51 @@ instance Default DeleteOpts where
       , timeout = Nothing
       , w = Nothing
       }
+
+
+newObject ::
+     Key -- ^ Key
+  -> a -- ^ Content
+  -> Object a
+newObject key content =
+  Object
+    { content = content
+    , context = newContext
+    , key = key
+    }
+
+-- | Parse an object from a get response.
+fromGetResponse ::
+     Key
+  -> Proto.RpbGetResp
+  -> Object [Sibling ByteString]
+fromGetResponse key response =
+  Object
+    { content = map Sibling.fromProtoContent (response ^. Proto.content)
+    , context = Context (response ^. Proto.vclock)
+    , key = key
+    }
+
+-- | Parse an object from a put response.
+--
+-- Assumes that either @return_body@ or @return_head@ was set on the request.
+fromPutResponse ::
+     Key
+  -> Proto.RpbPutResp
+  -> Object (NonEmpty (Sibling ByteString))
+fromPutResponse k@(Key bucketType bucket key) response =
+  Object
+    { content = List1.fromList (map Sibling.fromProtoContent (response ^. Proto.content))
+    , context = Context (response ^. Proto.vclock)
+    , key = key'
+    }
+
+  where
+    key' :: Key
+    key' =
+      if ByteString.null key
+        then Key bucketType bucket (response ^. Proto.key)
+        else k
 
 
 -- | Get an object.

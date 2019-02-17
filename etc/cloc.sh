@@ -2,7 +2,7 @@
 
 set -e
 
-badge src $(cloc --json riak2/src | jq .Haskell.code) :blue .svg > ./etc/riak2-src-sloc.svg
+badge src $(cloc --json riak2/public riak2/src | jq .Haskell.code) :blue .svg > ./etc/riak2-src-sloc.svg
 badge test $(cloc --json riak2/test | jq .Haskell.code) :blue .svg > ./etc/riak2-test-sloc.svg
 
 badge src $(cloc --json libriak/src | jq .Haskell.code) :blue .svg > ./etc/libriak-src-sloc.svg

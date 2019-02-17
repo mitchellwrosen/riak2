@@ -14,23 +14,22 @@ module RiakBucket
   , streamKeys
   ) where
 
-import Libriak.Handle               (Handle)
-import RiakInternalBucket           (Bucket(..))
-import RiakInternalBucketProperties (BucketProperties)
-import RiakInternalError
-import RiakInternalExactQuery       (ExactQuery(..))
-import RiakInternalIndexName        (IndexName(..))
-import RiakInternalKey              (Key(..))
-import RiakInternalPrelude
-import RiakInternalRangeQuery       (RangeQuery)
-import RiakInternalUtils            (bs2int)
+import Libriak.Handle       (Handle)
+import RiakBucketInternal   (Bucket(..))
+import RiakBucketProperties (BucketProperties)
+import RiakError
+import RiakExactQuery       (ExactQuery(..))
+import RiakIndexName        (IndexName(..))
+import RiakKey              (Key(..))
+import RiakRangeQuery       (RangeQuery)
+import RiakUtils            (bs2int)
 
-import qualified Libriak.Handle                  as Handle
-import qualified Libriak.Proto                   as Proto
-import qualified RiakInternalBucketProperties    as BucketProperties
-import qualified RiakInternalExactQuery          as ExactQuery
-import qualified RiakInternalRangeQuery          as RangeQuery
-import qualified RiakInternalSecondaryIndexValue as SecondaryIndexValue
+import qualified Libriak.Handle          as Handle
+import qualified Libriak.Proto           as Proto
+import qualified RiakBucketProperties    as BucketProperties
+import qualified RiakExactQuery          as ExactQuery
+import qualified RiakRangeQuery          as RangeQuery
+import qualified RiakSecondaryIndexValue as SecondaryIndexValue
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, view, (.~), (^.))

@@ -1,25 +1,14 @@
-module RiakBucketType
-  ( BucketType
-  , defaultBucketType
-    -- ** Bucket type properties
-  , getBucketType
-  , setBucketTypeIndex
-  , unsetBucketTypeIndex
-    -- ** Full traversals
-  , listBuckets
-  , streamBuckets
-  ) where
+module RiakBucketType where
 
-import Libriak.Handle               (Handle)
-import RiakBucket                   (Bucket(..))
-import RiakInternalBucketProperties (BucketProperties)
-import RiakInternalError
-import RiakInternalIndexName        (IndexName(..))
-import RiakInternalPrelude
+import Libriak.Handle       (Handle)
+import RiakBucket           (Bucket(..))
+import RiakBucketProperties (BucketProperties)
+import RiakError
+import RiakIndexName        (IndexName(..))
 
-import qualified Libriak.Handle               as Handle
-import qualified Libriak.Proto                as Proto
-import qualified RiakInternalBucketProperties as BucketProperties
+import qualified Libriak.Handle       as Handle
+import qualified Libriak.Proto        as Proto
+import qualified RiakBucketProperties as BucketProperties
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~))

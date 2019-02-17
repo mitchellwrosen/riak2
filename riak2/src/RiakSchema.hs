@@ -5,9 +5,8 @@ module RiakSchema
   , putSchema
   ) where
 
-import Libriak.Handle      (Handle)
-import RiakInternalError
-import RiakInternalPrelude
+import Libriak.Handle (Handle)
+import RiakError
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto

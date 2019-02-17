@@ -4,17 +4,16 @@ module RiakConvergentCounter
   , updateConvergentCounter
   ) where
 
-import Libriak.Handle      (Handle)
-import RiakInternalCrdt
-import RiakInternalError
-import RiakInternalPrelude
-import RiakKey             (Key(..))
-import RiakObject          (GetOpts(..), PutOpts(..))
+import Libriak.Handle (Handle)
+import RiakCrdt
+import RiakError
+import RiakKey        (Key(..))
+import RiakObject     (GetOpts(..), PutOpts(..))
 
-import qualified Libriak.Handle     as Handle
-import qualified Libriak.Proto      as Proto
-import qualified RiakInternalKey    as Key
-import qualified RiakInternalQuorum as Quorum
+import qualified Libriak.Handle as Handle
+import qualified Libriak.Proto  as Proto
+import qualified RiakKey        as Key
+import qualified RiakQuorum     as Quorum
 
 import Control.Lens ((.~), (^.))
 

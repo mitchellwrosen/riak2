@@ -3,8 +3,7 @@ module RiakContent
   , newContent
   ) where
 
-import RiakInternalPrelude
-import RiakInternalSecondaryIndex (SecondaryIndex)
+import RiakSecondaryIndex (SecondaryIndex)
 
 import Data.Time          (UTCTime(..))
 import Data.Time.Calendar (Day(..))
