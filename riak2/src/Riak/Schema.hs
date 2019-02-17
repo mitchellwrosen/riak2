@@ -33,7 +33,7 @@ getSchema ::
      MonadIO m
   => Handle -- ^
   -> Text -- ^
-  -> m (Either (Error 'GetSchemaOp) (Maybe Schema))
+  -> m (Either GetSchemaError (Maybe Schema))
 getSchema handle name = liftIO $
   fromHandleResult
     parseGetSchemaError
@@ -42,7 +42,7 @@ getSchema handle name = liftIO $
 
 parseGetSchemaError ::
      ByteString
-  -> Either (Error 'GetSchemaOp) (Maybe Schema)
+  -> Either GetSchemaError (Maybe Schema)
 parseGetSchemaError err
   | isNotfound err =
       Right Nothing
@@ -56,7 +56,7 @@ putSchema ::
      MonadIO m
   => Handle -- ^
   -> Schema -- ^
-  -> m (Either (Error 'PutSchemaOp) ())
+  -> m (Either PutSchemaError ())
 putSchema handle schema = liftIO $
   fromHandleResult
     (Left . parsePutSchemaError)
@@ -65,7 +65,7 @@ putSchema handle schema = liftIO $
 
 parsePutSchemaError ::
      ByteString
-  -> Error 'PutSchemaOp
+  -> PutSchemaError
 parsePutSchemaError err
   | isInvalidSchemaError err =
       InvalidSchemaError (decodeUtf8 err)

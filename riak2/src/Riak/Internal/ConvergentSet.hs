@@ -65,7 +65,7 @@ getConvergentSet ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentSet ByteString)))
+  -> m (Either GetConvergentSetError (Maybe (ConvergentSet ByteString)))
 getConvergentSet handle key@(Key bucketType _ _) = liftIO $
   fromHandleResult
     (parseGetCrdtError bucketType)
@@ -111,7 +111,7 @@ putConvergentSet ::
      MonadIO m
   => Handle -- ^
   -> ConvergentSet ByteString -- ^
-  -> m (Either (Error 'UpdateCrdtOp) (ConvergentSet ByteString))
+  -> m (Either PutConvergentSetError (ConvergentSet ByteString))
 putConvergentSet
     handle
     (ConvergentSet context key@(Key bucketType _ _) newValue oldValue) = liftIO $

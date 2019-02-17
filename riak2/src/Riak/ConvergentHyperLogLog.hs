@@ -45,7 +45,7 @@ getConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentHyperLogLog Word64)))
+  -> m (Either GetConvergentHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
 getConvergentHyperLogLog handle key@(Key bucketType _ _) = liftIO $
   fromHandleResult
     (parseGetCrdtError bucketType)
@@ -86,7 +86,7 @@ updateConvergentHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
-  -> m (Either (Error 'UpdateCrdtOp) (ConvergentHyperLogLog Word64))
+  -> m (Either UpdateConvergentHyperLogLogError (ConvergentHyperLogLog Word64))
 updateConvergentHyperLogLog
     handle
     (ConvergentHyperLogLog key@(Key bucketType _ _) value) = liftIO $

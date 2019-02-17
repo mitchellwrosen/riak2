@@ -44,7 +44,7 @@ getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either (Error 'GetBucketTypeOp) (Maybe BucketProperties))
+  -> m (Either GetBucketTypeError (Maybe BucketProperties))
 getBucketType handle bucketType = liftIO $
   fromHandleResult
     parseGetBucketTypeError
@@ -53,7 +53,7 @@ getBucketType handle bucketType = liftIO $
 
 parseGetBucketTypeError ::
      ByteString
-  -> Either (Error 'GetBucketTypeOp) (Maybe BucketProperties)
+  -> Either GetBucketTypeError (Maybe BucketProperties)
 parseGetBucketTypeError err
   | isBucketTypeDoesNotExistError3 err =
       Right Nothing
@@ -78,7 +78,7 @@ setBucketTypeIndex ::
   => Handle -- ^
   -> BucketType -- ^
   -> IndexName -- ^ Index name
-  -> m (Either (Error 'SetBucketTypeIndexOp) ())
+  -> m (Either SetBucketTypeIndexError ())
 setBucketTypeIndex handle bucketType index
   -- Careful changing this code... does it still make sense for
   -- 'unsetBucketTypeIndex' to share an error type?
@@ -92,7 +92,7 @@ setBucketTypeIndex_ ::
   => Handle
   -> BucketType
   -> IndexName
-  -> m (Either (Error 'SetBucketTypeIndexOp) ())
+  -> m (Either SetBucketTypeIndexError ())
 setBucketTypeIndex_ handle bucketType index = liftIO $
   fromHandleResult
     (Left . parseSetBucketTypeIndexError bucketType index)
@@ -113,7 +113,7 @@ unsetBucketTypeIndex ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either (Error 'SetBucketTypeIndexOp) ())
+  -> m (Either SetBucketTypeIndexError ())
 unsetBucketTypeIndex handle bucketType =
   setBucketTypeIndex handle bucketType (IndexName "_dont_index")
 
@@ -121,7 +121,7 @@ parseSetBucketTypeIndexError ::
      ByteString
   -> IndexName
   -> ByteString
-  -> Error 'SetBucketTypeIndexOp
+  -> SetBucketTypeIndexError
 parseSetBucketTypeIndexError bucketType index err
   | isBucketTypeDoesNotExistError2 err =
       BucketTypeDoesNotExistError bucketType
@@ -145,7 +145,7 @@ listBuckets ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either (Error 'ListBucketsOp) [Bucket])
+  -> m (Either ListBucketsError [Bucket])
 listBuckets handle bucketType =
   streamBuckets handle bucketType (Foldl.generalize Foldl.list)
 
@@ -160,7 +160,7 @@ streamBuckets ::
      => Handle -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
-  -> m (Either (Error 'ListBucketsOp) r)
+  -> m (Either ListBucketsError r)
 streamBuckets handle bucketType bucketFold = liftIO $
   fromHandleResult
     (Left . parseListBucketsError bucketType)
@@ -178,7 +178,7 @@ streamBuckets handle bucketType bucketFold = liftIO $
         & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
 
-parseListBucketsError :: ByteString -> ByteString -> Error 'ListBucketsOp
+parseListBucketsError :: ByteString -> ByteString -> ListBucketsError
 parseListBucketsError bucketType err
   | isBucketTypeDoesNotExistError4 err =
       BucketTypeDoesNotExistError bucketType

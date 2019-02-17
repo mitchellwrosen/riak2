@@ -45,7 +45,7 @@ getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either (Error 'GetBucketOp) (Maybe BucketProperties))
+  -> m (Either GetBucketError (Maybe BucketProperties))
 getBucket handle bucket = liftIO $
   fromHandleResult
     parseGetBucketError
@@ -60,7 +60,7 @@ getBucket handle bucket = liftIO $
 
 parseGetBucketError ::
      ByteString
-  -> Either (Error 'GetBucketOp) (Maybe BucketProperties)
+  -> Either GetBucketError (Maybe BucketProperties)
 parseGetBucketError err
   | isBucketTypeDoesNotExistError4 err =
       Right Nothing
@@ -94,14 +94,6 @@ unsetBucketIndex ::
   -> m (Either Handle.HandleError (Either ByteString ()))
 unsetBucketIndex handle bucket =
   setBucketIndex handle bucket (IndexName "_dont_index")
-
--- | Set bucket properties.
-setBucket
-  :: Handle -- ^
-  -> Proto.RpbSetBucketReq -- ^
-  -> IO (Either Handle.HandleError (Either ByteString ()))
-setBucket handle request =
-  Handle.setBucket handle request
 
 -- | Reset bucket properties.
 resetBucket ::
@@ -263,7 +255,7 @@ listKeys ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either (Error 'ListKeysOp) [Key])
+  -> m (Either ListKeysError [Key])
 listKeys handle bucket =
   streamKeys handle bucket (Foldl.generalize Foldl.list)
 
@@ -281,7 +273,7 @@ streamKeys ::
   => Handle -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
-  -> m (Either (Error 'ListKeysOp) r)
+  -> m (Either ListKeysError r)
 streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
   fromHandleResult
     (Left . parseListKeysError bucketType)
@@ -303,7 +295,7 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
         & setProto b
         -- TODO stream keys timeout
 
-parseListKeysError :: ByteString -> ByteString -> Error 'ListKeysOp
+parseListKeysError :: ByteString -> ByteString -> ListKeysError
 parseListKeysError bucketType err
   | isBucketTypeDoesNotExistError4 err =
       BucketTypeDoesNotExistError bucketType

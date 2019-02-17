@@ -98,6 +98,29 @@ data Op
   | SetBucketTypeIndexOp
   | UpdateCrdtOp
 
+type DeleteError                      = Error 'DeleteOp
+type DeleteIndexError                 = Error 'DeleteIndexOp
+type GetBucketError                   = Error 'GetBucketOp
+type GetBucketTypeError               = Error 'GetBucketTypeOp
+type GetConvergentCounterError        = Error 'GetCrdtOp
+type GetConvergentHyperLogLogError    = Error 'GetCrdtOp
+type GetConvergentMapError            = Error 'GetCrdtOp
+type GetConvergentSetError            = Error 'GetCrdtOp
+type GetIndexError                    = Error 'GetIndexOp
+type GetError                         = Error 'GetOp
+type GetSchemaError                   = Error 'GetSchemaOp
+type ListBucketsError                 = Error 'ListBucketsOp
+type ListKeysError                    = Error 'ListKeysOp
+type PutConvergentMapError            = Error 'UpdateCrdtOp
+type PutConvergentSetError            = Error 'UpdateCrdtOp
+type PutError                         = Error 'PutOp
+type PutIndexError                    = Error 'PutIndexOp
+type PutSchemaError                   = Error 'PutSchemaOp
+type SearchError                      = Error 'SearchOp
+type SetBucketTypeIndexError          = Error 'SetBucketTypeIndexOp
+type UpdateConvergentCounterError     = Error 'UpdateCrdtOp
+type UpdateConvergentHyperLogLogError = Error 'UpdateCrdtOp
+
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True
   MayReturnBucketTypeDoesNotExist 'GetCrdtOp = 'True

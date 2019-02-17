@@ -89,7 +89,7 @@ search ::
   -> IndexName -- ^ Search index
   -> ByteString -- ^ Search query
   -> SearchOpts -- ^ Search options
-  -> m (Either (Error 'SearchOp) SearchResults)
+  -> m (Either SearchError SearchResults)
 search
     handle
     index
@@ -126,7 +126,7 @@ search
     fromProtoSearchDoc doc =
       map Proto.Pair.toTuple (doc ^. Proto.fields)
 
-parseSearchError :: IndexName -> ByteString -> Error 'SearchOp
+parseSearchError :: IndexName -> ByteString -> SearchError
 parseSearchError index err
   | isIndexDoesNotExistError1 err =
       IndexDoesNotExistError index

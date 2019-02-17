@@ -61,7 +61,7 @@ getIndex ::
      MonadIO m
   => Handle -- ^
   -> IndexName -- ^
-  -> m (Either (Error 'GetIndexOp) (Maybe Index))
+  -> m (Either GetIndexError (Maybe Index))
 getIndex handle (IndexName name) = liftIO $
   fromHandleResult
     parseGetIndexError
@@ -70,7 +70,7 @@ getIndex handle (IndexName name) = liftIO $
 
 parseGetIndexError ::
      ByteString
-  -> Either (Error 'GetIndexOp) (Maybe Index)
+  -> Either GetIndexError (Maybe Index)
 parseGetIndexError err
   | isNotfound err =
       Right Nothing
@@ -83,14 +83,14 @@ parseGetIndexError err
 getIndexes ::
      MonadIO m
   => Handle -- ^
-  -> m (Either (Error 'GetIndexOp) [Index])
+  -> m (Either GetIndexError [Index])
 getIndexes handle = liftIO $
   fromHandleResult
     (Left . parseGetIndexesError)
     (map fromProto)
     (Handle.getIndex handle Nothing)
 
-parseGetIndexesError :: ByteString -> Error 'GetIndexOp
+parseGetIndexesError :: ByteString -> GetIndexError
 parseGetIndexesError err
   | isUnknownMessageCode err =
       SearchNotEnabledError
@@ -106,7 +106,7 @@ putIndex ::
   -> IndexName -- ^ Index name
   -> Text -- ^ Schema name
   -> PutIndexOpts -- ^
-  -> m (Either (Error 'PutIndexOp) ())
+  -> m (Either PutIndexError ())
 putIndex handle index schema (PutIndexOpts nodes timeout) =
   if nodes == Just 0
     then pure (Left InvalidNodesError)
@@ -120,7 +120,7 @@ putIndex_ ::
   -> Text
   -> Maybe Natural
   -> Maybe Word32
-  -> IO (Either (Error 'PutIndexOp) ())
+  -> IO (Either PutIndexError ())
 putIndex_ handle index schema nodes timeout = do
   getIndex handle index >>= \case
     Left err ->
@@ -170,7 +170,7 @@ putIndex_ handle index schema nodes timeout = do
         id
         (Handle.putIndex handle request)
 
-parsePutIndexError :: ByteString -> Error 'PutIndexOp
+parsePutIndexError :: ByteString -> PutIndexError
 parsePutIndexError err
   | isSchemaDoesNotExistError err =
       SchemaDoesNotExistError
@@ -187,7 +187,7 @@ deleteIndex ::
      MonadIO m
   => Handle -- ^
   -> IndexName -- ^
-  -> m (Either (Error 'DeleteIndexOp) Bool)
+  -> m (Either DeleteIndexError Bool)
 deleteIndex handle name = liftIO $
   fromHandleResult
     parseDeleteIndexError
@@ -196,7 +196,7 @@ deleteIndex handle name = liftIO $
 
 parseDeleteIndexError ::
      ByteString
-  -> Either (Error 'DeleteIndexOp) Bool
+  -> Either DeleteIndexError Bool
 parseDeleteIndexError err
   | isNotfound err =
       Right False

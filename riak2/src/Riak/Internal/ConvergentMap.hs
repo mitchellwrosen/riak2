@@ -61,7 +61,7 @@ getConvergentMap ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either (Error 'GetCrdtOp) (Maybe (ConvergentMap ConvergentMapValue)))
+  -> m (Either GetConvergentMapError (Maybe (ConvergentMap ConvergentMapValue)))
 getConvergentMap handle key@(Key bucketType _ _) = liftIO $
   fromHandleResult
     (parseGetCrdtError bucketType)
@@ -107,7 +107,7 @@ putConvergentMap ::
      MonadIO m
   => Handle -- ^
   -> ConvergentMap ConvergentMapValue -- ^
-  -> m (Either (Error 'UpdateCrdtOp) (ConvergentMap ConvergentMapValue))
+  -> m (Either PutConvergentMapError (ConvergentMap ConvergentMapValue))
 putConvergentMap
     handle
     (ConvergentMap context key@(Key bucketType _ _) newValue oldValue) = liftIO $

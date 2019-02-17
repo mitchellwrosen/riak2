@@ -83,9 +83,21 @@ module Riak
   , convergentSetKey
   , convergentSetValue
   , ErlangTerm(..)
+  , Error(..)
   , ExactQuery(..)
+  , DeleteError
+  , DeleteIndexError
   , DeleteOpts(..)
+  , GetBucketError
+  , GetBucketTypeError
+  , GetConvergentCounterError
+  , GetConvergentHyperLogLogError
+  , GetConvergentMapError
+  , GetConvergentSetError
+  , GetError
+  , GetIndexError
   , GetOpts(..)
+  , GetSchemaError
   , Handle
   , Index(..)
   , IndexName
@@ -93,24 +105,41 @@ module Riak
   , unsafeMakeIndexName
   , Key(..)
   , generatedKey
+  , ListBucketsError
+  , ListKeysError
   , MapReduceFunction(..)
   , MapReducePhase(..)
+  , MayReturnBucketTypeDoesNotExist
+  , MayReturnIndexDoesNotExist
+  , MayReturnInvalidNodes
+  , MayReturnOverload
+  , MayReturnSearchNotEnabled
   , NotfoundBehavior(..)
   , Object(..)
   , newObject
+  , Op(..)
+  , PutConvergentMapError
+  , PutConvergentSetError
+  , PutError
+  , PutIndexError
+  , PutSchemaError
   , PutIndexOpts(..)
   , PutOpts(..)
   , Quorum(..)
   , RangeQuery(..)
   , Schema(..)
   , defaultSchema
+  , SearchError
   , SearchOpts(..)
   , SearchResults(..)
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
+  , SetBucketTypeIndexError
   , Sibling(..)
   , UnexpectedResponse(..)
+  , UpdateConvergentCounterError
+  , UpdateConvergentHyperLogLogError
     -- ** Re-exports
   , def
   ) where
@@ -128,6 +157,7 @@ import Riak.ConvergentHyperLogLog
 import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ErlangTerm
+import Riak.Error
 import Riak.ExactQuery            (ExactQuery(..))
 import Riak.Index
 import Riak.Key

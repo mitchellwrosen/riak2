@@ -38,7 +38,7 @@ getConvergentCounter ::
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetCrdtOp) (Maybe ConvergentCounter))
+  -> m (Either GetConvergentCounterError (Maybe ConvergentCounter))
 getConvergentCounter
     handle
     key@(Key bucketType _ _)
@@ -81,7 +81,7 @@ updateConvergentCounter ::
   => Handle -- ^
   -> ConvergentCounter -- ^
   -> PutOpts -- ^
-  -> m (Either (Error 'UpdateCrdtOp) ConvergentCounter)
+  -> m (Either UpdateConvergentCounterError ConvergentCounter)
 updateConvergentCounter
     handle
     (ConvergentCounter key@(Key bucketType _ _) value)

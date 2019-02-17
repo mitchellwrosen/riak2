@@ -126,7 +126,7 @@ get ::
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) (Object [Sibling ByteString]))
+  -> m (Either GetError (Object [Sibling ByteString]))
 get handle key opts = liftIO $
   (fmap.fmap)
     (fromGetResponse key)
@@ -146,7 +146,7 @@ getHead ::
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) (Object [Sibling ()]))
+  -> m (Either GetError (Object [Sibling ()]))
 getHead handle key opts = liftIO $
   (fmap.fmap)
     ((fmap.map) (() <$)  . fromGetResponse key)
@@ -166,7 +166,7 @@ getIfModified ::
   => Handle -- ^
   -> Object a -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) (Maybe (Object [Sibling ByteString])))
+  -> m (Either GetError (Maybe (Object [Sibling ByteString])))
 getIfModified handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     (\response ->
@@ -190,7 +190,7 @@ getHeadIfModified ::
   => Handle -- ^
   -> Object a -- ^
   -> GetOpts -- ^
-  -> m (Either (Error 'GetOp) (Maybe (Object [Sibling ()])))
+  -> m (Either GetError (Maybe (Object [Sibling ()])))
 getHeadIfModified handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     fromResponse
@@ -211,14 +211,14 @@ getHeadIfModified handle Object { context, key } opts = liftIO $
 doGet ::
      Handle
   -> Proto.RpbGetReq
-  -> IO (Either (Error 'GetOp) Proto.RpbGetResp)
+  -> IO (Either GetError Proto.RpbGetResp)
 doGet handle request =
   fromHandleResult
     (Left . parseGetError request)
     id
     (Handle.get handle request)
 
-parseGetError :: Proto.RpbGetReq -> ByteString -> Error 'GetOp
+parseGetError :: Proto.RpbGetReq -> ByteString -> GetError
 parseGetError request err
   | isBucketTypeDoesNotExistError0 err =
       BucketTypeDoesNotExistError (request ^. Proto.type')
@@ -252,7 +252,7 @@ put ::
      Handle -- ^
   -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> IO (Either (Error 'PutOp) Key)
+  -> IO (Either PutError Key)
 put handle object opts =
   (fmap.fmap)
     fromResponse
@@ -285,7 +285,7 @@ putGet ::
   => Handle -- ^
   -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> m (Either (Error 'PutOp) (Object (NonEmpty (Sibling ByteString))))
+  -> m (Either PutError (Object (NonEmpty (Sibling ByteString))))
 putGet handle object opts = liftIO $
   (fmap.fmap)
     (fromPutResponse (object ^. field @"key"))
@@ -308,7 +308,7 @@ putGetHead ::
   => Handle -- ^
   -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> m (Either (Error 'PutOp) (Object (NonEmpty (Sibling ()))))
+  -> m (Either PutError (Object (NonEmpty (Sibling ()))))
 putGetHead handle object opts = liftIO $
   (fmap.fmap)
     ((fmap.fmap) (() <$) . fromPutResponse (object ^. field @"key"))
@@ -323,14 +323,14 @@ putGetHead handle object opts = liftIO $
 doPut ::
      Handle
   -> Proto.RpbPutReq
-  -> IO (Either (Error 'PutOp) Proto.RpbPutResp)
+  -> IO (Either PutError Proto.RpbPutResp)
 doPut handle request =
   fromHandleResult
     (Left . parsePutError request)
     id
     (Handle.put handle request)
 
-parsePutError :: Proto.RpbPutReq -> ByteString -> Error 'PutOp
+parsePutError :: Proto.RpbPutReq -> ByteString -> PutError
 parsePutError request err
   | isBucketTypeDoesNotExistError0 err =
       BucketTypeDoesNotExistError (request ^. Proto.type')
@@ -375,7 +375,7 @@ delete ::
   => Handle -- ^
   -> Object a -- ^
   -> DeleteOpts -- ^
-  -> m (Either (Error 'DeleteOp) ())
+  -> m (Either DeleteError ())
 delete
     handle
     Object { context, key }
@@ -400,7 +400,7 @@ delete
         & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
         & Proto.vclock .~ unContext context
 
-parseDeleteError :: ByteString -> Error 'DeleteOp
+parseDeleteError :: ByteString -> DeleteError
 parseDeleteError err
   | isOverloadError err =
       OverloadError
