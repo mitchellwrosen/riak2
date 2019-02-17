@@ -99,10 +99,6 @@ parseGetIndexesError err
 
 -- | Put a Solr index.
 --
--- /Note/: If you attempt to put an index that already exists, even if you
--- supply a different @nodes@ or @schema@ value, Riak will ignore the put but
--- not return an error.
---
 -- /See also/: 'Riak.Schema.defaultSchema'
 putIndex ::
      MonadIO m
@@ -116,6 +112,8 @@ putIndex handle index schema (PutIndexOpts nodes timeout) =
     then pure (Left InvalidNodesError)
     else liftIO (putIndex_ handle index schema nodes timeout)
 
+-- Riak is too dumb to modify an index that already exists. Instead, have to
+-- delete and re-put.
 putIndex_ ::
      Handle
   -> IndexName
@@ -123,11 +121,34 @@ putIndex_ ::
   -> Maybe Natural
   -> Maybe Word32
   -> IO (Either (Error 'PutIndexOp) ())
-putIndex_ handle index schema nodes timeout =
-  fromHandleResult
-    (Left . parsePutIndexError)
-    id
-    (Handle.putIndex handle request)
+putIndex_ handle index schema nodes timeout = do
+  getIndex handle index >>= \case
+    Left err ->
+      case err of
+        SearchNotEnabledError -> pure (Left SearchNotEnabledError)
+        HandleError err' -> pure (Left (HandleError err'))
+        UnknownError err' -> pure (Left (UnknownError err'))
+
+    Right Nothing ->
+      doPutIndex
+
+    Right (Just (Index _ oldNodes oldSchema)) ->
+      -- Modify: delete then put
+      if nodes /= Just oldNodes || schema /= oldSchema
+        then
+          deleteIndex handle index >>= \case
+            Left err ->
+              case err of
+                SearchNotEnabledError -> pure (Left SearchNotEnabledError)
+                HandleError err' -> pure (Left (HandleError err'))
+                UnknownError err' -> pure (Left (UnknownError err'))
+
+            Right _success ->
+              doPutIndex
+
+        -- Same as before: no need to modify
+        else
+          pure (Right ())
 
   where
     request :: Proto.RpbYokozunaIndexPutReq
@@ -142,6 +163,12 @@ putIndex_ handle index schema nodes timeout =
                     then Nothing
                     else Just (encodeUtf8 schema)))
         & Proto.maybe'timeout .~ timeout
+
+    doPutIndex =
+      fromHandleResult
+        (Left . parsePutIndexError)
+        id
+        (Handle.putIndex handle request)
 
 parsePutIndexError :: ByteString -> Error 'PutIndexOp
 parsePutIndexError err
