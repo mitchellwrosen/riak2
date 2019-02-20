@@ -25,10 +25,12 @@ executable riakc
   default-extensions:
     DataKinds
     DuplicateRecordFields
+    GADTs
     LambdaCase
     OverloadedStrings
     NamedFieldPuns
     ScopedTypeVariables
+    TupleSections
     TypeApplications
     ViewPatterns
 

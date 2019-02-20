@@ -11,7 +11,6 @@ import qualified RiakSecondaryIndexValue as SecondaryIndexValue
 import qualified Data.ByteString as ByteString
 
 
--- TODO Index values should be a set
 -- | A secondary index.
 data SecondaryIndex
   = forall a.

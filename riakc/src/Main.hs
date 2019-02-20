@@ -10,24 +10,26 @@ import qualified Riak.Handle.Impl.Exclusive as Handle.Exclusive
 import qualified Riak.Handle.Impl.Managed   as Handle.Managed
 import qualified Riak.ServerInfo            as ServerInfo
 
-import Control.Arrow       ((***))
-import Control.Lens        (view, (.~), (^.))
-import Data.ByteString     (ByteString)
-import Data.Foldable       (asum, for_)
-import Data.Function       ((&))
-import Data.HashMap.Strict (HashMap)
-import Data.HashSet        (HashSet)
-import Data.Int            (Int64)
-import Data.List.Split     (splitOn)
-import Data.Maybe          (fromMaybe)
-import Data.Text           (Text)
-import Data.Text.Encoding  (decodeUtf8, encodeUtf8)
+import Control.Arrow         ((***))
+import Control.Lens          (view, (.~), (^.))
+import Data.ByteString       (ByteString)
+import Data.Foldable         (asum, for_, traverse_)
+import Data.Function         ((&))
+import Data.Generics.Product (field)
+import Data.HashMap.Strict   (HashMap)
+import Data.HashSet          (HashSet)
+import Data.Int              (Int64)
+import Data.List.Split       (splitOn)
+import Data.Maybe            (fromMaybe)
+import Data.Text             (Text)
+import Data.Text.Encoding    (decodeUtf8, decodeUtf8', encodeUtf8)
 import Data.Word
-import Net.IPv4            (IPv4, ipv4)
-import Numeric.Natural     (Natural)
-import Options.Applicative hiding (infoParser)
-import System.Exit         (exitFailure)
-import Text.Read           (readMaybe)
+import Net.IPv4              (IPv4, ipv4)
+import Numeric.Natural       (Natural)
+import Options.Applicative   hiding (infoParser)
+import System.Exit           (exitFailure)
+import Text.Printf           (printf)
+import Text.Read             (readMaybe)
 
 import qualified Control.Foldl          as Foldl
 import qualified Data.ByteString        as ByteString
@@ -103,9 +105,10 @@ nodeParser =
     parseNode s =
       maybe (Left "Expected: 'host' or 'host:port'") Right $ do
         case span (/= ':') s of
-          (mkHost -> Just host, ':':port) -> do
-            port' <- readMaybe port
-            pure (host, port')
+          (mkHost -> Just host, ':':port) ->
+            case port of
+              [] -> pure (host, 8087)
+              _ -> (host,) <$> readMaybe port
           (mkHost -> Just host, []) ->
             pure (host, 8087)
           _ ->
@@ -141,6 +144,7 @@ commandParser =
       , command "put-map" (info putMapParser (progDesc "Put a map"))
       , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
       , command "put-set" (info putSetParser (progDesc "Put a set"))
+      , command "query" (info queryParser (progDesc "Perform a secondary index query"))
       , command "search" (info searchParser (progDesc "Perform a search"))
       , command "set-bucket-index" (info setBucketIndexParser (progDesc "Set a bucket type or bucket's index"))
       , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
@@ -218,8 +222,15 @@ getParser =
           print err
           exitFailure
 
-        Right object -> do
-          print object
+        Right object ->
+          case object ^. field @"content" of
+            [] ->
+              putStrLn "Not found"
+            siblings -> do
+              putStrLn ("context = " ++ show (object ^. field @"context"))
+              for_ siblings $ \sibling -> do
+                putStrLn ""
+                printSibling sibling
 
       where
         opts :: GetOpts
@@ -232,6 +243,45 @@ getParser =
             , r = r
             , timeout = Nothing
             }
+
+        printSibling :: Sibling ByteString -> IO ()
+        printSibling = \case
+          Sibling content ->
+            printContent content
+
+          Tombstone lastModified -> do
+            printf "last modified = %s\n" (show lastModified)
+            putStrLn "value = <tombstone>"
+
+        printContent :: Content ByteString -> IO ()
+        printContent content = do
+          for_ (content ^. field @"charset") $ \charset ->
+            Text.putStrLn ("charset = " <> decodeUtf8 charset)
+          for_ (content ^. field @"encoding") $ \encoding ->
+            Text.putStrLn ("encoding = " <> decodeUtf8 encoding)
+          traverse_ printSecondaryIndex (content ^. field @"indexes")
+          printf "last modified = %s\n" (show (content ^. field @"lastModified"))
+          traverse_ printMetadata (HashMap.toList (content ^. field @"metadata"))
+          for_ (content ^. field @"type'") $ \type' ->
+            Text.putStrLn ("content type = " <> decodeUtf8 type')
+          for_ (content ^. field @"ttl") $ \ttl ->
+            printf "ttl = %s\n" (show ttl)
+          Text.putStrLn ("value = " <> displayByteString (content ^. field @"value"))
+
+        printMetadata :: (ByteString, ByteString) -> IO ()
+        printMetadata (key, val) =
+          Text.putStrLn
+            ("metadata " <> decodeUtf8 key <> " = " <> displayByteString val)
+
+        printSecondaryIndex :: SecondaryIndex -> IO ()
+        printSecondaryIndex (SecondaryIndex name val) =
+          Text.putStrLn ("index " <> decodeUtf8 name <> " = " <> valstr)
+          where
+            valstr :: Text
+            valstr =
+              case val of
+                Binary blob -> displayByteString blob
+                Integer n -> Text.pack (show n)
 
 getBucketParser :: Parser (Handle -> IO ())
 getBucketParser =
@@ -508,22 +558,22 @@ putParser =
     <$> bucketOrKeyArgument
     <*> strArgument (help "Value" <> metavar "VALUE")
     <*> contentTypeOption
+    <*> charsetOption
+    <*> encodingOption
+    <*> many secondaryIndexOption
     <*> contextOption
     <*> nodesOption
     <*> wOption
     <*> dwOption
     <*> pwOption
   where
-    contentTypeOption :: Parser (Maybe ByteString)
-    contentTypeOption =
-      optional
-        (strOption
-          (help "Content type" <> long "content-type" <> metavar "TYPE"))
-
     doPut ::
          Either Bucket Key
       -> Text
       -> Maybe ByteString
+      -> Maybe ByteString
+      -> Maybe ByteString
+      -> [SecondaryIndex]
       -> Maybe Context
       -> Maybe Quorum
       -> Maybe Quorum
@@ -531,7 +581,7 @@ putParser =
       -> Maybe Quorum
       -> Handle
       -> IO ()
-    doPut bucketOrKey val type' context nodes w dw pw handle =
+    doPut bucketOrKey val type' charset encoding indexes context nodes w dw pw handle =
       put handle object opts >>= \case
         Left err -> do
           print err
@@ -548,7 +598,10 @@ putParser =
           Object
             { content =
                 (newContent (encodeUtf8 val))
-                  { type' = type'
+                  { charset = charset
+                  , encoding = encoding
+                  , indexes = indexes
+                  , type' = type'
                   }
             , context =
                 fromMaybe newContext context
@@ -905,6 +958,55 @@ putSchemaParser =
         Right () ->
           pure ()
 
+queryParser :: Parser (Handle -> IO ())
+queryParser =
+  doQuery
+    <$> bucketArgument
+    <*> strArgument (help "Key" <> metavar "KEY")
+    <*> secondaryIndexValueArgument
+    -- <*> optional secondaryIndexValueArgument
+
+  where
+    doQuery ::
+         Bucket
+      -> ByteString
+      -> Either ByteString Int64
+      -> Handle
+      -> IO ()
+    doQuery bucket index val1 handle =
+      queryExact handle query (Foldl.mapM_ printKey) >>= \case
+        Left err -> do
+          print err
+          exitFailure
+
+        Right (Left err) -> do
+          print err
+          exitFailure
+
+        Right (Right ()) ->
+          pure ()
+
+      where
+        query :: ExactQuery
+        query =
+          case val1 of
+            Left s ->
+              ExactQuery
+                { bucket = bucket
+                , index = index
+                , value = Binary s
+                }
+            Right n ->
+              ExactQuery
+                { bucket = bucket
+                , index = index
+                , value = Integer n
+                }
+
+    printKey :: Key -> IO ()
+    printKey (Key _ _ key) =
+      Text.putStrLn (decodeUtf8 key)
+
 searchParser :: Parser (Handle -> IO ())
 searchParser =
   doSearch
@@ -1029,9 +1131,26 @@ updateCounterParser =
             , w = w
             }
 
+-- Try to display a byte string as UTF-8 (best effor)
+displayByteString :: ByteString -> Text
+displayByteString bytes =
+  case decodeUtf8' bytes of
+    Left _ -> "<binary data>"
+    Right text -> text
+
+stringToByteString :: String -> ByteString
+stringToByteString =
+  encodeUtf8 . Text.pack
+
 --------------------------------------------------------------------------------
 -- Arguments/options
 --------------------------------------------------------------------------------
+
+bucketArgument :: Parser Bucket
+bucketArgument =
+  argument
+    (eitherReader parseBucket)
+    (help "Bucket" <> metavar "TYPE/BUCKET")
 
 bucketOrKeyArgument :: Parser (Either Bucket Key)
 bucketOrKeyArgument =
@@ -1050,6 +1169,17 @@ bucketTypeOrBucketArgument =
     ((Right <$> eitherReader parseBucket) <|> (Left . encodeUtf8 <$> str))
     (help "Bucket type or bucket" <> metavar "TYPE(/BUCKET)")
 
+charsetOption :: Parser (Maybe ByteString)
+charsetOption =
+  optional
+    (encodeUtf8 <$> strOption (long "charset" <> help "Character set"))
+
+contentTypeOption :: Parser (Maybe ByteString)
+contentTypeOption =
+  optional
+    (strOption
+      (help "Content type" <> long "content-type" <> metavar "TYPE"))
+
 contextOption :: Parser (Maybe Context)
 contextOption =
   optional
@@ -1064,6 +1194,11 @@ contextOption =
 dwOption :: Parser (Maybe Quorum)
 dwOption =
   optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
+
+encodingOption :: Parser (Maybe ByteString)
+encodingOption =
+  optional
+    (encodeUtf8 <$> strOption (long "encoding" <> help "Character encoding"))
 
 indexNameArgument :: Parser IndexName
 indexNameArgument =
@@ -1111,6 +1246,37 @@ rOption =
 schemaNameArgument :: Parser Text
 schemaNameArgument =
   strArgument (help "Schema name" <> metavar "SCHEMA")
+
+secondaryIndexOption :: Parser SecondaryIndex
+secondaryIndexOption =
+  option
+    (eitherReader parseSecondaryIndex)
+    (help "Secondary index" <> long "index" <> metavar "KEY/VALUE")
+  where
+    parseSecondaryIndex :: String -> Either String SecondaryIndex
+    parseSecondaryIndex string =
+      case splitOn "/" string of
+        [ stringToByteString -> name, val ] ->
+          case readMaybe val of
+            Nothing ->
+              Right (SecondaryIndex name (Binary (stringToByteString val)))
+            Just n ->
+              Right (SecondaryIndex name (Integer n))
+
+        _ ->
+          Left "Expected: key/value'"
+
+secondaryIndexValueArgument :: Parser (Either ByteString Int64)
+secondaryIndexValueArgument =
+  argument
+    (eitherReader parseSecondaryIndexValue)
+    (help "Value" <> metavar "VALUE")
+  where
+    parseSecondaryIndexValue :: String -> Either String (Either ByteString Int64)
+    parseSecondaryIndexValue string =
+      case readMaybe string of
+        Nothing -> Right (Left (stringToByteString string))
+        Just n -> Right (Right n)
 
 wOption :: Parser (Maybe Quorum)
 wOption =
