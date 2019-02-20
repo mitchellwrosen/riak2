@@ -5,9 +5,8 @@ module RiakMapReduce
   , mapReduceKeys
   ) where
 
-import Libriak.Connection (ConnectionError)
-import Libriak.Handle     (Handle)
-import RiakBucket         (Bucket)
+import Libriak.Handle (Handle)
+import RiakBucket     (Bucket)
 
 import RiakErlangTerm     (ErlangTerm(..))
 import RiakKey            (Key)
@@ -39,7 +38,7 @@ mapReduceBucket ::
   -> Bucket -- ^
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either ConnectionError (Either ByteString r))
+  -> m (Either Handle.HandleConnectionError (Either ByteString r))
 mapReduceBucket handle bucket phases responseFold =
   liftIO (mapReduce_ handle (MapReduceInputBucket bucket) phases responseFold)
 
@@ -50,7 +49,7 @@ mapReduceKeys ::
   -> [Key] -- ^
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either ConnectionError (Either ByteString r))
+  -> m (Either Handle.HandleConnectionError (Either ByteString r))
 mapReduceKeys handle keys phases responseFold =
   liftIO (mapReduce_ handle (MapReduceInputKeys keys) phases responseFold)
 
@@ -59,7 +58,7 @@ mapReduce_ ::
   -> MapReduceInput
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
 mapReduce_ handle input phases responseFold =
   Handle.mapReduce handle request responseFold
 

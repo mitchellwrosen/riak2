@@ -2,6 +2,8 @@ module Riak.Handle.Impl.Exclusive
   ( Handle
   , HandleConfig(..)
   , EventHandlers(..)
+  , HandleConnectError
+  , HandleConnectionError
   , withHandle
   , exchange
   , stream
@@ -47,6 +49,12 @@ instance Monoid EventHandlers where
 instance Semigroup EventHandlers where
   EventHandlers a1 b1 <> EventHandlers a2 b2 =
     EventHandlers (a1 <> a2) (b1 <> b2)
+
+type HandleConnectError
+  = ConnectError
+
+type HandleConnectionError
+  = ConnectionError
 
 -- | Acquire a handle.
 --

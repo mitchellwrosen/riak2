@@ -77,19 +77,11 @@ main = do
                     }
               }
         , reconnectSettings =
-            \case
-              Left connectErr ->
-                Just Handle.Managed.ReconnectSettings
-                  { initialDelay = 1
-                  , retryFor = 5
-                  }
-              Right connectionErr ->
-                Just Handle.Managed.ReconnectSettings
-                  { initialDelay = 1
-                  , retryFor = 5
-                  }
-        , onReconnectAttempt =
-            mempty
+            \_err ->
+              Just Handle.Managed.ReconnectSettings
+                { initialDelay = 1
+                , retryFor = 30
+                }
         }
 
   Handle.Managed.withHandle config run >>= \case

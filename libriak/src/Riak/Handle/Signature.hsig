@@ -1,8 +1,7 @@
 signature Riak.Handle.Signature where
 
-import Libriak.Connection (ConnectError, ConnectionError)
-import Libriak.Request    (Request)
-import Libriak.Response   (Response)
+import Libriak.Request  (Request)
+import Libriak.Response (Response)
 
 
 -- | Riak handle.
@@ -11,18 +10,27 @@ data Handle
 -- | Riak handle configuration.
 data HandleConfig
 
+data HandleConnectError
+
+instance Eq HandleConnectError
+instance Show HandleConnectError
+
+data HandleConnectionError
+
+instance Eq HandleConnectionError
+instance Show HandleConnectionError
 
 -- | Attempt to setup a handle.
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
-  -> IO (Either ConnectError a)
+  -> IO (Either HandleConnectError a)
 
 -- | Send a request and receive the response (a single message).
 exchange ::
      Handle
   -> Request
-  -> IO (Either ConnectionError Response)
+  -> IO (Either HandleConnectionError Response)
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
@@ -31,4 +39,4 @@ stream ::
   -> Request
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either ConnectionError r)
+  -> IO (Either HandleConnectionError r)

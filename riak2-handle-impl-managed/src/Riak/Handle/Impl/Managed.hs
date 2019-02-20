@@ -7,18 +7,16 @@ module Riak.Handle.Impl.Managed
   ( Handle
   , HandleConfig(..)
   , ReconnectSettings(..)
+  , HandleConnectError
+  , HandleConnectionError
   , withHandle
   , exchange
   , stream
   , ManagedHandleCrashed(..)
-    -- ** Re-exports
-  , ConnectError(..)
-  , ConnectionError(..)
   ) where
 
-import Libriak.Connection (ConnectError(..), ConnectionError(..))
-import Libriak.Request    (Request)
-import Libriak.Response   (Response)
+import Libriak.Request  (Request)
+import Libriak.Response (Response)
 
 import qualified Riak.Handle.Signature as Handle
 
@@ -26,8 +24,7 @@ import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
-import Control.Exception.Safe (Exception(..), SomeException, bracket, catchAny,
-                               tryAny)
+import Control.Exception.Safe (Exception(..), SomeException, bracket, tryAny)
 import Control.Monad          (when)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, UTCTime, diffUTCTime,
@@ -37,22 +34,24 @@ import Numeric.Natural        (Natural)
 
 data Handle
   = Handle
-  { handleVar :: !(TMVar (Handle.Handle, Natural))
-    -- ^ The handle, and which "generation" it is (when 0 dies, 1 replaces it,
-    -- etc.
-  , errorVar :: !(TMVar ConnectionError)
+  { statusVar :: !(TMVar HandleStatus)
+  , errorVar :: !(TMVar Handle.HandleConnectionError)
     -- ^ The last error some client received when trying to use the handle.
   }
+
+-- Either the handle and which "generation" it is (when 0 dies, 1 replaces it,
+-- etc), or the connection that brought down the manager thread.
+data HandleStatus
+  = HandleDead Handle.HandleConnectError
+  | HandleAlive Handle.Handle Natural
 
 data HandleConfig
   = HandleConfig
   { innerConfig :: !Handle.HandleConfig
     -- ^ The inner handle's config.
   , reconnectSettings ::
-      !(Either ConnectError ConnectionError -> Maybe ReconnectSettings)
+      !(Handle.HandleConnectError -> Maybe ReconnectSettings)
     -- ^ How to behave when an error occurs. 'Nothing' means don't reconnect.
-  , onReconnectAttempt :: !(Either ConnectError ConnectionError -> IO ())
-    -- ^ A function called just before a reconnect attempt is made.
   }
 
 data ReconnectSettings
@@ -63,19 +62,17 @@ data ReconnectSettings
     -- ^ Attempt to reconnect periodically until this amount of time has passed.
   }
 
+type HandleConnectError
+  = Handle.HandleConnectError
+
+type HandleConnectionError
+  = Handle.HandleConnectError
+
 newtype ManagedHandleCrashed
   = ManagedHandleCrashed SomeException
   deriving stock (Show)
 
 instance Exception ManagedHandleCrashed where
-  toException = asyncExceptionToException
-  fromException = asyncExceptionFromException
-
-newtype ManagedHandleConnectionError
-  = ManagedHandleConnectionError (Either ConnectError ConnectionError)
-  deriving stock (Show)
-
-instance Exception ManagedHandleConnectionError where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
 
@@ -87,38 +84,42 @@ instance Exception ManagedHandleConnectionError where
 -- /Throws/. If the background manager thread crashes, which indicates there is
 -- a bug in the library, throws an asynchronous 'ManagedHandleCrashed'
 -- exception.
---
--- /Throws/. If the background manager thread ends gracefully due to the
--- provided reconnect settings, throws asynchronous
--- 'ManagedHandleConnectionError' with the connection error that ultimately
--- caused the teardown.
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
-  -> IO (Either ConnectError a)
+  -> IO (Either Handle.HandleConnectError a)
 withHandle config onSuccess = do
-  handleVar :: TMVar (Handle.Handle, Natural) <-
+  statusVar :: TMVar HandleStatus <-
     newEmptyTMVarIO
 
-  errorVar :: TMVar ConnectionError <-
+  errorVar :: TMVar Handle.HandleConnectionError <-
     newEmptyTMVarIO
 
   threadId :: ThreadId <-
     myThreadId
 
+  let
+    acquire :: IO ThreadId
+    acquire =
+      forkIOWithUnmask $ \unmask ->
+        tryAny (unmask (manager config statusVar errorVar)) >>= \case
+          Left err ->
+            throwTo threadId (ManagedHandleCrashed err)
+          Right () ->
+            pure ()
+
+  let
+    release :: ThreadId -> IO ()
+    release =
+      killThread
+
   bracket
-    (forkIOWithUnmask $ \unmask ->
-      tryAny (unmask (manager config handleVar errorVar)) >>= \case
-        Left err ->
-          throwTo threadId (ManagedHandleCrashed err)
-        Right err ->
-          throwTo threadId (ManagedHandleConnectionError err)
-    )
-    killThread
+    acquire
+    release
     (\_ -> do
       Right <$>
         onSuccess Handle
-          { handleVar = handleVar
+          { statusVar = statusVar
           , errorVar = errorVar
           })
 
@@ -132,61 +133,74 @@ withHandle config onSuccess = do
 -- handle (if available), use it, and if anything goes wrong, write to the error
 -- TMVar and retry when a new connection is established.
 --
--- Returns with the error that caused the manager thread to ultimately shut
--- down, per the reconnect settings.
+-- TODO notify waiting clients of the shutdown
 manager ::
      HandleConfig
-  -> TMVar (Handle.Handle, Natural)
-  -> TMVar ConnectionError
-  -> IO (Either ConnectError ConnectionError)
-manager
-     (HandleConfig innerConfig reconnectSettings onReconnectAttempt)
-     handleVar
-     errorVar =
-
-  loop 0
+  -> TMVar HandleStatus
+  -> TMVar Handle.HandleConnectionError
+  -> IO ()
+manager (HandleConfig innerConfig reconnectSettings) statusVar errorVar = do
+  err <- loop 0 Nothing
+  atomically (putTMVar statusVar (HandleDead err))
 
   where
-    loop :: Natural -> IO (Either ConnectError ConnectionError)
-    loop !generation = do
+    loop ::
+         Natural
+         -- ^ The handle generation. Every time we successfully reconnect, it's
+         -- incremented by 1.
+      -> Maybe (UTCTime, NominalDiffTime, Handle.HandleConnectError)
+         -- ^ The last time we tried to reconnect, how long we should sleep for
+         -- if we decide to try again, and the original cause.
+      -> IO Handle.HandleConnectError
+    loop !generation prev =
       Handle.withHandle innerConfig (runUntilError generation) >>= \case
         Left connectErr -> do
-          putStrLn ("Manager thread connect error: " ++ show connectErr)
+          putStrLn ("[debug] " ++ show connectErr)
 
-          case reconnectSettings (Left connectErr) of
-            Nothing -> do
-              putStrLn "Manager thread shutting down"
-              pure (Left connectErr)
+          case reconnectSettings connectErr of
+            Nothing ->
+              pure connectErr
 
-            Just (ReconnectSettings initialDelay retryFor) -> do
-              sleep 1
-              loop (generation+1)
+            Just (ReconnectSettings initialDelay retryFor) ->
+              case prev of
+                -- This is not the first failure, in fact, it is a repeat.
+                -- Consult the retry settings for whether we should try again
+                -- or give up.
+                Just (t0, sleepFor, prevErr) | connectErr == prevErr -> do
+                  t1 <- getCurrentTime
+                  if t1 `diffUTCTime` t0 <= retryFor
+                    then do
+                      sleep sleepFor
+                      loop generation (Just (t0, sleepFor * 1.5, prevErr))
+                    else
+                      pure connectErr
+
+                -- This is either the first failure, or a different failure than
+                -- last time. Sleep for the initial delay, then re-enter the
+                -- loop with an initial sleep time of 1 second.
+                _ -> do
+                  sleep initialDelay
+                  t0 <- getCurrentTime
+                  loop generation (Just (t0, initialDelay * 1.5, connectErr))
 
         Right connectionErr -> do
-          putStrLn ("Manager thread connection error: " ++ show connectionErr)
+          putStrLn ("[debug] " ++ show connectionErr)
+          sleep 1 -- Whoops, kind of want to exponentially back of here too
+          loop (generation+1) Nothing
 
-          case reconnectSettings (Right connectionErr) of
-            Nothing -> do
-              putStrLn "Manager thread shutting down"
-              pure (Right connectionErr)
-
-            Just (ReconnectSettings initialDelay retryFor) -> do
-              sleep 1
-              loop (generation+1)
-
-    runUntilError :: Natural -> Handle.Handle -> IO ConnectionError
+    runUntilError :: Natural -> Handle.Handle -> IO Handle.HandleConnectionError
     runUntilError generation handle = do
       -- Clear out any previous errors, and put the healthy handle for
       -- clients to use
       atomically $ do
         _ <- tryTakeTMVar errorVar
-        putTMVar handleVar (handle, generation)
+        putTMVar statusVar (HandleAlive handle generation)
 
       -- When a client records an error, remove the handle so no more
       -- clients use it (don't bother clearing out the error var yet)
       atomically $ do
         err <- readTMVar errorVar
-        _ <- takeTMVar handleVar
+        _ <- takeTMVar statusVar
         pure err
 
 
@@ -195,27 +209,29 @@ manager
 exchange ::
      Handle
   -> Request
-  -> IO (Either ConnectionError Response)
-exchange Handle { handleVar, errorVar } request =
+  -> IO (Either Handle.HandleConnectError Response)
+exchange Handle { statusVar, errorVar } request =
   loop 0
 
   where
-    loop :: Natural -> IO (Either ConnectionError Response)
-    loop !healthyGen = do
-      (handle, gen) <-
-        waitForGen healthyGen handleVar
+    loop :: Natural -> IO (Either Handle.HandleConnectError Response)
+    loop !healthyGen =
+      waitForGen healthyGen statusVar >>= \case
+        Left err ->
+          pure (Left err)
 
-      Handle.exchange handle request >>= \case
-        Left err -> do
-          -- Notify the manager thread of an error (try put, because it's ok
-          -- if we are not the first thread to do so)
-          _ <- atomically (tryPutTMVar errorVar err)
+        Right (handle, gen) ->
+          Handle.exchange handle request >>= \case
+            Left err -> do
+              -- Notify the manager thread of an error (try put, because it's ok
+              -- if we are not the first thread to do so)
+              _ <- atomically (tryPutTMVar errorVar err)
 
-          -- Try again once the connection is re-established.
-          loop (gen + 1)
+              -- Try again once the connection is re-established.
+              loop (gen + 1)
 
-        Right response ->
-          pure (Right response)
+            Right response ->
+              pure (Right response)
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
@@ -224,38 +240,44 @@ stream ::
   -> Request -- ^
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either ConnectionError r)
-stream Handle { handleVar, errorVar } request value step =
+  -> IO (Either Handle.HandleConnectError r)
+stream Handle { statusVar, errorVar } request value step =
   loop 0
 
   where
-    loop :: Natural -> IO (Either ConnectionError r)
-    loop !healthyGen = do
-      (handle, gen) <-
-        waitForGen healthyGen handleVar
+    loop :: Natural -> IO (Either Handle.HandleConnectError r)
+    loop !healthyGen =
+      waitForGen healthyGen statusVar >>= \case
+        Left err ->
+          pure (Left err)
 
-      Handle.stream handle request value step >>= \case
-        Left err -> do
-          -- Notify the manager thread of an error (try put, because it's ok
-          -- if we are not the first thread to do so)
-          _ <- atomically (tryPutTMVar errorVar err)
+        Right (handle, gen) ->
+          Handle.stream handle request value step >>= \case
+            Left err -> do
+              -- Notify the manager thread of an error (try put, because it's ok
+              -- if we are not the first thread to do so)
+              _ <- atomically (tryPutTMVar errorVar err)
 
-          -- Try again once the connection is re-established.
-          loop (gen + 1)
+              -- Try again once the connection is re-established.
+              loop (gen + 1)
 
-        Right response ->
-          pure (Right response)
+            Right response ->
+              pure (Right response)
 
 -- Wait for (at least) the given generation of handle.
 waitForGen ::
      Natural
-  -> TMVar (Handle.Handle, Natural)
-  -> IO (Handle.Handle, Natural)
-waitForGen healthyGen handleVar =
-  atomically $ do
-    (handle, gen) <- readTMVar handleVar
-    when (gen < healthyGen) retry
-    pure (handle, gen)
+  -> TMVar HandleStatus
+  -> IO (Either Handle.HandleConnectError (Handle.Handle, Natural))
+waitForGen healthyGen statusVar =
+  atomically $
+    readTMVar statusVar >>= \case
+      HandleDead err ->
+        pure (Left err)
+
+      HandleAlive handle gen -> do
+        when (gen < healthyGen) retry
+        pure (Right (handle, gen))
 
 sleep :: NominalDiffTime -> IO ()
 sleep seconds =

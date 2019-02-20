@@ -8,7 +8,7 @@ library
   build-depends:
     base,
     foldl,
-    libriak-internal
+    libriak-internal,
 
   default-extensions:
     DataKinds

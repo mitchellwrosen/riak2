@@ -14,7 +14,6 @@ module RiakBucket
   , streamKeys
   ) where
 
-import Libriak.Connection   (ConnectionError)
 import Libriak.Handle       (Handle)
 import RiakBucketInternal   (Bucket(..))
 import RiakBucketProperties (BucketProperties)
@@ -73,7 +72,7 @@ setBucketIndex ::
   => Handle -- ^
   -> Bucket -- ^
   -> IndexName -- ^ Index name
-  -> m (Either ConnectionError (Either ByteString ()))
+  -> m (Either Handle.HandleConnectionError (Either ByteString ()))
 setBucketIndex handle bucket (IndexName index) =
   liftIO (Handle.setBucket handle request)
 
@@ -91,7 +90,7 @@ unsetBucketIndex ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either ConnectionError (Either ByteString ()))
+  -> m (Either Handle.HandleConnectionError (Either ByteString ()))
 unsetBucketIndex handle bucket =
   setBucketIndex handle bucket (IndexName "_dont_index")
 
@@ -100,7 +99,7 @@ resetBucket ::
      MonadIO m
   => Handle
   -> Bucket
-  -> m (Either ConnectionError (Either ByteString ()))
+  -> m (Either Handle.HandleConnectionError (Either ByteString ()))
 resetBucket handle (Bucket bucketType bucket) = liftIO $
   Handle.resetBucket handle request
 
@@ -118,7 +117,7 @@ queryExact
   :: Handle -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
 queryExact handle query@(ExactQuery { value }) keyFold =
   doIndex
     handle
@@ -148,7 +147,7 @@ queryRange
      Handle -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
 queryRange handle query keyFold =
   doIndex
     handle
@@ -185,7 +184,7 @@ doIndex ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
 doIndex handle =
   loop
 
@@ -193,9 +192,9 @@ doIndex handle =
     loop ::
          Proto.RpbIndexReq
       -> FoldM IO Proto.RpbIndexResp r
-      -> IO (Either ConnectionError (Either ByteString r))
+      -> IO (Either Handle.HandleConnectionError (Either ByteString r))
     loop request responseFold = do
-      result :: Either ConnectionError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
+      result :: Either Handle.HandleConnectionError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
           handle
           request
@@ -222,7 +221,7 @@ doIndexPage ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either ConnectionError (Either ByteString (r, Maybe ByteString)))
+  -> IO (Either Handle.HandleConnectionError (Either ByteString (r, Maybe ByteString)))
 doIndexPage handle request fold =
   Handle.secondaryIndex
     handle

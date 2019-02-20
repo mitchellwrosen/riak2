@@ -113,7 +113,7 @@ putIndex_ handle index schema nodes timeout = do
     Left err ->
       case err of
         SearchNotEnabledError -> pure (Left SearchNotEnabledError)
-        ErrConnection err' -> pure (Left (ErrConnection err'))
+        HandleError err' -> pure (Left (HandleError err'))
         UnknownError err' -> pure (Left (UnknownError err'))
 
     Right Nothing ->
@@ -127,7 +127,7 @@ putIndex_ handle index schema nodes timeout = do
             Left err ->
               case err of
                 SearchNotEnabledError -> pure (Left SearchNotEnabledError)
-                ErrConnection err' -> pure (Left (ErrConnection err'))
+                HandleError err' -> pure (Left (HandleError err'))
                 UnknownError err' -> pure (Left (UnknownError err'))
 
             Right _success ->

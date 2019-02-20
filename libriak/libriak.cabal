@@ -12,7 +12,6 @@ library
     lens,
     libriak-internal,
     proto-lens ^>= 0.4.0,
-    -- sockets ^>= 0.1.1,
 
   default-extensions:
     DeriveAnyClass

@@ -1,7 +1,7 @@
 steps:
   - simple_align:
       cases: false
-      top_level_patterns: true
+      top_level_patterns: false
       records: false
   - imports:
       align: group
@@ -19,6 +19,7 @@ steps:
 columns: 80
 newline: native
 language_extensions:
+  - BangPatterns
   - ConstraintKinds
   - DataKinds
   - DefaultSignatures

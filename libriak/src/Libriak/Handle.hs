@@ -1,6 +1,8 @@
 module Libriak.Handle
   ( Handle
   , HandleConfig(..)
+  , HandleConnectError
+  , HandleConnectionError
   , withHandle
   , delete
   , deleteIndex
@@ -27,10 +29,10 @@ module Libriak.Handle
   , UnexpectedResponse(..)
   ) where
 
-import Libriak.Connection    (ConnectionError)
 import Libriak.Request       (Request(..))
 import Libriak.Response      (Response(..))
-import Riak.Handle.Signature (Handle, HandleConfig(..), withHandle)
+import Riak.Handle.Signature (Handle, HandleConfig(..), HandleConnectError,
+                              HandleConnectionError, withHandle)
 
 import qualified Libriak.Proto         as Proto
 import qualified Riak.Handle.Signature as Handle
@@ -54,7 +56,7 @@ data UnexpectedResponse
 delete ::
      Handle
   -> Proto.RpbDelReq
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 delete handle request =
   exchange
     handle
@@ -66,7 +68,7 @@ delete handle request =
 deleteIndex ::
      Handle
   -> ByteString
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 deleteIndex handle name =
   exchange
     handle
@@ -83,7 +85,7 @@ deleteIndex handle name =
 get ::
      Handle
   -> Proto.RpbGetReq
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbGetResp))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbGetResp))
 get handle request =
   exchange
     handle
@@ -95,7 +97,7 @@ get handle request =
 getBucket ::
      Handle -- ^
   -> Proto.RpbGetBucketReq -- ^
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbBucketProps))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbBucketProps))
 getBucket handle request =
   exchange
     handle
@@ -107,7 +109,7 @@ getBucket handle request =
 getBucketType ::
      Handle -- ^
   -> ByteString -- ^ Bucket type
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbBucketProps))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbBucketProps))
 getBucketType handle bucketType =
   exchange
     handle
@@ -125,7 +127,7 @@ getBucketType handle bucketType =
 getCrdt ::
      Handle
   -> Proto.DtFetchReq
-  -> IO (Either ConnectionError (Either ByteString Proto.DtFetchResp))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.DtFetchResp))
 getCrdt handle request =
   exchange
     handle
@@ -137,7 +139,7 @@ getCrdt handle request =
 getIndex ::
      Handle
   -> Maybe ByteString
-  -> IO (Either ConnectionError (Either ByteString [Proto.RpbYokozunaIndex]))
+  -> IO (Either HandleConnectionError (Either ByteString [Proto.RpbYokozunaIndex]))
 getIndex handle name =
   exchange
     handle
@@ -154,7 +156,7 @@ getIndex handle name =
 getSchema ::
      Handle
   -> ByteString
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbYokozunaSchema))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbYokozunaSchema))
 getSchema handle name =
   exchange
     handle
@@ -171,7 +173,7 @@ getSchema handle name =
 
 getServerInfo ::
      Handle
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbGetServerInfoResp))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbGetServerInfoResp))
 getServerInfo handle =
   exchange
     handle
@@ -184,7 +186,7 @@ listBuckets ::
      Handle
   -> Proto.RpbListBucketsReq
   -> FoldM IO Proto.RpbListBucketsResp r
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either HandleConnectionError (Either ByteString r))
 listBuckets handle request =
   stream
     handle
@@ -198,7 +200,7 @@ listKeys ::
      Handle
   -> Proto.RpbListKeysReq
   -> FoldM IO Proto.RpbListKeysResp r
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either HandleConnectionError (Either ByteString r))
 listKeys handle request =
   stream
     handle
@@ -212,7 +214,7 @@ mapReduce ::
      Handle
   -> Proto.RpbMapRedReq
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either HandleConnectionError (Either ByteString r))
 mapReduce handle request =
   stream
     handle
@@ -224,7 +226,7 @@ mapReduce handle request =
 
 ping ::
      Handle
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 ping handle =
   exchange
     handle
@@ -236,7 +238,7 @@ ping handle =
 put ::
      Handle
   -> Proto.RpbPutReq
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbPutResp))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbPutResp))
 put handle request =
   exchange
     handle
@@ -248,7 +250,7 @@ put handle request =
 putIndex ::
      Handle
   -> Proto.RpbYokozunaIndexPutReq
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 putIndex handle request =
   exchange
     handle
@@ -260,7 +262,7 @@ putIndex handle request =
 putSchema ::
      Handle
   -> Proto.RpbYokozunaSchema
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 putSchema handle schema =
   exchange
     handle
@@ -278,7 +280,7 @@ putSchema handle schema =
 resetBucket ::
      Handle
   -> Proto.RpbResetBucketReq
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 resetBucket handle request =
   exchange
     handle
@@ -290,7 +292,7 @@ resetBucket handle request =
 setBucket ::
      Handle
   -> Proto.RpbSetBucketReq
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 setBucket handle request =
   exchange
     handle
@@ -302,7 +304,7 @@ setBucket handle request =
 setBucketType ::
      Handle
   -> Proto.RpbSetBucketTypeReq
-  -> IO (Either ConnectionError (Either ByteString ()))
+  -> IO (Either HandleConnectionError (Either ByteString ()))
 setBucketType handle request =
   exchange
     handle
@@ -314,7 +316,7 @@ setBucketType handle request =
 search ::
      Handle
   -> Proto.RpbSearchQueryReq
-  -> IO (Either ConnectionError (Either ByteString Proto.RpbSearchQueryResp))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.RpbSearchQueryResp))
 search handle request =
   exchange
     handle
@@ -327,7 +329,7 @@ secondaryIndex ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either HandleConnectionError (Either ByteString r))
 secondaryIndex handle request =
   stream
     handle
@@ -340,7 +342,7 @@ secondaryIndex handle request =
 updateCrdt ::
      Handle -- ^
   -> Proto.DtUpdateReq -- ^
-  -> IO (Either ConnectionError (Either ByteString Proto.DtUpdateResp))
+  -> IO (Either HandleConnectionError (Either ByteString Proto.DtUpdateResp))
 updateCrdt handle request =
   exchange
     handle
@@ -353,7 +355,7 @@ exchange ::
      Handle
   -> Request
   -> (Response -> Maybe a)
-  -> IO (Either ConnectionError (Either ByteString a))
+  -> IO (Either HandleConnectionError (Either ByteString a))
 exchange handle request f =
   Handle.exchange handle request >>= \case
     Left err ->
@@ -377,7 +379,7 @@ stream ::
   -> (Response -> Maybe a) -- ^ Correct response?
   -> (a -> Bool) -- ^ Done?
   -> FoldM IO a r -- ^ Fold responses
-  -> IO (Either ConnectionError (Either ByteString r))
+  -> IO (Either HandleConnectionError (Either ByteString r))
 stream handle request f done (FoldM step (initial :: IO x) extract) = do
   initial' <- initial
 

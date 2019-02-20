@@ -1,7 +1,6 @@
 module RiakServerInfo where
 
 import Libriak.Handle (Handle)
-import Libriak.Connection (ConnectionError)
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto
@@ -20,7 +19,7 @@ data ServerInfo
 getServerInfo ::
      MonadIO m
   => Handle -- ^
-  -> m (Either ConnectionError (Either ByteString ServerInfo))
+  -> m (Either Handle.HandleConnectionError (Either ByteString ServerInfo))
 getServerInfo handle = liftIO $
   (fmap.fmap.fmap)
     fromResponse
