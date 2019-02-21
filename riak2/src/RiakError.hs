@@ -1,6 +1,7 @@
 module RiakError where
 
-import RiakIndexName (IndexName)
+import RiakBucketInternal (Bucket)
+import RiakIndexName      (IndexName)
 
 import qualified Riak.Handle.Signature as Handle
 
@@ -8,7 +9,7 @@ import qualified Data.ByteString as ByteString
 
 
 -- TODO "Key cannot be zero-length" when putting with empty key
--- TODO "{error,{indexes_not_supported,riak_kv_bitcask_backend}}"
+-- TODO "{error,insufficient_vnodes_available}"
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.
@@ -26,9 +27,14 @@ data Error :: Op -> Type where
     => !ByteString
     -> Error op
 
+  -- | Secondary indexes are not supported by this bucket's backend.
+  SecondaryIndexesNotSupportedError ::
+       !Bucket
+    -> Error 'SecondaryIndexQueryOp
+
   -- | The bucket type was "invalid" for some reason (operation-specific).
   InvalidBucketTypeError ::
-      !ByteString
+       !ByteString
     -> Error 'SetBucketTypeIndexOp
 
   -- | The search index does not exist.
@@ -95,6 +101,7 @@ data Op
   | PutIndexOp
   | PutSchemaOp
   | SearchOp
+  | SecondaryIndexQueryOp
   | SetBucketTypeIndexOp
   | UpdateCrdtOp
 
@@ -116,6 +123,8 @@ type PutConvergentSetError            = Error 'UpdateCrdtOp
 type PutError                         = Error 'PutOp
 type PutIndexError                    = Error 'PutIndexOp
 type PutSchemaError                   = Error 'PutSchemaOp
+type QueryExactError                  = Error 'SecondaryIndexQueryOp
+type QueryRangeError                  = Error 'SecondaryIndexQueryOp
 type SearchError                      = Error 'SearchOp
 type SetBucketTypeIndexError          = Error 'SetBucketTypeIndexOp
 type UpdateConvergentCounterError     = Error 'UpdateCrdtOp
@@ -229,6 +238,10 @@ isSchemaDoesNotExistError =
 isSearchFailedError :: ByteString -> Bool
 isSearchFailedError =
   (== "Query unsuccessful check the logs.")
+
+isSecondaryIndexesNotSupportedError :: ByteString -> Bool
+isSecondaryIndexesNotSupportedError =
+  ByteString.isPrefixOf "{error,{indexes_not_supported,"
 
 isUnknownMessageCode :: ByteString -> Bool
 isUnknownMessageCode =

@@ -117,7 +117,7 @@ queryExact
   :: Handle -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
+  -> IO (Either QueryExactError r)
 queryExact handle query@(ExactQuery { value }) keyFold =
   doIndex
     handle
@@ -147,7 +147,7 @@ queryRange
      Handle -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
+  -> IO (Either QueryRangeError r)
 queryRange handle query keyFold =
   doIndex
     handle
@@ -184,7 +184,7 @@ doIndex ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
+  -> IO (Either (Error 'SecondaryIndexQueryOp) r)
 doIndex handle =
   loop
 
@@ -192,7 +192,7 @@ doIndex handle =
     loop ::
          Proto.RpbIndexReq
       -> FoldM IO Proto.RpbIndexResp r
-      -> IO (Either Handle.HandleConnectionError (Either ByteString r))
+      -> IO (Either (Error 'SecondaryIndexQueryOp) r)
     loop request responseFold = do
       result :: Either Handle.HandleConnectionError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
@@ -202,20 +202,36 @@ doIndex handle =
 
       case result of
         Left err ->
-          pure (Left err)
+          pure (Left (HandleError err))
 
         Right (Left err) ->
-          pure (Right (Left err))
+          pure (Left (parseSecondaryIndexQueryError bucket err))
 
         Right (Right (nextResponseFold, continuation)) ->
           case continuation of
             Nothing ->
-              Right . Right <$> extractM nextResponseFold
+              Right <$> extractM nextResponseFold
 
             Just continuation -> do
               loop
                 (request & Proto.continuation .~ continuation)
                 nextResponseFold
+
+      where
+        bucket :: Bucket
+        bucket =
+          Bucket (request ^. Proto.type') (request ^. Proto.bucket)
+
+parseSecondaryIndexQueryError ::
+     Bucket
+  -> ByteString
+  -> Error 'SecondaryIndexQueryOp
+parseSecondaryIndexQueryError bucket err
+  | isSecondaryIndexesNotSupportedError err =
+      SecondaryIndexesNotSupportedError bucket
+  | otherwise =
+      UnknownError (decodeUtf8 err)
+
 
 doIndexPage ::
      Handle

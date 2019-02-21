@@ -21,6 +21,8 @@ module Riak.Error
   , PutError
   , PutIndexError
   , PutSchemaError
+  , QueryExactError
+  , QueryRangeError
   , SearchError
   , SetBucketTypeIndexError
   , UpdateConvergentCounterError
