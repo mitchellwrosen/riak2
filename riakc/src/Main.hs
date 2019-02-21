@@ -26,7 +26,7 @@ import Data.Text.Encoding    (decodeUtf8, decodeUtf8', encodeUtf8)
 import Data.Word
 import Net.IPv4              (IPv4, ipv4)
 import Numeric.Natural       (Natural)
-import Options.Applicative   hiding (infoParser)
+import Options.Applicative   hiding (UnknownError, infoParser)
 import System.Exit           (exitFailure)
 import Text.Printf           (printf)
 import Text.Read             (readMaybe)
@@ -975,6 +975,10 @@ queryParser =
       -> IO ()
     doQuery bucket index val1 handle =
       queryExact handle query (Foldl.mapM_ printKey) >>= \case
+        Left (UnknownError err) -> do
+          Text.putStrLn err
+          exitFailure
+
         Left err -> do
           print err
           exitFailure

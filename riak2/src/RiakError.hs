@@ -9,7 +9,6 @@ import qualified Data.ByteString as ByteString
 
 
 -- TODO "Key cannot be zero-length" when putting with empty key
--- TODO "{error,insufficient_vnodes_available}"
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.
@@ -32,16 +31,21 @@ data Error :: Op -> Type where
        !Bucket
     -> Error 'SecondaryIndexQueryOp
 
-  -- | The bucket type was "invalid" for some reason (operation-specific).
-  InvalidBucketTypeError ::
-       !ByteString
-    -> Error 'SetBucketTypeIndexOp
-
   -- | The search index does not exist.
   IndexDoesNotExistError ::
        MayReturnIndexDoesNotExist op ~ 'True
     => !IndexName
     -> Error op
+
+  -- | Insufficient nodes are available to service the request.
+  InsufficientNodesError ::
+       MayReturnInsufficientNodes op ~ 'True
+    => Error op
+
+  -- | The bucket type was "invalid" for some reason (operation-specific).
+  InvalidBucketTypeError ::
+       !ByteString
+    -> Error 'SetBucketTypeIndexOp
 
   InvalidNodesError ::
        MayReturnInvalidNodes op ~ 'True
@@ -57,16 +61,16 @@ data Error :: Op -> Type where
        MayReturnOverload op ~ 'True
     => Error op
 
+  -- | A search-related operation was attempted, but either search is disabled
+  -- in @riak.conf@, or the search service is not yet up.
+  SearchNotEnabledError ::
+       MayReturnSearchNotEnabled op ~ 'True
+    => Error op
+
   -- | The search failed. Typically, this means the query was malformed. Check
   -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
   SearchFailedError ::
        Error 'SearchOp
-
-  -- | A search was attempted, but either search is disabled in @riak.conf@, or
-  -- the yokozuna service is not yet up.
-  SearchNotEnabledError ::
-       MayReturnSearchNotEnabled op ~ 'True
-    => Error op
 
   SchemaDoesNotExistError ::
        Error 'PutIndexOp
@@ -97,6 +101,7 @@ data Op
   | GetCrdtOp
   | ListBucketsOp
   | ListKeysOp
+  | MapReduceBucketOp
   | PutOp
   | PutIndexOp
   | PutSchemaOp
@@ -118,6 +123,7 @@ type GetError                         = Error 'GetOp
 type GetSchemaError                   = Error 'GetSchemaOp
 type ListBucketsError                 = Error 'ListBucketsOp
 type ListKeysError                    = Error 'ListKeysOp
+type MapReduceBucketError             = Error 'MapReduceBucketOp
 type PutConvergentMapError            = Error 'UpdateCrdtOp
 type PutConvergentSetError            = Error 'UpdateCrdtOp
 type PutError                         = Error 'PutOp
@@ -144,6 +150,10 @@ type family MayReturnIndexDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'SearchOp = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
+
+type family MayReturnInsufficientNodes (op :: Op) :: Bool where
+  MayReturnInsufficientNodes 'SecondaryIndexQueryOp = 'True
+  MayReturnInsufficientNodes _ = 'False
 
 -- | @{n_val_violation,_}@
 type family MayReturnInvalidNodes (op :: Op) :: Bool where
@@ -205,6 +215,10 @@ isIndexDoesNotExistError1 msg =
   ByteString.isPrefixOf "No index <<\"" msg &&
     ByteString.isSuffixOf "\">> found." msg
 
+isInsufficientNodesError :: ByteString -> Bool
+isInsufficientNodesError =
+  (== "{error,insufficient_vnodes_available}")
+
 isInvalidNodesError0 :: ByteString -> Bool
 isInvalidNodesError0 =
   ByteString.isPrefixOf "{n_val_violation"
@@ -246,21 +260,3 @@ isSecondaryIndexesNotSupportedError =
 isUnknownMessageCode :: ByteString -> Bool
 isUnknownMessageCode =
   ByteString.isPrefixOf "Unknown message code:"
-
--- Parse a response from a handle operation, for the common case that Riak
--- errors map to errors, and Riak successes map to successes.
-fromHandleResult ::
-     (ByteString -> Either (Error op) resp')
-  -> (resp -> resp')
-  -> IO (Either Handle.HandleConnectionError (Either ByteString resp))
-  -> IO (Either (Error op) resp')
-fromHandleResult fromErr fromOk =
-  fmap $ \case
-    Left err ->
-      Left (HandleError err)
-
-    Right (Left err) ->
-      fromErr err
-
-    Right (Right response) ->
-      Right (fromOk response)

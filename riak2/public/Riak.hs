@@ -107,6 +107,7 @@ module Riak
   , generatedKey
   , ListBucketsError
   , ListKeysError
+  , MapReduceBucketError
   , MapReduceFunction(..)
   , MapReducePhase(..)
   , MayReturnBucketTypeDoesNotExist
@@ -125,6 +126,8 @@ module Riak
   , PutSchemaError
   , PutIndexOpts(..)
   , PutOpts(..)
+  , QueryExactError
+  , QueryRangeError
   , Quorum(..)
   , RangeQuery(..)
   , Schema(..)

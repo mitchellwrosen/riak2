@@ -9,9 +9,11 @@ import Libriak.Handle (Handle)
 import RiakBucket     (Bucket)
 
 import RiakErlangTerm     (ErlangTerm(..))
+import RiakError
 import RiakKey            (Key)
 import RiakMapReduceInput (MapReduceInput(..))
 import RiakMapReducePhase (MapReducePhase(..))
+import RiakUtils          (retrying)
 
 import qualified Libriak.Handle     as Handle
 import qualified Libriak.Proto      as Proto
@@ -19,8 +21,9 @@ import qualified RiakErlangTerm     as ErlangTerm
 import qualified RiakMapReduceInput as MapReduceInput
 import qualified RiakMapReducePhase as MapReducePhase
 
-import Control.Foldl (FoldM)
-import Control.Lens  ((.~))
+import Control.Foldl      (FoldM)
+import Control.Lens       ((.~))
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Vector as Vector
 
@@ -38,9 +41,21 @@ mapReduceBucket ::
   -> Bucket -- ^
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either Handle.HandleConnectionError (Either ByteString r))
-mapReduceBucket handle bucket phases responseFold =
-  liftIO (mapReduce_ handle (MapReduceInputBucket bucket) phases responseFold)
+  -> m (Either MapReduceBucketError r)
+mapReduceBucket handle bucket phases responseFold = liftIO $
+  doMapReduce handle (MapReduceInputBucket bucket) phases responseFold >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (Left (parseMapReduceBucketError err))
+
+    Right (Right result) ->
+      pure (Right result)
+
+parseMapReduceBucketError :: ByteString -> MapReduceBucketError
+parseMapReduceBucketError err =
+  UnknownError (decodeUtf8 err)
 
 -- | Perform a MapReduce job over a list of keys.
 mapReduceKeys ::
@@ -51,16 +66,36 @@ mapReduceKeys ::
   -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either Handle.HandleConnectionError (Either ByteString r))
 mapReduceKeys handle keys phases responseFold =
-  liftIO (mapReduce_ handle (MapReduceInputKeys keys) phases responseFold)
+  liftIO (doMapReduce handle (MapReduceInputKeys keys) phases responseFold)
 
-mapReduce_ ::
+doMapReduce ::
      Handle
   -> MapReduceInput
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either Handle.HandleConnectionError (Either ByteString r))
-mapReduce_ handle input phases responseFold =
-  Handle.mapReduce handle request responseFold
+doMapReduce handle input phases responseFold =
+  retrying 1000000 (doMapReduce_ handle input phases responseFold)
+
+doMapReduce_ ::
+     Handle
+  -> MapReduceInput
+  -> [MapReducePhase]
+  -> FoldM IO Proto.RpbMapRedResp r
+  -> IO (Maybe (Either Handle.HandleConnectionError (Either ByteString r)))
+doMapReduce_ handle input phases responseFold =
+  Handle.mapReduce handle request responseFold >>= \case
+    Left err ->
+      pure (Just (Left err))
+
+    Right (Left err)
+      | isUnknownMessageCode err ->
+          pure Nothing
+      | otherwise ->
+          pure (Just (Right (Left err)))
+
+    Right (Right result) ->
+      pure (Just (Right (Right result)))
 
   where
     request :: Proto.RpbMapRedReq

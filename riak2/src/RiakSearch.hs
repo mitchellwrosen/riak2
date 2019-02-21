@@ -59,10 +59,15 @@ search
     query
     SearchOpts { fieldList, filter, presort, rows, sort, start } = liftIO $
 
-  fromHandleResult
-    (Left . parseSearchError index)
-    fromResponse
-    (Handle.search handle request)
+  Handle.search handle request >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (Left (parseSearchError index err))
+
+    Right (Right response) ->
+      pure (Right (fromResponse response))
 
   where
     request :: Proto.RpbSearchQueryReq

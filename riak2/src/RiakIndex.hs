@@ -50,10 +50,15 @@ getIndex ::
   -> IndexName -- ^
   -> m (Either GetIndexError (Maybe Index))
 getIndex handle (IndexName name) = liftIO $
-  fromHandleResult
-    parseGetIndexError
-    (Just . fromProto . head)
-    (Handle.getIndex handle (Just (encodeUtf8 name)))
+  Handle.getIndex handle (Just (encodeUtf8 name)) >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (parseGetIndexError err)
+
+    Right (Right response) ->
+      pure (Right (Just (fromProto (head response))))
 
 parseGetIndexError ::
      ByteString
@@ -72,10 +77,15 @@ getIndexes ::
   => Handle -- ^
   -> m (Either GetIndexError [Index])
 getIndexes handle = liftIO $
-  fromHandleResult
-    (Left . parseGetIndexesError)
-    (map fromProto)
-    (Handle.getIndex handle Nothing)
+  Handle.getIndex handle Nothing >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (Left (parseGetIndexesError err))
+
+    Right (Right response) ->
+      pure (Right (map fromProto response))
 
 parseGetIndexesError :: ByteString -> GetIndexError
 parseGetIndexesError err
@@ -152,10 +162,15 @@ putIndex_ handle index schema nodes timeout = do
         & Proto.maybe'timeout .~ timeout
 
     doPutIndex =
-      fromHandleResult
-        (Left . parsePutIndexError)
-        id
-        (Handle.putIndex handle request)
+      Handle.putIndex handle request >>= \case
+        Left err ->
+          pure (Left (HandleError err))
+
+        Right (Left err) ->
+          pure (Left (parsePutIndexError err))
+
+        Right (Right response) ->
+          pure (Right response)
 
 parsePutIndexError :: ByteString -> PutIndexError
 parsePutIndexError err
@@ -176,10 +191,15 @@ deleteIndex ::
   -> IndexName -- ^
   -> m (Either DeleteIndexError Bool)
 deleteIndex handle name = liftIO $
-  fromHandleResult
-    parseDeleteIndexError
-    (\() -> True)
-    (Handle.deleteIndex handle (encodeUtf8 (unIndexName name)))
+  Handle.deleteIndex handle (encodeUtf8 (unIndexName name)) >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (parseDeleteIndexError err)
+
+    Right (Right ()) ->
+      pure (Right True)
 
 parseDeleteIndexError ::
      ByteString

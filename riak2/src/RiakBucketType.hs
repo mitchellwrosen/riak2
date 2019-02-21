@@ -5,6 +5,7 @@ import RiakBucket           (Bucket(..))
 import RiakBucketProperties (BucketProperties)
 import RiakError
 import RiakIndexName        (IndexName(..))
+import RiakUtils            (retrying)
 
 import qualified Libriak.Handle       as Handle
 import qualified Libriak.Proto        as Proto
@@ -35,10 +36,15 @@ getBucketType ::
   -> BucketType -- ^
   -> m (Either GetBucketTypeError (Maybe BucketProperties))
 getBucketType handle bucketType = liftIO $
-  fromHandleResult
-    parseGetBucketTypeError
-    (Just . BucketProperties.fromProto)
-    (Handle.getBucketType handle bucketType)
+  Handle.getBucketType handle bucketType >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (parseGetBucketTypeError err)
+
+    Right (Right response) ->
+      pure (Right (Just (BucketProperties.fromProto response)))
 
 parseGetBucketTypeError ::
      ByteString
@@ -83,10 +89,15 @@ setBucketTypeIndex_ ::
   -> IndexName
   -> m (Either SetBucketTypeIndexError ())
 setBucketTypeIndex_ handle bucketType index = liftIO $
-  fromHandleResult
-    (Left . parseSetBucketTypeIndexError bucketType index)
-    id
-    (Handle.setBucketType handle request)
+  Handle.setBucketType handle request >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (Left (parseSetBucketTypeIndexError bucketType index err))
+
+    Right (Right response) ->
+      pure (Right (id response))
 
   where
     request :: Proto.RpbSetBucketTypeReq
@@ -146,18 +157,28 @@ listBuckets handle bucketType =
 -- /See also/: 'listBuckets'
 streamBuckets ::
      MonadIO m
-     => Handle -- ^
+  => Handle -- ^
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> m (Either ListBucketsError r)
-streamBuckets handle bucketType bucketFold = liftIO $
-  fromHandleResult
-    (Left . parseListBucketsError bucketType)
-    id
-    (Handle.listBuckets
-      handle
-      request
-      (makeResponseFold bucketType bucketFold))
+streamBuckets handle bucketType bucketFold =
+  liftIO (retrying 1000000 (streamBuckets_ handle bucketType bucketFold))
+
+streamBuckets_ ::
+     Handle
+  -> BucketType
+  -> FoldM IO Bucket r
+  -> IO (Maybe (Either ListBucketsError r))
+streamBuckets_ handle bucketType bucketFold =
+  Handle.listBuckets handle request (makeResponseFold bucketType bucketFold) >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseListBucketsError bucketType err)
+
+    Right (Right response) ->
+      pure (Just (Right response))
 
   where
     request :: Proto.RpbListBucketsReq
@@ -167,12 +188,14 @@ streamBuckets handle bucketType bucketFold = liftIO $
         & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
 
-parseListBucketsError :: ByteString -> ByteString -> ListBucketsError
+parseListBucketsError :: ByteString -> ByteString -> Maybe ListBucketsError
 parseListBucketsError bucketType err
   | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
+      Just (BucketTypeDoesNotExistError bucketType)
+  | isUnknownMessageCode err =
+      Nothing
   | otherwise =
-      UnknownError (decodeUtf8 err)
+      Just (UnknownError (decodeUtf8 err))
 
 makeResponseFold ::
      Monad m

@@ -34,10 +34,15 @@ getSchema ::
   -> Text -- ^
   -> m (Either GetSchemaError (Maybe Schema))
 getSchema handle name = liftIO $
-  fromHandleResult
-    parseGetSchemaError
-    (Just . fromProto)
-    (Handle.getSchema handle (encodeUtf8 name))
+  Handle.getSchema handle (encodeUtf8 name) >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (parseGetSchemaError err)
+
+    Right (Right response) ->
+      pure (Right (Just (fromProto response)))
 
 parseGetSchemaError ::
      ByteString
@@ -57,10 +62,15 @@ putSchema ::
   -> Schema -- ^
   -> m (Either PutSchemaError ())
 putSchema handle schema = liftIO $
-  fromHandleResult
-    (Left . parsePutSchemaError)
-    id
-    (Handle.putSchema handle (toProto schema))
+  Handle.putSchema handle (toProto schema) >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (Left (parsePutSchemaError err))
+
+    Right (Right ()) ->
+      pure (Right ())
 
 parsePutSchemaError ::
      ByteString

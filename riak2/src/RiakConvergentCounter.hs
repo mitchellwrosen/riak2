@@ -9,6 +9,7 @@ import RiakCrdt
 import RiakError
 import RiakKey        (Key(..))
 import RiakObject     (GetOpts(..), PutOpts(..))
+import RiakUtils      (retrying)
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto
@@ -38,15 +39,28 @@ getConvergentCounter ::
   -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetConvergentCounterError (Maybe ConvergentCounter))
-getConvergentCounter
+getConvergentCounter handle key opts =
+  liftIO (retrying 1000000 (getConvergentCounter_ handle key opts))
+
+getConvergentCounter_ ::
+     Handle
+  -> Key
+  -> GetOpts
+  -> IO (Maybe (Either GetConvergentCounterError (Maybe ConvergentCounter)))
+getConvergentCounter_
     handle
     key@(Key bucketType _ _)
-    (GetOpts basicQuorum nodes notfoundOk pr r timeout) = liftIO $
+    (GetOpts basicQuorum nodes notfoundOk pr r timeout) =
 
-  fromHandleResult
-    (parseGetCrdtError bucketType)
-    fromResponse
-    (Handle.getCrdt handle request)
+  Handle.getCrdt handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseGetCrdtError bucketType err)
+
+    Right (Right response) ->
+      pure (Just (Right (fromResponse response)))
 
   where
     request :: Proto.DtFetchReq
@@ -81,15 +95,28 @@ updateConvergentCounter ::
   -> ConvergentCounter -- ^
   -> PutOpts -- ^
   -> m (Either UpdateConvergentCounterError ConvergentCounter)
-updateConvergentCounter
+updateConvergentCounter handle counter opts =
+  liftIO (retrying 1000000 (updateConvergentCounter_ handle counter opts))
+
+updateConvergentCounter_ ::
+     Handle
+  -> ConvergentCounter
+  -> PutOpts
+  -> IO (Maybe (Either UpdateConvergentCounterError ConvergentCounter))
+updateConvergentCounter_
     handle
     (ConvergentCounter key@(Key bucketType _ _) value)
-    (PutOpts dw nodes pw timeout w) = liftIO $
+    (PutOpts dw nodes pw timeout w) =
 
-  fromHandleResult
-    (parseUpdateCrdtError bucketType)
-    fromResponse
-    (Handle.updateCrdt handle request)
+  Handle.updateCrdt handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseUpdateCrdtError bucketType err)
+
+    Right (Right response) ->
+      pure (Just (Right (fromResponse response)))
 
   where
     request :: Proto.DtUpdateReq

@@ -15,6 +15,7 @@ import GHC.ForeignPtr           (ForeignPtr(..))
 import qualified Data.ProtoLens as Proto
 
 
+-- TODO request 33 is of riak_kv so handle unknown message code by retrying
 data Request
   = ReqDtFetch DtFetchReq
   | ReqDtUpdate DtUpdateReq

@@ -10,6 +10,7 @@ import RiakError
 import RiakKey        (Key(..))
 import RiakQuorum     (Quorum)
 import RiakSibling    (Sibling(..))
+import RiakUtils      (retrying)
 
 import qualified Libriak.Handle     as Handle
 import qualified Libriak.Proto      as Proto
@@ -248,21 +249,35 @@ doGet ::
   -> Proto.RpbGetReq
   -> IO (Either GetError Proto.RpbGetResp)
 doGet handle request =
-  fromHandleResult
-    (Left . parseGetError request)
-    id
-    (Handle.get handle request)
+  retrying 1000000 (doGet_ handle request)
 
-parseGetError :: Proto.RpbGetReq -> ByteString -> GetError
+doGet_ ::
+     Handle
+  -> Proto.RpbGetReq
+  -> IO (Maybe (Either GetError Proto.RpbGetResp))
+doGet_ handle request =
+  Handle.get handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseGetError request err)
+
+    Right (Right response) ->
+      pure (Just (Right response))
+
+parseGetError :: Proto.RpbGetReq -> ByteString -> Maybe GetError
 parseGetError request err
   | isBucketTypeDoesNotExistError0 err =
-      BucketTypeDoesNotExistError (request ^. Proto.type')
+      Just (BucketTypeDoesNotExistError (request ^. Proto.type'))
   | isInvalidNodesError0 err =
-      InvalidNodesError
+      Just InvalidNodesError
   | isOverloadError err =
-      OverloadError
+      Just OverloadError
+  | isUnknownMessageCode err =
+      Nothing
   | otherwise =
-      UnknownError (decodeUtf8 err)
+      Just (UnknownError (decodeUtf8 err))
 
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest
@@ -360,21 +375,35 @@ doPut ::
   -> Proto.RpbPutReq
   -> IO (Either PutError Proto.RpbPutResp)
 doPut handle request =
-  fromHandleResult
-    (Left . parsePutError request)
-    id
-    (Handle.put handle request)
+  retrying 1000000 (doPut_ handle request)
 
-parsePutError :: Proto.RpbPutReq -> ByteString -> PutError
+doPut_ ::
+     Handle
+  -> Proto.RpbPutReq
+  -> IO (Maybe (Either PutError Proto.RpbPutResp))
+doPut_ handle request =
+  Handle.put handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parsePutError request err)
+
+    Right (Right response) ->
+      pure (Just (Right response))
+
+parsePutError :: Proto.RpbPutReq -> ByteString -> Maybe PutError
 parsePutError request err
   | isBucketTypeDoesNotExistError0 err =
-      BucketTypeDoesNotExistError (request ^. Proto.type')
+      Just (BucketTypeDoesNotExistError (request ^. Proto.type'))
   | isInvalidNodesError0 err =
-      InvalidNodesError
+      Just InvalidNodesError
   | isOverloadError err =
-      OverloadError
+      Just OverloadError
+  | isUnknownMessageCode err =
+      Nothing
   | otherwise =
-      UnknownError (decodeUtf8 err)
+      Just (UnknownError (decodeUtf8 err))
 
 makePutRequest ::
      Object (Content ByteString)
@@ -411,15 +440,28 @@ delete ::
   -> Object a -- ^
   -> DeleteOpts -- ^
   -> m (Either DeleteError ())
-delete
+delete handle object opts =
+  liftIO (retrying 1000000 (delete_ handle object opts))
+
+delete_ ::
+     Handle
+  -> Object a
+  -> DeleteOpts
+  -> IO (Maybe (Either DeleteError ()))
+delete_
     handle
     Object { context, key }
-    DeleteOpts { dw, nodes, pr, pw, r, timeout, w } = liftIO $
+    DeleteOpts { dw, nodes, pr, pw, r, timeout, w } =
 
-  fromHandleResult
-    (Left . parseDeleteError)
-    id
-    (Handle.delete handle request)
+  Handle.delete handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseDeleteError err)
+
+    Right (Right response) ->
+      pure (Just (Right response))
 
   where
     request :: Proto.RpbDelReq
@@ -435,9 +477,11 @@ delete
         & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
         & Proto.vclock .~ unContext context
 
-parseDeleteError :: ByteString -> DeleteError
+parseDeleteError :: ByteString -> Maybe DeleteError
 parseDeleteError err
   | isOverloadError err =
-      OverloadError
+      Just OverloadError
+  | isUnknownMessageCode err =
+      Nothing
   | otherwise =
-      UnknownError (decodeUtf8 err)
+      Just (UnknownError (decodeUtf8 err))

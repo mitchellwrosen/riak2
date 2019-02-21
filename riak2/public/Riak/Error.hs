@@ -16,6 +16,7 @@ module Riak.Error
   , GetSchemaError
   , ListBucketsError
   , ListKeysError
+  , MapReduceBucketError
   , PutConvergentMapError
   , PutConvergentSetError
   , PutError

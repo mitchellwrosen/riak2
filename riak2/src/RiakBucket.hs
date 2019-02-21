@@ -22,7 +22,7 @@ import RiakExactQuery       (ExactQuery(..))
 import RiakIndexName        (IndexName(..))
 import RiakKey              (Key(..))
 import RiakRangeQuery       (RangeQuery)
-import RiakUtils            (bs2int)
+import RiakUtils            (bs2int, retrying)
 
 import qualified Libriak.Handle          as Handle
 import qualified Libriak.Proto           as Proto
@@ -46,10 +46,15 @@ getBucket ::
   -> Bucket -- ^
   -> m (Either GetBucketError (Maybe BucketProperties))
 getBucket handle bucket = liftIO $
-  fromHandleResult
-    parseGetBucketError
-    (Just . BucketProperties.fromProto)
-    (Handle.getBucket handle request)
+  Handle.getBucket handle request >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (parseGetBucketError err)
+
+    Right (Right response) ->
+      pure (Right (Just (BucketProperties.fromProto response)))
 
   where
     request :: Proto.RpbGetBucketReq
@@ -113,12 +118,13 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
 -- | Perform an exact query on a secondary index.
 --
 -- Fetches results in batches of 50.
-queryExact
-  :: Handle -- ^
+queryExact ::
+     MonadIO m
+  => Handle -- ^
   -> ExactQuery -- ^
   -> FoldM IO Key r -- ^
-  -> IO (Either QueryExactError r)
-queryExact handle query@(ExactQuery { value }) keyFold =
+  -> m (Either QueryExactError r)
+queryExact handle query@(ExactQuery { value }) keyFold = liftIO $
   doIndex
     handle
     request
@@ -142,13 +148,14 @@ queryExact handle query@(ExactQuery { value }) keyFold =
 -- | Perform a range query on a secondary index.
 --
 -- Fetches results in batches of 50.
-queryRange
-  :: forall a r.
-     Handle -- ^
+queryRange ::
+     forall a m r.
+     MonadIO m
+  => Handle -- ^
   -> RangeQuery a -- ^
   -> FoldM IO (a, Key) r -- ^
-  -> IO (Either QueryRangeError r)
-queryRange handle query keyFold =
+  -> m (Either QueryRangeError r)
+queryRange handle query keyFold = liftIO $
   doIndex
     handle
     request
@@ -185,14 +192,23 @@ doIndex ::
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either (Error 'SecondaryIndexQueryOp) r)
-doIndex handle =
+doIndex handle request responseFold =
+  retrying 1000000 (doIndex_ handle request responseFold)
+
+doIndex_ ::
+     forall r.
+     Handle
+  -> Proto.RpbIndexReq
+  -> FoldM IO Proto.RpbIndexResp r
+  -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
+doIndex_ handle =
   loop
 
   where
     loop ::
          Proto.RpbIndexReq
       -> FoldM IO Proto.RpbIndexResp r
-      -> IO (Either (Error 'SecondaryIndexQueryOp) r)
+      -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
     loop request responseFold = do
       result :: Either Handle.HandleConnectionError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
@@ -202,15 +218,15 @@ doIndex handle =
 
       case result of
         Left err ->
-          pure (Left (HandleError err))
+          pure (Just (Left (HandleError err)))
 
         Right (Left err) ->
-          pure (Left (parseSecondaryIndexQueryError bucket err))
+          pure (Left <$> parseSecondaryIndexQueryError bucket err)
 
         Right (Right (nextResponseFold, continuation)) ->
           case continuation of
             Nothing ->
-              Right <$> extractM nextResponseFold
+              Just . Right <$> extractM nextResponseFold
 
             Just continuation -> do
               loop
@@ -225,12 +241,16 @@ doIndex handle =
 parseSecondaryIndexQueryError ::
      Bucket
   -> ByteString
-  -> Error 'SecondaryIndexQueryOp
+  -> Maybe (Error 'SecondaryIndexQueryOp)
 parseSecondaryIndexQueryError bucket err
+  | isInsufficientNodesError err =
+      Just InsufficientNodesError
   | isSecondaryIndexesNotSupportedError err =
-      SecondaryIndexesNotSupportedError bucket
+      Just (SecondaryIndexesNotSupportedError bucket)
+  | isUnknownMessageCode err =
+      Nothing
   | otherwise =
-      UnknownError (decodeUtf8 err)
+      Just (UnknownError (decodeUtf8 err))
 
 
 doIndexPage ::
@@ -289,11 +309,24 @@ streamKeys ::
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> m (Either ListKeysError r)
-streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
-  fromHandleResult
-    (Left . parseListKeysError bucketType)
-    id
-    doRequest
+streamKeys handle bucket keyFold =
+  liftIO (retrying 1000000 (streamKeys_ handle bucket keyFold))
+
+streamKeys_ ::
+     Handle
+  -> Bucket
+  -> FoldM IO Key r
+  -> IO (Maybe (Either ListKeysError r))
+streamKeys_ handle b@(Bucket bucketType bucket) keyFold =
+  doRequest >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseListKeysError bucketType err)
+
+    Right (Right response) ->
+      pure (Just (Right response))
 
   where
     doRequest =
@@ -310,12 +343,14 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
         & setProto b
         -- TODO stream keys timeout
 
-parseListKeysError :: ByteString -> ByteString -> ListKeysError
+parseListKeysError :: ByteString -> ByteString -> Maybe ListKeysError
 parseListKeysError bucketType err
   | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
+      Just (BucketTypeDoesNotExistError bucketType)
+  | isUnknownMessageCode err =
+      Nothing
   | otherwise =
-      UnknownError (decodeUtf8 err)
+      Just (UnknownError (decodeUtf8 err))
 
 setProto ::
      ( Proto.HasLens' a "bucket" ByteString

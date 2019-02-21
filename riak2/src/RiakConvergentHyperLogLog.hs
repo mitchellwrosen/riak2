@@ -1,6 +1,6 @@
 -- |
--- * <http://docs.basho.com/riak/kv/2.2.3/developing/data-types/hyperloglogs/>
--- * <http://basho.com/posts/technical/what-in-the-hell-is-hyperloglog/>
+-- * <https://docs.basho.com/riak/kv/2.2.3/developing/data-types/hyperloglogs/>
+-- * <https://basho.com/posts/technical/what-in-the-hell-is-hyperloglog/>
 -- * <https://github.com/basho/riak_kv/blob/develop/docs/hll/hll.pdf>
 
 module RiakConvergentHyperLogLog
@@ -13,6 +13,7 @@ import Libriak.Handle (Handle)
 import RiakCrdt
 import RiakError
 import RiakKey        (Key(..), isGeneratedKey)
+import RiakUtils      (retrying)
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto
@@ -45,11 +46,23 @@ getConvergentHyperLogLog ::
   => Handle -- ^
   -> Key -- ^
   -> m (Either GetConvergentHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
-getConvergentHyperLogLog handle key@(Key bucketType _ _) = liftIO $
-  fromHandleResult
-    (parseGetCrdtError bucketType)
-    fromResponse
-    (Handle.getCrdt handle request)
+getConvergentHyperLogLog handle key =
+  liftIO (retrying 1000000 (getConvergentHyperLogLog_ handle key))
+
+getConvergentHyperLogLog_ ::
+     Handle -- ^
+  -> Key -- ^
+  -> IO (Maybe (Either GetConvergentHyperLogLogError (Maybe (ConvergentHyperLogLog Word64))))
+getConvergentHyperLogLog_ handle key@(Key bucketType _ _) =
+  Handle.getCrdt handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseGetCrdtError bucketType err)
+
+    Right (Right response) ->
+      pure (Just (Right (fromResponse response)))
 
   where
     request :: Proto.DtFetchReq
@@ -86,14 +99,26 @@ updateConvergentHyperLogLog ::
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
   -> m (Either UpdateConvergentHyperLogLogError (ConvergentHyperLogLog Word64))
-updateConvergentHyperLogLog
-    handle
-    (ConvergentHyperLogLog key@(Key bucketType _ _) value) = liftIO $
+updateConvergentHyperLogLog handle hll =
+  liftIO (retrying 1000000 (updateConvergentHyperLogLog_ handle hll))
 
-  fromHandleResult
-    (parseUpdateCrdtError bucketType)
-    fromResponse
-    (Handle.updateCrdt handle request)
+updateConvergentHyperLogLog_ ::
+     Handle
+  -> ConvergentHyperLogLog [ByteString]
+  -> IO (Maybe (Either UpdateConvergentHyperLogLogError (ConvergentHyperLogLog Word64)))
+updateConvergentHyperLogLog_
+    handle
+    (ConvergentHyperLogLog key@(Key bucketType _ _) value) =
+
+  Handle.updateCrdt handle request >>= \case
+    Left err ->
+      pure (Just (Left (HandleError err)))
+
+    Right (Left err) ->
+      pure (Left <$> parseUpdateCrdtError bucketType err)
+
+    Right (Right response) ->
+      pure (Just (Right (fromResponse response)))
 
   where
     request :: Proto.DtUpdateReq
