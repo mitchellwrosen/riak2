@@ -44,7 +44,7 @@ data Object a
 data GetOpts
   = GetOpts
   { basicQuorum :: !(Maybe Bool)
-  , nodes :: !(Maybe Quorum)
+  , nodes :: !(Maybe Natural)
   , notfoundOk :: !(Maybe Bool)
   , pr :: !(Maybe Quorum)
   , r :: !(Maybe Quorum)
@@ -66,7 +66,7 @@ instance Default GetOpts where
 data PutOpts
   = PutOpts
   { dw :: !(Maybe Quorum)
-  , nodes :: !(Maybe Quorum)
+  , nodes :: !(Maybe Natural)
   , pw :: !(Maybe Quorum)
   , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
   , w :: !(Maybe Quorum)
@@ -289,7 +289,7 @@ makeGetRequest
     & Proto.deletedvclock .~ True
     & Proto.maybe'basicQuorum .~ basicQuorum
     & Proto.maybe'notfoundOk .~ notfoundOk
-    & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+    & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
     & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
     & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
     & Proto.maybe'timeout .~ timeout
@@ -424,7 +424,7 @@ makePutRequest
           & Proto.value .~ value
         )
     & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
-    & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+    & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
     & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
     & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
     & Proto.maybe'timeout .~ timeout

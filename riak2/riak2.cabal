@@ -236,11 +236,13 @@ library riak2-internal
 test-suite tests
   build-depends:
     base,
+    bytestring,
+    data-default-class,
     generic-lens,
     ip,
     lens,
     random-bytestring,
-    riak2,
+    riak2-internal,
     riak2-handle-impl-exclusive,
     tasty,
     tasty-hunit
@@ -268,7 +270,7 @@ test-suite tests
     Main.hs
 
   mixins:
-    riak2 requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)
+    riak2-internal requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)
 
   type:
     exitcode-stdio-1.0

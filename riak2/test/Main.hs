@@ -2,12 +2,23 @@
 
 module Main where
 
-import Riak
 import Riak.Handle.Impl.Exclusive (ConnectError(..), Endpoint(..),
                                    EventHandlers(..), Handle, HandleConfig(..),
                                    withHandle)
+import RiakBucket                 (Bucket(..))
+import RiakContent                (Content, newContent)
+import RiakContext                (newContext)
+import RiakKey                    (Key(..), generatedKey)
+import RiakObject                 (Object(..), delete, get, getHead,
+                                   getIfModified, newObject, put, putGet,
+                                   putGetHead)
+import RiakPing                   (ping)
+import RiakServerInfo             (ServerInfo(..), getServerInfo)
+import RiakSibling                (Sibling(..))
 
 import Control.Lens
+import Data.ByteString       (ByteString)
+import Data.Default.Class    (def)
 import Data.Either           (isRight)
 import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
@@ -17,7 +28,6 @@ import Test.Tasty
 import Test.Tasty.HUnit
 
 import qualified Data.ByteString.Random as ByteString
-
 
 main :: IO ()
 main = do
@@ -55,139 +65,122 @@ main = do
 
 integrationTests :: Handle -> [TestTree]
 integrationTests handle =
-  [ testGroup "Riak"
-    [ testCase "ping" $ do
-        ping handle `shouldReturn` Right (Right ())
+  [ testGroup "RiakObject" (riakObjectTests handle)
+  , testGroup "RiakPing" (riakPingTests handle)
+  , testGroup "RiakServerInfo" (riakServerInfoTests handle)
+  ]
+
+riakObjectTests :: Handle -> [TestTree]
+riakObjectTests handle =
+  [ testGroup "get"
+    [ testCase "404" $ do
+        key <- randomKey
+        get handle key def >>= \case
+          Right Object { content = [] } -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "success" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        get handle (object ^. field @"key") def >>= \case
+          Right Object { content = [Sibling content] } ->
+            (content ^. field @"value") `shouldBe`
+              (object ^. field @"content" . field @"value")
+          result -> assertFailure (show result)
+
+    , testCase "head 404" $ do
+        key <- randomKey
+        getHead handle key def >>= \case
+          Right Object { content = [] } -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "head success" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        getHead handle (object ^. field @"key") def `shouldReturnSatisfy` isRight
+
+    , testCase "if modified (not modified)" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        get handle (object ^. field @"key") def >>= \case
+          Right object -> do
+            getIfModified handle object def `shouldReturnSatisfy` isRightNothing
+          result -> assertFailure (show result)
+
+    , testCase "if modified (modified)" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        get handle (object ^. field @"key") def >>= \case
+          Right object@(Object { content = [Sibling content] }) -> do
+            let object' = object & field @"content" .~ content
+            _ <- put handle object' def
+            getIfModified handle object' def `shouldReturnSatisfy` isRightJust
+          result -> assertFailure (show result)
     ]
 
-  , testGroup "Riak.Object"
-    [ testGroup "get"
-      [ testCase "404" $ do
-          key <- randomKey
-          get handle key def >>= \case
-            Right Object { content = [] } -> pure ()
-            result -> assertFailure (show result)
+  , testGroup "put"
+    [ testCase "random key" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
 
-      , testCase "success" $ do
-          bucket <- ByteString.random 32
-          value <- ByteString.random 6
-          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
-          Right key <- put handle object def
-          get handle key def >>= \case
-            Right Object { content = [Sibling content] } ->
-              (content ^. field @"value") `shouldBe` value
-            result -> assertFailure (show result)
+    , testCase "return body" $ do
+        object <- randomObject
+        putGet handle object def >>= \case
+          Right Object { content = _:|[] } -> pure ()
+          result -> assertFailure (show result)
 
-      , testCase "head 404" $ do
-          key <- randomKey
-          getHead handle key def >>= \case
-            Right Object { content = [] } -> pure ()
-            result -> assertFailure (show result)
+    , testCase "return body (siblings)" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        putGet handle object def >>= \case
+          Right Object { content = _:|[_] } -> pure ()
+          result -> assertFailure (show result)
 
-      , testCase "head success" $ do
-          bucket <- ByteString.random 32
-          value <- ByteString.random 6
-          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
-          Right key <- put handle object def
-          getHead handle key def `shouldReturnSatisfy` isRight
+    , testCase "return head" $ do
+        object  <- randomObject
+        putGetHead handle object def >>= \case
+          Right Object { content = _:|[] } -> pure ()
+          result -> assertFailure (show result)
 
-      , testCase "if modified (not modified)" $ do
-          bucket <- ByteString.random 32
-          value <- ByteString.random 6
-          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
-          Right key <- put handle object def
-          get handle key def >>= \case
-            Right object -> do
-              getIfModified handle object def `shouldReturnSatisfy` isRightNothing
-            result -> assertFailure (show result)
-
-      , testCase "if modified (modified)" $ do
-          bucket <- ByteString.random 32
-          value <- ByteString.random 6
-          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
-          Right key <- put handle object def
-          get handle key def >>= \case
-            Right object@(Object { content = [Sibling content] }) -> do
-              let object' = object & field @"content" .~ content
-              _ <- put handle object' def
-              getIfModified handle object' def `shouldReturnSatisfy` isRightJust
-            result -> assertFailure (show result)
-      ]
-    , testGroup "put"
-      [ testCase "random key" $ do
-          bucket <- ByteString.random 32
-          value <- ByteString.random 6
-          let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent value)
-          put handle object def `shouldReturnSatisfy` isRight
-
-      , testCase "return body" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let object = newObject key (newContent value)
-          putGet handle object def >>= \case
-            Right Object { content = _:|[] } -> pure ()
-            result -> assertFailure (show result)
-
-      , testCase "return body (siblings)" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let object = newObject key (newContent value)
-          put handle object def `shouldReturnSatisfy` isRight
-          putGet handle object def >>= \case
-            Right Object { content = _:|[_] } -> pure ()
-            result -> assertFailure (show result)
-
-      , testCase "return head" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let object = newObject key (newContent value)
-          putGetHead handle object def >>= \case
-            Right Object { content = _:|[] } -> pure ()
-            result -> assertFailure (show result)
-
-      , testCase "return head (siblings)" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let object = newObject key (newContent value)
-          put handle object def `shouldReturnSatisfy` isRight
-          putGetHead handle object def >>= \case
-            Right Object { content = _:|[_] } -> pure ()
-            result -> assertFailure (show result)
-      ]
-
-    , testGroup "delete"
-      [ testCase "tombstone" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let object = newObject key (newContent value)
-          put handle object def `shouldReturnSatisfy` isRight
-          delete handle object { context = newContext } def `shouldReturn` Right ()
-          get handle key def >>= \case
-            Right Object { content = [Tombstone _, Sibling _] } -> pure ()
-            result -> assertFailure (show result)
-
-      , testCase "no tombstone" $ do
-          key <- randomKey
-          value <- ByteString.random 6
-          let object = newObject key (newContent value)
-          putGet handle object def >>= \case
-            Right object' -> do
-              delete handle object' def `shouldReturn` Right ()
-              get handle key def >>= \case
-                Right Object { content = [] } -> pure ()
-                result -> assertFailure (show result)
-            result -> assertFailure (show result)
-      ]
+    , testCase "return head (siblings)" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        putGetHead handle object def >>= \case
+          Right Object { content = _:|[_] } -> pure ()
+          result -> assertFailure (show result)
     ]
 
-  , testGroup "Riak.ServerInfo"
-    [ testCase "getServerInfo" $ do
-        getServerInfo handle `shouldReturn`
-          Right (Right ServerInfo
-            { name = "riak@172.17.0.2"
-            , version = "2.2.3"
-            })
+  , testGroup "delete"
+    [ testCase "tombstone" $ do
+        object <- randomObject
+        put handle object def `shouldReturnSatisfy` isRight
+        delete handle object { context = newContext } def `shouldReturn` Right ()
+        get handle (object ^. field @"key") def >>= \case
+          Right Object { content = [Tombstone _, Sibling _] } -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "no tombstone" $ do
+        object <- randomObject
+        putGet handle object def >>= \case
+          Right object' -> do
+            delete handle object' def `shouldReturn` Right ()
+            get handle (object' ^. field @"key") def >>= \case
+              Right Object { content = [] } -> pure ()
+              result -> assertFailure (show result)
+          result -> assertFailure (show result)
     ]
+  ]
+
+riakPingTests :: Handle -> [TestTree]
+riakPingTests handle =
+  [ testCase "ping" $ do
+      ping handle `shouldReturn` Right (Right ())
+  ]
+
+riakServerInfoTests :: Handle -> [TestTree]
+riakServerInfoTests handle =
+  [ testCase "getServerInfo" $ do
+      getServerInfo handle `shouldReturnSatisfy` isRight
   ]
 
 --   , testCase "exact int query" $ do
@@ -345,6 +338,13 @@ randomKey =
   Key "objects"
     <$> ByteString.random 32
     <*> ByteString.random 32
+
+randomObject :: IO (Object (Content ByteString))
+randomObject = do
+  bucket <- ByteString.random 32
+  key <- ByteString.random 32
+  value <- ByteString.random 6
+  pure (newObject (Key "objects" bucket key) (newContent value))
 
 -- randomObjectKeyIn :: ByteString -> IO RiakKey
 -- randomObjectKeyIn bucket = do

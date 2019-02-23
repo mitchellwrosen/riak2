@@ -211,7 +211,7 @@ getParser =
   where
     doGet ::
          Key
-      -> Maybe Quorum
+      -> Maybe Natural
       -> Maybe Quorum
       -> Maybe Quorum
       -> Handle
@@ -325,7 +325,7 @@ getCounterParser =
   where
     doGetCounter ::
          Key
-      -> Maybe Quorum
+      -> Maybe Natural
       -> Maybe Quorum
       -> Maybe Quorum
       -> Handle
@@ -575,7 +575,7 @@ putParser =
       -> Maybe ByteString
       -> [SecondaryIndex]
       -> Maybe Context
-      -> Maybe Quorum
+      -> Maybe Natural
       -> Maybe Quorum
       -> Maybe Quorum
       -> Maybe Quorum
@@ -1094,7 +1094,7 @@ updateCounterParser =
     doUpdateCounter ::
          Either Bucket Key
       -> Int64
-      -> Maybe Quorum
+      -> Maybe Natural
       -> Maybe Quorum
       -> Maybe Quorum
       -> Maybe Quorum
@@ -1215,12 +1215,10 @@ keyArgument :: Parser Key
 keyArgument =
   argument (eitherReader parseKey) keyMod
 
-nodesOption :: Parser (Maybe Quorum)
+nodesOption :: Parser (Maybe Natural)
 nodesOption =
   optional
-    (option
-      (eitherReader parseQuorum)
-        (help "Number of nodes" <> long "nodes" <> metavar "QUORUM"))
+    (option auto (help "Number of nodes" <> long "nodes" <> metavar "NODES"))
 
 prOption :: Parser (Maybe Quorum)
 prOption =

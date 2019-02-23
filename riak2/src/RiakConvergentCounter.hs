@@ -69,7 +69,7 @@ getConvergentCounter_
         & Key.setProto key
         & Proto.maybe'basicQuorum .~ basicQuorum
         & Proto.maybe'notfoundOk .~ notfoundOk
-        & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+        & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
         & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
         & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
         & Proto.maybe'timeout .~ timeout
@@ -124,7 +124,7 @@ updateConvergentCounter_
       Proto.defMessage
         & Key.setMaybeProto key
         & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
-        & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
+        & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
         & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
         & Proto.maybe'timeout .~ timeout
         & Proto.maybe'w .~ (Quorum.toWord32 <$> w)

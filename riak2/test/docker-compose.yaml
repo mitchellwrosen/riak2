@@ -3,7 +3,12 @@ version: "3.5"
 services:
   riak:
     image: "basho/riak-kv"
-    ports: ["8087:8087", "8098:8098"]
+
+    ports:
+      - "8087:8087"
+      - "8093:8093"
+      - "8098:8098"
+
     volumes:
       - type: "bind"
         source: "./02-bootstrap-datatypes.sh"

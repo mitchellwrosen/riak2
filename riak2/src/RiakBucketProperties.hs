@@ -33,7 +33,7 @@ data ObjectBucketProperties
   = ObjectBucketProperties
   { conflictResolution :: !ConflictResolution
   , dw :: !Quorum
-  , nodes :: !Quorum
+  , nodes :: !Natural
   , notfoundBehavior :: !NotfoundBehavior
   , postcommitHooks :: ![Proto.RpbCommitHook]
   , pr :: !Quorum
@@ -77,7 +77,7 @@ fromProto props =
               (False, False) -> UseTimestamps
               (False, True)  -> LastWriteWins
         , dw = Quorum.fromWord32 (props ^. Proto.dw)
-        , nodes = Quorum.fromWord32 (props ^. Proto.nVal)
+        , nodes = fromIntegral (props ^. Proto.nVal)
         , notfoundBehavior =
             case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
               (True, _)      -> NotfoundCounts

@@ -1,4 +1,5 @@
--- | A Riak client that manages another client by reconnecting automatically.
+-- | A Riak handle that "manages" an underlying handle by  reconnecting on
+-- failure.
 --
 -- Still TODO: some way of configuring when we want to reconnect, and when we
 -- want to give up on the connection permanently.
@@ -29,6 +30,7 @@ import Control.Monad          (when)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, UTCTime, diffUTCTime,
                                getCurrentTime, nominalDiffTimeToSeconds)
+import Data.Void              (Void)
 import Numeric.Natural        (Natural)
 
 
@@ -63,11 +65,12 @@ data ReconnectSettings
   }
 
 type HandleConnectError
-  = Handle.HandleConnectError
+  = Void
 
 type HandleConnectionError
   = Handle.HandleConnectError
 
+-- | The handle manager thread crashed, which indicates a bug in this library.
 newtype ManagedHandleCrashed
   = ManagedHandleCrashed SomeException
   deriving stock (Show)
@@ -79,15 +82,11 @@ instance Exception ManagedHandleCrashed where
 
 -- | Acquire a handle.
 --
--- /Throws/. Whatever the underlying handle might throw during its 'withHandle'.
---
--- /Throws/. If the background manager thread crashes, which indicates there is
--- a bug in the library, throws an asynchronous 'ManagedHandleCrashed'
--- exception.
+-- /Throws/. This function will never throw an exception.
 withHandle ::
      HandleConfig
   -> (Handle -> IO a)
-  -> IO (Either Handle.HandleConnectError a)
+  -> IO (Either Void a)
 withHandle config onSuccess = do
   statusVar :: TMVar HandleStatus <-
     newEmptyTMVarIO
@@ -132,8 +131,6 @@ withHandle config onSuccess = do
 -- Meanwhile, users of this handle (via exchange/stream) grab the underlying
 -- handle (if available), use it, and if anything goes wrong, write to the error
 -- TMVar and retry when a new connection is established.
---
--- TODO notify waiting clients of the shutdown
 manager ::
      HandleConfig
   -> TMVar HandleStatus
