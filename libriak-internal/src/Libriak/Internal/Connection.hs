@@ -48,7 +48,7 @@ data Connection
 -- /Throws/. This function will never throw an exception.
 withConnection ::
      Endpoint
-  -> (Maybe CloseException -> a -> IO b)
+  -> (Either CloseException () -> a -> IO b)
   -> (Connection -> IO a)
   -> IO (Either (ConnectException 'Uninterruptible) b)
 withConnection endpoint onTeardown onSuccess = do

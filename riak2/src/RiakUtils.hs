@@ -10,7 +10,7 @@ import qualified Data.ByteString.Char8        as Latin1
 import qualified Data.ByteString.Lex.Integral as ByteString
 
 
--- | Keep retrying an action until it returns Nothing. Delay by the given number
+-- | Keep retrying an action until it returns Just. Delay by the given number
 -- of microseconds before the first retry, and exponentially back off.
 retrying :: Int -> IO (Maybe a) -> IO a
 retrying delay0 action =

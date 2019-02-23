@@ -16,16 +16,6 @@ source-repository-package
   location: https://github.com/kcsongor/generic-lens.git
   tag: cf20ae3a0f27d25edf97c79b6635f7c79c9bc941
 
-source-repository-package
-  type: git
-  location: https://github.com/andrewthad/posix-api.git
-  tag: b7fec4952343474f5d5a43a40be36b05927435e4
-
-source-repository-package
-  type: git
-  location: https://github.com/andrewthad/sockets.git
-  tag: ce96e3ae85ef0dae2810831ca18c1ee1c41692bf
-
 allow-newer:
   directory:time
   riak:time

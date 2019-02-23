@@ -15,7 +15,7 @@ library
     primitive,
     proto-lens ^>= 0.4.0,
     riak-protobuf ^>= 1.0.0,
-    sockets ^>= 0.1.1,
+    sockets ^>= 0.3.0,
 
   default-extensions:
     BangPatterns
