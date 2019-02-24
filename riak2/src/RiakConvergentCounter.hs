@@ -126,7 +126,7 @@ updateConvergentCounter_
         & Key.setMaybeProto key
         & WriteQuorum.setProto quorum
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'timeout .~ timeout
+        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
         & Proto.op .~
             (Proto.defMessage
               & Proto.counterOp .~

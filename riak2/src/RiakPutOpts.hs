@@ -3,13 +3,14 @@ module RiakPutOpts where
 import RiakWriteQuorum (WriteQuorum)
 
 import Data.Default.Class (Default(..))
+import Data.Time          (NominalDiffTime)
 
 
 data PutOpts
   = PutOpts
   { nodes :: !(Maybe Natural)
   , quorum :: !(Maybe WriteQuorum)
-  , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
+  , timeout :: !(Maybe NominalDiffTime)
   } deriving stock (Generic, Show)
 
 instance Default PutOpts where

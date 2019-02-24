@@ -18,7 +18,6 @@ import qualified Libriak.Handle     as Handle
 import qualified Libriak.Proto      as Proto
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
-import qualified RiakQuorum         as Quorum
 import qualified RiakReadQuorum     as ReadQuorum
 import qualified RiakSecondaryIndex as SecondaryIndex
 import qualified RiakSibling        as Sibling
@@ -356,7 +355,7 @@ makePutRequest
           & Proto.value .~ value
         )
     & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-    & Proto.maybe'timeout .~ timeout
+    & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
     & Proto.maybe'vclock .~
         (if ByteString.null (unContext context)
           then Nothing
@@ -399,8 +398,8 @@ delete_
         & Key.setProto key
         & ReadQuorum.setProto readQuorum
         & WriteQuorum.setProto writeQuorum
-        & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
-        & Proto.maybe'timeout .~ timeout
+        & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
+        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
         & Proto.vclock .~ unContext context
 
 parseDeleteError :: ByteString -> Maybe DeleteError

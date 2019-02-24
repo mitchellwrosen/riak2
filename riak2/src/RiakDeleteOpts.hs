@@ -1,17 +1,17 @@
 module RiakDeleteOpts where
 
-import RiakQuorum      (Quorum)
 import RiakReadQuorum  (ReadQuorum)
 import RiakWriteQuorum (WriteQuorum)
 
 import Data.Default.Class (Default(..))
+import Data.Time          (NominalDiffTime)
 
 
 data DeleteOpts
   = DeleteOpts
-  { nodes :: !(Maybe Quorum)
+  { nodes :: !(Maybe Natural)
   , readQuorum :: !(Maybe ReadQuorum)
-  , timeout :: !(Maybe Word32)
+  , timeout :: !(Maybe NominalDiffTime)
   , writeQuorum :: !(Maybe WriteQuorum)
   } deriving stock (Generic, Show)
 

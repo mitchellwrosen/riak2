@@ -157,15 +157,22 @@ deleteParser =
   doDelete
     <$> keyArgument
     <*> optional contextOption
+    <*> optional nodesOption
+    <*> readQuorumOption
+    <*> writeQuorumOption
+    <*> optional timeoutOption
   where
     doDelete ::
          Key
       -> Maybe Context
+      -> Maybe Natural
+      -> Maybe ReadQuorum
+      -> Maybe WriteQuorum
+      -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doDelete key context handle =
-      -- TODO riakc delete options
-      delete handle object def >>= \case
+    doDelete key context nodes readQuorum writeQuorum timeout handle =
+      delete handle object opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -180,6 +187,15 @@ deleteParser =
             { content = ()
             , context = fromMaybe newContext context
             , key = key
+            }
+
+        opts :: DeleteOpts
+        opts =
+          DeleteOpts
+            { nodes = nodes
+            , readQuorum = readQuorum
+            , timeout = timeout
+            , writeQuorum = writeQuorum
             }
 
 deleteIndexParser :: Parser (Handle -> IO ())
@@ -562,6 +578,7 @@ putParser =
     <*> optional contextOption
     <*> optional nodesOption
     <*> writeQuorumOption
+    <*> optional timeoutOption
   where
     doPut ::
          Either Bucket Key
@@ -573,9 +590,10 @@ putParser =
       -> Maybe Context
       -> Maybe Natural
       -> Maybe WriteQuorum
+      -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doPut bucketOrKey val type' charset encoding indexes context nodes quorum handle =
+    doPut bucketOrKey val type' charset encoding indexes context nodes quorum timeout handle =
       put handle object opts >>= \case
         Left err -> do
           print err
@@ -610,7 +628,7 @@ putParser =
           PutOpts
             { nodes = nodes
             , quorum = quorum
-            , timeout = Nothing
+            , timeout = timeout
             }
 
 putIndexParser :: Parser (Handle -> IO ())
@@ -1075,6 +1093,7 @@ updateCounterParser =
     <*> amountArgument
     <*> optional nodesOption
     <*> writeQuorumOption
+    <*> optional timeoutOption
 
   where
     amountArgument :: Parser Int64
@@ -1086,9 +1105,10 @@ updateCounterParser =
       -> Int64
       -> Maybe Natural
       -> Maybe WriteQuorum
+      -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doUpdateCounter bucketOrKey amount nodes quorum handle = do
+    doUpdateCounter bucketOrKey amount nodes quorum timeout handle = do
       updateConvergentCounter handle operation opts >>= \case
         Left err -> do
           print err
@@ -1114,7 +1134,7 @@ updateCounterParser =
           PutOpts
             { nodes = nodes
             , quorum = quorum
-            , timeout = Nothing
+            , timeout = timeout
             }
 
 -- Try to display a byte string as UTF-8 (best effor)
