@@ -18,9 +18,13 @@ data ExactQuery
 
 name :: ExactQuery -> ByteString
 name (ExactQuery { index, value }) =
-  case value of
-    SecondaryIndexValue.Binary{}  -> index <> "_bin"
-    SecondaryIndexValue.Integer{} -> index <> "_int"
+  if index == builtinBucketIndex
+    then
+      index
+    else
+      case value of
+        SecondaryIndexValue.Binary{}  -> index <> "_bin"
+        SecondaryIndexValue.Integer{} -> index <> "_int"
 
 -- | Build a query on the built-in index @\"\$bucket\"@, which indexes each
 -- object by its bucket.
@@ -30,6 +34,10 @@ inBucket ::
 inBucket bucket@(Bucket _ b) =
   ExactQuery
     { bucket = bucket
-    , index = "$bucket"
+    , index = builtinBucketIndex
     , value = SecondaryIndexValue.Binary b
     }
+
+builtinBucketIndex :: ByteString
+builtinBucketIndex =
+  "$bucket"

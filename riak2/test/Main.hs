@@ -5,18 +5,24 @@ module Main where
 import Riak.Handle.Impl.Exclusive (ConnectError(..), Endpoint(..),
                                    EventHandlers(..), Handle, HandleConfig(..),
                                    withHandle)
-import RiakBucket                 (Bucket(..))
+import RiakBucket                 (Bucket(..), queryExact)
 import RiakContent                (Content, newContent)
 import RiakContext                (newContext)
-import RiakKey                    (Key(..), generatedKey)
-import RiakObject                 (Object(..), delete, get, getHead,
-                                   getIfModified, newObject, put, putGet,
-                                   putGetHead)
+import RiakError                  (Error(..))
+import RiakExactQuery             (ExactQuery(..), inBucket)
+import RiakIndexName              (unsafeMakeIndexName)
+import RiakKey                    (Key(..), generatedKey, keyBucket)
+import RiakObject                 (GetOpts(..), Object(..), PutOpts(..), delete,
+                                   get, getHead, getIfModified, newObject, put,
+                                   putGet, putGetHead)
 import RiakPing                   (ping)
+import RiakSecondaryIndex         (SecondaryIndex(..))
+import RiakSecondaryIndexValue    (SecondaryIndexValue(..))
 import RiakServerInfo             (ServerInfo(..), getServerInfo)
 import RiakSibling                (Sibling(..))
 
 import Control.Lens
+import Control.Monad
 import Data.ByteString       (ByteString)
 import Data.Default.Class    (def)
 import Data.Either           (isRight)
@@ -24,10 +30,12 @@ import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
 import Net.IPv4              (ipv4)
 import System.Exit           (exitFailure)
+import System.Random         (randomRIO)
 import Test.Tasty
 import Test.Tasty.HUnit
 
-import qualified Data.ByteString.Random as ByteString
+import qualified Control.Foldl         as Foldl
+import qualified Data.ByteString.Char8 as Latin1
 
 main :: IO ()
 main = do
@@ -65,16 +73,54 @@ main = do
 
 integrationTests :: Handle -> [TestTree]
 integrationTests handle =
-  [ testGroup "RiakObject" (riakObjectTests handle)
+  [ testGroup "RiakBucket" (riakBucketTests handle)
+  , testGroup "RiakObject" (riakObjectTests handle)
   , testGroup "RiakPing" (riakPingTests handle)
   , testGroup "RiakServerInfo" (riakServerInfoTests handle)
+  ]
+
+riakBucketTests :: Handle -> [TestTree]
+riakBucketTests handle =
+  [ testGroup "exact query"
+    [ testCase "empty index" $ do
+        bucket <- randomObjectBucket
+        idx <- randomByteString 32
+        let query = ExactQuery bucket idx (Integer 1)
+        queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 0
+
+    , testCase "int index" $ do
+        object <- randomObject
+        let bucket = object ^. field @"key" . keyBucket
+        idx <- randomByteString 32
+        let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Integer 1)]
+        put handle object' def `shouldReturnSatisfy` isRight
+        let query = ExactQuery bucket idx (Integer 1)
+        queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 1
+
+    , testCase "bin index" $ do
+        object <- randomObject
+        let bucket = object ^. field @"key" . keyBucket
+        idx <- randomByteString 32
+        let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Binary "x")]
+        put handle object' def `shouldReturnSatisfy` isRight
+        let query = ExactQuery bucket idx (Binary "x")
+        queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 1
+
+    , testCase "XXX in bucket" $ do
+        let n = 10
+        bucket <- randomObjectBucket
+        replicateM_ n $ do
+          put handle (newObject (generatedKey bucket) (newContent "")) def
+        queryExact handle (inBucket bucket) (Foldl.generalize Foldl.length) `shouldReturn` Right n
+    ]
+
   ]
 
 riakObjectTests :: Handle -> [TestTree]
 riakObjectTests handle =
   [ testGroup "get"
     [ testCase "404" $ do
-        key <- randomKey
+        key <- randomObjectKey
         get handle key def >>= \case
           Right Object { content = [] } -> pure ()
           result -> assertFailure (show result)
@@ -88,8 +134,20 @@ riakObjectTests handle =
               (object ^. field @"content" . field @"value")
           result -> assertFailure (show result)
 
+    , testCase "bucket type not found" $ do
+        bucketType <- randomByteString 32
+        bucket <- randomByteString 32
+        key <- randomByteString 32
+        get handle (Key bucketType bucket key) def `shouldReturn`
+          Left (BucketTypeDoesNotExistError bucketType)
+
+    , testCase "invalid nval" $ do
+        key <- randomObjectKey
+        get handle key (def { nodes = Just 4 }) `shouldReturn`
+          Left InvalidNodesError
+
     , testCase "head 404" $ do
-        key <- randomKey
+        key <- randomObjectKey
         getHead handle key def >>= \case
           Right Object { content = [] } -> pure ()
           result -> assertFailure (show result)
@@ -119,9 +177,24 @@ riakObjectTests handle =
     ]
 
   , testGroup "put"
-    [ testCase "random key" $ do
-        object <- randomObject
+    [ testCase "generated key" $ do
+        bucket <- randomByteString 32
+        let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent "")
         put handle object def `shouldReturnSatisfy` isRight
+
+    , testCase "bucket type not found" $ do
+        bucketType <- randomByteString 32
+        bucket <- randomByteString 32
+        key <- randomByteString 32
+        let object = newObject (Key bucketType bucket key) (newContent "")
+        put handle object def `shouldReturn`
+          Left (BucketTypeDoesNotExistError bucketType)
+
+    , testCase "invalid nval" $ do
+        key <- randomObjectKey
+        let object = newObject key (newContent "")
+        put handle object (def { nodes = Just 4 }) `shouldReturn`
+          Left InvalidNodesError
 
     , testCase "return body" $ do
         object <- randomObject
@@ -333,17 +406,26 @@ riakServerInfoTests handle =
 -- randomText :: IO Text
 -- randomText = Text.pack <$> replicateM 32 (randomRIO ('a', 'z'))
 
-randomKey :: IO Key
-randomKey =
+randomByteString :: Int -> IO ByteString
+randomByteString n =
+  Latin1.pack <$> replicateM n (randomRIO ('a', 'z'))
+
+randomObjectBucket :: IO Bucket
+randomObjectBucket =
+  Bucket "objects"
+    <$> randomByteString 32
+
+randomObjectKey :: IO Key
+randomObjectKey =
   Key "objects"
-    <$> ByteString.random 32
-    <*> ByteString.random 32
+    <$> randomByteString 32
+    <*> randomByteString 32
 
 randomObject :: IO (Object (Content ByteString))
 randomObject = do
-  bucket <- ByteString.random 32
-  key <- ByteString.random 32
-  value <- ByteString.random 6
+  bucket <- randomByteString 32
+  key <- randomByteString 32
+  value <- randomByteString 6
   pure (newObject (Key "objects" bucket key) (newContent value))
 
 -- randomObjectKeyIn :: ByteString -> IO RiakKey

@@ -104,6 +104,7 @@ module Riak
   , makeIndexName
   , unsafeMakeIndexName
   , Key(..)
+  , keyBucket
   , generatedKey
   , ListBucketsError
   , ListKeysError

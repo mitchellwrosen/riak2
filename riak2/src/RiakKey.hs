@@ -4,7 +4,7 @@ import RiakBucketInternal (Bucket(..))
 
 import qualified Libriak.Proto as Proto
 
-import Control.Lens  ((.~))
+import Control.Lens (Lens', (.~))
 import Data.Hashable (Hashable)
 
 import qualified Data.ByteString as ByteString
@@ -17,6 +17,11 @@ data Key
   = Key !ByteString !ByteString !ByteString
   deriving stock (Eq, Generic, Show)
   deriving anyclass (Hashable)
+
+keyBucket :: Lens' Key Bucket
+keyBucket f (Key bucketType bucket key) =
+  (\(Bucket bucketType bucket) -> Key bucketType bucket key) <$>
+    f (Bucket bucketType bucket)
 
 -- | Use 'generatedKey' to ask Riak to generate a random key when writing a new
 -- object or data type.
