@@ -1,5 +1,7 @@
 module Riak.Quorum
   ( Quorum(..)
+  , ReadQuorum(..)
   ) where
 
-import RiakQuorum
+import RiakQuorum     (Quorum(..))
+import RiakReadQuorum (ReadQuorum(..))

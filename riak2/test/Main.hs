@@ -106,7 +106,7 @@ riakBucketTests handle =
         let query = ExactQuery bucket idx (Binary "x")
         queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 1
 
-    , testCase "XXX in bucket" $ do
+    , testCase "in bucket" $ do
         let n = 10
         bucket <- randomObjectBucket
         replicateM_ n $ do

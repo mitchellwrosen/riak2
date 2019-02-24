@@ -1,9 +1,12 @@
 module RiakBucketProperties where
 
-import RiakQuorum (Quorum(..))
+import RiakIndexName  (IndexName(..))
+import RiakQuorum     (Quorum(..))
+import RiakReadQuorum (ReadQuorum(..))
 
-import qualified Libriak.Proto as Proto
-import qualified RiakQuorum    as Quorum
+import qualified Libriak.Proto  as Proto
+import qualified RiakQuorum     as Quorum
+import qualified RiakReadQuorum as ReadQuorum
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -36,11 +39,10 @@ data ObjectBucketProperties
   , nodes :: !Natural
   , notfoundBehavior :: !NotfoundBehavior
   , postcommitHooks :: ![Proto.RpbCommitHook]
-  , pr :: !Quorum
   , precommitHooks :: ![Proto.RpbCommitHook]
   , pw :: !Quorum
-  , r :: !Quorum
-  , index :: !(Maybe Text) -- ^ Search index
+  , readQuorum :: !ReadQuorum
+  , index :: !(Maybe IndexName) -- ^ Search index
   , w :: !Quorum
   } deriving stock (Generic, Show)
 
@@ -84,11 +86,10 @@ fromProto props =
               (False, False) -> NotfoundSkipped
               (False, True)  -> NotfoundSkippedBasic
         , postcommitHooks = props ^. Proto.postcommit
-        , pr = Quorum.fromWord32 (props ^. Proto.pr)
         , precommitHooks = props ^. Proto.precommit
         , pw = Quorum.fromWord32 (props ^. Proto.pw)
-        , r = Quorum.fromWord32 (props ^. Proto.r)
-        , index = decodeUtf8 <$> (props ^. Proto.maybe'searchIndex)
+        , readQuorum = ReadQuorum.fromProto props
+        , index = IndexName . decodeUtf8 <$> (props ^. Proto.maybe'searchIndex)
         , w = Quorum.fromWord32 (props ^. Proto.w)
         }
 

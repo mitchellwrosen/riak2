@@ -181,9 +181,11 @@ library riak2-internal
     RiakConvergentMap
     RiakConvergentMapValue
     RiakConvergentSet
+    RiakDeleteOpts
     RiakErlangTerm
     RiakError
     RiakExactQuery
+    RiakGetOpts
     RiakIndex
     RiakIndexName
     RiakKey
@@ -194,12 +196,14 @@ library riak2-internal
     RiakPing
     RiakQuorum
     RiakRangeQuery
+    RiakReadQuorum
     RiakSchema
     RiakSearch
     RiakSecondaryIndex
     RiakSecondaryIndexValue
     RiakServerInfo
     RiakSibling
+    RiakWriteQuorum
 
   ghc-options:
     -Weverything

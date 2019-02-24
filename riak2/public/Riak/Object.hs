@@ -19,4 +19,6 @@ module Riak.Object
   , DeleteOpts(..)
   ) where
 
+import RiakDeleteOpts (DeleteOpts(..))
+import RiakGetOpts    (GetOpts(..))
 import RiakObject

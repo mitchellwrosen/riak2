@@ -131,6 +131,7 @@ module Riak
   , QueryRangeError
   , Quorum(..)
   , RangeQuery(..)
+  , ReadQuorum(..)
   , Schema(..)
   , defaultSchema
   , SearchError
@@ -165,7 +166,8 @@ import Riak.ExactQuery            (ExactQuery(..))
 import Riak.Index
 import Riak.Key
 import Riak.MapReduce
-import Riak.Quorum                (Quorum(..))
+import Riak.Object
+import Riak.Quorum                (Quorum(..), ReadQuorum(..))
 import Riak.RangeQuery            (RangeQuery(..))
 import Riak.Schema
 import Riak.Search
@@ -174,7 +176,6 @@ import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
 import Riak.Sibling
 import RiakBucket
-import Riak.Object
 import RiakPing
 
 import Data.Default.Class (def)

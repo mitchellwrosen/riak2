@@ -7,14 +7,16 @@ module RiakConvergentCounter
 import Libriak.Handle (Handle)
 import RiakCrdt
 import RiakError
+import RiakGetOpts    (GetOpts(..))
 import RiakKey        (Key(..))
-import RiakObject     (GetOpts(..), PutOpts(..))
+import RiakObject     (PutOpts(..))
 import RiakUtils      (retrying)
 
 import qualified Libriak.Handle as Handle
 import qualified Libriak.Proto  as Proto
 import qualified RiakKey        as Key
 import qualified RiakQuorum     as Quorum
+import qualified RiakReadQuorum as ReadQuorum
 
 import Control.Lens ((.~), (^.))
 
@@ -50,7 +52,7 @@ getConvergentCounter_ ::
 getConvergentCounter_
     handle
     key@(Key bucketType _ _)
-    (GetOpts basicQuorum nodes notfoundOk pr r timeout) =
+    (GetOpts basicQuorum nodes notfoundOk quorum timeout) =
 
   Handle.getCrdt handle request >>= \case
     Left err ->
@@ -67,11 +69,10 @@ getConvergentCounter_
     request =
       Proto.defMessage
         & Key.setProto key
+        & ReadQuorum.setProto quorum
         & Proto.maybe'basicQuorum .~ basicQuorum
         & Proto.maybe'notfoundOk .~ notfoundOk
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
-        & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
         & Proto.maybe'timeout .~ timeout
 
     fromResponse :: Proto.DtFetchResp -> Maybe ConvergentCounter

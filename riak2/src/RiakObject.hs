@@ -6,7 +6,9 @@ module RiakObject where
 import Libriak.Handle (Handle)
 import RiakContent    (Content(..))
 import RiakContext    (Context(..), newContext)
+import RiakDeleteOpts (DeleteOpts(..))
 import RiakError
+import RiakGetOpts    (GetOpts(..))
 import RiakKey        (Key(..))
 import RiakQuorum     (Quorum)
 import RiakSibling    (Sibling(..))
@@ -17,6 +19,7 @@ import qualified Libriak.Proto      as Proto
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
 import qualified RiakQuorum         as Quorum
+import qualified RiakReadQuorum     as ReadQuorum
 import qualified RiakSecondaryIndex as SecondaryIndex
 import qualified RiakSibling        as Sibling
 
@@ -39,30 +42,6 @@ data Object a
   , key :: !Key -- ^ Key
   } deriving stock (Eq, Functor, Generic, Show)
 
--- TODO better names for pr/r
--- TODO basicQuorum/notfoundOk -> NotfoundBehavior
-data GetOpts
-  = GetOpts
-  { basicQuorum :: !(Maybe Bool)
-  , nodes :: !(Maybe Natural)
-  , notfoundOk :: !(Maybe Bool)
-  , pr :: !(Maybe Quorum)
-  , r :: !(Maybe Quorum)
-  , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
-  } deriving stock (Generic, Show)
-
-instance Default GetOpts where
-  def :: GetOpts
-  def =
-    GetOpts
-      { basicQuorum = Nothing
-      , nodes = Nothing
-      , notfoundOk = Nothing
-      , pr = Nothing
-      , r = Nothing
-      , timeout = Nothing
-      }
-
 data PutOpts
   = PutOpts
   { dw :: !(Maybe Quorum)
@@ -82,31 +61,6 @@ instance Default PutOpts where
       , timeout = Nothing
       , w = Nothing
       }
-
-data DeleteOpts
-  = DeleteOpts
-  { dw :: !(Maybe Quorum)
-  , nodes :: !(Maybe Quorum)
-  , pr :: !(Maybe Quorum)
-  , pw :: !(Maybe Quorum)
-  , r :: !(Maybe Quorum)
-  , timeout :: !(Maybe Word32)
-  , w :: !(Maybe Quorum)
-  } deriving stock (Generic, Show)
-
-instance Default DeleteOpts where
-  def :: DeleteOpts
-  def =
-    DeleteOpts
-      { dw = Nothing
-      , nodes = Nothing
-      , pr = Nothing
-      , pw = Nothing
-      , r = Nothing
-      , timeout = Nothing
-      , w = Nothing
-      }
-
 
 newObject ::
      Key -- ^ Key
@@ -282,16 +236,15 @@ parseGetError request err
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest
     key
-    GetOpts { basicQuorum, nodes, notfoundOk, pr, r, timeout } =
+    GetOpts { basicQuorum, nodes, notfoundOk, quorum, timeout } =
 
   Proto.defMessage
     & Key.setProto key
+    & ReadQuorum.setProto quorum
     & Proto.deletedvclock .~ True
     & Proto.maybe'basicQuorum .~ basicQuorum
     & Proto.maybe'notfoundOk .~ notfoundOk
     & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-    & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
-    & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
     & Proto.maybe'timeout .~ timeout
 
 
@@ -451,7 +404,7 @@ delete_ ::
 delete_
     handle
     Object { context, key }
-    DeleteOpts { dw, nodes, pr, pw, r, timeout, w } =
+    DeleteOpts { dw, nodes, pw, readQuorum, timeout, w } =
 
   Handle.delete handle request >>= \case
     Left err ->
@@ -468,11 +421,10 @@ delete_
     request =
       Proto.defMessage
         & Key.setProto key
+        & ReadQuorum.setProto readQuorum
         & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
         & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
-        & Proto.maybe'pr .~ (Quorum.toWord32 <$> pr)
         & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
-        & Proto.maybe'r .~ (Quorum.toWord32 <$> r)
         & Proto.maybe'timeout .~ timeout
         & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
         & Proto.vclock .~ unContext context

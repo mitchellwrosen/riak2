@@ -206,17 +206,15 @@ getParser =
   doGet
     <$> keyArgument
     <*> nodesOption
-    <*> rOption
-    <*> prOption
+    <*> readQuorumOption
   where
     doGet ::
          Key
       -> Maybe Natural
-      -> Maybe Quorum
-      -> Maybe Quorum
+      -> Maybe ReadQuorum
       -> Handle
       -> IO ()
-    doGet key nodes r pr handle =
+    doGet key nodes quorum handle =
       get handle key opts >>= \case
         Left err -> do
           print err
@@ -239,8 +237,7 @@ getParser =
             { basicQuorum = Nothing
             , nodes = nodes
             , notfoundOk = Nothing
-            , pr = pr
-            , r = r
+            , quorum = quorum
             , timeout = Nothing
             }
 
@@ -320,17 +317,15 @@ getCounterParser =
   doGetCounter
     <$> keyArgument
     <*> nodesOption
-    <*> rOption
-    <*> prOption
+    <*> readQuorumOption
   where
     doGetCounter ::
          Key
       -> Maybe Natural
-      -> Maybe Quorum
-      -> Maybe Quorum
+      -> Maybe ReadQuorum
       -> Handle
       -> IO ()
-    doGetCounter key nodes r pr handle =
+    doGetCounter key nodes quorum handle =
       getConvergentCounter handle key opts >>= \case
         Left err -> do
           print err
@@ -346,8 +341,7 @@ getCounterParser =
             { basicQuorum = Nothing
             , nodes = nodes
             , notfoundOk = Nothing
-            , pr = pr
-            , r = r
+            , quorum = quorum
             , timeout = Nothing
             }
 
@@ -1220,13 +1214,6 @@ nodesOption =
   optional
     (option auto (help "Number of nodes" <> long "nodes" <> metavar "NODES"))
 
-prOption :: Parser (Maybe Quorum)
-prOption =
-  optional
-    (option
-      (eitherReader parseQuorum)
-        (help "Primary read quorum" <> long "pr" <> metavar "QUORUM"))
-
 pwOption :: Parser (Maybe Quorum)
 pwOption =
   optional
@@ -1234,12 +1221,36 @@ pwOption =
       (eitherReader parseQuorum)
       (help "Prmary write quorum" <> long "pw" <> metavar "QUORUM"))
 
-rOption :: Parser (Maybe Quorum)
-rOption =
-  optional
-    (option
-      (eitherReader parseQuorum)
-      (help "Read quorum" <> long "r" <> metavar "QUORUM"))
+readQuorumOption :: Parser (Maybe ReadQuorum)
+readQuorumOption =
+  f <$> optional rOption <*> optional prOption
+  where
+    f :: Maybe Quorum -> Maybe Quorum -> Maybe ReadQuorum
+    f r pr =
+      case (r, pr) of
+        (Nothing, Nothing) ->
+          Nothing
+
+        (Just r, Nothing) ->
+          Just (ReadQuorum { nodes = r, primary = QuorumDefault })
+
+        (Nothing, Just pr) ->
+          Just (ReadQuorum { nodes = QuorumDefault, primary = pr })
+
+        (Just r, Just pr) ->
+          Just (ReadQuorum { nodes = r, primary = pr })
+
+    prOption :: Parser Quorum
+    prOption =
+      option
+        (eitherReader parseQuorum)
+          (help "Primary read quorum" <> long "pr" <> metavar "QUORUM")
+
+    rOption :: Parser Quorum
+    rOption =
+      option
+        (eitherReader parseQuorum)
+        (help "Read quorum" <> long "r" <> metavar "QUORUM")
 
 schemaNameArgument :: Parser Text
 schemaNameArgument =
