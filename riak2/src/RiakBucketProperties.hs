@@ -19,34 +19,62 @@ data BucketProperties
   | BucketPropertiesSet SetBucketProperties
   deriving stock (Show)
 
--- TODO counter/hll/map/set bucket properties
 data CounterBucketProperties
   = CounterBucketProperties
-  deriving stock (Show)
-
-data HyperLogLogBucketProperties
-  = HyperLogLogBucketProperties
-  deriving stock (Show)
-
-data MapBucketProperties
-  = MapBucketProperties
-  deriving stock (Show)
-
-data ObjectBucketProperties
-  = ObjectBucketProperties
-  { conflictResolution :: !(Maybe ConflictResolution)
+  { index :: !(Maybe IndexName) -- ^ Search index
   , nodes :: !Natural
   , notfoundBehavior :: !NotfoundBehavior
   , postcommitHooks :: ![Proto.RpbCommitHook]
   , precommitHooks :: ![Proto.RpbCommitHook]
   , readQuorum :: !ReadQuorum
+  , writeQuorum :: !WriteQuorum
+  } deriving stock (Generic, Show)
+
+-- TODO hll precision
+data HyperLogLogBucketProperties
+  = HyperLogLogBucketProperties
+  { index :: !(Maybe IndexName) -- ^ Search index
+  , nodes :: !Natural
+  , notfoundBehavior :: !NotfoundBehavior
+  , postcommitHooks :: ![Proto.RpbCommitHook]
+  , precommitHooks :: ![Proto.RpbCommitHook]
+  , readQuorum :: !ReadQuorum
+  , writeQuorum :: !WriteQuorum
+  } deriving stock (Generic, Show)
+
+data MapBucketProperties
+  = MapBucketProperties
+  { index :: !(Maybe IndexName) -- ^ Search index
+  , nodes :: !Natural
+  , notfoundBehavior :: !NotfoundBehavior
+  , postcommitHooks :: ![Proto.RpbCommitHook]
+  , precommitHooks :: ![Proto.RpbCommitHook]
+  , readQuorum :: !ReadQuorum
+  , writeQuorum :: !WriteQuorum
+  } deriving stock (Generic, Show)
+
+data ObjectBucketProperties
+  = ObjectBucketProperties
+  { conflictResolution :: !(Maybe ConflictResolution)
   , index :: !(Maybe IndexName) -- ^ Search index
+  , nodes :: !Natural
+  , notfoundBehavior :: !NotfoundBehavior
+  , postcommitHooks :: ![Proto.RpbCommitHook]
+  , precommitHooks :: ![Proto.RpbCommitHook]
+  , readQuorum :: !ReadQuorum
   , writeQuorum :: !WriteQuorum
   } deriving stock (Generic, Show)
 
 data SetBucketProperties
   = SetBucketProperties
-  deriving stock (Show)
+  { index :: !(Maybe IndexName) -- ^ Search index
+  , nodes :: !Natural
+  , notfoundBehavior :: !NotfoundBehavior
+  , postcommitHooks :: ![Proto.RpbCommitHook]
+  , precommitHooks :: ![Proto.RpbCommitHook]
+  , readQuorum :: !ReadQuorum
+  , writeQuorum :: !WriteQuorum
+  } deriving stock (Generic, Show)
 
 -- | The conflict resolution strategy used by Riak, for normal KV (non-CRDT)
 -- objects.
@@ -68,28 +96,101 @@ data NotfoundBehavior
 fromProto :: Proto.RpbBucketProps -> BucketProperties
 fromProto props =
   case props ^. Proto.maybe'datatype of
-    Nothing ->
-      BucketPropertiesObject ObjectBucketProperties
-        { conflictResolution = do
-            guard (not (props ^. Proto.allowMult))
-            if props ^. Proto.lastWriteWins
-              then Just LastWriteWins
-              else Just UseTimestamps
-        , nodes = fromIntegral (props ^. Proto.nVal)
-        , notfoundBehavior =
-            case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
-              (True, _)      -> NotfoundCounts
-              (False, False) -> NotfoundSkipped
-              (False, True)  -> NotfoundSkippedBasic
-        , postcommitHooks = props ^. Proto.postcommit
-        , precommitHooks = props ^. Proto.precommit
-        , readQuorum = ReadQuorum.fromProto props
-        , index = IndexName . decodeUtf8 <$> (props ^. Proto.maybe'searchIndex)
-        , writeQuorum = WriteQuorum.fromProto props
+    Just "counter" ->
+      BucketPropertiesCounter CounterBucketProperties
+        { index            = index
+        , nodes            = nodes
+        , notfoundBehavior = notfoundBehavior
+        , postcommitHooks  = postcommitHooks
+        , precommitHooks   = precommitHooks
+        , readQuorum       = readQuorum
+        , writeQuorum      = writeQuorum
+        }
+
+    Just "hll" ->
+      BucketPropertiesHyperLogLog HyperLogLogBucketProperties
+        { index            = index
+        , nodes            = nodes
+        , notfoundBehavior = notfoundBehavior
+        , postcommitHooks  = postcommitHooks
+        , precommitHooks   = precommitHooks
+        , readQuorum       = readQuorum
+        , writeQuorum      = writeQuorum
+        }
+
+    Just "map" ->
+      BucketPropertiesMap MapBucketProperties
+        { index            = index
+        , nodes            = nodes
+        , notfoundBehavior = notfoundBehavior
+        , postcommitHooks  = postcommitHooks
+        , precommitHooks   = precommitHooks
+        , readQuorum       = readQuorum
+        , writeQuorum      = writeQuorum
+        }
+
+    Just "set" ->
+      BucketPropertiesSet SetBucketProperties
+        { index            = index
+        , nodes            = nodes
+        , notfoundBehavior = notfoundBehavior
+        , postcommitHooks  = postcommitHooks
+        , precommitHooks   = precommitHooks
+        , readQuorum       = readQuorum
+        , writeQuorum      = writeQuorum
         }
 
     _ ->
-      undefined
+      BucketPropertiesObject ObjectBucketProperties
+        { conflictResolution = conflictResolution
+        , index              = index
+        , nodes              = nodes
+        , notfoundBehavior   = notfoundBehavior
+        , postcommitHooks    = postcommitHooks
+        , precommitHooks     = precommitHooks
+        , readQuorum         = readQuorum
+        , writeQuorum        = writeQuorum
+        }
+
+  where
+    conflictResolution :: Maybe ConflictResolution
+    conflictResolution = do
+      guard (not (props ^. Proto.allowMult))
+      if props ^. Proto.lastWriteWins
+        then Just LastWriteWins
+        else Just UseTimestamps
+
+    index :: Maybe IndexName
+    index =
+      IndexName . decodeUtf8 <$>
+        (props ^. Proto.maybe'searchIndex)
+
+    nodes :: Natural
+    nodes =
+      fromIntegral (props ^. Proto.nVal)
+
+    notfoundBehavior :: NotfoundBehavior
+    notfoundBehavior =
+      case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
+        (True, _)      -> NotfoundCounts
+        (False, False) -> NotfoundSkipped
+        (False, True)  -> NotfoundSkippedBasic
+
+    postcommitHooks :: [Proto.RpbCommitHook]
+    postcommitHooks =
+      props ^. Proto.postcommit
+
+    precommitHooks :: [Proto.RpbCommitHook]
+    precommitHooks =
+      props ^. Proto.precommit
+
+    readQuorum :: ReadQuorum
+    readQuorum =
+      ReadQuorum.fromProto props
+
+    writeQuorum :: WriteQuorum
+    writeQuorum =
+      WriteQuorum.fromProto props
 
 -- _BucketProperties'oldVclock :: !(Prelude.Maybe Data.Word.Word32),
 -- _BucketProperties'youngVclock :: !(Prelude.Maybe Data.Word.Word32),

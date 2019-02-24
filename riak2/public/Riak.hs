@@ -82,6 +82,7 @@ module Riak
   , newConvergentSet
   , convergentSetKey
   , convergentSetValue
+  , CounterBucketProperties(..)
   , ErlangTerm(..)
   , Error(..)
   , ExactQuery(..)
@@ -99,6 +100,7 @@ module Riak
   , GetOpts(..)
   , GetSchemaError
   , Handle
+  , HyperLogLogBucketProperties(..)
   , Index(..)
   , IndexName
   , makeIndexName
@@ -108,6 +110,7 @@ module Riak
   , generatedKey
   , ListBucketsError
   , ListKeysError
+  , MapBucketProperties(..)
   , MapReduceBucketError
   , MapReduceFunction(..)
   , MapReducePhase(..)
@@ -119,6 +122,7 @@ module Riak
   , NotfoundBehavior(..)
   , Object(..)
   , newObject
+  , ObjectBucketProperties(..)
   , Op(..)
   , PutConvergentMapError
   , PutConvergentSetError
@@ -140,6 +144,7 @@ module Riak
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
+  , SetBucketProperties(..)
   , SetBucketTypeIndexError
   , Sibling(..)
   , UnexpectedResponse(..)
@@ -153,7 +158,12 @@ module Riak
 -- TODO rename Config/Error export them
 import Libriak.Handle             (Handle, UnexpectedResponse(..))
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
-                                   NotfoundBehavior(..))
+                                   CounterBucketProperties(..),
+                                   HyperLogLogBucketProperties(..),
+                                   MapBucketProperties(..),
+                                   NotfoundBehavior(..),
+                                   ObjectBucketProperties(..),
+                                   SetBucketProperties(..))
 import Riak.BucketType
 import Riak.Content
 import Riak.Context
