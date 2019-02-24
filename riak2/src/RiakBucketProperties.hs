@@ -34,7 +34,7 @@ data MapBucketProperties
 
 data ObjectBucketProperties
   = ObjectBucketProperties
-  { conflictResolution :: !ConflictResolution
+  { conflictResolution :: !(Maybe ConflictResolution)
   , nodes :: !Natural
   , notfoundBehavior :: !NotfoundBehavior
   , postcommitHooks :: ![Proto.RpbCommitHook]
@@ -52,10 +52,9 @@ data SetBucketProperties
 -- objects.
 --
 -- Allowing Riak to create siblings is highly recommended, but there are two
--- built-in strategies to resolve conflicts in Riak.
+-- built-in strategies to resolve conflicts in Riak itself.
 data ConflictResolution
-  = CreateSiblings
-  | UseTimestamps
+  = UseTimestamps
   | LastWriteWins
   deriving stock (Show)
 
@@ -71,11 +70,11 @@ fromProto props =
   case props ^. Proto.maybe'datatype of
     Nothing ->
       BucketPropertiesObject ObjectBucketProperties
-        { conflictResolution =
-            case (props ^. Proto.allowMult, props ^. Proto.lastWriteWins) of
-              (True, _)      -> CreateSiblings
-              (False, False) -> UseTimestamps
-              (False, True)  -> LastWriteWins
+        { conflictResolution = do
+            guard (not (props ^. Proto.allowMult))
+            if props ^. Proto.lastWriteWins
+              then Just LastWriteWins
+              else Just UseTimestamps
         , nodes = fromIntegral (props ^. Proto.nVal)
         , notfoundBehavior =
             case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
