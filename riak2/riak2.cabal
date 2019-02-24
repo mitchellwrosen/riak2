@@ -194,6 +194,7 @@ library riak2-internal
     RiakMapReducePhase
     RiakObject
     RiakPing
+    RiakPutOpts
     RiakQuorum
     RiakRangeQuery
     RiakReadQuorum

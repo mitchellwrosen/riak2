@@ -9,14 +9,14 @@ import RiakCrdt
 import RiakError
 import RiakGetOpts    (GetOpts(..))
 import RiakKey        (Key(..))
-import RiakObject     (PutOpts(..))
+import RiakPutOpts    (PutOpts(..))
 import RiakUtils      (retrying)
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
-import qualified RiakKey        as Key
-import qualified RiakQuorum     as Quorum
-import qualified RiakReadQuorum as ReadQuorum
+import qualified Libriak.Handle  as Handle
+import qualified Libriak.Proto   as Proto
+import qualified RiakKey         as Key
+import qualified RiakReadQuorum  as ReadQuorum
+import qualified RiakWriteQuorum as WriteQuorum
 
 import Control.Lens ((.~), (^.))
 
@@ -107,7 +107,7 @@ updateConvergentCounter_ ::
 updateConvergentCounter_
     handle
     (ConvergentCounter key@(Key bucketType _ _) value)
-    (PutOpts dw nodes pw timeout w) =
+    (PutOpts nodes quorum timeout) =
 
   Handle.updateCrdt handle request >>= \case
     Left err ->
@@ -124,11 +124,9 @@ updateConvergentCounter_
     request =
       Proto.defMessage
         & Key.setMaybeProto key
-        & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
+        & WriteQuorum.setProto quorum
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
         & Proto.maybe'timeout .~ timeout
-        & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
         & Proto.op .~
             (Proto.defMessage
               & Proto.counterOp .~

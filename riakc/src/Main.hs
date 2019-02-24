@@ -557,9 +557,7 @@ putParser =
     <*> many secondaryIndexOption
     <*> contextOption
     <*> nodesOption
-    <*> wOption
-    <*> dwOption
-    <*> pwOption
+    <*> writeQuorumOption
   where
     doPut ::
          Either Bucket Key
@@ -570,12 +568,10 @@ putParser =
       -> [SecondaryIndex]
       -> Maybe Context
       -> Maybe Natural
-      -> Maybe Quorum
-      -> Maybe Quorum
-      -> Maybe Quorum
+      -> Maybe WriteQuorum
       -> Handle
       -> IO ()
-    doPut bucketOrKey val type' charset encoding indexes context nodes w dw pw handle =
+    doPut bucketOrKey val type' charset encoding indexes context nodes quorum handle =
       put handle object opts >>= \case
         Left err -> do
           print err
@@ -608,11 +604,9 @@ putParser =
         opts :: PutOpts
         opts =
           PutOpts
-            { dw = dw
-            , nodes = nodes
-            , pw = pw
+            { nodes = nodes
+            , quorum = quorum
             , timeout = Nothing
-            , w = w
             }
 
 putIndexParser :: Parser (Handle -> IO ())
@@ -1076,9 +1070,7 @@ updateCounterParser =
     <$> bucketOrKeyArgument
     <*> amountArgument
     <*> nodesOption
-    <*> wOption
-    <*> dwOption
-    <*> pwOption
+    <*> writeQuorumOption
 
   where
     amountArgument :: Parser Int64
@@ -1089,12 +1081,10 @@ updateCounterParser =
          Either Bucket Key
       -> Int64
       -> Maybe Natural
-      -> Maybe Quorum
-      -> Maybe Quorum
-      -> Maybe Quorum
+      -> Maybe WriteQuorum
       -> Handle
       -> IO ()
-    doUpdateCounter bucketOrKey amount nodes w dw pw handle = do
+    doUpdateCounter bucketOrKey amount nodes quorum handle = do
       updateConvergentCounter handle operation opts >>= \case
         Left err -> do
           print err
@@ -1118,11 +1108,9 @@ updateCounterParser =
         opts :: PutOpts
         opts =
           PutOpts
-            { dw = dw
-            , nodes = nodes
-            , pw = pw
+            { nodes = nodes
+            , quorum = quorum
             , timeout = Nothing
-            , w = w
             }
 
 -- Try to display a byte string as UTF-8 (best effor)
@@ -1185,10 +1173,6 @@ contextOption =
     parseContext =
       fmap unsafeMakeContext . Base64.decode . Latin1.pack
 
-dwOption :: Parser (Maybe Quorum)
-dwOption =
-  optional (option (eitherReader parseQuorum) (long "dw" <> help "DW"))
-
 encodingOption :: Parser (Maybe ByteString)
 encodingOption =
   optional
@@ -1214,13 +1198,6 @@ nodesOption =
   optional
     (option auto (help "Number of nodes" <> long "nodes" <> metavar "NODES"))
 
-pwOption :: Parser (Maybe Quorum)
-pwOption =
-  optional
-    (option
-      (eitherReader parseQuorum)
-      (help "Prmary write quorum" <> long "pw" <> metavar "QUORUM"))
-
 readQuorumOption :: Parser (Maybe ReadQuorum)
 readQuorumOption =
   f <$> optional rOption <*> optional prOption
@@ -1231,14 +1208,11 @@ readQuorumOption =
         (Nothing, Nothing) ->
           Nothing
 
-        (Just r, Nothing) ->
-          Just (ReadQuorum { nodes = r, primary = QuorumDefault })
-
-        (Nothing, Just pr) ->
-          Just (ReadQuorum { nodes = QuorumDefault, primary = pr })
-
-        (Just r, Just pr) ->
-          Just (ReadQuorum { nodes = r, primary = pr })
+        _ ->
+          Just ReadQuorum
+            { nodes = fromMaybe QuorumDefault r
+            , primary = fromMaybe QuorumDefault pr
+            }
 
     prOption :: Parser Quorum
     prOption =
@@ -1287,12 +1261,38 @@ secondaryIndexValueArgument =
         Nothing -> Right (Left (stringToByteString string))
         Just n -> Right (Right n)
 
-wOption :: Parser (Maybe Quorum)
-wOption =
-  optional
-    (option
-      (eitherReader parseQuorum)
-      (help "Write quorum" <> long "w" <> metavar "QUORUM"))
+writeQuorumOption :: Parser (Maybe WriteQuorum)
+writeQuorumOption =
+  f <$> optional wOption <*> optional pwOption <*> optional dwOption
+  where
+    f :: Maybe Quorum -> Maybe Quorum -> Maybe Quorum -> Maybe WriteQuorum
+    f w pw dw =
+      case (w, pw, dw) of
+        (Nothing, Nothing, Nothing) ->
+          Nothing
+
+        _ ->
+          Just WriteQuorum
+            { durable = fromMaybe QuorumDefault dw
+            , nodes = fromMaybe QuorumDefault w
+            , primary = fromMaybe QuorumDefault pw
+            }
+
+    dwOption :: Parser Quorum
+    dwOption =
+      option (eitherReader parseQuorum) (long "dw" <> help "DW")
+
+    pwOption :: Parser Quorum
+    pwOption =
+      option
+        (eitherReader parseQuorum)
+        (help "Prmary write quorum" <> long "pw" <> metavar "QUORUM")
+
+    wOption :: Parser Quorum
+    wOption =
+      option
+        (eitherReader parseQuorum)
+        (help "Write quorum" <> long "w" <> metavar "QUORUM")
 
 parseBucket :: String -> Either String Bucket
 parseBucket string =

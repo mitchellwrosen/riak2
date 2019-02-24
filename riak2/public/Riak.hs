@@ -145,6 +145,7 @@ module Riak
   , UnexpectedResponse(..)
   , UpdateConvergentCounterError
   , UpdateConvergentHyperLogLogError
+  , WriteQuorum(..)
     -- ** Re-exports
   , def
   ) where
@@ -167,7 +168,7 @@ import Riak.Index
 import Riak.Key
 import Riak.MapReduce
 import Riak.Object
-import Riak.Quorum                (Quorum(..), ReadQuorum(..))
+import Riak.Quorum                (Quorum(..), ReadQuorum(..), WriteQuorum(..))
 import Riak.RangeQuery            (RangeQuery(..))
 import Riak.Schema
 import Riak.Search

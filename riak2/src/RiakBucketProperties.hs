@@ -1,12 +1,12 @@
 module RiakBucketProperties where
 
-import RiakIndexName  (IndexName(..))
-import RiakQuorum     (Quorum(..))
-import RiakReadQuorum (ReadQuorum(..))
+import RiakIndexName   (IndexName(..))
+import RiakReadQuorum  (ReadQuorum(..))
+import RiakWriteQuorum (WriteQuorum(..))
 
-import qualified Libriak.Proto  as Proto
-import qualified RiakQuorum     as Quorum
-import qualified RiakReadQuorum as ReadQuorum
+import qualified Libriak.Proto   as Proto
+import qualified RiakReadQuorum  as ReadQuorum
+import qualified RiakWriteQuorum as WriteQuorum
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -35,15 +35,13 @@ data MapBucketProperties
 data ObjectBucketProperties
   = ObjectBucketProperties
   { conflictResolution :: !ConflictResolution
-  , dw :: !Quorum
   , nodes :: !Natural
   , notfoundBehavior :: !NotfoundBehavior
   , postcommitHooks :: ![Proto.RpbCommitHook]
   , precommitHooks :: ![Proto.RpbCommitHook]
-  , pw :: !Quorum
   , readQuorum :: !ReadQuorum
   , index :: !(Maybe IndexName) -- ^ Search index
-  , w :: !Quorum
+  , writeQuorum :: !WriteQuorum
   } deriving stock (Generic, Show)
 
 data SetBucketProperties
@@ -78,7 +76,6 @@ fromProto props =
               (True, _)      -> CreateSiblings
               (False, False) -> UseTimestamps
               (False, True)  -> LastWriteWins
-        , dw = Quorum.fromWord32 (props ^. Proto.dw)
         , nodes = fromIntegral (props ^. Proto.nVal)
         , notfoundBehavior =
             case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
@@ -87,10 +84,9 @@ fromProto props =
               (False, True)  -> NotfoundSkippedBasic
         , postcommitHooks = props ^. Proto.postcommit
         , precommitHooks = props ^. Proto.precommit
-        , pw = Quorum.fromWord32 (props ^. Proto.pw)
         , readQuorum = ReadQuorum.fromProto props
         , index = IndexName . decodeUtf8 <$> (props ^. Proto.maybe'searchIndex)
-        , w = Quorum.fromWord32 (props ^. Proto.w)
+        , writeQuorum = WriteQuorum.fromProto props
         }
 
     _ ->

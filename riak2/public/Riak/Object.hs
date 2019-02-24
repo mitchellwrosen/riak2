@@ -22,3 +22,4 @@ module Riak.Object
 import RiakDeleteOpts (DeleteOpts(..))
 import RiakGetOpts    (GetOpts(..))
 import RiakObject
+import RiakPutOpts    (PutOpts(..))

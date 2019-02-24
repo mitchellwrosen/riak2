@@ -10,7 +10,7 @@ import RiakDeleteOpts (DeleteOpts(..))
 import RiakError
 import RiakGetOpts    (GetOpts(..))
 import RiakKey        (Key(..))
-import RiakQuorum     (Quorum)
+import RiakPutOpts    (PutOpts(..))
 import RiakSibling    (Sibling(..))
 import RiakUtils      (retrying)
 
@@ -22,17 +22,14 @@ import qualified RiakQuorum         as Quorum
 import qualified RiakReadQuorum     as ReadQuorum
 import qualified RiakSecondaryIndex as SecondaryIndex
 import qualified RiakSibling        as Sibling
-
+import qualified RiakWriteQuorum    as WriteQuorum
 
 import Control.Lens          ((.~), (^.))
-import Data.Default.Class    (Default(..))
 import Data.Generics.Product (field)
 import Data.Text.Encoding    (decodeUtf8)
 
-
 import qualified Data.ByteString    as ByteString
 import qualified Data.List.NonEmpty as List1
-
 
 
 data Object a
@@ -42,25 +39,6 @@ data Object a
   , key :: !Key -- ^ Key
   } deriving stock (Eq, Functor, Generic, Show)
 
-data PutOpts
-  = PutOpts
-  { dw :: !(Maybe Quorum)
-  , nodes :: !(Maybe Natural)
-  , pw :: !(Maybe Quorum)
-  , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
-  , w :: !(Maybe Quorum)
-  } deriving stock (Generic, Show)
-
-instance Default PutOpts where
-  def :: PutOpts
-  def =
-    PutOpts
-      { dw = Nothing
-      , nodes = Nothing
-      , pw = Nothing
-      , timeout = Nothing
-      , w = Nothing
-      }
 
 newObject ::
      Key -- ^ Key
@@ -364,9 +342,10 @@ makePutRequest ::
   -> Proto.RpbPutReq
 makePutRequest
      Object { content = Content { charset, encoding, indexes, metadata, type', value }, context, key }
-     PutOpts { dw, nodes, pw, timeout, w } =
+     PutOpts { nodes, quorum, timeout } =
   Proto.defMessage
     & Key.setMaybeProto key
+    & WriteQuorum.setProto quorum
     & Proto.content .~
         (Proto.defMessage
           & Proto.Content.setMetadata metadata
@@ -376,10 +355,7 @@ makePutRequest
           & Proto.maybe'contentType .~ type'
           & Proto.value .~ value
         )
-    & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
     & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-    & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
-    & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
     & Proto.maybe'timeout .~ timeout
     & Proto.maybe'vclock .~
         (if ByteString.null (unContext context)
@@ -404,7 +380,7 @@ delete_ ::
 delete_
     handle
     Object { context, key }
-    DeleteOpts { dw, nodes, pw, readQuorum, timeout, w } =
+    DeleteOpts { nodes, readQuorum, timeout, writeQuorum } =
 
   Handle.delete handle request >>= \case
     Left err ->
@@ -422,11 +398,9 @@ delete_
       Proto.defMessage
         & Key.setProto key
         & ReadQuorum.setProto readQuorum
-        & Proto.maybe'dw .~ (Quorum.toWord32 <$> dw)
+        & WriteQuorum.setProto writeQuorum
         & Proto.maybe'nVal .~ (Quorum.toWord32 <$> nodes)
-        & Proto.maybe'pw .~ (Quorum.toWord32 <$> pw)
         & Proto.maybe'timeout .~ timeout
-        & Proto.maybe'w .~ (Quorum.toWord32 <$> w)
         & Proto.vclock .~ unContext context
 
 parseDeleteError :: ByteString -> Maybe DeleteError
