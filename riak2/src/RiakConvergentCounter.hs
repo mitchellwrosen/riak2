@@ -10,7 +10,7 @@ import RiakError
 import RiakGetOpts    (GetOpts(..))
 import RiakKey        (Key(..))
 import RiakPutOpts    (PutOpts(..))
-import RiakUtils      (retrying)
+import RiakUtils      (difftimeToMillis, retrying)
 
 import qualified Libriak.Handle  as Handle
 import qualified Libriak.Proto   as Proto
@@ -73,7 +73,7 @@ getConvergentCounter_
         & Proto.maybe'basicQuorum .~ basicQuorum
         & Proto.maybe'notfoundOk .~ notfoundOk
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'timeout .~ timeout
+        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
     fromResponse :: Proto.DtFetchResp -> Maybe ConvergentCounter
     fromResponse response = do

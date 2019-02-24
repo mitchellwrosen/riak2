@@ -224,9 +224,9 @@ library riak2-internal
     base
       (Control.Applicative, Control.Category, Control.Concurrent,
         Control.Exception, Control.Monad, Control.Monad.IO.Class,
-        Data.Bifunctor, Data.Bits, Data.Coerce, Data.Function, Data.Int,
-        Data.Kind, Data.List, Data.List.NonEmpty, Data.Maybe, Data.Word,
-        GHC.Generics, Numeric.Natural, Prelude as GHC.Prelude)
+        Data.Bifunctor, Data.Bits, Data.Coerce, Data.Fixed, Data.Function,
+        Data.Int, Data.Kind, Data.List, Data.List.NonEmpty, Data.Maybe,
+        Data.Word, GHC.Generics, Numeric.Natural, Prelude as GHC.Prelude)
 
   other-modules:
     Prelude

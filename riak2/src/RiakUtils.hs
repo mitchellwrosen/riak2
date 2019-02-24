@@ -3,7 +3,9 @@ module RiakUtils where
 import RiakPanic
 
 import Control.Concurrent (threadDelay)
+import Data.Fixed         (Fixed(..))
 import Data.Maybe         (fromJust)
+import Data.Time          (NominalDiffTime, nominalDiffTimeToSeconds)
 
 import qualified Data.ByteString              as ByteString
 import qualified Data.ByteString.Char8        as Latin1
@@ -23,6 +25,12 @@ retrying delay0 action =
           loop (delay * 3 `div` 2)
         Just result ->
           pure result
+
+difftimeToMillis :: NominalDiffTime -> Word32
+difftimeToMillis time =
+  case nominalDiffTimeToSeconds time of
+    MkFixed picoseconds ->
+      fromIntegral (picoseconds `div` 1000000000)
 
 -- | Pack an 'Int64' as an ASCII byte array.
 int2bs :: Int64 -> ByteString

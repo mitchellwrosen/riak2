@@ -3,9 +3,9 @@ module RiakGetOpts where
 import RiakReadQuorum (ReadQuorum)
 
 import Data.Default.Class (Default(..))
+import Data.Time          (NominalDiffTime)
 
 
--- TODO better names for pr/r
 -- TODO basicQuorum/notfoundOk -> NotfoundBehavior
 data GetOpts
   = GetOpts
@@ -13,7 +13,7 @@ data GetOpts
   , nodes :: !(Maybe Natural)
   , notfoundOk :: !(Maybe Bool)
   , quorum :: !(Maybe ReadQuorum)
-  , timeout :: !(Maybe Word32) -- TODO NominalDiffTime
+  , timeout :: !(Maybe NominalDiffTime)
   } deriving stock (Generic, Show)
 
 instance Default GetOpts where

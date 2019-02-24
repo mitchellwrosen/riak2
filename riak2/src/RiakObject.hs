@@ -12,7 +12,7 @@ import RiakGetOpts    (GetOpts(..))
 import RiakKey        (Key(..))
 import RiakPutOpts    (PutOpts(..))
 import RiakSibling    (Sibling(..))
-import RiakUtils      (retrying)
+import RiakUtils      (difftimeToMillis, retrying)
 
 import qualified Libriak.Handle     as Handle
 import qualified Libriak.Proto      as Proto
@@ -223,7 +223,7 @@ makeGetRequest
     & Proto.maybe'basicQuorum .~ basicQuorum
     & Proto.maybe'notfoundOk .~ notfoundOk
     & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-    & Proto.maybe'timeout .~ timeout
+    & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
 
 -- | Put an object and return its key.

@@ -20,6 +20,7 @@ executable riakc
     , riak2-handle-impl-managed
     , split
     , text
+    , time
     , unordered-containers
 
   default-extensions:

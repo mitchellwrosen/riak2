@@ -13,6 +13,7 @@ import qualified Riak.ServerInfo            as ServerInfo
 import Control.Arrow         ((***))
 import Control.Lens          (view, (.~), (^.))
 import Data.ByteString       (ByteString)
+import Data.Fixed            (Fixed(..))
 import Data.Foldable         (asum, for_, traverse_)
 import Data.Function         ((&))
 import Data.Generics.Product (field)
@@ -23,6 +24,7 @@ import Data.List.Split       (splitOn)
 import Data.Maybe            (fromMaybe)
 import Data.Text             (Text)
 import Data.Text.Encoding    (decodeUtf8, decodeUtf8', encodeUtf8)
+import Data.Time             (NominalDiffTime, secondsToNominalDiffTime)
 import Data.Word
 import Net.IPv4              (IPv4, ipv4)
 import Numeric.Natural       (Natural)
@@ -154,7 +156,7 @@ deleteParser :: Parser (Handle -> IO ())
 deleteParser =
   doDelete
     <$> keyArgument
-    <*> contextOption
+    <*> optional contextOption
   where
     doDelete ::
          Key
@@ -205,16 +207,18 @@ getParser :: Parser (Handle -> IO ())
 getParser =
   doGet
     <$> keyArgument
-    <*> nodesOption
+    <*> optional nodesOption
     <*> readQuorumOption
+    <*> optional timeoutOption
   where
     doGet ::
          Key
       -> Maybe Natural
       -> Maybe ReadQuorum
+      -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doGet key nodes quorum handle =
+    doGet key nodes quorum timeout handle =
       get handle key opts >>= \case
         Left err -> do
           print err
@@ -238,7 +242,7 @@ getParser =
             , nodes = nodes
             , notfoundOk = Nothing
             , quorum = quorum
-            , timeout = Nothing
+            , timeout = timeout
             }
 
         printSibling :: Sibling ByteString -> IO ()
@@ -316,7 +320,7 @@ getCounterParser :: Parser (Handle -> IO ())
 getCounterParser =
   doGetCounter
     <$> keyArgument
-    <*> nodesOption
+    <*> optional nodesOption
     <*> readQuorumOption
   where
     doGetCounter ::
@@ -551,12 +555,12 @@ putParser =
   doPut
     <$> bucketOrKeyArgument
     <*> strArgument (help "Value" <> metavar "VALUE")
-    <*> contentTypeOption
-    <*> charsetOption
-    <*> encodingOption
+    <*> optional contentTypeOption
+    <*> optional charsetOption
+    <*> optional encodingOption
     <*> many secondaryIndexOption
-    <*> contextOption
-    <*> nodesOption
+    <*> optional contextOption
+    <*> optional nodesOption
     <*> writeQuorumOption
   where
     doPut ::
@@ -1069,7 +1073,7 @@ updateCounterParser =
   doUpdateCounter
     <$> bucketOrKeyArgument
     <*> amountArgument
-    <*> nodesOption
+    <*> optional nodesOption
     <*> writeQuorumOption
 
   where
@@ -1151,32 +1155,27 @@ bucketTypeOrBucketArgument =
     ((Right <$> eitherReader parseBucket) <|> (Left . encodeUtf8 <$> str))
     (help "Bucket type or bucket" <> metavar "TYPE(/BUCKET)")
 
-charsetOption :: Parser (Maybe ByteString)
+charsetOption :: Parser ByteString
 charsetOption =
-  optional
-    (encodeUtf8 <$> strOption (long "charset" <> help "Character set"))
+  encodeUtf8 <$> strOption (long "charset" <> help "Character set")
 
-contentTypeOption :: Parser (Maybe ByteString)
+contentTypeOption :: Parser ByteString
 contentTypeOption =
-  optional
-    (strOption
-      (help "Content type" <> long "content-type" <> metavar "TYPE"))
+  strOption (help "Content type" <> long "content-type" <> metavar "TYPE")
 
-contextOption :: Parser (Maybe Context)
+contextOption :: Parser Context
 contextOption =
-  optional
-    (option
-      (eitherReader parseContext)
-      (long "context" <> help "Causal context"))
+  option
+    (eitherReader parseContext)
+    (long "context" <> help "Causal context")
   where
     parseContext :: String -> Either String Context
     parseContext =
       fmap unsafeMakeContext . Base64.decode . Latin1.pack
 
-encodingOption :: Parser (Maybe ByteString)
+encodingOption :: Parser ByteString
 encodingOption =
-  optional
-    (encodeUtf8 <$> strOption (long "encoding" <> help "Character encoding"))
+  encodeUtf8 <$> strOption (long "encoding" <> help "Character encoding")
 
 indexNameArgument :: Parser IndexName
 indexNameArgument =
@@ -1193,10 +1192,9 @@ keyArgument :: Parser Key
 keyArgument =
   argument (eitherReader parseKey) keyMod
 
-nodesOption :: Parser (Maybe Natural)
+nodesOption :: Parser Natural
 nodesOption =
-  optional
-    (option auto (help "Number of nodes" <> long "nodes" <> metavar "NODES"))
+  option auto (help "Number of nodes" <> long "nodes" <> metavar "NODES")
 
 readQuorumOption :: Parser (Maybe ReadQuorum)
 readQuorumOption =
@@ -1260,6 +1258,15 @@ secondaryIndexValueArgument =
       case readMaybe string of
         Nothing -> Right (Left (stringToByteString string))
         Just n -> Right (Right n)
+
+timeoutOption :: Parser NominalDiffTime
+timeoutOption =
+  millisToDifftime <$>
+    option auto (help "Timeout" <> long "timeout" <> metavar "MILLIS")
+  where
+    millisToDifftime :: Integer -> NominalDiffTime
+    millisToDifftime millis =
+      secondsToNominalDiffTime (MkFixed (millis * 1000000000))
 
 writeQuorumOption :: Parser (Maybe WriteQuorum)
 writeQuorumOption =
