@@ -5,17 +5,20 @@ module Main where
 import Riak.Handle.Impl.Exclusive (ConnectError(..), Endpoint(..),
                                    EventHandlers(..), Handle, HandleConfig(..),
                                    withHandle)
-import RiakBucket                 (Bucket(..), queryExact)
+import RiakBinaryIndexQuery       (BinaryIndexQuery(..), inBucket)
+import RiakBucket                 (Bucket(..), queryBinaryIndex, queryIntIndex)
 import RiakContent                (Content, newContent)
 import RiakContext                (newContext)
 import RiakError                  (Error(..))
-import RiakExactQuery             (ExactQuery(..), inBucket)
+import RiakGetOpts                (GetOpts(..))
 import RiakIndexName              (unsafeMakeIndexName)
+import RiakIntIndexQuery          (IntIndexQuery(..))
 import RiakKey                    (Key(..), generatedKey, keyBucket)
-import RiakObject                 (GetOpts(..), Object(..), PutOpts(..), delete,
-                                   get, getHead, getIfModified, newObject, put,
-                                   putGet, putGetHead)
+import RiakObject                 (Object(..), delete, get, getHead,
+                                   getIfModified, newObject, put, putGet,
+                                   putGetHead)
 import RiakPing                   (ping)
+import RiakPutOpts                (PutOpts(..))
 import RiakSecondaryIndex         (SecondaryIndex(..))
 import RiakSecondaryIndexValue    (SecondaryIndexValue(..))
 import RiakServerInfo             (ServerInfo(..), getServerInfo)
@@ -85,8 +88,11 @@ riakBucketTests handle =
     [ testCase "empty index" $ do
         bucket <- randomObjectBucket
         idx <- randomByteString 32
-        let query = ExactQuery bucket idx (Integer 1)
-        queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 0
+        queryIntIndex
+          handle
+          (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 0
 
     , testCase "int index" $ do
         object <- randomObject
@@ -94,8 +100,11 @@ riakBucketTests handle =
         idx <- randomByteString 32
         let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Integer 1)]
         put handle object' def `shouldReturnSatisfy` isRight
-        let query = ExactQuery bucket idx (Integer 1)
-        queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 1
+        queryIntIndex
+          handle
+          (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 1
 
     , testCase "bin index" $ do
         object <- randomObject
@@ -103,15 +112,22 @@ riakBucketTests handle =
         idx <- randomByteString 32
         let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Binary "x")]
         put handle object' def `shouldReturnSatisfy` isRight
-        let query = ExactQuery bucket idx (Binary "x")
-        queryExact handle query (Foldl.generalize Foldl.length) `shouldReturn` Right 1
+        queryBinaryIndex
+          handle
+          (BinaryIndexQuery { bucket = bucket, index = idx, minValue = "x", maxValue = "x" } )
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 1
 
     , testCase "in bucket" $ do
         let n = 10
         bucket <- randomObjectBucket
         replicateM_ n $ do
           put handle (newObject (generatedKey bucket) (newContent "")) def
-        queryExact handle (inBucket bucket) (Foldl.generalize Foldl.length) `shouldReturn` Right n
+        queryBinaryIndex
+          handle
+          (inBucket bucket)
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right n
     ]
 
   ]

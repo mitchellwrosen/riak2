@@ -46,8 +46,7 @@ description:
   .
   * "Riak.SecondaryIndex"
   * "Riak.SecondaryIndexValue"
-  * "Riak.ExactQuery"
-  * "Riak.RangeQuery"
+  * "Riak.SecondaryIndexQuery"
   .
   Search types and operations:
   .
@@ -92,13 +91,12 @@ library
     Riak.ConvergentSet
     Riak.ErlangTerm
     Riak.Error
-    Riak.ExactQuery
     Riak.Index
+    Riak.SecondaryIndexQuery
     Riak.Key
     Riak.MapReduce
     Riak.Object
     Riak.Quorum
-    Riak.RangeQuery
     Riak.Schema
     Riak.Search
     Riak.SecondaryIndex
@@ -171,6 +169,7 @@ library riak2-internal
     Haskell2010
 
   exposed-modules:
+    RiakBinaryIndexQuery
     RiakBucket
     RiakBucketProperties
     RiakBucketType
@@ -184,10 +183,10 @@ library riak2-internal
     RiakDeleteOpts
     RiakErlangTerm
     RiakError
-    RiakExactQuery
     RiakGetOpts
     RiakIndex
     RiakIndexName
+    RiakIntIndexQuery
     RiakKey
     RiakMapReduce
     RiakMapReduceFunction
@@ -196,7 +195,6 @@ library riak2-internal
     RiakPing
     RiakPutOpts
     RiakQuorum
-    RiakRangeQuery
     RiakReadQuorum
     RiakSchema
     RiakSearch

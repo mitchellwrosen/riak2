@@ -7,29 +7,29 @@ module RiakBucket
   , unsetBucketIndex
   , resetBucket
     -- ** Search
-  , queryExact
-  , queryRange
+  , queryIntIndex
+  , queryIntIndexTerms
+  , queryBinaryIndex
+  , queryBinaryIndexTerms
     -- ** Full traversals
   , listKeys
   , streamKeys
   ) where
 
 import Libriak.Handle       (Handle)
+import RiakBinaryIndexQuery (BinaryIndexQuery(..))
 import RiakBucketInternal   (Bucket(..))
 import RiakBucketProperties (BucketProperties)
 import RiakError
-import RiakExactQuery       (ExactQuery(..))
 import RiakIndexName        (IndexName(..))
+import RiakIntIndexQuery    (IntIndexQuery(..))
 import RiakKey              (Key(..))
-import RiakRangeQuery       (RangeQuery)
-import RiakUtils            (bs2int, retrying)
+import RiakUtils            (bs2int, int2bs, retrying)
 
-import qualified Libriak.Handle          as Handle
-import qualified Libriak.Proto           as Proto
-import qualified RiakBucketProperties    as BucketProperties
-import qualified RiakExactQuery          as ExactQuery
-import qualified RiakRangeQuery          as RangeQuery
-import qualified RiakSecondaryIndexValue as SecondaryIndexValue
+import qualified Libriak.Handle       as Handle
+import qualified Libriak.Proto        as Proto
+import qualified RiakBinaryIndexQuery as BinaryIndexQuery
+import qualified RiakBucketProperties as BucketProperties
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, view, (.~), (^.))
@@ -115,76 +115,149 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
         & Proto.bucket .~ bucket
         & Proto.type' .~ bucketType
 
--- | Perform an exact query on a secondary index.
+-- | Perform a query on a binary secondary index.
 --
 -- Fetches results in batches of 50.
-queryExact ::
+queryBinaryIndex ::
      MonadIO m
   => Handle -- ^
-  -> ExactQuery -- ^
+  -> BinaryIndexQuery -- ^
   -> FoldM IO Key r -- ^
-  -> m (Either QueryExactError r)
-queryExact handle query@(ExactQuery { value }) keyFold = liftIO $
+  -> m (Either QueryRangeError r)
+queryBinaryIndex handle query@(BinaryIndexQuery { bucket, minValue, maxValue }) keyFold = liftIO $
   doIndex
     handle
     request
-    (Foldl.handlesM (Proto.keys . folded . to (Key bucketType bucket)) keyFold)
+    (Foldl.handlesM (Proto.keys . folded . to mkKey) keyFold)
 
   where
-    Bucket bucketType bucket =
-      ExactQuery.bucket query
-
     request :: Proto.RpbIndexReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.index .~ ExactQuery.name query
-        & Proto.key .~ SecondaryIndexValue.encode value
-        & Proto.maxResults .~ 50
-        & Proto.qtype .~ Proto.RpbIndexReq'eq
+        & setProto bucket
+        & Proto.index .~ BinaryIndexQuery.indexName query
+        & Proto.maxResults .~ 50 -- TODO configure page size
+        & Proto.rangeMax .~ maxValue
+        & Proto.rangeMin .~ minValue
+        & Proto.qtype .~ Proto.RpbIndexReq'range -- TODO perform exact query if min == max
         & Proto.stream .~ True
-        & Proto.type' .~ bucketType
 
--- | Perform a range query on a secondary index.
+    mkKey :: ByteString -> Key
+    mkKey =
+      case bucket of
+        Bucket bucketType bucket ->
+          Key bucketType bucket
+
+-- | Perform a query on a binary secondary index.
 --
 -- Fetches results in batches of 50.
-queryRange ::
-     forall a m r.
+--
+-- TODO make this work for '$bucket' queries
+queryBinaryIndexTerms ::
      MonadIO m
   => Handle -- ^
-  -> RangeQuery a -- ^
-  -> FoldM IO (a, Key) r -- ^
+  -> BinaryIndexQuery -- ^
+  -> FoldM IO (ByteString, Key) r -- ^
   -> m (Either QueryRangeError r)
-queryRange handle query keyFold = liftIO $
+queryBinaryIndexTerms handle query@(BinaryIndexQuery { bucket, minValue, maxValue }) keyFold = liftIO $
   doIndex
     handle
     request
     (Foldl.handlesM (Proto.results . folded . to fromResult) keyFold)
 
   where
-    Bucket bucketType bucket =
-      RangeQuery.bucket query
-
     request :: Proto.RpbIndexReq
     request =
       Proto.defMessage
-        & Proto.bucket .~ bucket
-        & Proto.index .~ RangeQuery.name query
+        & setProto bucket
+        & Proto.index .~ BinaryIndexQuery.indexName query
         & Proto.maxResults .~ 50 -- TODO configure page size
-        & Proto.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.max query)
-        & Proto.rangeMax .~ SecondaryIndexValue.encode (RangeQuery.min query)
+        & Proto.rangeMax .~ maxValue
+        & Proto.rangeMin .~ minValue
         & Proto.returnTerms .~ True
         & Proto.qtype .~ Proto.RpbIndexReq'range
         & Proto.stream .~ True
-        & Proto.type' .~ bucketType
 
-    fromResult :: Proto.RpbPair -> (a, Key)
+    fromResult :: Proto.RpbPair -> (ByteString, Key)
     fromResult pair =
-      ( case RangeQuery.min query of
-          SecondaryIndexValue.Binary{}  -> pair ^. Proto.key
-          SecondaryIndexValue.Integer{} -> bs2int (pair ^. Proto.key)
-      , Key bucketType bucket (pair ^. Proto.value)
-      )
+      (pair ^. Proto.key, mkKey (pair ^. Proto.value))
+
+    mkKey :: ByteString -> Key
+    mkKey =
+      case bucket of
+        Bucket bucketType bucket ->
+          Key bucketType bucket
+
+-- | Perform a query on an integer secondary index.
+--
+-- Fetches results in batches of 50.
+queryIntIndex ::
+     MonadIO m
+  => Handle -- ^
+  -> IntIndexQuery -- ^
+  -> FoldM IO Key r -- ^
+  -> m (Either QueryRangeError r)
+queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
+  doIndex
+    handle
+    request
+    (Foldl.handlesM (Proto.keys . folded . to mkKey) keyFold)
+
+  where
+    request :: Proto.RpbIndexReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+        & Proto.index .~ (index <> "_int")
+        & Proto.maxResults .~ 50 -- TODO configure page size
+        & Proto.rangeMax .~ int2bs maxValue
+        & Proto.rangeMin .~ int2bs minValue
+        & Proto.qtype .~ Proto.RpbIndexReq'range
+        & Proto.stream .~ True
+
+    mkKey :: ByteString -> Key
+    mkKey =
+      case bucket of
+        Bucket bucketType bucket ->
+          Key bucketType bucket
+
+-- | Perform a query on an integer secondary index.
+--
+-- Fetches results in batches of 50.
+queryIntIndexTerms ::
+     MonadIO m
+  => Handle -- ^
+  -> IntIndexQuery -- ^
+  -> FoldM IO (Int64, Key) r -- ^
+  -> m (Either QueryRangeError r)
+queryIntIndexTerms handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
+  doIndex
+    handle
+    request
+    (Foldl.handlesM (Proto.results . folded . to fromResult) keyFold)
+
+  where
+    request :: Proto.RpbIndexReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+        & Proto.index .~ (index <> "_int")
+        & Proto.maxResults .~ 50 -- TODO configure page size
+        & Proto.rangeMax .~ int2bs maxValue
+        & Proto.rangeMin .~ int2bs minValue
+        & Proto.returnTerms .~ True
+        & Proto.qtype .~ Proto.RpbIndexReq'range
+        & Proto.stream .~ True
+
+    fromResult :: Proto.RpbPair -> (Int64, Key)
+    fromResult pair =
+      (bs2int (pair ^. Proto.key), mkKey (pair ^. Proto.value))
+
+    mkKey :: ByteString -> Key
+    mkKey =
+      case bucket of
+        Bucket bucketType bucket ->
+          Key bucketType bucket
 
 doIndex ::
      forall r.
@@ -283,7 +356,7 @@ doIndexPage handle request fold =
 -- production cluster.
 --
 -- /Note/: If your backend supports secondary indexes, it is faster to use the
--- 'Riak.ExactQuery.inBucket' query.
+-- 'Riak.SecondaryIndexQuery.inBucket' query.
 --
 -- /See also/: 'streamKeys'
 listKeys ::
@@ -300,7 +373,7 @@ listKeys handle bucket =
 -- production cluster.
 --
 -- /Note/: If your backend supports secondary indexes, it is faster to use the
--- 'Riak.ExactQuery.inBucket' query.
+-- 'Riak.SecondaryIndexQuery.inBucket' query.
 --
 -- /See also/: 'listKeys'
 streamKeys ::

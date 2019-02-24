@@ -38,8 +38,10 @@ module Riak
   , unsetBucketIndex
   , resetBucket
     -- ** Secondary index search
-  , queryExact
-  , queryRange
+  , queryIntIndex
+  , queryIntIndexTerms
+  , queryBinaryIndex
+  , queryBinaryIndexTerms
     -- ** Full key traversals
   , listKeys
   , streamKeys
@@ -60,6 +62,8 @@ module Riak
   , ping
   , getServerInfo
     -- * Types
+  , BinaryIndexQuery(..)
+  , inBucket
   , Bucket(..)
   , BucketProperties(..)
   , BucketType
@@ -85,7 +89,6 @@ module Riak
   , CounterBucketProperties(..)
   , ErlangTerm(..)
   , Error(..)
-  , ExactQuery(..)
   , DeleteError
   , DeleteIndexError
   , DeleteOpts(..)
@@ -105,6 +108,7 @@ module Riak
   , IndexName
   , makeIndexName
   , unsafeMakeIndexName
+  , IntIndexQuery(..)
   , Key(..)
   , keyBucket
   , generatedKey
@@ -134,7 +138,6 @@ module Riak
   , QueryExactError
   , QueryRangeError
   , Quorum(..)
-  , RangeQuery(..)
   , ReadQuorum(..)
   , Schema(..)
   , defaultSchema
@@ -173,16 +176,16 @@ import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ErlangTerm
 import Riak.Error
-import Riak.ExactQuery            (ExactQuery(..))
 import Riak.Index
 import Riak.Key
 import Riak.MapReduce
 import Riak.Object
 import Riak.Quorum                (Quorum(..), ReadQuorum(..), WriteQuorum(..))
-import Riak.RangeQuery            (RangeQuery(..))
 import Riak.Schema
 import Riak.Search
 import Riak.SecondaryIndex        (SecondaryIndex(..))
+import Riak.SecondaryIndexQuery   (BinaryIndexQuery(..), IntIndexQuery(..),
+                                   inBucket)
 import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
 import Riak.Sibling

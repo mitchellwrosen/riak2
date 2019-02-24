@@ -984,7 +984,7 @@ queryParser =
       -> Handle
       -> IO ()
     doQuery bucket index val1 handle =
-      queryExact handle query (Foldl.mapM_ printKey) >>= \case
+      doQuery_ >>= \case
         Left (UnknownError err) -> do
           Text.putStrLn err
           exitFailure
@@ -997,25 +997,35 @@ queryParser =
           pure ()
 
       where
-        query :: ExactQuery
-        query =
+        doQuery_ :: IO (Either QueryRangeError ())
+        doQuery_ =
           case val1 of
             Left s ->
-              ExactQuery
-                { bucket = bucket
-                , index = index
-                , value = Binary s
-                }
-            Right n ->
-              ExactQuery
-                { bucket = bucket
-                , index = index
-                , value = Integer n
-                }
+              queryBinaryIndexTerms
+                handle
+                (BinaryIndexQuery
+                  { bucket = bucket
+                  , index = index
+                  , minValue = s
+                  , maxValue = s
+                  })
+                (Foldl.mapM_
+                  (\(val, Key _ _ key) ->
+                    Text.putStrLn (decodeUtf8 val <> " " <> decodeUtf8 key)))
 
-    printKey :: Key -> IO ()
-    printKey (Key _ _ key) =
-      Text.putStrLn (decodeUtf8 key)
+            Right n ->
+              queryIntIndexTerms
+                handle
+                (IntIndexQuery
+                  { bucket = bucket
+                  , index = index
+                  , minValue = n
+                  , maxValue = n
+                  })
+                (Foldl.mapM_
+                  (\(val, Key _ _ key) ->
+                    Text.putStrLn (Text.pack (show val) <> " " <> decodeUtf8 key)))
+
 
 searchParser :: Parser (Handle -> IO ())
 searchParser =

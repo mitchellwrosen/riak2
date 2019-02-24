@@ -3,16 +3,15 @@ module RiakMapReduceInput
   , toErlangTerm
   ) where
 
-import RiakBucket     (Bucket(..))
-import RiakErlangTerm (ErlangTerm(..))
-import RiakExactQuery (ExactQuery(..))
-import RiakKey        (Key(..))
-import RiakRangeQuery (RangeQuery(..))
+import RiakBinaryIndexQuery (BinaryIndexQuery(..))
+import RiakBucket           (Bucket(..))
+import RiakErlangTerm       (ErlangTerm(..))
+import RiakIntIndexQuery    (IntIndexQuery(..))
+import RiakKey              (Key(..))
+import RiakUtils            (int2bs)
 
+import qualified RiakBinaryIndexQuery    as BinaryIndexQuery
 import qualified RiakErlangTerm          as Erlang
-import qualified RiakExactQuery          as ExactQuery
-import qualified RiakRangeQuery          as RangeQuery
-import qualified RiakSecondaryIndexValue as SecondaryIndexValue
 
 import qualified Data.Vector as Vector
 
@@ -21,8 +20,8 @@ data MapReduceInput
   = MapReduceInputBucket !Bucket
   | MapReduceInputKeys ![Key]
   | MapReduceInputFunction !Text !Text
-  | MapReduceInputExactQuery !ExactQuery
-  | forall a. MapReduceInputRangeQuery !(RangeQuery a)
+  | MapReduceInputIntIndexQuery !IntIndexQuery
+  | MapReduceInputBinaryIndexQuery !BinaryIndexQuery
   -- TODO MapReduceInputSearch
   -- see riak_kv_mapred_term.erl
 
@@ -53,11 +52,27 @@ toErlangTerm = \case
       (ErlAtomUtf8 f)
       (Erlang.list Vector.empty)
 
-  MapReduceInputExactQuery query ->
-    exactQueryToErlangTerm query
+  MapReduceInputIntIndexQuery query ->
+    intIndexQueryToErlangTerm query
 
-  MapReduceInputRangeQuery query ->
-    rangeQueryToErlangTerm query
+  MapReduceInputBinaryIndexQuery query ->
+    binaryIndexQueryToErlangTerm query
+
+intIndexQueryToErlangTerm :: IntIndexQuery -> ErlangTerm
+intIndexQueryToErlangTerm IntIndexQuery { bucket, index, minValue, maxValue } =
+  if minValue == maxValue
+    then exactQueryToErlangTerm bucket index (int2bs minValue)
+    else rangeQueryToErlangTerm bucket index (int2bs minValue) (int2bs maxValue)
+
+binaryIndexQueryToErlangTerm :: BinaryIndexQuery -> ErlangTerm
+binaryIndexQueryToErlangTerm query@(BinaryIndexQuery { bucket, minValue, maxValue }) =
+  if minValue == maxValue
+    then exactQueryToErlangTerm bucket index minValue
+    else rangeQueryToErlangTerm bucket index minValue maxValue
+  where
+    index :: ByteString
+    index =
+      BinaryIndexQuery.indexName query
 
 -- {T, B}
 bucketToErlangTerm :: Bucket -> ErlangTerm
@@ -65,20 +80,29 @@ bucketToErlangTerm (Bucket bucketType bucket) =
   Erlang.tuple2 (ErlBinary bucketType) (ErlBinary bucket)
 
 -- {index, {Type, Bucket}, Index, Key}
-exactQueryToErlangTerm :: ExactQuery -> ErlangTerm
-exactQueryToErlangTerm query@(ExactQuery { bucket, value }) =
+exactQueryToErlangTerm :: Bucket -> ByteString -> ByteString -> ErlangTerm
+exactQueryToErlangTerm bucket index value =
   Erlang.tuple4
-    (ErlAtomUtf8 "index")
+    atomIndex
     (bucketToErlangTerm bucket)
-    (ErlBinary (ExactQuery.name query))
-    (ErlBinary (SecondaryIndexValue.encode value))
+    (ErlBinary index)
+    (ErlBinary value)
 
 -- {index, {Type, Bucket}, Index, StartKey, EndKey}
-rangeQueryToErlangTerm :: RangeQuery a -> ErlangTerm
-rangeQueryToErlangTerm query@(RangeQuery { bucket, min, max }) =
+rangeQueryToErlangTerm ::
+     Bucket
+  -> ByteString
+  -> ByteString
+  -> ByteString
+  -> ErlangTerm
+rangeQueryToErlangTerm bucket index minValue maxValue =
   Erlang.tuple5
-    (ErlAtomUtf8 "index")
+    atomIndex
     (bucketToErlangTerm bucket)
-    (ErlBinary (RangeQuery.name query))
-    (ErlBinary (SecondaryIndexValue.encode min))
-    (ErlBinary (SecondaryIndexValue.encode max))
+    (ErlBinary index)
+    (ErlBinary minValue)
+    (ErlBinary maxValue)
+
+atomIndex :: ErlangTerm
+atomIndex =
+  ErlAtomUtf8 "index"
