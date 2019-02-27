@@ -1,25 +1,18 @@
--- | A Riak handle that "manages" an underlying handle by reconnecting on
--- failure.
---
--- Still TODO: some way of configuring when we want to reconnect, and when we
--- want to give up on the connection permanently.
-
-module Riak.Handle.Impl.Managed
-  ( Handle
-  , HandleConfig(..)
+module RiakManagedBus
+  ( ManagedBus
   , ReconnectSettings(..)
-  , HandleConnectError
-  , HandleConnectionError
-  , withHandle
+  , withManagedBus
   , exchange
   , stream
-  , ManagedHandleCrashed(..)
+  , ManagedBusCrashed(..)
   ) where
 
-import Libriak.Request  (Request)
-import Libriak.Response (Response)
+import Libriak.Connection (ConnectError, ConnectionError, Endpoint)
+import Libriak.Request    (Request)
+import Libriak.Response   (Response)
+import RiakBus            (Bus, withBus)
 
-import qualified Riak.Handle.Signature as Handle
+import qualified RiakBus as Bus
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -30,31 +23,21 @@ import Control.Monad          (when)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, UTCTime, diffUTCTime,
                                getCurrentTime, nominalDiffTimeToSeconds)
-import Data.Void              (Void)
 import Numeric.Natural        (Natural)
 
 
-data Handle
-  = Handle
-  { statusVar :: !(TMVar HandleStatus)
-  , errorVar :: !(TMVar Handle.HandleConnectionError)
-    -- ^ The last error some client received when trying to use the handle.
+data ManagedBus
+  = ManagedBus
+  { statusVar :: !(TMVar Status)
+  , errorVar :: !(TMVar ConnectionError)
+    -- ^ The last error some client received when trying to use the bus.
   }
 
--- Either the handle and which "generation" it is (when 0 dies, 1 replaces it,
+-- Either the bus and which "generation" it is (when 0 dies, 1 replaces it,
 -- etc), or the connection that brought down the manager thread.
-data HandleStatus
-  = HandleDead Handle.HandleConnectError
-  | HandleAlive Handle.Handle Natural
-
-data HandleConfig
-  = HandleConfig
-  { innerConfig :: !Handle.HandleConfig
-    -- ^ The inner handle's config.
-  , reconnectSettings ::
-      !(Handle.HandleConnectError -> Maybe ReconnectSettings)
-    -- ^ How to behave when an error occurs. 'Nothing' means don't reconnect.
-  }
+data Status
+  = Dead ConnectError
+  | Alive Bus Natural
 
 data ReconnectSettings
   = ReconnectSettings
@@ -64,34 +47,30 @@ data ReconnectSettings
     -- ^ Attempt to reconnect periodically until this amount of time has passed.
   }
 
-type HandleConnectError
-  = Void
-
-type HandleConnectionError
-  = Handle.HandleConnectError
-
--- | The handle manager thread crashed, which indicates a bug in this library.
-newtype ManagedHandleCrashed
-  = ManagedHandleCrashed SomeException
+-- | The bus manager thread crashed, which indicates a bug in this library.
+newtype ManagedBusCrashed
+  = ManagedBusCrashed SomeException
   deriving stock (Show)
 
-instance Exception ManagedHandleCrashed where
+instance Exception ManagedBusCrashed where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
 
 
--- | Acquire a handle.
+-- | Acquire a managed bus.
 --
 -- /Throws/. This function will never throw an exception.
-withHandle ::
-     HandleConfig
-  -> (Handle -> IO a)
-  -> IO (Either Void a)
-withHandle config onSuccess = do
-  statusVar :: TMVar HandleStatus <-
+withManagedBus ::
+     Endpoint
+  -> (ConnectError -> Maybe ReconnectSettings)
+  -- ^ How to behave when an error occurs. 'Nothing' means don't reconnect.
+  -> (ManagedBus -> IO a)
+  -> IO a
+withManagedBus endpoint reconnectSettings onSuccess = do
+  statusVar :: TMVar Status <-
     newEmptyTMVarIO
 
-  errorVar :: TMVar Handle.HandleConnectionError <-
+  errorVar :: TMVar ConnectionError <-
     newEmptyTMVarIO
 
   threadId :: ThreadId <-
@@ -101,9 +80,9 @@ withHandle config onSuccess = do
     acquire :: IO ThreadId
     acquire =
       forkIOWithUnmask $ \unmask ->
-        tryAny (unmask (manager config statusVar errorVar)) >>= \case
+        tryAny (unmask (manager endpoint reconnectSettings statusVar errorVar)) >>= \case
           Left err ->
-            throwTo threadId (ManagedHandleCrashed err)
+            throwTo threadId (ManagedBusCrashed err)
           Right () ->
             pure ()
 
@@ -115,12 +94,11 @@ withHandle config onSuccess = do
   bracket
     acquire
     release
-    (\_ -> do
-      Right <$>
-        onSuccess Handle
-          { statusVar = statusVar
-          , errorVar = errorVar
-          })
+    (\_ ->
+      onSuccess ManagedBus
+        { statusVar = statusVar
+        , errorVar = errorVar
+        })
 
 -- The manager thread:
 --
@@ -128,29 +106,30 @@ withHandle config onSuccess = do
 -- * Smuggle it out to the rest of the world via a TMVar.
 -- * Wait for an error to appear in another TMVar, then reconnect.
 --
--- Meanwhile, users of this handle (via exchange/stream) grab the underlying
--- handle (if available), use it, and if anything goes wrong, write to the error
--- TMVar and retry when a new connection is established.
+-- Meanwhile, users of this bus (via exchange/stream) grab the underlying bus
+-- (if available), use it, and if anything goes wrong, write to the error TMVar
+-- and retry when a new connection is established.
 manager ::
-     HandleConfig
-  -> TMVar HandleStatus
-  -> TMVar Handle.HandleConnectionError
+     Endpoint
+  -> (ConnectError -> Maybe ReconnectSettings)
+  -> TMVar Status
+  -> TMVar ConnectionError
   -> IO ()
-manager (HandleConfig innerConfig reconnectSettings) statusVar errorVar = do
+manager endpoint reconnectSettings statusVar errorVar = do
   err <- loop 0 Nothing
-  atomically (putTMVar statusVar (HandleDead err))
+  atomically (putTMVar statusVar (Dead err))
 
   where
     loop ::
          Natural
-         -- ^ The handle generation. Every time we successfully reconnect, it's
+         -- ^ The bus generation. Every time we successfully reconnect, it's
          -- incremented by 1.
-      -> Maybe (UTCTime, NominalDiffTime, Handle.HandleConnectError)
+      -> Maybe (UTCTime, NominalDiffTime, ConnectError)
          -- ^ The last time we tried to reconnect, how long we should sleep for
          -- if we decide to try again, and the original cause.
-      -> IO Handle.HandleConnectError
+      -> IO ConnectError
     loop !generation prev =
-      Handle.withHandle innerConfig (runUntilError generation) >>= \case
+      withBus endpoint (runUntilError generation) >>= \case
         Left connectErr -> do
           putStrLn ("[debug] " ++ show connectErr)
 
@@ -185,40 +164,38 @@ manager (HandleConfig innerConfig reconnectSettings) statusVar errorVar = do
           sleep 1 -- Whoops, kind of want to exponentially back of here too
           loop (generation+1) Nothing
 
-    runUntilError :: Natural -> Handle.Handle -> IO Handle.HandleConnectionError
-    runUntilError generation handle = do
-      -- Clear out any previous errors, and put the healthy handle for
-      -- clients to use
+    runUntilError :: Natural -> Bus -> IO ConnectionError
+    runUntilError generation bus = do
+      -- Clear out any previous errors, and put the healthy bus for clients to
+      -- use
       atomically $ do
         _ <- tryTakeTMVar errorVar
-        putTMVar statusVar (HandleAlive handle generation)
+        putTMVar statusVar (Alive bus generation)
 
-      -- When a client records an error, remove the handle so no more
-      -- clients use it (don't bother clearing out the error var yet)
+      -- When a client records an error, remove the bus so no more clients use
+      -- it (don't bother clearing out the error var yet)
       atomically $ do
         err <- readTMVar errorVar
         _ <- takeTMVar statusVar
         pure err
 
-
-
 -- | Send a request and receive the response (a single message).
 exchange ::
-     Handle
+     ManagedBus
   -> Request
-  -> IO (Either Handle.HandleConnectError Response)
-exchange Handle { statusVar, errorVar } request =
+  -> IO (Either ConnectError Response)
+exchange ManagedBus { statusVar, errorVar } request =
   loop 0
 
   where
-    loop :: Natural -> IO (Either Handle.HandleConnectError Response)
+    loop :: Natural -> IO (Either ConnectError Response)
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->
           pure (Left err)
 
-        Right (handle, gen) ->
-          Handle.exchange handle request >>= \case
+        Right (bus, gen) ->
+          Bus.exchange bus request >>= \case
             Left err -> do
               -- Notify the manager thread of an error (try put, because it's ok
               -- if we are not the first thread to do so)
@@ -233,23 +210,23 @@ exchange Handle { statusVar, errorVar } request =
 -- | Send a request and stream the response (one or more messages).
 stream ::
      ∀ r x.
-     Handle -- ^
+     ManagedBus -- ^
   -> Request -- ^
   -> x
   -> (x -> Response -> IO (Either x r))
-  -> IO (Either Handle.HandleConnectError r)
-stream Handle { statusVar, errorVar } request value step =
+  -> IO (Either ConnectError r)
+stream ManagedBus { statusVar, errorVar } request value step =
   loop 0
 
   where
-    loop :: Natural -> IO (Either Handle.HandleConnectError r)
+    loop :: Natural -> IO (Either ConnectError r)
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->
           pure (Left err)
 
-        Right (handle, gen) ->
-          Handle.stream handle request value step >>= \case
+        Right (bus, gen) ->
+          Bus.stream bus request value step >>= \case
             Left err -> do
               -- Notify the manager thread of an error (try put, because it's ok
               -- if we are not the first thread to do so)
@@ -261,20 +238,20 @@ stream Handle { statusVar, errorVar } request value step =
             Right response ->
               pure (Right response)
 
--- Wait for (at least) the given generation of handle.
+-- Wait for (at least) the given generation of bus.
 waitForGen ::
      Natural
-  -> TMVar HandleStatus
-  -> IO (Either Handle.HandleConnectError (Handle.Handle, Natural))
+  -> TMVar Status
+  -> IO (Either ConnectError (Bus, Natural))
 waitForGen healthyGen statusVar =
   atomically $
     readTMVar statusVar >>= \case
-      HandleDead err ->
+      Dead err ->
         pure (Left err)
 
-      HandleAlive handle gen -> do
+      Alive bus gen -> do
         when (gen < healthyGen) retry
-        pure (Right (handle, gen))
+        pure (Right (bus, gen))
 
 sleep :: NominalDiffTime -> IO ()
 sleep seconds =

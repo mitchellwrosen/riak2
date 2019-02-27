@@ -126,12 +126,15 @@ library riak2-internal
     lens-labels,
     libriak,
     profunctors ^>= 5.3,
+    safe-exceptions,
+    stm,
     text ^>= 1.2.3,
     time,
     unordered-containers ^>= 0.2.9,
     vector,
 
   default-extensions:
+    BangPatterns
     ConstraintKinds
     DataKinds
     DefaultSignatures
@@ -173,6 +176,7 @@ library riak2-internal
     RiakBucket
     RiakBucketProperties
     RiakBucketType
+    RiakBus
     RiakContent
     RiakContext
     RiakConvergentCounter
@@ -184,10 +188,12 @@ library riak2-internal
     RiakErlangTerm
     RiakError
     RiakGetOpts
+    RiakHandle2
     RiakIndex
     RiakIndexName
     RiakIntIndexQuery
     RiakKey
+    RiakManagedBus
     RiakMapReduce
     RiakMapReduceFunction
     RiakMapReducePhase
@@ -219,12 +225,8 @@ library riak2-internal
     src
 
   mixins:
-    base
-      (Control.Applicative, Control.Category, Control.Concurrent,
-        Control.Exception, Control.Monad, Control.Monad.IO.Class,
-        Data.Bifunctor, Data.Bits, Data.Coerce, Data.Fixed, Data.Function,
-        Data.Int, Data.Kind, Data.List, Data.List.NonEmpty, Data.Maybe,
-        Data.Word, GHC.Generics, Numeric.Natural, Prelude as GHC.Prelude)
+    base hiding (Prelude),
+    base (Prelude as GHC.Prelude)
 
   other-modules:
     Prelude

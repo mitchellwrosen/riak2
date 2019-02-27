@@ -1,7 +1,6 @@
 module RiakProtoContent where
 
 import qualified Libriak.Proto as Proto
-import qualified RiakProtoPair as Pair
 
 import Control.Lens          ((.~), (^.))
 import Data.List             (foldl')
