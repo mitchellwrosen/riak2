@@ -29,6 +29,7 @@ import Data.Word
 import Net.IPv4              (IPv4, ipv4)
 import Numeric.Natural       (Natural)
 import Options.Applicative   hiding (UnknownError, infoParser)
+import System.Environment    (lookupEnv)
 import System.Exit           (exitFailure)
 import Text.Printf           (printf)
 import Text.Read             (readMaybe)
@@ -46,14 +47,16 @@ import qualified Net.IPv4               as IPv4
 
 main :: IO ()
 main = do
-  ((host, port), verbose, run) <-
+  (host, port) <-
+    parseHost
+
+  (verbose, run) <-
     (customExecParser
       (prefs (showHelpOnEmpty <> showHelpOnError))
       (info
         (helper <*>
-          ((,,)
-            <$> nodeParser
-            <*> verboseParser
+          ((,)
+            <$> verboseParser
             <*> commandParser))
         (progDesc "Riak command-line client")))
 
@@ -95,6 +98,37 @@ main = do
 
     Right () ->
       pure ()
+
+  where
+    parseHost :: IO (IPv4, Word16)
+    parseHost =
+      lookupEnv "RIAKC_HOST" >>= \case
+        Nothing ->
+          pure (localhost, 8087)
+
+        Just string ->
+          case span (/= ':') string of
+            (mkHost -> Just host, mkPort -> Just port) ->
+              pure (host, port)
+            _ -> do
+              putStrLn "$RIAKC_HOST expected 'host' or 'host:port'"
+              exitFailure
+
+    mkHost :: String -> Maybe IPv4
+    mkHost = \case
+      "" -> Just localhost
+      "localhost" -> Just localhost
+      host -> IPv4.decode (Text.pack host)
+
+    mkPort :: String -> Maybe Word16
+    mkPort = \case
+      "" -> Just 8087
+      ':' : port -> readMaybe port
+      _ -> Nothing
+
+    localhost :: IPv4
+    localhost =
+      ipv4 127 0 0 1
 
 nodeParser :: Parser (IPv4, Word16)
 nodeParser =
