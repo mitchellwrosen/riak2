@@ -1,5 +1,6 @@
 module Libriak.Request
   ( Request(..)
+  , EncodedRequest(..)
   , encodeRequest
   ) where
 
@@ -41,7 +42,10 @@ data Request
   | ReqRpbYokozunaSchemaPut RpbYokozunaSchemaPutReq
   deriving stock (Show)
 
-encodeRequest :: Request -> [ByteArray]
+newtype EncodedRequest
+  = EncodedRequest { unEncodedRequest :: [ByteArray] }
+
+encodeRequest :: Request -> EncodedRequest
 encodeRequest = \case
   ReqDtFetch                request -> go 80 request
   ReqDtUpdate               request -> go 82 request
@@ -67,11 +71,12 @@ encodeRequest = \case
   ReqRpbYokozunaSchemaPut   request -> go 60 request
 
   where
-    go :: Proto.Message a => Word8 -> a -> [ByteArray]
+    go :: Proto.Message a => Word8 -> a -> EncodedRequest
     go code (Proto.encodeMessage -> PS (ForeignPtr addr _) offset len) =
-      [ runST makeCodeByteArray
-      , runST makeRequestByteArray
-      ]
+      EncodedRequest
+        [ runST makeCodeByteArray
+        , runST makeRequestByteArray
+        ]
       where
         makeCodeByteArray :: ST s ByteArray
         makeCodeByteArray = do

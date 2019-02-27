@@ -17,13 +17,12 @@ module Libriak.Connection
 import Libriak.Internal.Connection (ConnectException(..), Connection,
                                     Endpoint(..), Interruptibility(..),
                                     ReceiveException(..), SendException(..))
-import Libriak.Request             (Request, encodeRequest)
-import Libriak.Response            (DecodeError(..), Response, parseResponse)
+import Libriak.Request             (EncodedRequest(..))
+import Libriak.Response            (DecodeError(..), EncodedResponse(..))
 
 import qualified Libriak.Internal.Connection as Connection
 
-import Control.Exception (throwIO)
-import Data.Bifunctor    (first)
+import Data.Bifunctor (bimap, first)
 
 
 data ConnectError
@@ -57,31 +56,18 @@ withConnection endpoint onSuccess =
 -- /Throws/. This function will never throw an exception.
 send ::
      Connection
-  -> Request
+  -> EncodedRequest
   -> IO (Either ConnectionError ())
-send conn request =
+send conn (EncodedRequest request) =
   first fromSendException <$>
-    Connection.send conn (encodeRequest request)
+    Connection.send conn request
 
 -- | Receive a response.
---
--- /Throws/. If response decoding fails, which should never happen, throws
--- 'DecodeError'.
 receive ::
      Connection
-  -> IO (Either ConnectionError Response)
-receive conn =
-  Connection.receive conn >>= \case
-    Left err ->
-      pure (Left (fromReceiveException err))
-
-    Right bytes ->
-      case parseResponse bytes of
-        Left err ->
-          throwIO err
-
-        Right response ->
-          pure (Right response)
+  -> IO (Either ConnectionError EncodedResponse)
+receive =
+  fmap (bimap fromReceiveException EncodedResponse) . Connection.receive
 
 fromConnectException ::
      ConnectException 'Uninterruptible

@@ -14,6 +14,7 @@ import Data.Function          as X ((&))
 import Data.HashMap.Strict    as X (HashMap)
 import Data.HashSet           as X (HashSet)
 import Data.Int               as X (Int64)
+import Data.IORef             as X
 import Data.Kind              as X (Type)
 import Data.List.NonEmpty     as X (NonEmpty)
 import Data.Maybe             as X (fromMaybe)

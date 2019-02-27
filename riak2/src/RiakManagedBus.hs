@@ -7,10 +7,10 @@ module RiakManagedBus
   , ManagedBusCrashed(..)
   ) where
 
-import Libriak.Connection (ConnectError, ConnectionError, Endpoint)
+import Libriak.Connection (ConnectError, Endpoint)
 import Libriak.Request    (Request)
 import Libriak.Response   (Response)
-import RiakBus            (Bus, withBus)
+import RiakBus            (Bus, BusError, withBus)
 
 import qualified RiakBus as Bus
 
@@ -29,7 +29,7 @@ import Numeric.Natural        (Natural)
 data ManagedBus
   = ManagedBus
   { statusVar :: !(TMVar Status)
-  , errorVar :: !(TMVar ConnectionError)
+  , errorVar :: !(TMVar BusError)
     -- ^ The last error some client received when trying to use the bus.
   }
 
@@ -70,7 +70,7 @@ withManagedBus endpoint reconnectSettings onSuccess = do
   statusVar :: TMVar Status <-
     newEmptyTMVarIO
 
-  errorVar :: TMVar ConnectionError <-
+  errorVar :: TMVar BusError <-
     newEmptyTMVarIO
 
   threadId :: ThreadId <-
@@ -113,7 +113,7 @@ manager ::
      Endpoint
   -> (ConnectError -> Maybe ReconnectSettings)
   -> TMVar Status
-  -> TMVar ConnectionError
+  -> TMVar BusError
   -> IO ()
 manager endpoint reconnectSettings statusVar errorVar = do
   err <- loop 0 Nothing
@@ -164,7 +164,7 @@ manager endpoint reconnectSettings statusVar errorVar = do
           sleep 1 -- Whoops, kind of want to exponentially back of here too
           loop (generation+1) Nothing
 
-    runUntilError :: Natural -> Bus -> IO ConnectionError
+    runUntilError :: Natural -> Bus -> IO BusError
     runUntilError generation bus = do
       -- Clear out any previous errors, and put the healthy bus for clients to
       -- use

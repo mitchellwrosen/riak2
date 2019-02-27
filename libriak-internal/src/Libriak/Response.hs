@@ -1,6 +1,7 @@
 module Libriak.Response
   ( Response(..)
-  , parseResponse
+  , EncodedResponse(..)
+  , decodeResponse
   , DecodeError(..)
   ) where
 
@@ -40,11 +41,13 @@ data Response
   | RespRpbYokozunaSchemaGet RpbYokozunaSchemaGetResp
   deriving stock (Show)
 
--- | Parse a response, which consists of a 1-byte message code and a payload.
--- This function assumes the 4-byte, big-endian length prefix has already been
--- stripped.
-parseResponse :: ByteArray -> Either DecodeError Response
-parseResponse bytes =
+-- | An encoded response, which consists of a 1-byte message code and a protobuf
+-- payload. The 4-byte big-endian length prefix has already been stripped.
+newtype EncodedResponse
+  = EncodedResponse { unEncodedResponse :: ByteArray }
+
+decodeResponse :: EncodedResponse -> Either DecodeError Response
+decodeResponse (EncodedResponse bytes) =
   decode (indexByteArray bytes 0) (runST makeByteStringFromPayload)
   where
     makeByteStringFromPayload :: ST s ByteString
