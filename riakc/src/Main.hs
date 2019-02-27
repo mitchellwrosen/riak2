@@ -161,30 +161,49 @@ verboseParser =
 
 commandParser :: Parser (Handle -> IO ())
 commandParser =
-  hsubparser
-    (mconcat
-      [ command "delete" (info deleteParser (progDesc "Delete an object"))
-      , command "delete-index" (info deleteIndexParser (progDesc "Delete an index"))
-      , command "get" (info getParser (progDesc "Get an object"))
-      , command "get-bucket" (info getBucketParser (progDesc "Get a bucket type or bucket"))
-      , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
-      , command "get-index" (info getIndexParser (progDesc "Get an index, or all indexes"))
-      , command "get-map" (info getMapParser (progDesc "Get a map"))
-      , command "get-schema" (info getSchemaParser (progDesc "Get a schema"))
-      , command "get-set" (info getSetParser (progDesc "Get a set"))
-      , command "info" (info infoParser (progDesc "Get server info"))
-      , command "list" (info listParser (progDesc "List buckets or keys"))
-      , command "ping" (info pingParser (progDesc "Ping Riak"))
-      , command "put" (info putParser (progDesc "Put an object"))
-      , command "put-index" (info putIndexParser (progDesc "Put an index"))
-      , command "put-map" (info putMapParser (progDesc "Put a map"))
-      , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
-      , command "put-set" (info putSetParser (progDesc "Put a set"))
-      , command "query" (info queryParser (progDesc "Perform a secondary index query"))
-      , command "search" (info searchParser (progDesc "Perform a search"))
-      , command "set-bucket-index" (info setBucketIndexParser (progDesc "Set a bucket type or bucket's index"))
-      , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
-      ])
+  asum
+    [ hsubparser
+        (mconcat
+          [ commandGroup "Key/value"
+          , command "delete" (info deleteParser (progDesc "Delete an object"))
+          , command "get" (info getParser (progDesc "Get an object"))
+          , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
+          , command "get-map" (info getMapParser (progDesc "Get a map"))
+          , command "get-set" (info getSetParser (progDesc "Get a set"))
+          , command "put" (info putParser (progDesc "Put an object"))
+          , command "put-map" (info putMapParser (progDesc "Put a map"))
+          , command "put-set" (info putSetParser (progDesc "Put a set"))
+          , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
+          ])
+
+    , hsubparser
+        (mconcat
+          [ commandGroup "Search"
+          , command "list" (info listParser (progDesc "List buckets or keys"))
+          , command "query" (info queryParser (progDesc "Perform a secondary index query"))
+          , command "search" (info searchParser (progDesc "Perform a search"))
+          , hidden
+          ])
+
+    , hsubparser
+        (mconcat
+          [ commandGroup "Administration"
+          , command "delete-index" (info deleteIndexParser (progDesc "Delete an index"))
+          , command "get-bucket" (info getBucketParser (progDesc "Get a bucket type or bucket"))
+          , command "get-index" (info getIndexParser (progDesc "Get an index, or all indexes"))
+          , command "get-schema" (info getSchemaParser (progDesc "Get a schema"))
+          , command "put-index" (info putIndexParser (progDesc "Put an index"))
+          , command "put-schema" (info putSchemaParser (progDesc "Put a schema"))
+          , command "set-bucket-index" (info setBucketIndexParser (progDesc "Set a bucket type or bucket's index"))
+          ])
+
+    , hsubparser
+        (mconcat
+          [ commandGroup "Diagnostics"
+          , command "info" (info infoParser (progDesc "Get server info"))
+          , command "ping" (info pingParser (progDesc "Ping Riak"))
+          ])
+    ]
 
 deleteParser :: Parser (Handle -> IO ())
 deleteParser =
