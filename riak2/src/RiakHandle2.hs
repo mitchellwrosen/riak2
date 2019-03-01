@@ -5,7 +5,11 @@ import Libriak.Request    (Request)
 import Libriak.Response   (Response)
 import RiakManagedBus     (ManagedBus, ReconnectSettings, withManagedBus)
 
+import qualified Libriak.Proto  as Proto
 import qualified RiakManagedBus as ManagedBus
+
+import Control.Foldl (FoldM)
+
 
 data Handle
   = Handle
@@ -56,20 +60,22 @@ withHandle HandleConfig { endpoint, reconnectSettings, handlers } callback =
 exchange ::
      Handle -- ^
   -> Request -- ^
-  -> IO (Either ConnectError Response)
-exchange Handle { bus } =
-  ManagedBus.exchange bus
+  -> (Response -> Maybe a) -- ^
+  -> IO (Either ConnectError (Either ByteString a))
+exchange Handle { bus } parse =
+  ManagedBus.exchange bus parse
 
 
 -- | Send a request and stream the response (one or more messages).
 --
 -- /Throws/: If response decoding fails, throws 'DecodeError'.
 stream ::
-     ∀ r x.
-     Handle -- ^
+     ∀ a r.
+     Proto.HasLens' a "done" Bool
+  => Handle -- ^
   -> Request -- ^
-  -> x
-  -> (x -> Response -> IO (Either x r))
-  -> IO (Either ConnectError r)
+  -> (Response -> Maybe a)
+  -> FoldM IO a r
+  -> IO (Either ConnectError (Either ByteString r))
 stream Handle { bus } =
   ManagedBus.stream bus

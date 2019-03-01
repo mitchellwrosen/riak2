@@ -9,12 +9,15 @@ module RiakBus
 import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
                            DecodeError, Endpoint(..))
 import Libriak.Request    (Request, encodeRequest)
-import Libriak.Response   (Response, decodeResponse)
+import Libriak.Response   (Response(..), decodeResponse)
 
 import qualified Libriak.Connection as Connection
+import qualified Libriak.Proto      as Proto
 
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
+import Control.Foldl           (FoldM(..))
+import Control.Lens            ((^.))
 
 
 data Bus
@@ -26,15 +29,18 @@ data Bus
   }
 
 -- | The connection status - it's alive until something goes wrong.
-data Status
-  = Alive Connection
-  | Dead BusError
+data Status :: Type where
+  Alive :: !Connection -> Status
+  Dead :: !BusError -> Status
 
-data BusError
-  = BusConnectionError ConnectionError
-  -- ^ A connection error occurred during a send or receive.
-  | BusDecodeError DecodeError
-  -- ^ A protobuf decode error occurred.
+data BusError :: Type where
+  -- | A connection error occurred during a send or receive.
+  BusConnectionError :: !ConnectionError -> BusError
+  -- | A protobuf decode error occurred.
+  BusDecodeError :: !DecodeError -> BusError
+  -- | A response with an unexpcected message code was received.
+  -- TODO put request/response inside
+  BusUnexpectedResponseError :: BusError
   deriving stock (Show)
 
 -- | Acquire a bus.
@@ -73,15 +79,45 @@ withConnection bus callback =
     Dead err ->
       pure (Left err)
 
+receive ::
+     (Response -> Maybe a)
+  -> Connection
+  -> IO (Either BusError (Either ByteString a))
+receive parse connection =
+  Connection.receive connection >>= \case
+    Left err ->
+      pure (Left (BusConnectionError err))
+
+    Right bytes ->
+      case decodeResponse bytes of
+        Left err ->
+          pure (Left (BusDecodeError err))
+
+        Right response ->
+          case response of
+            RespRpbError err ->
+              pure (Right (Left (err ^. Proto.errmsg)))
+
+            _ ->
+              case parse response of
+                Nothing ->
+                  pure (Left BusUnexpectedResponseError)
+
+                Just response ->
+                  pure (Right (Right response))
+
 -- | Send a request and receive the response (a single message).
 --
 -- TODO: Handle sooo many race conditions wrt. async exceptions (important use
 -- case: killing a thread after a timeout)
+--
+-- TODO: who puts Dead to the status, and how?
 exchange ::
      Bus -- ^
   -> Request -- ^
-  -> IO (Either BusError Response)
-exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
+  -> (Response -> Maybe a) -- ^
+  -> IO (Either BusError (Either ByteString a))
+exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request parse =
   withConnection bus $ \connection -> do
     -- Try sending, which either results in an error, or two empty TMVars: one
     -- that will fill when it's our turn to receive, and one that we must fill
@@ -116,18 +152,13 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
 
         case waitResult of
           Nothing ->
-            Connection.receive connection >>= \case
+            receive parse connection >>= \case
               Left err ->
-                pure (Left (BusConnectionError err))
+                pure (Left err)
 
-              Right bytes ->
-                case decodeResponse bytes of
-                  Left err ->
-                    pure (Left (BusDecodeError err))
-
-                  Right response -> do
-                    atomically (putTMVar doneVar ())
-                    pure (Right response)
+              Right response -> do
+                atomically (putTMVar doneVar ())
+                pure (Right response)
 
           Just err ->
             pure (Left err)
@@ -136,13 +167,14 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
 --
 -- /Throws/: If response decoding fails, throws 'DecodeError'.
 stream ::
-     ∀ r x.
-     Bus -- ^
+     ∀ a r.
+     Proto.HasLens' a "done" Bool
+  => Bus -- ^
   -> Request -- ^
-  -> x
-  -> (x -> Response -> IO (Either x r))
-  -> IO (Either BusError r)
-stream bus@(Bus { sendLock }) request value0 step =
+  -> (Response -> Maybe a)
+  -> FoldM IO a r
+  -> IO (Either BusError (Either ByteString r))
+stream bus@(Bus { sendLock }) request parse (FoldM step (initial :: IO x) extract) =
   withConnection bus $ \connection ->
     -- Riak request handling state machine is odd. Streaming responses are
     -- special; when one is active, no other requests can be serviced on this
@@ -157,22 +189,19 @@ stream bus@(Bus { sendLock }) request value0 step =
 
         Right () ->
           let
-            consume :: x -> IO (Either BusError r)
+            consume :: x -> IO (Either BusError (Either ByteString r))
             consume value =
-              Connection.receive connection >>= \case
+              receive parse connection >>= \case
                 Left err ->
-                  pure (Left (BusConnectionError err))
+                  pure (Left err)
 
-                Right bytes ->
-                  case decodeResponse bytes of
-                    Left err ->
-                      pure (Left (BusDecodeError err))
+                Right (Left err) ->
+                  pure (Right (Left err))
 
-                    Right response ->
-                      step value response >>= \case
-                        Left newValue ->
-                          consume newValue
-                        Right result ->
-                          pure (Right result)
+                Right (Right response) -> do
+                  newValue <- step value response
+                  if response ^. Proto.done
+                    then Right . Right <$> extract newValue
+                    else consume newValue
           in
-            consume value0
+            consume =<< initial

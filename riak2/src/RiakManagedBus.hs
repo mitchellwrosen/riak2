@@ -12,13 +12,15 @@ import Libriak.Request    (Request)
 import Libriak.Response   (Response)
 import RiakBus            (Bus, BusError, withBus)
 
-import qualified RiakBus as Bus
+import qualified Libriak.Proto as Proto
+import qualified RiakBus       as Bus
 
 import Control.Concurrent
 import Control.Concurrent.STM
 import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
 import Control.Exception.Safe (Exception(..), SomeException, bracket, tryAny)
+import Control.Foldl          (FoldM)
 import Control.Monad          (when)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, UTCTime, diffUTCTime,
@@ -181,21 +183,23 @@ manager endpoint reconnectSettings statusVar errorVar = do
 
 -- | Send a request and receive the response (a single message).
 exchange ::
+     forall a.
      ManagedBus
   -> Request
-  -> IO (Either ConnectError Response)
-exchange ManagedBus { statusVar, errorVar } request =
+  -> (Response -> Maybe a)
+  -> IO (Either ConnectError (Either ByteString a))
+exchange ManagedBus { statusVar, errorVar } request parse =
   loop 0
 
   where
-    loop :: Natural -> IO (Either ConnectError Response)
+    loop :: Natural -> IO (Either ConnectError (Either ByteString a))
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->
           pure (Left err)
 
         Right (bus, gen) ->
-          Bus.exchange bus request >>= \case
+          Bus.exchange bus request parse >>= \case
             Left err -> do
               -- Notify the manager thread of an error (try put, because it's ok
               -- if we are not the first thread to do so)
@@ -209,24 +213,25 @@ exchange ManagedBus { statusVar, errorVar } request =
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
-     ∀ r x.
-     ManagedBus -- ^
+     ∀ a r.
+     Proto.HasLens' a "done" Bool
+  => ManagedBus -- ^
   -> Request -- ^
-  -> x
-  -> (x -> Response -> IO (Either x r))
-  -> IO (Either ConnectError r)
-stream ManagedBus { statusVar, errorVar } request value step =
+  -> (Response -> Maybe a)
+  -> FoldM IO a r
+  -> IO (Either ConnectError (Either ByteString r))
+stream ManagedBus { statusVar, errorVar } request parse responseFold =
   loop 0
 
   where
-    loop :: Natural -> IO (Either ConnectError r)
+    loop :: Natural -> IO (Either ConnectError (Either ByteString r))
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->
           pure (Left err)
 
         Right (bus, gen) ->
-          Bus.stream bus request value step >>= \case
+          Bus.stream bus request parse responseFold >>= \case
             Left err -> do
               -- Notify the manager thread of an error (try put, because it's ok
               -- if we are not the first thread to do so)
