@@ -22,6 +22,7 @@ import Data.Maybe              as X (fromMaybe)
 import Data.Set                as X (Set)
 import Data.Text               as X (Text)
 import Data.Word               as X (Word32, Word64, Word8)
+import GHC.Clock               as X (getMonotonicTimeNSec)
 import GHC.Generics            as X (Generic)
 import GHC.Prelude             as X
 import Numeric.Natural         as X (Natural)

@@ -26,21 +26,20 @@ import GHC.TypeLits           (KnownNat)
 
 data Bus
   = Bus
-  { statusVar :: !(TVar Status)
+  { connVar :: !(TMVar Connection)
+    -- ^ The connection. Starts out full, but once a connection error occurs,
+    -- becomes empty permanently.
   , sendLock :: !(MVar ())
     -- ^ Lock acquired during sending a request.
   , doneVarRef :: !(IORef (TMVar ()))
+  , lastUsedRef :: !(IORef Word64)
+    -- ^ The last time the bus was used.
   , handlers :: !EventHandlers
   }
 
--- | The connection status - it's alive until something goes wrong. Subsequent
--- attempts to use the bus will continue returning the same 'BusError' that
--- brought it down initially.
-data Status :: Type where
-  Alive :: !Connection -> Status
-  Dead :: !BusError -> Status
-
 data BusError :: Type where
+  -- | The bus is permanently closed.
+  BusClosedError :: BusError
   -- | A connection error occurred during a send or receive.
   BusConnectionError :: !ConnectionError -> BusError
   -- | A protobuf decode error occurred.
@@ -83,14 +82,18 @@ withBus endpoint handlers callback = do
   doneVarRef :: IORef (TMVar ()) <-
     newIORef =<< newTMVarIO ()
 
+  lastUsedRef :: IORef Word64 <-
+    newIORef =<< getMonotonicTimeNSec
+
   Connection.withConnection endpoint $ \connection -> do
-    statusVar :: TVar Status <-
-      newTVarIO (Alive connection)
+    connVar :: TMVar Connection <-
+      newTMVarIO connection
 
     callback Bus
-      { statusVar = statusVar
+      { connVar = connVar
       , sendLock = sendLock
       , doneVarRef = doneVarRef
+      , lastUsedRef = lastUsedRef
       , handlers = handlers
       }
 
@@ -104,13 +107,18 @@ withConnection ::
      Bus
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
-withConnection Bus { handlers, statusVar } callback =
-  readTVarIO statusVar >>= \case
-    Alive connection ->
+withConnection Bus { connVar, handlers, lastUsedRef } callback =
+  atomically (tryReadTMVar connVar) >>= \case
+    Just connection -> do
+      writeIORef lastUsedRef =<< getMonotonicTimeNSec
+
       callback connection >>= \case
         Left err -> do
-          atomically (writeTVar statusVar (Dead err))
+          void (atomically (tryTakeTMVar connVar))
+
           case err of
+            BusClosedError ->
+              debug "bus closed"
             BusConnectionError err ->
               onConnectionError handlers err
             BusDecodeError err ->
@@ -123,8 +131,8 @@ withConnection Bus { handlers, statusVar } callback =
         Right result ->
           pure (Right result)
 
-    Dead err ->
-      pure (Left err)
+    Nothing ->
+      pure (Left BusClosedError)
 
 send ::
      EventHandlers
@@ -164,7 +172,7 @@ exchange ::
   => Bus -- ^
   -> Request code -- ^
   -> IO (Either BusError (Either (Response 0) (Response code)))
-exchange bus@(Bus { statusVar, sendLock, doneVarRef, handlers }) request =
+exchange bus@(Bus { connVar, sendLock, doneVarRef, handlers }) request =
   withConnection bus $ \connection -> do
     -- Try sending, which either results in an error, or two empty TMVars: one
     -- that will fill when it's our turn to receive, and one that we must fill
@@ -186,16 +194,15 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef, handlers }) request =
         pure (Left err)
 
       Right (prevDoneVar, doneVar) -> do
-        -- It's a race: either something goes wrong somewhere (at which point
-        -- the connection status var will be filled with a bus error), or
-        -- everything goes well and it becomes our turn to receive.
+        -- It's a race: either a previous request fails, or everything goes well
+        -- and it finally becomes our turn to receive.
         waitResult :: Maybe BusError <-
           atomically $ do
             (Nothing <$ readTMVar prevDoneVar)
             <|>
-            (readTVar statusVar >>= \case
-              Alive _ -> retry
-              Dead err -> pure (Just err))
+            (tryReadTMVar connVar >>= \case
+              Nothing -> pure (Just BusClosedError)
+              Just _ -> retry)
 
         case waitResult of
           Nothing ->

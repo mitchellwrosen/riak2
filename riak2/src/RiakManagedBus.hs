@@ -171,7 +171,10 @@ manager endpoint handlers statusVar =
 
       where
         loop :: IO ()
-        loop =
+        loop = do
+          -- TODO configurable ping frequency
+          threadDelay (3*1000*1000)
+
           Bus.ping bus >>= \case
             Left err -> do
               debug ("ping " ++ show err)
@@ -181,8 +184,6 @@ manager endpoint handlers statusVar =
             -- TODO manager thread third state: "unhealthy"
             Right response -> do
               debug ("ping " ++ show response)
-              -- TODO configurable ping frequency
-              threadDelay (3*1000*1000)
               loop
 
 withBus ::
