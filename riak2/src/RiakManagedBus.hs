@@ -1,18 +1,20 @@
 module RiakManagedBus
   ( ManagedBus
-  , ReconnectSettings(..)
+  , ManagedBusError(..)
   , withManagedBus
   , exchange
   , stream
   , ManagedBusCrashed(..)
   ) where
 
-import Libriak.Connection (ConnectError, Endpoint)
-import Libriak.Request    (Request)
-import Libriak.Response   (Response)
-import RiakBus            (Bus, BusError, EventHandlers(..), withBus)
+import Libriak.Connection (ConnectError, ConnectionError, Endpoint)
+import Libriak.Request    (Request(..))
+import Libriak.Response   (DecodeError, Response)
+import RiakBus            (Bus, BusError(..), EventHandlers(..))
+import RiakDebug          (debug)
 
-import qualified RiakBus as Bus
+import qualified Libriak.Proto as Proto
+import qualified RiakBus       as Bus
 
 import Control.Concurrent
 import Control.Concurrent.STM
@@ -20,35 +22,32 @@ import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
 import Control.Exception.Safe (Exception(..), SomeException, bracket, tryAny)
 import Control.Foldl          (FoldM)
-import Control.Monad          (when)
 import Data.Fixed             (Fixed(..))
-import Data.Time.Clock        (NominalDiffTime, UTCTime, diffUTCTime,
-                               getCurrentTime, nominalDiffTimeToSeconds)
+import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
 import GHC.TypeLits           (KnownNat)
-import Numeric.Natural        (Natural)
 
 
 data ManagedBus
   = ManagedBus
-  { statusVar :: !(TMVar Status)
-  , errorVar :: !(TMVar BusError)
-    -- ^ The last error some client received when trying to use the bus.
+  { statusVar :: !(TVar Status)
   , handlers :: !EventHandlers
   }
 
--- Either the bus and which "generation" it is (when 0 dies, 1 replaces it,
--- etc), or the connection that brought down the manager thread.
-data Status
-  = Dead ConnectError
-  | Alive Bus Natural
+data Status :: Type where
+  Connecting :: Status
+  Alive :: !Bus -> Status
 
-data ReconnectSettings
-  = ReconnectSettings
-  { initialDelay :: !NominalDiffTime
-    -- ^ How long to delay before reconnecting for the first time.
-  , retryFor :: !NominalDiffTime
-    -- ^ Attempt to reconnect periodically until this amount of time has passed.
-  }
+data ManagedBusError :: Type where
+  -- | The bus is currently connecting.
+  ManagedBusConnectingError :: ManagedBusError
+  -- | A connection error occurred during a send or receive.
+  ManagedBusConnectionError :: !ConnectionError -> ManagedBusError
+  -- | A protobuf decode error occurred.
+  ManagedBusDecodeError :: !DecodeError -> ManagedBusError
+  -- | A response with an unexpcected message code was received.
+  -- TODO put request/response inside
+  ManagedBusUnexpectedResponseError :: ManagedBusError
+  deriving stock (Eq, Show)
 
 -- | The bus manager thread crashed, which indicates a bug in this library.
 newtype ManagedBusCrashed
@@ -65,17 +64,12 @@ instance Exception ManagedBusCrashed where
 -- /Throws/. This function will never throw an exception.
 withManagedBus ::
      Endpoint
-  -> (ConnectError -> Maybe ReconnectSettings)
-  -- ^ How to behave when an error occurs. 'Nothing' means don't reconnect.
   -> EventHandlers
   -> (ManagedBus -> IO a)
   -> IO a
-withManagedBus endpoint reconnectSettings handlers callback = do
-  statusVar :: TMVar Status <-
-    newEmptyTMVarIO
-
-  errorVar :: TMVar BusError <-
-    newEmptyTMVarIO
+withManagedBus endpoint handlers callback = do
+  statusVar :: TVar Status <-
+    newTVarIO Connecting
 
   threadId :: ThreadId <-
     myThreadId
@@ -84,7 +78,7 @@ withManagedBus endpoint reconnectSettings handlers callback = do
     acquire :: IO ThreadId
     acquire =
       forkIOWithUnmask $ \unmask ->
-        tryAny (unmask (manager endpoint reconnectSettings handlers statusVar errorVar)) >>= \case
+        tryAny (unmask (manager endpoint handlers statusVar)) >>= \case
           Left err ->
             throwTo threadId (ManagedBusCrashed err)
           Right () ->
@@ -101,86 +95,82 @@ withManagedBus endpoint reconnectSettings handlers callback = do
     (\_ ->
       callback ManagedBus
         { statusVar = statusVar
-        , errorVar = errorVar
         , handlers = handlers
         })
 
--- The manager thread:
---
--- * Acquire an underlying connection.
--- * Smuggle it out to the rest of the world via a TMVar.
--- * Wait for an error to appear in another TMVar, then reconnect.
---
--- Meanwhile, users of this bus (via exchange/stream) grab the underlying bus
--- (if available), use it, and if anything goes wrong, write to the error TMVar
--- and retry when a new connection is established.
 manager ::
      Endpoint
-  -> (ConnectError -> Maybe ReconnectSettings)
   -> EventHandlers
-  -> TMVar Status
-  -> TMVar BusError
+  -> TVar Status
   -> IO ()
-manager endpoint reconnectSettings handlers statusVar errorVar = do
-  err <- loop 0 Nothing
-  atomically (putTMVar statusVar (Dead err))
+manager endpoint handlers statusVar =
+  reconnect 1 loop
 
   where
-    loop ::
-         Natural
-         -- ^ The bus generation. Every time we successfully reconnect, it's
-         -- incremented by 1.
-      -> Maybe (UTCTime, NominalDiffTime, ConnectError)
-         -- ^ The last time we tried to reconnect, how long we should sleep for
-         -- if we decide to try again, and the original cause.
-      -> IO ConnectError
-    loop !generation prev =
-      withBus endpoint handlers (runUntilError generation) >>= \case
-        Left connectErr ->
-          case reconnectSettings connectErr of
-            Nothing ->
-              pure connectErr
+    reconnect ::
+         forall r.
+         NominalDiffTime
+      -> (Bus -> IO r)
+      -> IO r
+    reconnect seconds callback = do
+      result :: Either ConnectError (Maybe r) <-
+        Bus.withBus endpoint handlers $ \bus ->
+          Bus.exchange bus (ReqRpbPing Proto.defMessage) >>= \case
+            Left err -> do
+              debug (show err ++ ", sleeping for " ++ show seconds)
+              pure Nothing
 
-            Just (ReconnectSettings initialDelay retryFor) ->
-              case prev of
-                -- This is not the first failure, in fact, it is a repeat.
-                -- Consult the retry settings for whether we should try again
-                -- or give up.
-                Just (t0, sleepFor, prevErr) | connectErr == prevErr -> do
-                  t1 <- getCurrentTime
-                  if t1 `diffUTCTime` t0 <= retryFor
-                    then do
-                      sleep sleepFor
-                      loop generation (Just (t0, sleepFor * 1.5, prevErr))
-                    else
-                      pure connectErr
+            Right (Left err) -> do
+              debug (show err ++ ", sleeping for " ++ show seconds)
+              pure Nothing
 
-                -- This is either the first failure, or a different failure than
-                -- last time. Sleep for the initial delay, then re-enter the
-                -- loop with an initial sleep time of 1 second.
-                _ -> do
-                  sleep initialDelay
-                  t0 <- getCurrentTime
-                  loop generation (Just (t0, initialDelay * 1.5, connectErr))
+            Right (Right _) ->
+              Just <$> callback bus
 
-        Right connectionErr -> do
-          sleep 1 -- Whoops, kind of want to exponentially back of here too
-          loop (generation+1) Nothing
+      case result of
+        Left err -> do
+          debug (show err ++ ", sleeping for " ++ show seconds)
+          sleep seconds
+          reconnect (seconds * 1.5) callback
 
-    runUntilError :: Natural -> Bus -> IO BusError
-    runUntilError generation bus = do
-      -- Clear out any previous errors, and put the healthy bus for clients to
-      -- use
+        Right Nothing -> do
+          sleep seconds
+          reconnect (seconds * 1.5) callback
+
+        Right (Just result) ->
+          pure result
+
+    loop :: Bus -> IO a
+    loop bus = do
+      atomically (writeTVar statusVar (Alive bus))
+
       atomically $ do
-        _ <- tryTakeTMVar errorVar
-        putTMVar statusVar (Alive bus generation)
+        readTVar statusVar >>= \case
+          Connecting -> pure ()
+          Alive{} -> retry
 
-      -- When a client records an error, remove the bus so no more clients use
-      -- it (don't bother clearing out the error var yet)
-      atomically $ do
-        err <- readTMVar errorVar
-        _ <- takeTMVar statusVar
-        pure err
+      reconnect 1 loop
+
+withBus ::
+     ManagedBus
+  -> (Bus -> IO (Either BusError a))
+  -> IO (Either ManagedBusError a)
+withBus ManagedBus { statusVar } callback =
+  readTVarIO statusVar >>= \case
+    Connecting ->
+      pure (Left ManagedBusConnectingError)
+
+    Alive bus ->
+      first fromBusError <$>
+        callback bus
+
+  where
+    fromBusError :: BusError -> ManagedBusError
+    fromBusError = \case
+      BusConnectionError err -> ManagedBusConnectionError err
+      BusDecodeError err -> ManagedBusDecodeError err
+      BusUnexpectedResponseError -> ManagedBusUnexpectedResponseError
+
 
 -- | Send a request and receive the response (a single message).
 exchange ::
@@ -188,31 +178,9 @@ exchange ::
      KnownNat code
   => ManagedBus
   -> Request code
-  -> IO (Either ConnectError (Either (Response 0) (Response code)))
-exchange ManagedBus { statusVar, errorVar } request =
-  loop 0
-
-  where
-    loop ::
-         Natural
-      -> IO (Either ConnectError (Either (Response 0) (Response code)))
-    loop !healthyGen =
-      waitForGen healthyGen statusVar >>= \case
-        Left err ->
-          pure (Left err)
-
-        Right (bus, gen) ->
-          Bus.exchange bus request >>= \case
-            Left err -> do
-              -- Notify the manager thread of an error (try put, because it's ok
-              -- if we are not the first thread to do so)
-              _ <- atomically (tryPutTMVar errorVar err)
-
-              -- Try again once the connection is re-established.
-              loop (gen + 1)
-
-            Right response ->
-              pure (Right response)
+  -> IO (Either ManagedBusError (Either (Response 0) (Response code)))
+exchange managedBus request =
+  withBus managedBus (\bus -> Bus.exchange bus request)
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
@@ -221,44 +189,9 @@ stream ::
   => ManagedBus -- ^
   -> Request code -- ^
   -> FoldM IO (Response code) r
-  -> IO (Either ConnectError (Either (Response 0) r))
-stream ManagedBus { statusVar, errorVar } request responseFold =
-  loop 0
-
-  where
-    loop :: Natural -> IO (Either ConnectError (Either (Response 0) r))
-    loop !healthyGen =
-      waitForGen healthyGen statusVar >>= \case
-        Left err ->
-          pure (Left err)
-
-        Right (bus, gen) ->
-          Bus.stream bus request responseFold >>= \case
-            Left err -> do
-              -- Notify the manager thread of an error (try put, because it's ok
-              -- if we are not the first thread to do so)
-              _ <- atomically (tryPutTMVar errorVar err)
-
-              -- Try again once the connection is re-established.
-              loop (gen + 1)
-
-            Right response ->
-              pure (Right response)
-
--- Wait for (at least) the given generation of bus.
-waitForGen ::
-     Natural
-  -> TMVar Status
-  -> IO (Either ConnectError (Bus, Natural))
-waitForGen healthyGen statusVar =
-  atomically $
-    readTMVar statusVar >>= \case
-      Dead err ->
-        pure (Left err)
-
-      Alive bus gen -> do
-        when (gen < healthyGen) retry
-        pure (Right (bus, gen))
+  -> IO (Either ManagedBusError (Either (Response 0) r))
+stream managedBus request responseFold =
+  withBus managedBus (\bus -> Bus.stream bus request responseFold)
 
 sleep :: NominalDiffTime -> IO ()
 sleep seconds =

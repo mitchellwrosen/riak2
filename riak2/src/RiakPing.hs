@@ -2,8 +2,7 @@ module RiakPing
   ( ping
   ) where
 
-import Libriak.Connection (ConnectError)
-import RiakHandle         (Handle)
+import RiakHandle (Handle, HandleError)
 
 import qualified RiakHandle as Handle
 
@@ -15,7 +14,7 @@ import Data.ByteString        (ByteString)
 ping ::
      MonadIO m
   => Handle -- ^
-  -> m (Either ConnectError (Either ByteString ()))
+  -> m (Either HandleError (Either ByteString ()))
 ping handle = liftIO $
   (fmap.fmap) (() <$)
     (Handle.ping handle)

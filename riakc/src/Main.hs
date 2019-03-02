@@ -3,12 +3,6 @@
 module Main where
 
 import Riak
-import Riak.Handle.Impl.Exclusive (Endpoint(..), EventHandlers(..))
-import Riak.Handle.Impl.Managed   (Handle)
-
-import qualified Riak.Handle.Impl.Exclusive as Handle.Exclusive
-import qualified Riak.Handle.Impl.Managed   as Handle.Managed
-import qualified Riak.ServerInfo            as ServerInfo
 
 import Control.Arrow         ((***))
 import Control.Lens          (view, (.~), (^.))
@@ -61,43 +55,32 @@ main = do
         (progDesc "Riak command-line client")))
 
   let
-    config :: Handle.Managed.HandleConfig
+    config :: HandleConfig
     config =
-      Handle.Managed.HandleConfig
-        { innerConfig =
-            Handle.Exclusive.HandleConfig
-              { endpoint =
-                  Endpoint
-                    { address = host
-                    , port = port
-                    }
-              , handlers =
-                  Handle.Exclusive.EventHandlers
-                    { onSend =
-                        if verbose
-                          then \msg -> putStrLn (">>> " ++ show msg)
-                          else mempty
-                    , onReceive =
-                        if verbose
-                          then \msg -> putStrLn ("<<< " ++ show msg)
-                          else mempty
-                    }
+      HandleConfig
+        { endpoint =
+            Endpoint
+              { address = host
+              , port = port
               }
-        , reconnectSettings =
-            \_err ->
-              Just Handle.Managed.ReconnectSettings
-                { initialDelay = 1
-                , retryFor = 30
-                }
+        , handlers =
+            EventHandlers
+              { onSend =
+                  if verbose
+                    then \msg -> putStrLn (">>> " ++ show msg)
+                    else mempty
+              , onReceive =
+                  if verbose
+                    then \msg -> putStrLn ("<<< " ++ show msg)
+                    else mempty
+              , onConnectionError =
+                  if verbose
+                    then \err -> putStrLn ("*** " ++ show err)
+                    else mempty
+              }
         }
 
-  Handle.Managed.withHandle config run >>= \case
-    Left err -> do
-      print err
-      exitFailure
-
-    Right () ->
-      pure ()
+  withHandle config run
 
   where
     parseHost :: IO (IPv4, Word16)
@@ -553,7 +536,7 @@ getSetParser =
 infoParser :: Parser (Handle -> IO ())
 infoParser =
   pure $ \handle ->
-    ServerInfo.getServerInfo handle >>= \case
+    getServerInfo handle >>= \case
       Left err -> do
         print err
         exitFailure

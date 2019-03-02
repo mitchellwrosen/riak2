@@ -16,8 +16,6 @@ executable riakc
     , lens
     , optparse-applicative
     , riak2
-    , riak2-handle-impl-exclusive
-    , riak2-handle-impl-managed
     , split
     , text
     , time
@@ -46,9 +44,3 @@ executable riakc
 
   main-is:
     Main.hs
-
-  mixins:
-    riak2 requires
-      (Riak.Handle.Signature as Riak.Handle.Impl.Managed),
-    riak2-handle-impl-managed requires
-      (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive)

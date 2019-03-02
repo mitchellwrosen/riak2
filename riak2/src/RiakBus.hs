@@ -12,14 +12,14 @@ import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
 import Libriak.Request    (Request, encodeRequest)
 import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
                            decodeResponse, responseDone)
+import RiakDebug          (debug)
 
 import qualified Libriak.Connection as Connection
 import qualified Libriak.Response   as Libriak
 
-import Control.Concurrent.MVar
 import Control.Concurrent.STM
-import Control.Foldl           (FoldM(..))
-import GHC.TypeLits            (KnownNat)
+import Control.Foldl          (FoldM(..))
+import GHC.TypeLits           (KnownNat)
 
 
 data Bus
@@ -31,7 +31,9 @@ data Bus
   , handlers :: !EventHandlers
   }
 
--- | The connection status - it's alive until something goes wrong.
+-- | The connection status - it's alive until something goes wrong. Subsequent
+-- attempts to use the bus will continue returning the same 'BusError' that
+-- brought it down initially.
 data Status :: Type where
   Alive :: !Connection -> Status
   Dead :: !BusError -> Status
@@ -49,16 +51,19 @@ data BusError :: Type where
 data EventHandlers
   = EventHandlers
   { onSend :: forall code. Request code -> IO ()
+    -- ^ Called just prior to sending a request.
   , onReceive :: forall code. Response code -> IO ()
+    -- ^ Called just after receiving a response.
+  , onConnectionError :: ConnectionError -> IO ()
   }
 
 instance Monoid EventHandlers where
-  mempty = EventHandlers mempty mempty
+  mempty = EventHandlers mempty mempty mempty
   mappend = (<>)
 
 instance Semigroup EventHandlers where
-  EventHandlers a1 b1 <> EventHandlers a2 b2 =
-    EventHandlers (a1 <> a2) (b1 <> b2)
+  EventHandlers a1 b1 c1 <> EventHandlers a2 b2 c2 =
+    EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
 
 -- | Acquire a bus.
@@ -91,10 +96,24 @@ withConnection ::
      Bus
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
-withConnection bus callback =
-  readTVarIO (statusVar bus) >>= \case
+withConnection Bus { handlers, statusVar } callback =
+  readTVarIO statusVar >>= \case
     Alive connection ->
-      callback connection
+      callback connection >>= \case
+        Left err -> do
+          atomically (writeTVar statusVar (Dead err))
+          case err of
+            BusConnectionError err ->
+              onConnectionError handlers err
+            BusDecodeError err ->
+              debug ("bus decode error: " ++ show err)
+            BusUnexpectedResponseError ->
+              debug "bus unexpected response error"
+
+          pure (Left err)
+
+        Right result ->
+          pure (Right result)
 
     Dead err ->
       pure (Left err)
@@ -132,8 +151,6 @@ receive handlers connection =
 --
 -- TODO: Handle sooo many race conditions wrt. async exceptions (important use
 -- case: killing a thread after a timeout)
---
--- TODO: who puts Dead to the status, and how?
 exchange ::
      KnownNat code
   => Bus -- ^

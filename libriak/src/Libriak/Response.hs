@@ -33,7 +33,7 @@ import qualified Data.ByteString.Internal as ByteString
 data DecodeError
   = ProtobufDecodeError !ByteString !String
   | UnexpectedMessageCode !Word8
-  deriving stock (Show)
+  deriving stock (Eq, Show)
   deriving anyclass (Exception)
 
 data Response :: Nat -> Type where

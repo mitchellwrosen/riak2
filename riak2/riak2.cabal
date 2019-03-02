@@ -187,6 +187,7 @@ library riak2-internal
     RiakConvergentMap
     RiakConvergentMapValue
     RiakConvergentSet
+    RiakDebug
     RiakDeleteOpts
     RiakErlangTerm
     RiakError

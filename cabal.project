@@ -6,7 +6,7 @@ packages:
   -- riak2-handle-impl-managed,
   -- riak2-handle-impl-pipeline,
   -- riak2-handle-impl-striped,
-  -- riakc,
+  riakc,
   ../riak-haskell-client,
   ../riak-haskell-client/protobuf
 

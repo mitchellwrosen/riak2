@@ -1,7 +1,6 @@
 module Riak.Handle
   ( Handle
   , HandleConfig(..)
-  , ReconnectSettings(..)
   , EventHandlers(..)
   , HandleError
   , withHandle
@@ -9,5 +8,5 @@ module Riak.Handle
   , Endpoint(..)
   ) where
 
-import RiakHandle
 import Libriak.Connection (Endpoint(..))
+import RiakHandle

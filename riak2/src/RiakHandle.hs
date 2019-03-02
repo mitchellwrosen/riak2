@@ -1,7 +1,6 @@
 module RiakHandle
   ( Handle(..)
   , HandleConfig(..)
-  , ReconnectSettings(..)
   , EventHandlers(..)
   , HandleError
   , withHandle
@@ -33,7 +32,7 @@ import Libriak.Connection (ConnectError, Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
 import RiakBus            (EventHandlers(..))
-import RiakManagedBus     (ManagedBus, ReconnectSettings(..), withManagedBus)
+import RiakManagedBus     (ManagedBus, ManagedBusError, withManagedBus)
 
 import qualified Libriak.Proto  as Proto
 import qualified RiakManagedBus as ManagedBus
@@ -52,12 +51,11 @@ data Handle
 data HandleConfig
   = HandleConfig
   { endpoint :: !Endpoint
-  , reconnectSettings :: !(HandleError -> Maybe ReconnectSettings)
   , handlers :: !EventHandlers
   }
 
 type HandleError
-  = ConnectError
+  = ManagedBusError
 
 
 -- | Acquire a handle.
@@ -67,8 +65,8 @@ withHandle ::
      HandleConfig
   -> (Handle -> IO a)
   -> IO a
-withHandle HandleConfig { endpoint, reconnectSettings, handlers } callback =
-  withManagedBus endpoint reconnectSettings handlers $ \bus ->
+withHandle HandleConfig { endpoint, handlers } callback =
+  withManagedBus endpoint handlers $ \bus ->
     callback (Handle bus handlers)
 
 delete ::
@@ -271,7 +269,6 @@ exchange Handle { bus } request =
   (fmap.fmap.first)
     (\(RespRpbError err) -> err ^. Proto.errmsg)
     (ManagedBus.exchange bus request)
-
 
 -- | Send a request and stream the response (one or more messages).
 stream ::

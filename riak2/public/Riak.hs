@@ -105,7 +105,8 @@ module Riak
   , GetIndexError
   , GetOpts(..)
   , GetSchemaError
-  , HandleConfig
+  , Handle
+  , HandleConfig(..)
   , HandleError
   , HyperLogLogBucketProperties(..)
   , Index(..)
@@ -181,8 +182,7 @@ import Riak.ConvergentSet
 import Riak.ErlangTerm
 import Riak.Error
 import Riak.Handle                (EventHandlers(..), Handle, HandleConfig(..),
-                                   HandleError, ReconnectSettings(..),
-                                   withHandle)
+                                   HandleError, withHandle)
 import Riak.Index
 import Riak.Key
 import Riak.MapReduce

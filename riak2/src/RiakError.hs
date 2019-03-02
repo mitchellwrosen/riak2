@@ -1,8 +1,9 @@
 module RiakError where
 
-import Libriak.Connection (ConnectError)
 import RiakBucketInternal (Bucket)
 import RiakIndexName      (IndexName)
+
+import qualified RiakHandle as Handle (HandleError)
 
 import qualified Data.ByteString as ByteString
 
@@ -77,7 +78,7 @@ data Error :: Op -> Type where
 
   -- | An error was returned by the underlying handle, not Riak itself.
   HandleError ::
-       !ConnectError
+       !Handle.HandleError
     -> Error op
 
   -- | An error was returned by Riak, but this library couldn't parse it. Please
