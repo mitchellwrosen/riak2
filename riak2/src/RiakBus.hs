@@ -4,7 +4,6 @@ module RiakBus
   , exchange
   , stream
   , BusError(..)
-  , Code
   ) where
 
 import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
@@ -46,30 +45,6 @@ data BusError :: Type where
   -- TODO put request/response inside
   BusUnexpectedResponseError :: BusError
   deriving stock (Show)
-
-type family Code (req :: Nat) :: Nat where
-  Code  1 =  2
-  Code  7 =  8
-  Code  9 = 10
-  Code 11 = 12
-  Code 13 = 14
-  Code 15 = 16
-  Code 17 = 18
-  Code 19 = 20
-  Code 21 = 22
-  Code 23 = 24
-  Code 25 = 26
-  Code 27 = 28
-  Code 29 = 30
-  Code 31 = 20
-  Code 32 = 22
-  Code 54 = 55
-  Code 56 = 12
-  Code 57 = 14
-  Code 58 = 59
-  Code 60 = 12
-  Code 80 = 81
-  Code 82 = 83
 
 -- | Acquire a bus.
 --
@@ -141,10 +116,10 @@ receive =
 --
 -- TODO: who puts Dead to the status, and how?
 exchange ::
-     KnownNat (Code code)
+     KnownNat code
   => Bus -- ^
   -> Request code -- ^
-  -> IO (Either BusError (Either ByteString (Response (Code code))))
+  -> IO (Either BusError (Either ByteString (Response code)))
 exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
   withConnection bus $ \connection -> do
     -- Try sending, which either results in an error, or two empty TMVars: one
@@ -196,10 +171,10 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
 -- /Throws/: If response decoding fails, throws 'DecodeError'.
 stream ::
      ∀ code r.
-     KnownNat (Code code)
+     KnownNat code
   => Bus -- ^
   -> Request code -- ^
-  -> FoldM IO (Response (Code code)) r
+  -> FoldM IO (Response code) r
   -> IO (Either BusError (Either ByteString r))
 stream bus@(Bus { sendLock }) request (FoldM step (initial :: IO x) extract) =
   withConnection bus $ \connection ->

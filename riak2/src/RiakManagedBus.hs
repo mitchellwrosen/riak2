@@ -8,7 +8,7 @@ module RiakManagedBus
   ) where
 
 import Libriak.Connection (ConnectError, Endpoint)
-import RiakBus            (Bus, BusError, Code, withBus)
+import RiakBus            (Bus, BusError, withBus)
 import RiakRequest        (Request)
 import RiakResponse       (Response)
 
@@ -184,17 +184,17 @@ manager endpoint reconnectSettings statusVar errorVar = do
 -- | Send a request and receive the response (a single message).
 exchange ::
      forall code.
-     KnownNat (Code code)
+     KnownNat code
   => ManagedBus
   -> Request code
-  -> IO (Either ConnectError (Either ByteString (Response (Code code))))
+  -> IO (Either ConnectError (Either ByteString (Response code)))
 exchange ManagedBus { statusVar, errorVar } request =
   loop 0
 
   where
     loop ::
          Natural
-      -> IO (Either ConnectError (Either ByteString (Response (Code code))))
+      -> IO (Either ConnectError (Either ByteString (Response code)))
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->
@@ -216,10 +216,10 @@ exchange ManagedBus { statusVar, errorVar } request =
 -- | Send a request and stream the response (one or more messages).
 stream ::
      ∀ code r.
-     KnownNat (Code code)
+     KnownNat code
   => ManagedBus -- ^
   -> Request code -- ^
-  -> FoldM IO (Response (Code code)) r
+  -> FoldM IO (Response code) r
   -> IO (Either ConnectError (Either ByteString r))
 stream ManagedBus { statusVar, errorVar } request responseFold =
   loop 0

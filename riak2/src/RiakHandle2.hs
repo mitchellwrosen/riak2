@@ -28,7 +28,6 @@ module RiakHandle2
   ) where
 
 import Libriak.Connection (ConnectError, Endpoint)
-import RiakBus            (Code)
 import RiakManagedBus     (ManagedBus, ReconnectSettings, withManagedBus)
 import RiakRequest        (Request(..))
 import RiakResponse       (Response(..))
@@ -273,10 +272,10 @@ updateCrdt handle request =
 -- 'Control.Exception.BlockedIndefinitelyOnMVar'.
 exchange ::
      forall code.
-     KnownNat (Code code)
+     KnownNat code
   => Handle -- ^
   -> Request code -- ^
-  -> IO (Either ConnectError (Either ByteString (Response (Code code))))
+  -> IO (Either ConnectError (Either ByteString (Response code)))
 exchange Handle { bus } =
   ManagedBus.exchange bus
 
@@ -284,10 +283,10 @@ exchange Handle { bus } =
 -- | Send a request and stream the response (one or more messages).
 stream ::
      ∀ code r.
-     KnownNat (Code code)
+     KnownNat code
   => Handle -- ^
   -> Request code -- ^
-  -> FoldM IO (Response (Code code)) r
+  -> FoldM IO (Response code) r
   -> IO (Either ConnectError (Either ByteString r))
 stream Handle { bus } =
   ManagedBus.stream bus

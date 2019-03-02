@@ -19,29 +19,30 @@ import qualified Data.ProtoLens as Proto
 
 -- TODO request 33 is of riak_kv so handle unknown message code by retrying
 
+-- | Request indexed by message code of the expected response.
 data Request :: Nat -> Type where
-  ReqDtFetch                :: DtFetchReq                -> Request 80
-  ReqDtUpdate               :: DtUpdateReq               -> Request 82
-  ReqRpbDel                 :: RpbDelReq                 -> Request 13
-  ReqRpbGet                 :: RpbGetReq                 -> Request 9
-  ReqRpbGetBucket           :: RpbGetBucketReq           -> Request 19
-  ReqRpbGetBucketType       :: RpbGetBucketTypeReq       -> Request 31
-  ReqRpbGetServerInfo       :: RpbGetServerInfoReq       -> Request 7
-  ReqRpbIndex               :: RpbIndexReq               -> Request 25
-  ReqRpbListBuckets         :: RpbListBucketsReq         -> Request 15
-  ReqRpbListKeys            :: RpbListKeysReq            -> Request 17
-  ReqRpbMapRed              :: RpbMapRedReq              -> Request 23
-  ReqRpbPing                :: RpbPingReq                -> Request 1
-  ReqRpbPut                 :: RpbPutReq                 -> Request 11
-  ReqRpbResetBucket         :: RpbResetBucketReq         -> Request 29
-  ReqRpbSearchQuery         :: RpbSearchQueryReq         -> Request 27
-  ReqRpbSetBucket           :: RpbSetBucketReq           -> Request 21
-  ReqRpbSetBucketType       :: RpbSetBucketTypeReq       -> Request 32
-  ReqRpbYokozunaIndexDelete :: RpbYokozunaIndexDeleteReq -> Request 57
-  ReqRpbYokozunaIndexGet    :: RpbYokozunaIndexGetReq    -> Request 54
-  ReqRpbYokozunaIndexPut    :: RpbYokozunaIndexPutReq    -> Request 56
-  ReqRpbYokozunaSchemaGet   :: RpbYokozunaSchemaGetReq   -> Request 58
-  ReqRpbYokozunaSchemaPut   :: RpbYokozunaSchemaPutReq   -> Request 60
+  ReqDtFetch                :: DtFetchReq                -> Request 81
+  ReqDtUpdate               :: DtUpdateReq               -> Request 83
+  ReqRpbDel                 :: RpbDelReq                 -> Request 14
+  ReqRpbGet                 :: RpbGetReq                 -> Request 10
+  ReqRpbGetBucket           :: RpbGetBucketReq           -> Request 20
+  ReqRpbGetBucketType       :: RpbGetBucketTypeReq       -> Request 20
+  ReqRpbGetServerInfo       :: RpbGetServerInfoReq       -> Request 8
+  ReqRpbIndex               :: RpbIndexReq               -> Request 26
+  ReqRpbListBuckets         :: RpbListBucketsReq         -> Request 16
+  ReqRpbListKeys            :: RpbListKeysReq            -> Request 18
+  ReqRpbMapRed              :: RpbMapRedReq              -> Request 24
+  ReqRpbPing                :: RpbPingReq                -> Request 2
+  ReqRpbPut                 :: RpbPutReq                 -> Request 12
+  ReqRpbResetBucket         :: RpbResetBucketReq         -> Request 30
+  ReqRpbSearchQuery         :: RpbSearchQueryReq         -> Request 28
+  ReqRpbSetBucket           :: RpbSetBucketReq           -> Request 22
+  ReqRpbSetBucketType       :: RpbSetBucketTypeReq       -> Request 22
+  ReqRpbYokozunaIndexDelete :: RpbYokozunaIndexDeleteReq -> Request 14
+  ReqRpbYokozunaIndexGet    :: RpbYokozunaIndexGetReq    -> Request 55
+  ReqRpbYokozunaIndexPut    :: RpbYokozunaIndexPutReq    -> Request 12
+  ReqRpbYokozunaSchemaGet   :: RpbYokozunaSchemaGetReq   -> Request 59
+  ReqRpbYokozunaSchemaPut   :: RpbYokozunaSchemaPutReq   -> Request 12
 
 deriving stock instance Show (Request code)
 
