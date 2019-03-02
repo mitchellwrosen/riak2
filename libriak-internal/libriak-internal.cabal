@@ -25,12 +25,15 @@ library
     DeriveFunctor
     DerivingStrategies
     DuplicateRecordFields
+    GADTs
     GeneralizedNewtypeDeriving
     InstanceSigs
+    KindSignatures
     LambdaCase
     OverloadedLabels
     NamedFieldPuns
     ScopedTypeVariables
+    StandaloneDeriving
     TupleSections
     TypeApplications
     ViewPatterns

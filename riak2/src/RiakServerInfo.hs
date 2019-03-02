@@ -1,9 +1,10 @@
 module RiakServerInfo where
 
-import Libriak.Handle (Handle)
+import Libriak.Response   (Response(..))
+import RiakHandle         (Handle, HandleError)
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
+import qualified Libriak.Proto as Proto
+import qualified RiakHandle    as Handle
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -19,15 +20,15 @@ data ServerInfo
 getServerInfo ::
      MonadIO m
   => Handle -- ^
-  -> m (Either Handle.HandleConnectionError (Either ByteString ServerInfo))
+  -> m (Either HandleError (Either ByteString ServerInfo))
 getServerInfo handle = liftIO $
   (fmap.fmap.fmap)
     fromResponse
     (Handle.getServerInfo handle)
 
   where
-    fromResponse :: Proto.RpbGetServerInfoResp -> ServerInfo
-    fromResponse response =
+    fromResponse :: Response 8 -> ServerInfo
+    fromResponse (RespRpbGetServerInfo response) =
       ServerInfo
         { name = decodeUtf8 (response ^. Proto.node)
         , version = decodeUtf8 (response ^. Proto.serverVersion)

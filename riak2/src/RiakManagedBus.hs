@@ -8,11 +8,11 @@ module RiakManagedBus
   ) where
 
 import Libriak.Connection (ConnectError, Endpoint)
+import Libriak.Request    (Request)
+import Libriak.Response   (Response)
 import RiakBus            (Bus, BusError, withBus)
-import RiakRequest        (Request)
-import RiakResponse       (Response)
 
-import qualified RiakBus       as Bus
+import qualified RiakBus as Bus
 
 import Control.Concurrent
 import Control.Concurrent.STM

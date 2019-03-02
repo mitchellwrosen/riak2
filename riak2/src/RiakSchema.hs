@@ -5,11 +5,12 @@ module RiakSchema
   , putSchema
   ) where
 
-import Libriak.Handle (Handle)
+import Libriak.Response (Response(..))
 import RiakError
+import RiakHandle       (Handle)
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
+import qualified Libriak.Proto as Proto
+import qualified RiakHandle    as Handle
 
 import Control.Lens       ((.~), (^.))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
@@ -41,8 +42,8 @@ getSchema handle name = liftIO $
     Right (Left err) ->
       pure (parseGetSchemaError err)
 
-    Right (Right response) ->
-      pure (Right (Just (fromProto response)))
+    Right (Right (RespRpbYokozunaSchemaGet response)) ->
+      pure (Right (Just (fromProto (response ^. Proto.schema))))
 
 parseGetSchemaError ::
      ByteString
@@ -69,7 +70,7 @@ putSchema handle schema = liftIO $
     Right (Left err) ->
       pure (Left (parsePutSchemaError err))
 
-    Right (Right ()) ->
+    Right (Right _) ->
       pure (Right ())
 
 parsePutSchemaError ::

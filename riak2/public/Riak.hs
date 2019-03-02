@@ -1,7 +1,10 @@
 module Riak
-  ( -- * Object operations
+  ( -- * Handle
+    Handle
+  , withHandle
+    -- * Object operations
     -- ** Get object
-    get
+  , get
   , getHead
   , getIfModified
   , getHeadIfModified
@@ -102,7 +105,7 @@ module Riak
   , GetIndexError
   , GetOpts(..)
   , GetSchemaError
-  , Handle
+  , HandleError
   , HyperLogLogBucketProperties(..)
   , Index(..)
   , IndexName
@@ -150,7 +153,6 @@ module Riak
   , SetBucketProperties(..)
   , SetBucketTypeIndexError
   , Sibling(..)
-  , UnexpectedResponse(..)
   , UpdateConvergentCounterError
   , UpdateConvergentHyperLogLogError
   , WriteQuorum(..)
@@ -159,7 +161,6 @@ module Riak
   ) where
 
 -- TODO rename Config/Error export them
-import Libriak.Handle             (Handle, UnexpectedResponse(..))
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
                                    CounterBucketProperties(..),
                                    HyperLogLogBucketProperties(..),
@@ -176,6 +177,7 @@ import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ErlangTerm
 import Riak.Error
+import Riak.Handle                (Handle, HandleError, withHandle)
 import Riak.Index
 import Riak.Key
 import Riak.MapReduce

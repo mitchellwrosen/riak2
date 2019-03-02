@@ -1,12 +1,13 @@
 module RiakSearch where
 
-import Libriak.Handle (Handle)
+import Libriak.Response (Response(..))
 import RiakError
-import RiakIndexName  (IndexName(..))
+import RiakHandle       (Handle)
+import RiakIndexName    (IndexName(..))
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
-import qualified RiakProtoPair  as Proto.Pair
+import qualified Libriak.Proto as Proto
+import qualified RiakHandle    as Handle
+import qualified RiakProtoPair as Proto.Pair
 
 import Control.Lens       ((.~), (^.))
 import Data.Default.Class (Default(..))
@@ -66,7 +67,7 @@ search
     Right (Left err) ->
       pure (Left (parseSearchError index err))
 
-    Right (Right response) ->
+    Right (Right (RespRpbSearchQuery response)) ->
       pure (Right (fromResponse response))
 
   where

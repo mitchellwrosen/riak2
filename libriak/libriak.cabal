@@ -6,25 +6,10 @@ build-type: Simple
 
 library
   build-depends:
-    base,
-    bytestring,
-    foldl,
-    lens,
-    libriak-internal,
-    proto-lens ^>= 0.4.0,
-
-  default-extensions:
-    DeriveAnyClass
-    DerivingStrategies
-    LambdaCase
-    ScopedTypeVariables
-    UnicodeSyntax
+    libriak-internal
 
   default-language:
     Haskell2010
-
-  exposed-modules:
-    Libriak.Handle
 
   reexported-modules:
     Libriak.Connection,
@@ -34,6 +19,3 @@ library
 
   hs-source-dirs:
     src
-
-  signatures:
-    Riak.Handle.Signature

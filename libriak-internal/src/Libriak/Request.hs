@@ -8,44 +8,49 @@ import Libriak.Proto
 
 import Control.Monad.ST
 import Data.ByteString.Internal (ByteString(..))
+import Data.Kind                (Type)
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Word                (Word8)
 import GHC.ForeignPtr           (ForeignPtr(..))
+import GHC.TypeLits             (Nat)
 
 import qualified Data.ProtoLens as Proto
 
 
 -- TODO request 33 is of riak_kv so handle unknown message code by retrying
-data Request
-  = ReqDtFetch DtFetchReq
-  | ReqDtUpdate DtUpdateReq
-  | ReqRpbDel RpbDelReq
-  | ReqRpbGet RpbGetReq
-  | ReqRpbGetBucket RpbGetBucketReq
-  | ReqRpbGetBucketType RpbGetBucketTypeReq
-  | ReqRpbGetServerInfo RpbGetServerInfoReq
-  | ReqRpbIndex RpbIndexReq
-  | ReqRpbListBuckets RpbListBucketsReq
-  | ReqRpbListKeys RpbListKeysReq
-  | ReqRpbMapRed RpbMapRedReq
-  | ReqRpbPing RpbPingReq
-  | ReqRpbPut RpbPutReq
-  | ReqRpbResetBucket RpbResetBucketReq
-  | ReqRpbSearchQuery RpbSearchQueryReq
-  | ReqRpbSetBucket RpbSetBucketReq
-  | ReqRpbSetBucketType RpbSetBucketTypeReq
-  | ReqRpbYokozunaIndexDelete RpbYokozunaIndexDeleteReq
-  | ReqRpbYokozunaIndexGet RpbYokozunaIndexGetReq
-  | ReqRpbYokozunaIndexPut RpbYokozunaIndexPutReq
-  | ReqRpbYokozunaSchemaGet RpbYokozunaSchemaGetReq
-  | ReqRpbYokozunaSchemaPut RpbYokozunaSchemaPutReq
-  deriving stock (Show)
+
+-- | Request indexed by message code of the expected response.
+data Request :: Nat -> Type where
+  ReqDtFetch                :: DtFetchReq                -> Request 81
+  ReqDtUpdate               :: DtUpdateReq               -> Request 83
+  ReqRpbDel                 :: RpbDelReq                 -> Request 14
+  ReqRpbGet                 :: RpbGetReq                 -> Request 10
+  ReqRpbGetBucket           :: RpbGetBucketReq           -> Request 20
+  ReqRpbGetBucketType       :: RpbGetBucketTypeReq       -> Request 20
+  ReqRpbGetServerInfo       :: RpbGetServerInfoReq       -> Request 8
+  ReqRpbIndex               :: RpbIndexReq               -> Request 26
+  ReqRpbListBuckets         :: RpbListBucketsReq         -> Request 16
+  ReqRpbListKeys            :: RpbListKeysReq            -> Request 18
+  ReqRpbMapRed              :: RpbMapRedReq              -> Request 24
+  ReqRpbPing                :: RpbPingReq                -> Request 2
+  ReqRpbPut                 :: RpbPutReq                 -> Request 12
+  ReqRpbResetBucket         :: RpbResetBucketReq         -> Request 30
+  ReqRpbSearchQuery         :: RpbSearchQueryReq         -> Request 28
+  ReqRpbSetBucket           :: RpbSetBucketReq           -> Request 22
+  ReqRpbSetBucketType       :: RpbSetBucketTypeReq       -> Request 22
+  ReqRpbYokozunaIndexDelete :: RpbYokozunaIndexDeleteReq -> Request 14
+  ReqRpbYokozunaIndexGet    :: RpbYokozunaIndexGetReq    -> Request 55
+  ReqRpbYokozunaIndexPut    :: RpbYokozunaIndexPutReq    -> Request 12
+  ReqRpbYokozunaSchemaGet   :: RpbYokozunaSchemaGetReq   -> Request 59
+  ReqRpbYokozunaSchemaPut   :: RpbYokozunaSchemaPutReq   -> Request 12
+
+deriving stock instance Show (Request code)
 
 newtype EncodedRequest
   = EncodedRequest { unEncodedRequest :: [ByteArray] }
 
-encodeRequest :: Request -> EncodedRequest
+encodeRequest :: Request code -> EncodedRequest
 encodeRequest = \case
   ReqDtFetch                request -> go 80 request
   ReqDtUpdate               request -> go 82 request

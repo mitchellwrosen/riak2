@@ -8,8 +8,8 @@ module RiakBus
 
 import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
                            Endpoint(..))
-import RiakRequest        (Request, encodeRequest)
-import RiakResponse       (DecodeError, EncodedResponse(..), Response(..),
+import Libriak.Request    (Request, encodeRequest)
+import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
                            decodeResponse, responseDone)
 
 import qualified Libriak.Connection as Connection
@@ -20,7 +20,7 @@ import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Control.Foldl           (FoldM(..))
 import Control.Lens            ((^.))
-import GHC.TypeLits            (KnownNat, Nat)
+import GHC.TypeLits            (KnownNat)
 
 
 data Bus

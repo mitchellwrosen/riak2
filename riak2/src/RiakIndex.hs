@@ -1,12 +1,13 @@
 module RiakIndex where
 
-import Libriak.Handle (Handle)
+import Libriak.Response (Response(..))
 import RiakError
+import RiakHandle       (Handle)
 import RiakIndexName
-import RiakSchema     (defaultSchema)
+import RiakSchema       (defaultSchema)
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
+import qualified Libriak.Proto as Proto
+import qualified RiakHandle    as Handle
 
 import Control.Lens       ((.~), (^.))
 import Data.Default.Class (Default(..))
@@ -57,8 +58,8 @@ getIndex handle (IndexName name) = liftIO $
     Right (Left err) ->
       pure (parseGetIndexError err)
 
-    Right (Right response) ->
-      pure (Right (Just (fromProto (head response))))
+    Right (Right (RespRpbYokozunaIndexGet response)) ->
+      pure (Right (Just (fromProto (head (response ^. Proto.index)))))
 
 parseGetIndexError ::
      ByteString
@@ -84,8 +85,8 @@ getIndexes handle = liftIO $
     Right (Left err) ->
       pure (Left (parseGetIndexesError err))
 
-    Right (Right response) ->
-      pure (Right (map fromProto response))
+    Right (Right (RespRpbYokozunaIndexGet response)) ->
+      pure (Right (map fromProto (response ^. Proto.index)))
 
 parseGetIndexesError :: ByteString -> GetIndexError
 parseGetIndexesError err
@@ -169,8 +170,8 @@ putIndex_ handle index schema nodes timeout = do
         Right (Left err) ->
           pure (Left (parsePutIndexError err))
 
-        Right (Right response) ->
-          pure (Right response)
+        Right (Right _) ->
+          pure (Right ())
 
 parsePutIndexError :: ByteString -> PutIndexError
 parsePutIndexError err
@@ -198,7 +199,7 @@ deleteIndex handle name = liftIO $
     Right (Left err) ->
       pure (parseDeleteIndexError err)
 
-    Right (Right ()) ->
+    Right (Right _) ->
       pure (Right True)
 
 parseDeleteIndexError ::

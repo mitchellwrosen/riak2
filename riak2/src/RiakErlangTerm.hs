@@ -23,7 +23,6 @@ import Data.ByteString.Builder    (Builder)
 import Data.Int
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
 import Data.Vector                (Vector)
-import Data.Word
 
 import qualified Data.Attoparsec.ByteString as Atto
 import qualified Data.ByteString            as ByteString

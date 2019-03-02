@@ -5,9 +5,10 @@ module RiakMapReduce
   , mapReduceKeys
   ) where
 
-import Libriak.Handle (Handle)
-import RiakBucket     (Bucket)
+import RiakBucket (Bucket)
+import RiakHandle (Handle, HandleError)
 
+import Libriak.Response   (Response(..))
 import RiakErlangTerm     (ErlangTerm(..))
 import RiakError
 import RiakKey            (Key)
@@ -15,14 +16,15 @@ import RiakMapReduceInput (MapReduceInput(..))
 import RiakMapReducePhase (MapReducePhase(..))
 import RiakUtils          (retrying)
 
-import qualified Libriak.Handle     as Handle
 import qualified Libriak.Proto      as Proto
 import qualified RiakErlangTerm     as ErlangTerm
+import qualified RiakHandle         as Handle
 import qualified RiakMapReduceInput as MapReduceInput
 import qualified RiakMapReducePhase as MapReducePhase
 
 import Control.Foldl      (FoldM)
 import Control.Lens       ((.~))
+import Data.Profunctor    (lmap)
 import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Vector as Vector
@@ -43,15 +45,19 @@ mapReduceBucket ::
   -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either MapReduceBucketError r)
 mapReduceBucket handle bucket phases responseFold = liftIO $
-  doMapReduce handle (MapReduceInputBucket bucket) phases responseFold >>= \case
-    Left err ->
-      pure (Left (HandleError err))
+  fromResponse <$>
+    doMapReduce handle (MapReduceInputBucket bucket) phases responseFold
 
-    Right (Left err) ->
-      pure (Left (parseMapReduceBucketError err))
+  where
+    fromResponse = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Right result) ->
-      pure (Right result)
+      Right (Left err) ->
+        Left (parseMapReduceBucketError err)
+
+      Right (Right result) ->
+        Right result
 
 parseMapReduceBucketError :: ByteString -> MapReduceBucketError
 parseMapReduceBucketError err =
@@ -64,16 +70,16 @@ mapReduceKeys ::
   -> [Key] -- ^
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either Handle.HandleConnectionError (Either ByteString r))
-mapReduceKeys handle keys phases responseFold =
-  liftIO (doMapReduce handle (MapReduceInputKeys keys) phases responseFold)
+  -> m (Either HandleError (Either ByteString r))
+mapReduceKeys handle keys phases responseFold = liftIO $
+  doMapReduce handle (MapReduceInputKeys keys) phases responseFold
 
 doMapReduce ::
      Handle
   -> MapReduceInput
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either Handle.HandleConnectionError (Either ByteString r))
+  -> IO (Either HandleError (Either ByteString r))
 doMapReduce handle input phases responseFold =
   retrying 1000000 (doMapReduce_ handle input phases responseFold)
 
@@ -82,20 +88,13 @@ doMapReduce_ ::
   -> MapReduceInput
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Maybe (Either Handle.HandleConnectionError (Either ByteString r)))
+  -> IO (Maybe (Either HandleError (Either ByteString r)))
 doMapReduce_ handle input phases responseFold =
-  Handle.mapReduce handle request responseFold >>= \case
-    Left err ->
-      pure (Just (Left err))
-
-    Right (Left err)
-      | isUnknownMessageCode err ->
-          pure Nothing
-      | otherwise ->
-          pure (Just (Right (Left err)))
-
-    Right (Right result) ->
-      pure (Just (Right (Right result)))
+  fromResponse <$>
+    Handle.mapReduce
+      handle
+      request
+      (lmap (\(RespRpbMapRed response) -> response) responseFold)
 
   where
     request :: Proto.RpbMapRedReq
@@ -103,6 +102,19 @@ doMapReduce_ handle input phases responseFold =
       Proto.defMessage
         & Proto.contentType .~ "application/x-erlang-binary"
         & Proto.request .~ ErlangTerm.build (makeMapReduceErlangTerm input phases)
+
+    fromResponse = \case
+      Left err ->
+        Just (Left err)
+
+      Right (Left err)
+        | isUnknownMessageCode err ->
+            Nothing
+        | otherwise ->
+            Just (Right (Left err))
+
+      Right (Right result) ->
+        Just (Right (Right result))
 
 -- [{inputs, Inputs}, {query, Query}, {timeout, Timeout}]
 --

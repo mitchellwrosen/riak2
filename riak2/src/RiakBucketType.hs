@@ -1,18 +1,19 @@
 module RiakBucketType where
 
-import Libriak.Handle       (Handle)
+import Libriak.Response     (Response(..))
 import RiakBucket           (Bucket(..))
 import RiakBucketProperties (BucketProperties)
 import RiakError
+import RiakHandle           (Handle)
 import RiakIndexName        (IndexName(..))
 import RiakUtils            (retrying)
 
-import qualified Libriak.Handle       as Handle
 import qualified Libriak.Proto        as Proto
 import qualified RiakBucketProperties as BucketProperties
+import qualified RiakHandle           as Handle
 
 import Control.Foldl      (FoldM(..))
-import Control.Lens       (folded, to, (.~))
+import Control.Lens       (folded, to, (.~), (^.))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
 import qualified Control.Foldl as Foldl
@@ -43,8 +44,8 @@ getBucketType handle bucketType = liftIO $
     Right (Left err) ->
       pure (parseGetBucketTypeError err)
 
-    Right (Right response) ->
-      pure (Right (Just (BucketProperties.fromProto response)))
+    Right (Right (RespRpbGetBucket response)) ->
+      pure (Right (Just (BucketProperties.fromProto (response ^. Proto.props))))
 
 parseGetBucketTypeError ::
      ByteString
@@ -96,8 +97,8 @@ setBucketTypeIndex_ handle bucketType index = liftIO $
     Right (Left err) ->
       pure (Left (parseSetBucketTypeIndexError bucketType index err))
 
-    Right (Right response) ->
-      pure (Right (id response))
+    Right (Right _) ->
+      pure (Right ())
 
   where
     request :: Proto.RpbSetBucketTypeReq
@@ -198,9 +199,17 @@ parseListBucketsError bucketType err
       Just (UnknownError (decodeUtf8 err))
 
 makeResponseFold ::
-     Monad m
+     forall m r. Monad m
   => ByteString
   -> FoldM m Bucket r
-  -> FoldM m Proto.RpbListBucketsResp r
+  -> FoldM m (Response 16) r
 makeResponseFold bucketType =
-  Foldl.handlesM (Proto.buckets . folded . to (Bucket bucketType))
+  Foldl.handlesM handler
+
+  where
+    handler :: Foldl.HandlerM m (Response 16) Bucket
+    handler =
+      to (\(RespRpbListBuckets response) -> response) .
+      Proto.buckets .
+      folded .
+      to (Bucket bucketType)

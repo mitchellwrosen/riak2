@@ -9,15 +9,16 @@ module RiakConvergentHyperLogLog
   , updateConvergentHyperLogLog
   ) where
 
-import Libriak.Handle (Handle)
+import Libriak.Response (Response(..))
 import RiakCrdt
 import RiakError
-import RiakKey        (Key(..), isGeneratedKey)
-import RiakUtils      (retrying)
+import RiakHandle       (Handle)
+import RiakKey          (Key(..), isGeneratedKey)
+import RiakUtils        (retrying)
 
-import qualified Libriak.Handle as Handle
-import qualified Libriak.Proto  as Proto
-import qualified RiakKey        as Key
+import qualified Libriak.Proto as Proto
+import qualified RiakHandle    as Handle
+import qualified RiakKey       as Key
 
 import Control.Lens ((.~), (^.))
 
@@ -80,9 +81,9 @@ getConvergentHyperLogLog_ handle key@(Key bucketType _ _) =
         -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
-         Proto.DtFetchResp
+         Response 81
       -> Maybe (ConvergentHyperLogLog Word64)
-    fromResponse response = do
+    fromResponse (RespDtFetch response) = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
 
@@ -140,8 +141,8 @@ updateConvergentHyperLogLog_
 -- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
-    fromResponse :: Proto.DtUpdateResp -> ConvergentHyperLogLog Word64
-    fromResponse response =
+    fromResponse :: Response 83 -> ConvergentHyperLogLog Word64
+    fromResponse (RespDtUpdate response) =
       ConvergentHyperLogLog
         { key =
             if isGeneratedKey key
