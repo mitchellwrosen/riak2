@@ -2,6 +2,7 @@ module RiakBus
   ( Bus
   , EventHandlers(..)
   , withBus
+  , ping
   , exchange
   , stream
   , BusError(..)
@@ -9,12 +10,13 @@ module RiakBus
 
 import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
                            Endpoint(..))
-import Libriak.Request    (Request, encodeRequest)
+import Libriak.Request    (Request(..), encodeRequest)
 import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
                            decodeResponse, responseDone)
 import RiakDebug          (debug)
 
 import qualified Libriak.Connection as Connection
+import qualified Libriak.Proto      as Proto
 import qualified Libriak.Response   as Libriak
 
 import Control.Concurrent.STM
@@ -91,6 +93,12 @@ withBus endpoint handlers callback = do
       , doneVarRef = doneVarRef
       , handlers = handlers
       }
+
+ping ::
+     Bus
+  -> IO (Either BusError (Either (Response 0) (Response 2)))
+ping bus =
+  exchange bus (ReqRpbPing Proto.defMessage)
 
 withConnection ::
      Bus

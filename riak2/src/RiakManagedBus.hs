@@ -14,19 +14,19 @@ import Libriak.Response   (DecodeError, Response)
 import RiakBus            (Bus, BusError(..), EventHandlers(..))
 import RiakDebug          (debug)
 
-import qualified Libriak.Proto as Proto
-import qualified RiakBus       as Bus
+import qualified RiakBus as Bus
 
 import Control.Concurrent
+import Control.Concurrent.Async
 import Control.Concurrent.STM
-import Control.Exception      (asyncExceptionFromException,
-                               asyncExceptionToException)
-import Control.Exception.Safe (Exception(..), SomeException, bracket, tryAny)
-import Control.Foldl          (FoldM)
-import Control.Monad          (forever)
-import Data.Fixed             (Fixed(..))
-import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
-import GHC.TypeLits           (KnownNat)
+import Control.Exception        (asyncExceptionFromException,
+                                 asyncExceptionToException)
+import Control.Exception.Safe   (Exception(..), SomeException, bracket, tryAny)
+import Control.Foldl            (FoldM)
+import Control.Monad            (forever)
+import Data.Fixed               (Fixed(..))
+import Data.Time.Clock          (NominalDiffTime, nominalDiffTimeToSeconds)
+import GHC.TypeLits             (KnownNat)
 
 
 data ManagedBus
@@ -112,19 +112,19 @@ manager ::
   -> TVar Status
   -> IO a
 manager endpoint handlers statusVar =
-  forever (reconnect 1 connected)
+  forever (reconnecting 1 connected)
 
   where
-    -- Reconnect state
-    reconnect ::
+    -- Reconnecting state
+    reconnecting ::
          forall r.
          NominalDiffTime
       -> (Bus -> IO r)
       -> IO r
-    reconnect seconds callback = do
+    reconnecting seconds callback = do
       result :: Either ConnectError (Maybe r) <-
         Bus.withBus endpoint handlers $ \bus ->
-          Bus.exchange bus (ReqRpbPing Proto.defMessage) >>= \case
+          Bus.ping bus >>= \case
             Left err -> do
               debug (show err ++ ", sleeping for " ++ show seconds)
               pure Nothing
@@ -140,25 +140,50 @@ manager endpoint handlers statusVar =
         Left err -> do
           debug (show err ++ ", sleeping for " ++ show seconds)
           sleep seconds
-          reconnect (seconds * 1.5) callback
+          reconnecting (seconds * 1.5) callback
 
         Right Nothing -> do
           sleep seconds
-          reconnect (seconds * 1.5) callback
+          reconnecting (seconds * 1.5) callback
 
         Right (Just result) ->
           pure result
 
-    -- Connected state: return when the status var is set to 'Connecting' by
-    -- some thread whose request failed.
+    -- Connected state:
+    --
+    -- * Spawn a health-check thread.
+    --
+    -- * Wait for the status var to be set to 'Connecting' (by some thread,
+    --   possibly the health-check thread, whose request failed).
     connected :: Bus -> IO ()
-    connected bus = do
-      atomically (writeTVar statusVar (Alive bus))
+    connected bus =
+      withAsync (healthCheckThread bus) $ \_ -> do
+        atomically (writeTVar statusVar (Alive bus))
 
-      atomically $ do
-        readTVar statusVar >>= \case
-          Connecting -> pure ()
-          Alive{} -> retry
+        atomically $ do
+          readTVar statusVar >>= \case
+            Connecting -> pure ()
+            Alive{} -> retry
+
+    healthCheckThread :: Bus -> IO ()
+    healthCheckThread bus =
+      loop
+
+      where
+        loop :: IO ()
+        loop =
+          Bus.ping bus >>= \case
+            Left err -> do
+              debug ("ping " ++ show err)
+              atomically (writeTVar statusVar Connecting)
+              pure ()
+
+            -- TODO manager thread third state: "unhealthy"
+            Right response -> do
+              debug ("ping " ++ show response)
+              -- TODO configurable ping frequency
+              threadDelay (3*1000*1000)
+              loop
 
 withBus ::
      ManagedBus
