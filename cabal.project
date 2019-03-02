@@ -2,10 +2,6 @@ packages:
   libriak,
   riak2,
   -- riak2-benchmarks,
-  -- riak2-handle-impl-exclusive,
-  -- riak2-handle-impl-managed,
-  -- riak2-handle-impl-pipeline,
-  -- riak2-handle-impl-striped,
   riakc,
   ../riak-haskell-client,
   ../riak-haskell-client/protobuf
