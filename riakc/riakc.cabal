@@ -38,6 +38,8 @@ executable riakc
 
   ghc-options:
     -Wall
+    -threaded
+    -O
 
   hs-source-dirs:
     src

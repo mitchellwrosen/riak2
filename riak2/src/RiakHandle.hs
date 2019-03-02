@@ -2,7 +2,7 @@ module RiakHandle
   ( Handle(..)
   , HandleConfig(..)
   , EventHandlers(..)
-  , HandleError
+  , HandleError(..)
   , withHandle
   , delete
   , deleteIndex
@@ -28,18 +28,21 @@ module RiakHandle
   , updateCrdt
   ) where
 
-import Libriak.Connection (ConnectError, Endpoint)
+import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
 import RiakBus            (EventHandlers(..))
-import RiakManagedBus     (ManagedBus, ManagedBusError, withManagedBus)
+import RiakManagedBus     (ManagedBus, ManagedBusError(..), managedBusConnected,
+                           withManagedBus)
 
 import qualified Libriak.Proto  as Proto
 import qualified RiakManagedBus as ManagedBus
 
-import Control.Foldl (FoldM)
-import Control.Lens  ((.~), (^.))
-import GHC.TypeLits  (KnownNat)
+import Control.Concurrent.STM (TVar, atomically, readTVar, retry)
+import Control.Foldl          (FoldM)
+import Control.Lens           ((.~), (^.))
+import GHC.Conc               (registerDelay)
+import GHC.TypeLits           (KnownNat)
 
 
 data Handle
@@ -54,8 +57,12 @@ data HandleConfig
   , handlers :: !EventHandlers
   }
 
-type HandleError
-  = ManagedBusError
+data HandleError :: Type where
+  -- | A request timed out waiting for a handle to become connected.
+  HandleTimeoutError :: HandleError
+  -- | A request was attempted the maximum number of times.
+  HandleRetryError :: HandleError
+  deriving stock (Eq, Show)
 
 
 -- | Acquire a handle.
@@ -266,9 +273,10 @@ exchange ::
   -> Request code -- ^
   -> IO (Either HandleError (Either ByteString (Response code)))
 exchange Handle { bus } request =
-  (fmap.fmap.first)
-    (\(RespRpbError err) -> err ^. Proto.errmsg)
+  doExchangeOrStream
     (ManagedBus.exchange bus request)
+    (waitForManagedBus bus)
+    0
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
@@ -279,6 +287,80 @@ stream ::
   -> FoldM IO (Response code) r
   -> IO (Either HandleError (Either ByteString r))
 stream Handle { bus } request responseFold =
-  (fmap.fmap.first)
-    (\(RespRpbError err) -> err ^. Proto.errmsg)
+  doExchangeOrStream
     (ManagedBus.stream bus request responseFold)
+    (waitForManagedBus bus)
+    0
+
+doExchangeOrStream ::
+     IO (Either ManagedBusError (Either (Response 0) a))
+  -> IO (Either HandleError ())
+  -> Int
+  -> IO (Either HandleError (Either ByteString a))
+doExchangeOrStream action wait !attempts =
+  -- TODO configure num attempts
+  if attempts >= 3
+    then
+      pure (Left HandleRetryError)
+
+    else
+      action >>= \case
+        Left err ->
+          case err of
+            ManagedBusConnectingError ->
+              wait >>= \case
+                Left err ->
+                  pure (Left err)
+
+                Right () ->
+                  doExchangeOrStream action wait 0
+
+            ManagedBusConnectionError _ ->
+              wait >>= \case
+                Left err ->
+                  pure (Left err)
+
+                Right () ->
+                  doExchangeOrStream action wait (attempts+1)
+
+            -- Weird to tread a decode error (very unexpected) like a connection
+            -- error (expected)
+            ManagedBusDecodeError _ ->
+              wait >>= \case
+                Left err ->
+                  pure (Left err)
+
+                Right () ->
+                  doExchangeOrStream action wait (attempts+1)
+
+            -- Weird to tread an unexpected response error (very unexpected)
+            -- like a connection error (expected)
+            ManagedBusUnexpectedResponseError ->
+              wait >>= \case
+                Left err ->
+                  pure (Left err)
+
+                Right () ->
+                  doExchangeOrStream action wait (attempts+1)
+
+        Right (Left (RespRpbError err)) ->
+          pure (Right (Left (err ^. Proto.errmsg)))
+
+        Right (Right response) ->
+          pure (Right (Right response))
+
+
+waitForManagedBus ::
+     ManagedBus
+  -> IO (Either HandleError ())
+waitForManagedBus bus = do
+  -- TODO configure connecting wait time
+  timeoutVar :: TVar Bool <-
+    registerDelay (5*1000*1000)
+
+  atomically $ do
+    (readTVar timeoutVar >>= \case
+      True -> pure (Left HandleTimeoutError)
+      False -> retry)
+    <|>
+    (Right () <$ managedBusConnected bus)

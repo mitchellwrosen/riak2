@@ -107,7 +107,7 @@ module Riak
   , GetSchemaError
   , Handle
   , HandleConfig(..)
-  , HandleError
+  , HandleError(..)
   , HyperLogLogBucketProperties(..)
   , Index(..)
   , IndexName

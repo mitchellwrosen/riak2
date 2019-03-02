@@ -1,6 +1,7 @@
 module RiakManagedBus
   ( ManagedBus
   , ManagedBusError(..)
+  , managedBusConnected
   , withManagedBus
   , exchange
   , stream
@@ -22,6 +23,7 @@ import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
 import Control.Exception.Safe (Exception(..), SomeException, bracket, tryAny)
 import Control.Foldl          (FoldM)
+import Control.Monad          (forever)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
 import GHC.TypeLits           (KnownNat)
@@ -58,6 +60,12 @@ instance Exception ManagedBusCrashed where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
 
+-- | An STM action that returns when the managed bus is connected.
+managedBusConnected :: ManagedBus -> STM ()
+managedBusConnected ManagedBus { statusVar } =
+  readTVar statusVar >>= \case
+    Connecting -> retry
+    Alive{} -> pure ()
 
 -- | Acquire a managed bus.
 --
@@ -102,11 +110,12 @@ manager ::
      Endpoint
   -> EventHandlers
   -> TVar Status
-  -> IO ()
+  -> IO a
 manager endpoint handlers statusVar =
-  reconnect 1 loop
+  forever (reconnect 1 connected)
 
   where
+    -- Reconnect state
     reconnect ::
          forall r.
          NominalDiffTime
@@ -140,16 +149,16 @@ manager endpoint handlers statusVar =
         Right (Just result) ->
           pure result
 
-    loop :: Bus -> IO a
-    loop bus = do
+    -- Connected state: return when the status var is set to 'Connecting' by
+    -- some thread whose request failed.
+    connected :: Bus -> IO ()
+    connected bus = do
       atomically (writeTVar statusVar (Alive bus))
 
       atomically $ do
         readTVar statusVar >>= \case
           Connecting -> pure ()
           Alive{} -> retry
-
-      reconnect 1 loop
 
 withBus ::
      ManagedBus
@@ -161,8 +170,16 @@ withBus ManagedBus { statusVar } callback =
       pure (Left ManagedBusConnectingError)
 
     Alive bus ->
-      first fromBusError <$>
-        callback bus
+      -- It's ok that this code is not exception-safe. If a callback results in
+      -- a bus error, and then we are killed before writing 'Connecting' to the
+      -- status var, the next thread that comes along will attempt to use the
+      -- dead connection and see a similar bus error.
+      callback bus >>= \case
+        Left err -> do
+          atomically (writeTVar statusVar Connecting)
+          pure (Left (fromBusError err))
+        Right result ->
+          pure (Right result)
 
   where
     fromBusError :: BusError -> ManagedBusError

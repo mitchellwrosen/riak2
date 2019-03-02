@@ -2,7 +2,7 @@ module Riak.Handle
   ( Handle
   , HandleConfig(..)
   , EventHandlers(..)
-  , HandleError
+  , HandleError(..)
   , withHandle
     -- * Re-exports
   , Endpoint(..)
