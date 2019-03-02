@@ -125,7 +125,9 @@ library riak2-internal
     lens ^>= 4.17,
     lens-labels,
     libriak,
+    primitive,
     profunctors ^>= 5.3,
+    proto-lens,
     safe-exceptions,
     stm,
     text ^>= 1.2.3,
@@ -202,6 +204,8 @@ library riak2-internal
     RiakPutOpts
     RiakQuorum
     RiakReadQuorum
+    RiakRequest
+    RiakResponse
     RiakSchema
     RiakSearch
     RiakSecondaryIndex

@@ -4,20 +4,24 @@ module RiakBus
   , exchange
   , stream
   , BusError(..)
+  , Code
   ) where
 
 import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
-                           DecodeError, Endpoint(..))
-import Libriak.Request    (Request, encodeRequest)
-import Libriak.Response   (Response(..), decodeResponse)
+                           Endpoint(..))
+import RiakRequest        (Request, encodeRequest)
+import RiakResponse       (DecodeError, EncodedResponse(..), Response(..),
+                           decodeResponse, responseDone)
 
 import qualified Libriak.Connection as Connection
 import qualified Libriak.Proto      as Proto
+import qualified Libriak.Response   as Libriak
 
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Control.Foldl           (FoldM(..))
 import Control.Lens            ((^.))
+import GHC.TypeLits            (KnownNat, Nat)
 
 
 data Bus
@@ -42,6 +46,30 @@ data BusError :: Type where
   -- TODO put request/response inside
   BusUnexpectedResponseError :: BusError
   deriving stock (Show)
+
+type family Code (req :: Nat) :: Nat where
+  Code  1 =  2
+  Code  7 =  8
+  Code  9 = 10
+  Code 11 = 12
+  Code 13 = 14
+  Code 15 = 16
+  Code 17 = 18
+  Code 19 = 20
+  Code 21 = 22
+  Code 23 = 24
+  Code 25 = 26
+  Code 27 = 28
+  Code 29 = 30
+  Code 31 = 20
+  Code 32 = 22
+  Code 54 = 55
+  Code 56 = 12
+  Code 57 = 14
+  Code 58 = 59
+  Code 60 = 12
+  Code 80 = 81
+  Code 82 = 83
 
 -- | Acquire a bus.
 --
@@ -80,31 +108,31 @@ withConnection bus callback =
       pure (Left err)
 
 receive ::
-     (Response -> Maybe a)
-  -> Connection
-  -> IO (Either BusError (Either ByteString a))
-receive parse connection =
-  Connection.receive connection >>= \case
-    Left err ->
-      pure (Left (BusConnectionError err))
+     forall code.
+     KnownNat code
+  => Connection
+  -> IO (Either BusError (Either ByteString (Response code)))
+receive =
+  fmap parse . Connection.receive
 
-    Right bytes ->
-      case decodeResponse bytes of
-        Left err ->
-          pure (Left (BusDecodeError err))
+  where
+    parse ::
+         Either ConnectionError Libriak.EncodedResponse
+      -> Either BusError (Either ByteString (Response code))
+    parse = \case
+      Left err ->
+        Left (BusConnectionError err)
 
-        Right response ->
-          case response of
-            RespRpbError err ->
-              pure (Right (Left (err ^. Proto.errmsg)))
+      Right (Libriak.EncodedResponse bytes) ->
+        case decodeResponse (EncodedResponse bytes) of
+          Left err ->
+            Left (BusDecodeError err)
 
-            _ ->
-              case parse response of
-                Nothing ->
-                  pure (Left BusUnexpectedResponseError)
+          Right (Left (RespRpbError err)) ->
+            Right (Left (err ^. Proto.errmsg))
 
-                Just response ->
-                  pure (Right (Right response))
+          Right (Right response) ->
+            Right (Right response)
 
 -- | Send a request and receive the response (a single message).
 --
@@ -113,11 +141,11 @@ receive parse connection =
 --
 -- TODO: who puts Dead to the status, and how?
 exchange ::
-     Bus -- ^
-  -> Request -- ^
-  -> (Response -> Maybe a) -- ^
-  -> IO (Either BusError (Either ByteString a))
-exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request parse =
+     KnownNat (Code code)
+  => Bus -- ^
+  -> Request code -- ^
+  -> IO (Either BusError (Either ByteString (Response (Code code))))
+exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
   withConnection bus $ \connection -> do
     -- Try sending, which either results in an error, or two empty TMVars: one
     -- that will fill when it's our turn to receive, and one that we must fill
@@ -152,7 +180,7 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request parse =
 
         case waitResult of
           Nothing ->
-            receive parse connection >>= \case
+            receive connection >>= \case
               Left err ->
                 pure (Left err)
 
@@ -167,14 +195,13 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request parse =
 --
 -- /Throws/: If response decoding fails, throws 'DecodeError'.
 stream ::
-     ∀ a r.
-     Proto.HasLens' a "done" Bool
+     ∀ code r.
+     KnownNat (Code code)
   => Bus -- ^
-  -> Request -- ^
-  -> (Response -> Maybe a)
-  -> FoldM IO a r
+  -> Request code -- ^
+  -> FoldM IO (Response (Code code)) r
   -> IO (Either BusError (Either ByteString r))
-stream bus@(Bus { sendLock }) request parse (FoldM step (initial :: IO x) extract) =
+stream bus@(Bus { sendLock }) request (FoldM step (initial :: IO x) extract) =
   withConnection bus $ \connection ->
     -- Riak request handling state machine is odd. Streaming responses are
     -- special; when one is active, no other requests can be serviced on this
@@ -191,7 +218,7 @@ stream bus@(Bus { sendLock }) request parse (FoldM step (initial :: IO x) extrac
           let
             consume :: x -> IO (Either BusError (Either ByteString r))
             consume value =
-              receive parse connection >>= \case
+              receive connection >>= \case
                 Left err ->
                   pure (Left err)
 
@@ -200,7 +227,7 @@ stream bus@(Bus { sendLock }) request parse (FoldM step (initial :: IO x) extrac
 
                 Right (Right response) -> do
                   newValue <- step value response
-                  if response ^. Proto.done
+                  if responseDone response
                     then Right . Right <$> extract newValue
                     else consume newValue
           in
