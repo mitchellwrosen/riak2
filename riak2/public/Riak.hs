@@ -1,7 +1,6 @@
 module Riak
   ( -- * Handle
-    Handle
-  , withHandle
+    withHandle
     -- * Object operations
     -- ** Get object
   , get
@@ -92,6 +91,7 @@ module Riak
   , CounterBucketProperties(..)
   , ErlangTerm(..)
   , Error(..)
+  , EventHandlers(..)
   , DeleteError
   , DeleteIndexError
   , DeleteOpts(..)
@@ -105,6 +105,7 @@ module Riak
   , GetIndexError
   , GetOpts(..)
   , GetSchemaError
+  , HandleConfig
   , HandleError
   , HyperLogLogBucketProperties(..)
   , Index(..)
@@ -157,10 +158,12 @@ module Riak
   , UpdateConvergentHyperLogLogError
   , WriteQuorum(..)
     -- ** Re-exports
+  , Endpoint(..)
   , def
   ) where
 
 -- TODO rename Config/Error export them
+import Libriak.Connection         (Endpoint(..))
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
                                    CounterBucketProperties(..),
                                    HyperLogLogBucketProperties(..),
@@ -177,7 +180,9 @@ import Riak.ConvergentMap
 import Riak.ConvergentSet
 import Riak.ErlangTerm
 import Riak.Error
-import Riak.Handle                (Handle, HandleError, withHandle)
+import Riak.Handle                (EventHandlers(..), Handle, HandleConfig(..),
+                                   HandleError, ReconnectSettings(..),
+                                   withHandle)
 import Riak.Index
 import Riak.Key
 import Riak.MapReduce

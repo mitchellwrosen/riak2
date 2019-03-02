@@ -312,7 +312,7 @@ doPut_ ::
      Handle
   -> Proto.RpbPutReq
   -> IO (Maybe (Either PutError Proto.RpbPutResp))
-doPut_ handle request =
+doPut_ handle request = do
   Handle.put handle request >>= \case
     Left err ->
       pure (Just (Left (HandleError err)))

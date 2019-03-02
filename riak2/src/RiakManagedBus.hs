@@ -10,7 +10,7 @@ module RiakManagedBus
 import Libriak.Connection (ConnectError, Endpoint)
 import Libriak.Request    (Request)
 import Libriak.Response   (Response)
-import RiakBus            (Bus, BusError, withBus)
+import RiakBus            (Bus, BusError, EventHandlers(..), withBus)
 
 import qualified RiakBus as Bus
 
@@ -33,6 +33,7 @@ data ManagedBus
   { statusVar :: !(TMVar Status)
   , errorVar :: !(TMVar BusError)
     -- ^ The last error some client received when trying to use the bus.
+  , handlers :: !EventHandlers
   }
 
 -- Either the bus and which "generation" it is (when 0 dies, 1 replaces it,
@@ -66,9 +67,10 @@ withManagedBus ::
      Endpoint
   -> (ConnectError -> Maybe ReconnectSettings)
   -- ^ How to behave when an error occurs. 'Nothing' means don't reconnect.
+  -> EventHandlers
   -> (ManagedBus -> IO a)
   -> IO a
-withManagedBus endpoint reconnectSettings onSuccess = do
+withManagedBus endpoint reconnectSettings handlers callback = do
   statusVar :: TMVar Status <-
     newEmptyTMVarIO
 
@@ -82,7 +84,7 @@ withManagedBus endpoint reconnectSettings onSuccess = do
     acquire :: IO ThreadId
     acquire =
       forkIOWithUnmask $ \unmask ->
-        tryAny (unmask (manager endpoint reconnectSettings statusVar errorVar)) >>= \case
+        tryAny (unmask (manager endpoint reconnectSettings handlers statusVar errorVar)) >>= \case
           Left err ->
             throwTo threadId (ManagedBusCrashed err)
           Right () ->
@@ -97,9 +99,10 @@ withManagedBus endpoint reconnectSettings onSuccess = do
     acquire
     release
     (\_ ->
-      onSuccess ManagedBus
+      callback ManagedBus
         { statusVar = statusVar
         , errorVar = errorVar
+        , handlers = handlers
         })
 
 -- The manager thread:
@@ -114,10 +117,11 @@ withManagedBus endpoint reconnectSettings onSuccess = do
 manager ::
      Endpoint
   -> (ConnectError -> Maybe ReconnectSettings)
+  -> EventHandlers
   -> TMVar Status
   -> TMVar BusError
   -> IO ()
-manager endpoint reconnectSettings statusVar errorVar = do
+manager endpoint reconnectSettings handlers statusVar errorVar = do
   err <- loop 0 Nothing
   atomically (putTMVar statusVar (Dead err))
 
@@ -131,10 +135,8 @@ manager endpoint reconnectSettings statusVar errorVar = do
          -- if we decide to try again, and the original cause.
       -> IO ConnectError
     loop !generation prev =
-      withBus endpoint (runUntilError generation) >>= \case
-        Left connectErr -> do
-          putStrLn ("[debug] " ++ show connectErr)
-
+      withBus endpoint handlers (runUntilError generation) >>= \case
+        Left connectErr ->
           case reconnectSettings connectErr of
             Nothing ->
               pure connectErr
@@ -162,7 +164,6 @@ manager endpoint reconnectSettings statusVar errorVar = do
                   loop generation (Just (t0, initialDelay * 1.5, connectErr))
 
         Right connectionErr -> do
-          putStrLn ("[debug] " ++ show connectionErr)
           sleep 1 -- Whoops, kind of want to exponentially back of here too
           loop (generation+1) Nothing
 
@@ -187,14 +188,14 @@ exchange ::
      KnownNat code
   => ManagedBus
   -> Request code
-  -> IO (Either ConnectError (Either ByteString (Response code)))
+  -> IO (Either ConnectError (Either (Response 0) (Response code)))
 exchange ManagedBus { statusVar, errorVar } request =
   loop 0
 
   where
     loop ::
          Natural
-      -> IO (Either ConnectError (Either ByteString (Response code)))
+      -> IO (Either ConnectError (Either (Response 0) (Response code)))
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->
@@ -220,12 +221,12 @@ stream ::
   => ManagedBus -- ^
   -> Request code -- ^
   -> FoldM IO (Response code) r
-  -> IO (Either ConnectError (Either ByteString r))
+  -> IO (Either ConnectError (Either (Response 0) r))
 stream ManagedBus { statusVar, errorVar } request responseFold =
   loop 0
 
   where
-    loop :: Natural -> IO (Either ConnectError (Either ByteString r))
+    loop :: Natural -> IO (Either ConnectError (Either (Response 0) r))
     loop !healthyGen =
       waitForGen healthyGen statusVar >>= \case
         Left err ->

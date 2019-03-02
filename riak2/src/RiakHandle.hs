@@ -1,6 +1,7 @@
 module RiakHandle
   ( Handle(..)
   , HandleConfig(..)
+  , ReconnectSettings(..)
   , EventHandlers(..)
   , HandleError
   , withHandle
@@ -31,13 +32,14 @@ module RiakHandle
 import Libriak.Connection (ConnectError, Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
-import RiakManagedBus     (ManagedBus, ReconnectSettings, withManagedBus)
+import RiakBus            (EventHandlers(..))
+import RiakManagedBus     (ManagedBus, ReconnectSettings(..), withManagedBus)
 
 import qualified Libriak.Proto  as Proto
 import qualified RiakManagedBus as ManagedBus
 
 import Control.Foldl (FoldM)
-import Control.Lens  ((.~))
+import Control.Lens  ((.~), (^.))
 import GHC.TypeLits  (KnownNat)
 
 
@@ -54,21 +56,6 @@ data HandleConfig
   , handlers :: !EventHandlers
   }
 
--- TODO actually use event handlers
-data EventHandlers
-  = EventHandlers
-  { onSend :: forall code. Request code -> IO ()
-  , onReceive :: forall code. Response code -> IO ()
-  }
-
-instance Monoid EventHandlers where
-  mempty = EventHandlers mempty mempty
-  mappend = (<>)
-
-instance Semigroup EventHandlers where
-  EventHandlers a1 b1 <> EventHandlers a2 b2 =
-    EventHandlers (a1 <> a2) (b1 <> b2)
-
 type HandleError
   = ConnectError
 
@@ -81,7 +68,7 @@ withHandle ::
   -> (Handle -> IO a)
   -> IO a
 withHandle HandleConfig { endpoint, reconnectSettings, handlers } callback =
-  withManagedBus endpoint reconnectSettings $ \bus ->
+  withManagedBus endpoint reconnectSettings handlers $ \bus ->
     callback (Handle bus handlers)
 
 delete ::
@@ -280,8 +267,10 @@ exchange ::
   => Handle -- ^
   -> Request code -- ^
   -> IO (Either HandleError (Either ByteString (Response code)))
-exchange Handle { bus } =
-  ManagedBus.exchange bus
+exchange Handle { bus } request =
+  (fmap.fmap.first)
+    (\(RespRpbError err) -> err ^. Proto.errmsg)
+    (ManagedBus.exchange bus request)
 
 
 -- | Send a request and stream the response (one or more messages).
@@ -292,5 +281,7 @@ stream ::
   -> Request code -- ^
   -> FoldM IO (Response code) r
   -> IO (Either HandleError (Either ByteString r))
-stream Handle { bus } =
-  ManagedBus.stream bus
+stream Handle { bus } request responseFold =
+  (fmap.fmap.first)
+    (\(RespRpbError err) -> err ^. Proto.errmsg)
+    (ManagedBus.stream bus request responseFold)

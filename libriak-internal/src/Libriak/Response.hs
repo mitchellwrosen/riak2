@@ -111,7 +111,7 @@ decode actual bytes
         83 -> recode (doDecode (Right . RespDtUpdate))
         _  -> error ("unknown message code " ++ show actual)
   | otherwise =
-      undefined
+      Left (UnexpectedMessageCode actual)
 
 
   where

@@ -250,9 +250,9 @@ test-suite tests
     generic-lens,
     ip,
     lens,
+    libriak-internal,
     random,
     riak2-internal,
-    riak2-handle-impl-exclusive,
     tasty,
     tasty-hunit
 

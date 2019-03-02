@@ -1,5 +1,6 @@
 module RiakBus
   ( Bus
+  , EventHandlers(..)
   , withBus
   , exchange
   , stream
@@ -29,6 +30,7 @@ data Bus
   , sendLock :: !(MVar ())
     -- ^ Lock acquired during sending a request.
   , doneVarRef :: !(IORef (TMVar ()))
+  , handlers :: !EventHandlers
   }
 
 -- | The connection status - it's alive until something goes wrong.
@@ -46,19 +48,35 @@ data BusError :: Type where
   BusUnexpectedResponseError :: BusError
   deriving stock (Show)
 
+data EventHandlers
+  = EventHandlers
+  { onSend :: forall code. Request code -> IO ()
+  , onReceive :: forall code. Response code -> IO ()
+  }
+
+instance Monoid EventHandlers where
+  mempty = EventHandlers mempty mempty
+  mappend = (<>)
+
+instance Semigroup EventHandlers where
+  EventHandlers a1 b1 <> EventHandlers a2 b2 =
+    EventHandlers (a1 <> a2) (b1 <> b2)
+
+
 -- | Acquire a bus.
 --
 -- /Throws/: This function will never throw an exception.
 withBus ::
      Endpoint
+  -> EventHandlers
   -> (Bus -> IO a)
   -> IO (Either ConnectError a)
-withBus endpoint callback = do
+withBus endpoint handlers callback = do
   sendLock :: MVar () <-
     newMVar ()
 
   doneVarRef :: IORef (TMVar ()) <-
-    newIORef =<< newEmptyTMVarIO
+    newIORef =<< newTMVarIO ()
 
   Connection.withConnection endpoint $ \connection -> do
     statusVar :: TVar Status <-
@@ -68,6 +86,7 @@ withBus endpoint callback = do
       { statusVar = statusVar
       , sendLock = sendLock
       , doneVarRef = doneVarRef
+      , handlers = handlers
       }
 
 withConnection ::
@@ -82,32 +101,34 @@ withConnection bus callback =
     Dead err ->
       pure (Left err)
 
+send ::
+     EventHandlers
+  -> Connection
+  -> Request code
+  -> IO (Either ConnectionError ())
+send handlers connection request = do
+  onSend handlers request
+  Connection.send connection (encodeRequest request)
+
 receive ::
      forall code.
      KnownNat code
-  => Connection
-  -> IO (Either BusError (Either ByteString (Response code)))
-receive =
-  fmap parse . Connection.receive
+  => EventHandlers
+  -> Connection
+  -> IO (Either BusError (Either (Response 0) (Response code)))
+receive handlers connection =
+  Connection.receive connection >>= \case
+    Left err ->
+      pure (Left (BusConnectionError err))
 
-  where
-    parse ::
-         Either ConnectionError Libriak.EncodedResponse
-      -> Either BusError (Either ByteString (Response code))
-    parse = \case
-      Left err ->
-        Left (BusConnectionError err)
+    Right (Libriak.EncodedResponse bytes) ->
+      case decodeResponse (EncodedResponse bytes) of
+        Left err -> do
+          pure (Left (BusDecodeError err))
 
-      Right (Libriak.EncodedResponse bytes) ->
-        case decodeResponse (EncodedResponse bytes) of
-          Left err ->
-            Left (BusDecodeError err)
-
-          Right (Left (RespRpbError err)) ->
-            Right (Left (err ^. Proto.errmsg))
-
-          Right (Right response) ->
-            Right (Right response)
+        Right response -> do
+          either (onReceive handlers) (onReceive handlers) response
+          pure (Right response)
 
 -- | Send a request and receive the response (a single message).
 --
@@ -119,8 +140,8 @@ exchange ::
      KnownNat code
   => Bus -- ^
   -> Request code -- ^
-  -> IO (Either BusError (Either ByteString (Response code)))
-exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
+  -> IO (Either BusError (Either (Response 0) (Response code)))
+exchange bus@(Bus { statusVar, sendLock, doneVarRef, handlers }) request =
   withConnection bus $ \connection -> do
     -- Try sending, which either results in an error, or two empty TMVars: one
     -- that will fill when it's our turn to receive, and one that we must fill
@@ -155,7 +176,7 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef }) request =
 
         case waitResult of
           Nothing ->
-            receive connection >>= \case
+            receive handlers connection >>= \case
               Left err ->
                 pure (Left err)
 
@@ -175,8 +196,8 @@ stream ::
   => Bus -- ^
   -> Request code -- ^
   -> FoldM IO (Response code) r
-  -> IO (Either BusError (Either ByteString r))
-stream bus@(Bus { sendLock }) request (FoldM step (initial :: IO x) extract) =
+  -> IO (Either BusError (Either (Response 0) r))
+stream bus@(Bus { sendLock, handlers }) request (FoldM step (initial :: IO x) extract) =
   withConnection bus $ \connection ->
     -- Riak request handling state machine is odd. Streaming responses are
     -- special; when one is active, no other requests can be serviced on this
@@ -191,9 +212,9 @@ stream bus@(Bus { sendLock }) request (FoldM step (initial :: IO x) extract) =
 
         Right () ->
           let
-            consume :: x -> IO (Either BusError (Either ByteString r))
+            consume :: x -> IO (Either BusError (Either (Response 0) r))
             consume value =
-              receive connection >>= \case
+              receive handlers connection >>= \case
                 Left err ->
                   pure (Left err)
 

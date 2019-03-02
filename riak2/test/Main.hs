@@ -2,27 +2,26 @@
 
 module Main where
 
-import Riak.Handle.Impl.Exclusive (ConnectError(..), Endpoint(..),
-                                   EventHandlers(..), Handle, HandleConfig(..),
-                                   withHandle)
-import RiakBinaryIndexQuery       (BinaryIndexQuery(..), inBucket)
-import RiakBucket                 (Bucket(..), queryBinaryIndex, queryIntIndex)
-import RiakContent                (Content, newContent)
-import RiakContext                (newContext)
-import RiakError                  (Error(..))
-import RiakGetOpts                (GetOpts(..))
-import RiakIndexName              (unsafeMakeIndexName)
-import RiakIntIndexQuery          (IntIndexQuery(..))
-import RiakKey                    (Key(..), generatedKey, keyBucket)
-import RiakObject                 (Object(..), delete, get, getHead,
-                                   getIfModified, newObject, put, putGet,
-                                   putGetHead)
-import RiakPing                   (ping)
-import RiakPutOpts                (PutOpts(..))
-import RiakSecondaryIndex         (SecondaryIndex(..))
-import RiakSecondaryIndexValue    (SecondaryIndexValue(..))
-import RiakServerInfo             (ServerInfo(..), getServerInfo)
-import RiakSibling                (Sibling(..))
+import Libriak.Connection      (Endpoint(..))
+import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
+import RiakBucket              (Bucket(..), queryBinaryIndex, queryIntIndex)
+import RiakContent             (Content, newContent)
+import RiakContext             (newContext)
+import RiakError               (Error(..))
+import RiakGetOpts             (GetOpts(..))
+import RiakHandle              (EventHandlers(..), Handle, HandleConfig(..),
+                                HandleError, withHandle)
+import RiakIndexName           (unsafeMakeIndexName)
+import RiakIntIndexQuery       (IntIndexQuery(..))
+import RiakKey                 (Key(..), generatedKey, keyBucket)
+import RiakObject              (Object(..), delete, get, getHead, getIfModified,
+                                newObject, put, putGet, putGetHead)
+import RiakPing                (ping)
+import RiakPutOpts             (PutOpts(..))
+import RiakSecondaryIndex      (SecondaryIndex(..))
+import RiakSecondaryIndexValue (SecondaryIndexValue(..))
+import RiakServerInfo          (ServerInfo(..), getServerInfo)
+import RiakSibling             (Sibling(..))
 
 import Control.Lens
 import Control.Monad
@@ -42,20 +41,11 @@ import qualified Data.ByteString.Char8 as Latin1
 
 main :: IO ()
 main = do
-  result :: Either ConnectError () <-
-    withHandle
-      config
-      (\handle ->
-        defaultMain
-          (testGroup "Riak integration tests" (integrationTests handle)))
-
-  case result of
-    Left err -> do
-      print err
-      exitFailure
-
-    Right () ->
-      pure ()
+  withHandle
+    config
+    (\handle ->
+      defaultMain
+        (testGroup "Riak integration tests" (integrationTests handle)))
 
   where
     config :: HandleConfig
@@ -66,11 +56,12 @@ main = do
               { address = ipv4 127 0 0 1
               , port = 8087
               }
+        , reconnectSettings = \_ -> Nothing
         , handlers =
             mempty
             -- EventHandlers
-            --   { onSend = print
-            --   , onReceive = print
+            --   { onSend = \req -> putStrLn (">>> " ++ show req)
+            --   , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
             --   }
         }
 

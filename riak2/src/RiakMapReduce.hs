@@ -38,6 +38,7 @@ import qualified Data.Vector as Vector
 -- /Note/: If your backend supports secondary indexes, it is faster to use
 -- 'mapReduceQueryExact' with the 'Riak.ExactQuery.inBucket' query.
 mapReduceBucket ::
+     forall m r.
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
@@ -49,6 +50,9 @@ mapReduceBucket handle bucket phases responseFold = liftIO $
     doMapReduce handle (MapReduceInputBucket bucket) phases responseFold
 
   where
+    fromResponse ::
+         Either HandleError (Either ByteString r)
+      -> Either MapReduceBucketError r
     fromResponse = \case
       Left err ->
         Left (HandleError err)
@@ -84,6 +88,7 @@ doMapReduce handle input phases responseFold =
   retrying 1000000 (doMapReduce_ handle input phases responseFold)
 
 doMapReduce_ ::
+     forall r.
      Handle
   -> MapReduceInput
   -> [MapReducePhase]
@@ -103,6 +108,9 @@ doMapReduce_ handle input phases responseFold =
         & Proto.contentType .~ "application/x-erlang-binary"
         & Proto.request .~ ErlangTerm.build (makeMapReduceErlangTerm input phases)
 
+    fromResponse ::
+         Either HandleError (Either ByteString r)
+      -> Maybe (Either HandleError (Either ByteString r))
     fromResponse = \case
       Left err ->
         Just (Left err)
