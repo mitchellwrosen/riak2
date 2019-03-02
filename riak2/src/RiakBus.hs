@@ -13,7 +13,6 @@ import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
 import Libriak.Request    (Request(..), encodeRequest)
 import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
                            decodeResponse, responseDone)
-import RiakDebug          (debug)
 
 import qualified Libriak.Connection as Connection
 import qualified Libriak.Proto      as Proto
@@ -32,8 +31,6 @@ data Bus
   , sendLock :: !(MVar ())
     -- ^ Lock acquired during sending a request.
   , doneVarRef :: !(IORef (TMVar ()))
-  , lastUsedRef :: !(IORef Word64)
-    -- ^ The last time the bus was used.
   , handlers :: !EventHandlers
   }
 
@@ -66,7 +63,6 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 c1 <> EventHandlers a2 b2 c2 =
     EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
-
 -- | Acquire a bus.
 --
 -- /Throws/: This function will never throw an exception.
@@ -82,9 +78,6 @@ withBus endpoint handlers callback = do
   doneVarRef :: IORef (TMVar ()) <-
     newIORef =<< newTMVarIO ()
 
-  lastUsedRef :: IORef Word64 <-
-    newIORef =<< getMonotonicTimeNSec
-
   Connection.withConnection endpoint $ \connection -> do
     connVar :: TMVar Connection <-
       newTMVarIO connection
@@ -93,7 +86,6 @@ withBus endpoint handlers callback = do
       { connVar = connVar
       , sendLock = sendLock
       , doneVarRef = doneVarRef
-      , lastUsedRef = lastUsedRef
       , handlers = handlers
       }
 
@@ -107,24 +99,22 @@ withConnection ::
      Bus
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
-withConnection Bus { connVar, handlers, lastUsedRef } callback =
+withConnection Bus { connVar, handlers } callback =
   atomically (tryReadTMVar connVar) >>= \case
     Just connection -> do
-      writeIORef lastUsedRef =<< getMonotonicTimeNSec
-
       callback connection >>= \case
         Left err -> do
           void (atomically (tryTakeTMVar connVar))
 
           case err of
             BusClosedError ->
-              debug "bus closed"
+              pure ()
             BusConnectionError err ->
               onConnectionError handlers err
-            BusDecodeError err ->
-              debug ("bus decode error: " ++ show err)
+            BusDecodeError _ ->
+              pure ()
             BusUnexpectedResponseError ->
-              debug "bus unexpected response error"
+              pure ()
 
           pure (Left err)
 
