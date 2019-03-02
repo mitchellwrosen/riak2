@@ -56,7 +56,6 @@ main = do
               { address = ipv4 127 0 0 1
               , port = 8087
               }
-        , reconnectSettings = \_ -> Nothing
         , handlers =
             mempty
             -- EventHandlers

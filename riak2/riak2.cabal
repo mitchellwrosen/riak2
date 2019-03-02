@@ -252,7 +252,7 @@ test-suite tests
     generic-lens,
     ip,
     lens,
-    libriak-internal,
+    libriak,
     random,
     riak2-internal,
     tasty,
@@ -273,6 +273,7 @@ test-suite tests
 
   ghc-options:
     -Wall
+    -threaded
 
   hs-source-dirs:
     test
