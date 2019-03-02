@@ -14,13 +14,11 @@ import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
                            decodeResponse, responseDone)
 
 import qualified Libriak.Connection as Connection
-import qualified Libriak.Proto      as Proto
 import qualified Libriak.Response   as Libriak
 
 import Control.Concurrent.MVar
 import Control.Concurrent.STM
 import Control.Foldl           (FoldM(..))
-import Control.Lens            ((^.))
 import GHC.TypeLits            (KnownNat)
 
 
@@ -148,7 +146,7 @@ exchange bus@(Bus { statusVar, sendLock, doneVarRef, handlers }) request =
     -- when we are done receiving.
     sendResult :: Either BusError (TMVar (), TMVar ()) <-
       withMVar sendLock $ \() ->
-        Connection.send connection (encodeRequest request) >>= \case
+        send handlers connection request >>= \case
           Left err ->
             pure (Left (BusConnectionError err))
 
@@ -206,7 +204,7 @@ stream bus@(Bus { sendLock, handlers }) request (FoldM step (initial :: IO x) ex
     -- So, hold a lock for the entirety of the request-response exchange, not
     -- just during sending the request.
     withMVar sendLock $ \() ->
-      Connection.send connection (encodeRequest request) >>= \case
+      send handlers connection request >>= \case
         Left err ->
           pure (Left (BusConnectionError err))
 

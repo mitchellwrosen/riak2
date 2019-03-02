@@ -1,6 +1,5 @@
 packages:
   libriak,
-  libriak-internal,
   riak2,
   -- riak2-benchmarks,
   -- riak2-handle-impl-exclusive,
