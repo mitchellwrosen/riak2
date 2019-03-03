@@ -306,15 +306,7 @@ doExchangeOrStream action wait !attempts =
       action >>= \case
         Left err ->
           case err of
-            ManagedBusConnectingError ->
-              wait >>= \case
-                Left err ->
-                  pure (Left err)
-
-                Right () ->
-                  doExchangeOrStream action wait 0
-
-            ManagedBusUnhealthyError ->
+            ManagedBusNotReadyError ->
               wait >>= \case
                 Left err ->
                   pure (Left err)
