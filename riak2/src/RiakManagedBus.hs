@@ -281,7 +281,7 @@ healthCheckThread statusVar bus = do
     loop :: IO ()
     loop = do
       -- TODO configurable ping frequency
-      threadDelay (3*1000*1000)
+      threadDelay (1*1000*1000)
 
       debug "managed bus: healthy; pinging"
 

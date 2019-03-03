@@ -317,18 +317,27 @@ stream Handle { bus, retries } request responseFold =
     0
 
 doExchangeOrStream ::
+     forall a.
      Natural
   -> IO (Either ManagedBusError (Either (Response 0) a))
   -> IO (Either HandleError ())
   -> Natural
   -> IO (Either HandleError (Either ByteString a))
 doExchangeOrStream retries action wait =
-  loop
+  loop False
 
   where
-    loop attempts =
+    loop ::
+         -- Have we waited for the handle to become ready at least once? If so,
+         -- treat handle-not-ready errors against the retry count (to prevent
+         -- continuously resetting the attempts to 0).
+         Bool
+      -> Natural
+      -> IO (Either HandleError (Either ByteString a))
+    loop wasReady attempts =
       if attempts > retries
         then
+          -- TODO accumulate errors and return them
           pure (Left HandleRetryError)
 
         else
@@ -341,7 +350,7 @@ doExchangeOrStream retries action wait =
                       pure (Left err)
 
                     Right () ->
-                      loop 0
+                      loop True (if wasReady then attempts+1 else attempts)
 
                 ManagedBusConnectionError _ ->
                   wait >>= \case
@@ -349,9 +358,9 @@ doExchangeOrStream retries action wait =
                       pure (Left err)
 
                     Right () ->
-                      loop (attempts+1)
+                      loop wasReady (attempts+1)
 
-                -- Weird to tread a decode error (very unexpected) like a connection
+                -- Weird to treat a decode error (very unexpected) like a connection
                 -- error (expected)
                 ManagedBusDecodeError _ ->
                   wait >>= \case
@@ -359,9 +368,9 @@ doExchangeOrStream retries action wait =
                       pure (Left err)
 
                     Right () ->
-                      loop (attempts+1)
+                      loop wasReady (attempts+1)
 
-                -- Weird to tread an unexpected response error (very unexpected)
+                -- Weird to treat an unexpected response error (very unexpected)
                 -- like a connection error (expected)
                 ManagedBusUnexpectedResponseError ->
                   wait >>= \case
@@ -369,7 +378,7 @@ doExchangeOrStream retries action wait =
                       pure (Left err)
 
                     Right () ->
-                      loop (attempts+1)
+                      loop wasReady (attempts+1)
 
             Right (Left (RespRpbError err)) ->
               pure (Right (Left (err ^. Proto.errmsg)))
