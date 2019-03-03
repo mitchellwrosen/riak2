@@ -63,6 +63,8 @@ main = do
               { address = host
               , port = port
               }
+        , retries =
+            3
         , timeout =
             5
         , handlers =

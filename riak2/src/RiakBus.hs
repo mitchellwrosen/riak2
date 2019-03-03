@@ -1,3 +1,6 @@
+-- TODO perhaps don't ruin the whole bus if one thread, during an exchange, gets
+-- killed before it receives?
+
 module RiakBus
   ( Bus
   , EventHandlers(..)

@@ -49,6 +49,7 @@ import GHC.TypeLits           (KnownNat)
 data Handle
   = Handle
   { bus :: !ManagedBus
+  , retries :: !Natural
   , handlers :: !EventHandlers
   }
 
@@ -57,6 +58,24 @@ data HandleConfig
   { endpoint :: !Endpoint
     -- | How long to wait for a response from Riak before timing out.
   , timeout :: !NominalDiffTime
+    -- | The additional number of times to attempt a request if it results in a
+    -- non-Riak error.
+    --
+    -- This covers a many possible conditions, including:
+    --
+    -- * A remote reset or remote shutdown due to Riak not being fully
+    --   initialized.
+    --
+    -- * A remote timeout, configurable via @timeout@.
+    --
+    -- * A protobuf decode error or incorrect message code (very unexpected
+    --   failure conditions, but they exist nonetheless).
+    --
+    -- A sensible, low number like @3@ should be appropriate for persisting
+    -- through common, ephemeral network failures, while still giving up
+    -- eventually in the case of a catastrophic error, like accidentally
+    -- connecting to an endpoint that isn't Riak.
+  , retries :: !Natural
   , handlers :: !EventHandlers
   }
 
@@ -75,9 +94,9 @@ withHandle ::
      HandleConfig
   -> (Handle -> IO a)
   -> IO a
-withHandle HandleConfig { endpoint, handlers, timeout } callback =
+withHandle HandleConfig { endpoint, handlers, retries, timeout } callback =
   withManagedBus endpoint (difftimeToMicros timeout) handlers $ \bus ->
-    callback (Handle bus handlers)
+    callback (Handle bus retries handlers)
 
 delete ::
      Handle -- ^
@@ -275,8 +294,9 @@ exchange ::
   => Handle -- ^
   -> Request code -- ^
   -> IO (Either HandleError (Either ByteString (Response code)))
-exchange Handle { bus } request =
+exchange Handle { bus, retries } request =
   doExchangeOrStream
+    retries
     (ManagedBus.exchange bus request)
     (waitForManagedBus bus)
     0
@@ -289,68 +309,73 @@ stream ::
   -> Request code -- ^
   -> FoldM IO (Response code) r
   -> IO (Either HandleError (Either ByteString r))
-stream Handle { bus } request responseFold =
+stream Handle { bus, retries } request responseFold =
   doExchangeOrStream
+    retries
     (ManagedBus.stream bus request responseFold)
     (waitForManagedBus bus)
     0
 
 doExchangeOrStream ::
-     IO (Either ManagedBusError (Either (Response 0) a))
+     Natural
+  -> IO (Either ManagedBusError (Either (Response 0) a))
   -> IO (Either HandleError ())
-  -> Int
+  -> Natural
   -> IO (Either HandleError (Either ByteString a))
-doExchangeOrStream action wait !attempts =
-  -- TODO configure num attempts
-  if attempts >= 3
-    then
-      pure (Left HandleRetryError)
+doExchangeOrStream retries action wait =
+  loop
 
-    else
-      action >>= \case
-        Left err ->
-          case err of
-            ManagedBusNotReadyError ->
-              wait >>= \case
-                Left err ->
-                  pure (Left err)
+  where
+    loop attempts =
+      if attempts > retries
+        then
+          pure (Left HandleRetryError)
 
-                Right () ->
-                  doExchangeOrStream action wait 0
+        else
+          action >>= \case
+            Left err ->
+              case err of
+                ManagedBusNotReadyError ->
+                  wait >>= \case
+                    Left err ->
+                      pure (Left err)
 
-            ManagedBusConnectionError _ ->
-              wait >>= \case
-                Left err ->
-                  pure (Left err)
+                    Right () ->
+                      loop 0
 
-                Right () ->
-                  doExchangeOrStream action wait (attempts+1)
+                ManagedBusConnectionError _ ->
+                  wait >>= \case
+                    Left err ->
+                      pure (Left err)
 
-            -- Weird to tread a decode error (very unexpected) like a connection
-            -- error (expected)
-            ManagedBusDecodeError _ ->
-              wait >>= \case
-                Left err ->
-                  pure (Left err)
+                    Right () ->
+                      loop (attempts+1)
 
-                Right () ->
-                  doExchangeOrStream action wait (attempts+1)
+                -- Weird to tread a decode error (very unexpected) like a connection
+                -- error (expected)
+                ManagedBusDecodeError _ ->
+                  wait >>= \case
+                    Left err ->
+                      pure (Left err)
 
-            -- Weird to tread an unexpected response error (very unexpected)
-            -- like a connection error (expected)
-            ManagedBusUnexpectedResponseError ->
-              wait >>= \case
-                Left err ->
-                  pure (Left err)
+                    Right () ->
+                      loop (attempts+1)
 
-                Right () ->
-                  doExchangeOrStream action wait (attempts+1)
+                -- Weird to tread an unexpected response error (very unexpected)
+                -- like a connection error (expected)
+                ManagedBusUnexpectedResponseError ->
+                  wait >>= \case
+                    Left err ->
+                      pure (Left err)
 
-        Right (Left (RespRpbError err)) ->
-          pure (Right (Left (err ^. Proto.errmsg)))
+                    Right () ->
+                      loop (attempts+1)
 
-        Right (Right response) ->
-          pure (Right (Right response))
+            Right (Left (RespRpbError err)) ->
+              pure (Right (Left (err ^. Proto.errmsg)))
+
+            Right (Right response) ->
+              pure (Right (Right response))
 
 
 waitForManagedBus ::
