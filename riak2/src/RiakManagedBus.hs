@@ -1,7 +1,7 @@
 module RiakManagedBus
   ( ManagedBus
   , ManagedBusError(..)
-  , managedBusConnected
+  , managedBusReady
   , withManagedBus
   , exchange
   , stream
@@ -41,8 +41,11 @@ data Status :: Type where
   Disconnected :: Status
   -- | Attempting to establish a connection.
   Connecting :: Status
-  -- | Connected.
-  Connected :: !Bus -> Status
+  -- | Connected, but unhealthy (haven't gotten a successful response from the
+  -- initial ping).
+  Unhealthy :: !Bus -> Status
+  -- | Connected and healthy.
+  Healthy :: !Bus -> Status
 
 data ManagedBusError :: Type where
   -- | The bus is currently connecting.
@@ -54,6 +57,8 @@ data ManagedBusError :: Type where
   -- | A response with an unexpcected message code was received.
   -- TODO put request/response inside
   ManagedBusUnexpectedResponseError :: ManagedBusError
+  -- | The bus is connected, but unhealthy.
+  ManagedBusUnhealthyError :: ManagedBusError
   deriving stock (Eq, Show)
 
 -- | The bus manager thread crashed, which indicates a bug in this library.
@@ -65,13 +70,14 @@ instance Exception ManagedBusCrashed where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
 
--- | An STM action that returns when the managed bus is connected.
-managedBusConnected :: ManagedBus -> STM ()
-managedBusConnected ManagedBus { statusVar } =
+-- | An STM action that returns when the managed bus is connected and healthy.
+managedBusReady :: ManagedBus -> STM ()
+managedBusReady ManagedBus { statusVar } =
   readTVar statusVar >>= \case
     Disconnected -> retry
     Connecting -> retry
-    Connected{} -> pure ()
+    Unhealthy _ -> retry
+    Healthy _ -> pure ()
 
 -- | Acquire a managed bus.
 --
@@ -128,91 +134,91 @@ managerThread endpoint handlers statusVar lastUsedRef =
   where
     -- Reconnecting state:
     --
-    -- * Given a length of time to sleep for if connecting fails, attempt to
-    --   establish a connection.
+    -- * Attempt to establish a connection.
     --
-    -- * If a connection is established, ping Riak. If the ping succeeds, move
-    --   to the connected state. If the ping fails, sleep and retry (with a
-    --   longer sleep time).
+    -- * If successful, move to the unhealthy state (we assume even pinging will
+    --   fail until proven otherwise).
     --
-    -- * If the connection is not established, sleep and retry (with a longer
-    --   sleep time).
+    -- * If unsuccessful, sleep and try again.
     reconnecting :: NominalDiffTime -> IO Void
     reconnecting seconds = do
-      debug "managed bus: connecting"
+      debug "managed bus: reconnecting;"
 
-      result :: Either ConnectError (Maybe (IO Void)) <-
+      result :: Either ConnectError (IO Void) <-
         Bus.withBus endpoint handlers $ \bus -> do
-          debug "managed bus: connected, making initial ping"
-
-          Bus.ping bus >>= \case
-            Left err -> do
-              debug ("managed bus: initial ping failed: " ++ show err)
-              pure Nothing
-
-            Right (Left err) -> do
-              debug ("managed bus: initial ping failed: " ++ show err)
-              pure Nothing
-
-            Right (Right _) -> do
-              debug "managed bus: initial ping succeeded"
-              Just <$> connected bus
+          atomically (writeTVar statusVar (Unhealthy bus))
+          unhealthy bus 1
 
       case result of
         Left err -> do
-          debug ("managed bus: connect failed: " ++ show err)
+          debug ("managed bus: reconnecting; connect failed: " ++ show err)
           sleep seconds
           reconnecting (seconds * 1.5)
 
-        Right Nothing -> do
-          sleep seconds
-          reconnecting (seconds * 1.5)
-
-        Right (Just next) ->
+        Right next ->
           next
 
-    -- Connected state:
+    -- Healthy state:
     --
-    -- * Spawn a health-check thread.
-    --
-    -- * Spawn an idle timeout thread.
+    -- * Spawn a health-check thread and an idle timeout thread.
     --
     -- * Record that the connection is established, so clients can begin using
     --   it.
     --
-    -- * Wait for the connection status to update to either 'Disconnected' (idle
-    --   timeout) or 'Connecting' (connection failure). Return the action to
-    --   be called next.
-    connected :: Bus -> IO (IO Void)
-    connected bus = do
-      debug "managed bus: spawning health check thread"
+    -- * More docs go here.
+    healthy :: Bus -> IO (IO Void)
+    healthy bus = do
+      debug "managed bus: healthy; spawning health check thread"
 
-      withAsync (healthCheckThread statusVar bus) $ \_ -> do
-        debug "managed bus: spawning idle timeout thread"
+      next :: IO (IO Void) <-
+        withAsync (healthCheckThread statusVar bus) $ \_ -> do
+          debug "managed bus: healthy; spawning idle timeout thread"
 
-        withAsync (idleTimeoutThread statusVar lastUsedRef) $ \_ -> do
-          atomically (writeTVar statusVar (Connected bus))
+          withAsync (idleTimeoutThread statusVar lastUsedRef) $ \_ -> do
+            atomically (writeTVar statusVar (Healthy bus))
 
-          atomically $ do
-            readTVar statusVar >>= \case
-              Disconnected -> pure idle
-              Connecting -> pure (reconnecting 1)
-              Connected{} -> retry
+            atomically $
+              readTVar statusVar >>= \case
+                Disconnected -> pure (pure idle)
+                Connecting -> pure (pure (reconnecting 1))
+                Unhealthy _ -> pure (unhealthy bus 1)
+                Healthy _ -> retry
+
+      next
+
+    unhealthy :: Bus -> NominalDiffTime -> IO (IO Void)
+    unhealthy bus seconds = do
+      debug "managed bus: unhealthy; pinging"
+
+      Bus.ping bus >>= \case
+        Left err -> do
+          debug ("managed bus: unhealthy; ping failed: " ++ show err)
+          sleep seconds
+          pure (reconnecting 1)
+
+        Right (Left err) -> do
+          debug ("managed bus: unhealthy; ping failed: " ++ show err)
+          sleep seconds
+          unhealthy bus (seconds * 1.5)
+
+        Right (Right _) ->
+          healthy bus
 
     -- Idle state:
     --
-    -- * Wait for status to go from 'Disconnected' to 'Connecting'.
+    -- * Wait for status to go from disconnected to connecting
     --
     -- * Move to reconnecting state.
     idle :: IO Void
     idle = do
-      debug "managed bus: idle"
+      debug "managed bus: idle;"
 
       atomically $ do
         readTVar statusVar >>= \case
           Disconnected -> retry
           Connecting -> pure ()
-          Connected{} -> undefined
+          Unhealthy _ -> undefined
+          Healthy _ -> undefined
 
       reconnecting 1
 
@@ -229,20 +235,30 @@ healthCheckThread statusVar bus =
       -- TODO configurable ping frequency
       threadDelay (3*1000*1000)
 
-      debug "managed bus: health check thread: pinging"
+      debug "managed bus: healthy; pinging"
+
       Bus.ping bus >>= \case
         Left err -> do
-          debug ("managed bus: health check thread: ping failed: " ++ show err)
+          debug ("managed bus: healthy; ping failed: " ++ show err)
 
           atomically $
             readTVar statusVar >>= \case
               Disconnected -> pure ()
               Connecting -> pure ()
-              Connected{} -> writeTVar statusVar Connecting
+              Unhealthy _ -> undefined
+              Healthy _ -> writeTVar statusVar Connecting
 
-        -- TODO manager thread new state: "unhealthy"
-        Right response -> do
-          debug ("managed bus: health check thread: ping succeeded: " ++ show response)
+        Right (Left err) -> do
+          debug ("managed bus: healthy; ping failed: " ++ show err)
+
+          atomically $ do
+            readTVar statusVar >>= \case
+              Disconnected -> pure ()
+              Connecting -> pure ()
+              Unhealthy _ -> undefined
+              Healthy bus -> writeTVar statusVar (Unhealthy bus)
+
+        Right (Right _) ->
           loop
 
 idleTimeoutThread ::
@@ -258,20 +274,19 @@ idleTimeoutThread statusVar lastUsedRef =
       -- TODO configurable idle timeout
       threadDelay (5*1000*1000)
 
-      debug "managed bus: idle timeout thread: checking last used time"
-
       now <- getMonotonicTimeNSec
       lastUsed <- readIORef lastUsedRef
 
       if now - lastUsed > (10*1000*1000*1000)
         then do
-          debug "managed bus: idle timeout thread: closing idle connection"
+          debug "managed bus: healthy; closing idle connection"
 
           atomically $
             readTVar statusVar >>= \case
               Disconnected -> pure ()
               Connecting -> pure ()
-              Connected _ -> writeTVar statusVar Disconnected
+              Unhealthy _ -> pure ()
+              Healthy _ -> writeTVar statusVar Disconnected
         else
           loop
 
@@ -288,7 +303,10 @@ withBus ManagedBus { lastUsedRef, statusVar } callback =
     Connecting ->
       pure (Left ManagedBusConnectingError)
 
-    Connected bus -> do
+    Unhealthy _ ->
+      pure (Left ManagedBusUnhealthyError)
+
+    Healthy bus -> do
       writeIORef lastUsedRef =<< getMonotonicTimeNSec
 
       -- It's ok that this code is not exception-safe. If a callback results in

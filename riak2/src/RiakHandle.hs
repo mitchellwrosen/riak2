@@ -32,7 +32,7 @@ import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
 import RiakBus            (EventHandlers(..))
-import RiakManagedBus     (ManagedBus, ManagedBusError(..), managedBusConnected,
+import RiakManagedBus     (ManagedBus, ManagedBusError(..), managedBusReady,
                            withManagedBus)
 
 import qualified Libriak.Proto  as Proto
@@ -363,4 +363,4 @@ waitForManagedBus bus = do
       True -> pure (Left HandleTimeoutError)
       False -> retry)
     <|>
-    (Right () <$ managedBusConnected bus)
+    (Right () <$ managedBusReady bus)
