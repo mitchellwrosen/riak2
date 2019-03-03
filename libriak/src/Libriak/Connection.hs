@@ -5,18 +5,22 @@
 module Libriak.Connection
   ( Connection
   , withConnection
+  , connect
+  , disconnect
   , send
   , receive
   , ConnectError(..)
   , ConnectionError(..)
     -- * Re-exports
-  , DecodeError(..)
   , Endpoint(..)
+  , DecodeError(..)
+  , CloseException(..)
   ) where
 
-import Libriak.Internal.Connection (Connection, Endpoint(..),
-                                    Interruptibility(..), ReceiveException(..),
-                                    SendException(..))
+import Libriak.Internal.Connection (CloseException(..), Connection,
+                                    Endpoint(..), Interruptibility(..),
+                                    ReceiveException(..), SendException(..),
+                                    disconnect)
 import Libriak.Request             (EncodedRequest(..))
 import Libriak.Response            (DecodeError(..), EncodedResponse(..))
 
@@ -56,6 +60,17 @@ withConnection ::
 withConnection endpoint receiveTimeout onSuccess =
   first fromConnectException <$>
     Connection.withConnection endpoint receiveTimeout (const pure) onSuccess
+
+-- | Acquire a connection.
+--
+-- /Throws/. This function will never throw an exception.
+connect ::
+     Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
+  -> IO (Either ConnectError Connection)
+connect endpoint receiveTimeout =
+  first fromConnectException <$>
+    Connection.connect endpoint receiveTimeout
 
 -- | Send a request.
 --

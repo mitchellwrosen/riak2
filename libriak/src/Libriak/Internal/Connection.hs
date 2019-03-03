@@ -6,6 +6,8 @@
 module Libriak.Internal.Connection
   ( Connection
   , withConnection
+  , connect
+  , disconnect
   , send
   , receive
     -- * Re-exports
@@ -57,7 +59,7 @@ withConnection ::
   -> (Either CloseException () -> a -> IO b)
   -> (Connection -> IO a)
   -> IO (Either (ConnectException 'Uninterruptible) b)
-withConnection endpoint receiveTimeout onTeardown onSuccess = do
+withConnection endpoint receiveTimeout onTeardown onSuccess =
   Socket.withConnection endpoint onTeardown $ \connection -> do
     sendBuffer :: MutableByteArray RealWorld <-
       newByteArray gSendBufferSize
@@ -67,6 +69,34 @@ withConnection endpoint receiveTimeout onTeardown onSuccess = do
       , sendBuffer = sendBuffer
       , receiveTimeout = receiveTimeout
       }
+
+-- | Acquire a connection.
+--
+-- /Throws/. This function will never throw an exception.
+connect ::
+     Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
+  -> IO (Either (ConnectException 'Uninterruptible) Connection)
+connect endpoint receiveTimeout =
+  Socket.connect endpoint >>= \case
+    Left err ->
+      pure (Left err)
+
+    Right connection -> do
+      sendBuffer :: MutableByteArray RealWorld <-
+        newByteArray gSendBufferSize
+
+      pure (Right Connection
+        { connection = connection
+        , sendBuffer = sendBuffer
+        , receiveTimeout = receiveTimeout
+        })
+
+disconnect ::
+     Connection
+  -> IO (Either CloseException ())
+disconnect Connection { connection } =
+  Socket.disconnect connection
 
 -- | Send a length-prefixed payload, which is composed of arbitrarily-sized byte
 -- array fragments. Sends as many bytes as possible (up to 4kb) per syscall.
