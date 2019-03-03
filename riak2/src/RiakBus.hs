@@ -5,6 +5,7 @@ module RiakBus
   ( Bus
   , EventHandlers(..)
   , withBus
+  , connect
   , ping
   , exchange
   , stream
@@ -29,9 +30,9 @@ import GHC.TypeLits           (KnownNat)
 
 data Bus
   = Bus
-  { connVar :: !(TMVar Connection)
-    -- ^ The connection. Starts out full, but once a connection error occurs,
-    -- becomes empty permanently.
+  { connVar :: !(TVar (Either Connection Connection))
+    -- ^ The connection. Starts out on the Right, but once a connection error
+    -- occurs, gets put on the Left permanently.
   , sendLock :: !(MVar ())
     -- ^ Lock acquired during sending a request.
   , doneVarRef :: !(IORef (TMVar ()))
@@ -84,8 +85,8 @@ withBus endpoint receiveTimeout handlers callback = do
     newIORef =<< newTMVarIO ()
 
   Connection.withConnection endpoint receiveTimeout $ \connection -> do
-    connVar :: TMVar Connection <-
-      newTMVarIO connection
+    connVar :: TVar (Either Connection Connection) <-
+      newTVarIO (Right connection)
 
     callback Bus
       { connVar = connVar
@@ -93,6 +94,33 @@ withBus endpoint receiveTimeout handlers callback = do
       , doneVarRef = doneVarRef
       , handlers = handlers
       }
+
+connect ::
+     Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
+  -> EventHandlers
+  -> IO (Either ConnectError Bus)
+connect endpoint receiveTimeout handlers =
+  Connection.connect endpoint receiveTimeout >>= \case
+    Left err ->
+      pure (Left err)
+
+    Right connection -> do
+      sendLock :: MVar () <-
+        newMVar ()
+
+      doneVarRef :: IORef (TMVar ()) <-
+        newIORef =<< newTMVarIO ()
+
+      connVar :: TVar (Either Connection Connection) <-
+        newTVarIO (Right connection)
+
+      pure (Right Bus
+        { connVar = connVar
+        , sendLock = sendLock
+        , doneVarRef = doneVarRef
+        , handlers = handlers
+        })
 
 ping ::
      Bus
@@ -106,8 +134,11 @@ withConnection ::
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
 withConnection Bus { connVar, handlers } callback =
-  atomically (tryReadTMVar connVar) >>= \case
-    Just connection ->
+  readTVarIO connVar >>= \case
+    Left _ ->
+      pure (Left BusClosedError)
+
+    Right connection ->
       doCallback connection >>= \case
         Left err -> do
           teardown
@@ -127,9 +158,6 @@ withConnection Bus { connVar, handlers } callback =
         Right result ->
           pure (Right result)
 
-    Nothing ->
-      pure (Left BusClosedError)
-
   where
     doCallback :: Connection -> IO (Either BusError a)
     doCallback connection =
@@ -140,7 +168,10 @@ withConnection Bus { connVar, handlers } callback =
 
     teardown :: IO ()
     teardown =
-      void (atomically (tryTakeTMVar connVar))
+      atomically $
+        readTVar connVar >>= \case
+          Left _ -> pure ()
+          Right conn -> writeTVar connVar (Left conn)
 
 send ::
      EventHandlers
@@ -205,9 +236,9 @@ exchange bus@(Bus { connVar, sendLock, doneVarRef, handlers }) request =
           atomically $ do
             (Nothing <$ readTMVar prevDoneVar)
             <|>
-            (tryReadTMVar connVar >>= \case
-              Nothing -> pure (Just BusClosedError)
-              Just _ -> retry)
+            (readTVar connVar >>= \case
+              Left _ -> pure (Just BusClosedError)
+              Right _ -> retry)
 
         case waitResult of
           Nothing ->
