@@ -22,6 +22,7 @@ import Control.Monad.Primitive  (RealWorld)
 import Data.Primitive.ByteArray
 import Data.Word                (Word32, byteSwap32)
 import GHC.ByteOrder            (ByteOrder(..), targetByteOrder)
+import GHC.Conc                 (TVar, registerDelay)
 import Socket.Stream.IPv4       (CloseException(..), ConnectException(..),
                                  Endpoint(..), Interruptibility(..),
                                  ReceiveException(..), SendException(..),
@@ -38,9 +39,11 @@ data Connection
   = Connection
   { connection :: !(Socket.Connection)
     -- ^ Underlying connection.
-  , sendbuf :: !(MutableByteArray RealWorld)
+  , sendBuffer :: !(MutableByteArray RealWorld)
     -- ^ Fixed-size send buffer. Used during a send as a scrap buffer to fill up
     -- and send out. Not useful between sends.
+  , receiveTimeout :: !Int
+    -- ^ Number of microseconds to wait before giving up on a receive.
   }
 
 -- | Acquire a connection.
@@ -48,17 +51,19 @@ data Connection
 -- /Throws/. This function will never throw an exception.
 withConnection ::
      Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
   -> (Either CloseException () -> a -> IO b)
   -> (Connection -> IO a)
   -> IO (Either (ConnectException 'Uninterruptible) b)
-withConnection endpoint onTeardown onSuccess = do
+withConnection endpoint receiveTimeout onTeardown onSuccess = do
   Socket.withConnection endpoint onTeardown $ \connection -> do
-    sendbuf :: MutableByteArray RealWorld <-
+    sendBuffer :: MutableByteArray RealWorld <-
       newByteArray gSendBufferSize
 
     onSuccess Connection
       { connection = connection
-      , sendbuf = sendbuf
+      , sendBuffer = sendBuffer
+      , receiveTimeout = receiveTimeout
       }
 
 -- | Send a length-prefixed payload, which is composed of arbitrarily-sized byte
@@ -90,7 +95,7 @@ sendall ::
      Connection
   -> [ByteArray]
   -> IO (Either (SendException 'Uninterruptible) ())
-sendall Connection { sendbuf, connection } =
+sendall Connection { sendBuffer, connection } =
   loop 0
 
   where
@@ -100,7 +105,7 @@ sendall Connection { sendbuf, connection } =
       -> IO (Either (SendException 'Uninterruptible) ())
     loop !buffered = \case
       [] ->
-        Socket.sendMutableByteArraySlice connection sendbuf 0 buffered
+        Socket.sendMutableByteArraySlice connection sendBuffer 0 buffered
 
       bytes : bytess ->
         let
@@ -110,11 +115,11 @@ sendall Connection { sendbuf, connection } =
         in
           case compare (buffered + nbytes) gSendBufferSize of
             LT -> do
-              copyByteArray sendbuf buffered bytes 0 nbytes
+              copyByteArray sendBuffer buffered bytes 0 nbytes
               loop (buffered + nbytes) bytess
 
             EQ -> do
-              copyByteArray sendbuf buffered bytes 0 nbytes
+              copyByteArray sendBuffer buffered bytes 0 nbytes
               loop 0 bytess
 
             GT -> do
@@ -151,13 +156,13 @@ sendall Connection { sendbuf, connection } =
 
               -- Running example:
               --
-              -- sendbuf <-
+              -- sendBuffer <-
               --   'X  X  X ...  X  A  B'
               --    0  1  2     97 98 99
               copyMutableByteArray
-                sendbuf buffered mbytes 0 bytesSent
+                sendBuffer buffered mbytes 0 bytesSent
 
-              Socket.sendMutableByteArray connection sendbuf >>= \case
+              Socket.sendMutableByteArray connection sendBuffer >>= \case
                 Left err ->
                   pure (Left err)
 
@@ -191,20 +196,29 @@ sendall Connection { sendbuf, connection } =
 -- /Throws/. This function will never throw an exception.
 receive ::
      Connection
-  -> IO (Either (ReceiveException 'Uninterruptible) ByteArray)
-receive Connection { connection } =
-  receiveBigEndianWord32 connection >>= \case
+  -> IO (Either (ReceiveException 'Interruptible) ByteArray)
+receive Connection { connection, receiveTimeout } = do
+  timeoutVar :: TVar Bool <-
+    registerDelay receiveTimeout
+
+  receiveBigEndianWord32 connection timeoutVar >>= \case
     Left err ->
       pure (Left err)
 
     Right len ->
-      Socket.receiveByteArray connection (fromIntegral len)
+      Socket.interruptibleReceiveByteArray
+        timeoutVar
+        connection
+        (fromIntegral len)
 
 receiveBigEndianWord32 ::
      Socket.Connection
-  -> IO (Either (ReceiveException 'Uninterruptible) Word32)
-receiveBigEndianWord32 connection =
-  fmap parse <$> Socket.receiveByteArray connection 4
+  -> TVar Bool
+  -> IO (Either (ReceiveException 'Interruptible) Word32)
+receiveBigEndianWord32 connection timeoutVar =
+  (fmap.fmap)
+    parse
+    (Socket.interruptibleReceiveByteArray timeoutVar connection 4)
 
   where
     parse :: ByteArray -> Word32

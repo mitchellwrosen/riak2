@@ -14,9 +14,9 @@ module Libriak.Connection
   , Endpoint(..)
   ) where
 
-import Libriak.Internal.Connection (ConnectException(..), Connection,
-                                    Endpoint(..), Interruptibility(..),
-                                    ReceiveException(..), SendException(..))
+import Libriak.Internal.Connection (Connection, Endpoint(..),
+                                    Interruptibility(..), ReceiveException(..),
+                                    SendException(..))
 import Libriak.Request             (EncodedRequest(..))
 import Libriak.Response            (DecodeError(..), EncodedResponse(..))
 
@@ -26,18 +26,23 @@ import Data.Bifunctor (bimap, first)
 
 
 data ConnectError
-  = ConnectionFirewalled
-  | ConnectionRefused
-  | ConnectionTimedOut
+  = ConnectFirewalled
+  | ConnectRefused
+  | ConnectTimedOut
   | NetworkUnreachable
   | NoEphemeralPortsAvailable
   | TooManyOpenFiles
   deriving stock (Eq, Show)
 
 data ConnectionError
-  = LocalShutdown -- ^ The socket write channel is shut down.
-  | RemoteReset -- ^ The remote peer reset the connection.
-  | RemoteShutdown -- ^ The remote peer's write channel is shut down.
+    -- | The socket write channel is shut down.
+  = LocalShutdown
+    -- | The remote peer reset the connection.
+  | RemoteReset
+    -- | The remote peer's write channel is shut down.
+  | RemoteShutdown
+    -- | We timed out waiting for a message from the remote peer.
+  | RemoteTimeout
   deriving stock (Eq, Show)
 
 -- | Acquire a connection.
@@ -45,11 +50,12 @@ data ConnectionError
 -- /Throws/. This function will never throw an exception.
 withConnection ::
      Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
   -> (Connection -> IO a)
   -> IO (Either ConnectError a)
-withConnection endpoint onSuccess =
+withConnection endpoint receiveTimeout onSuccess =
   first fromConnectException <$>
-    Connection.withConnection endpoint (const pure) onSuccess
+    Connection.withConnection endpoint receiveTimeout (const pure) onSuccess
 
 -- | Send a request.
 --
@@ -70,22 +76,23 @@ receive =
   fmap (bimap fromReceiveException EncodedResponse) . Connection.receive
 
 fromConnectException ::
-     ConnectException 'Uninterruptible
+     Connection.ConnectException 'Uninterruptible
   -> ConnectError
 fromConnectException = \case
-  ConnectEphemeralPortsExhausted -> NoEphemeralPortsAvailable
-  ConnectFileDescriptorLimit     -> TooManyOpenFiles
-  ConnectFirewalled              -> ConnectionFirewalled
-  ConnectNetworkUnreachable      -> NetworkUnreachable
-  ConnectRefused                 -> ConnectionRefused
-  ConnectTimeout                 -> ConnectionTimedOut
+  Connection.ConnectEphemeralPortsExhausted -> NoEphemeralPortsAvailable
+  Connection.ConnectFileDescriptorLimit     -> TooManyOpenFiles
+  Connection.ConnectFirewalled              -> ConnectFirewalled
+  Connection.ConnectNetworkUnreachable      -> NetworkUnreachable
+  Connection.ConnectRefused                 -> ConnectRefused
+  Connection.ConnectTimeout                 -> ConnectTimedOut
 
 fromSendException :: SendException 'Uninterruptible -> ConnectionError
 fromSendException = \case
   SendReset    -> RemoteReset
   SendShutdown -> LocalShutdown
 
-fromReceiveException :: ReceiveException 'Uninterruptible -> ConnectionError
+fromReceiveException :: ReceiveException 'Interruptible -> ConnectionError
 fromReceiveException = \case
+  ReceiveInterrupted -> RemoteTimeout
   ReceiveReset -> RemoteReset
   ReceiveShutdown -> RemoteShutdown

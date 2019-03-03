@@ -69,17 +69,18 @@ instance Semigroup EventHandlers where
 -- /Throws/: This function will never throw an exception.
 withBus ::
      Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
   -> (Bus -> IO a)
   -> IO (Either ConnectError a)
-withBus endpoint handlers callback = do
+withBus endpoint receiveTimeout handlers callback = do
   sendLock :: MVar () <-
     newMVar ()
 
   doneVarRef :: IORef (TMVar ()) <-
     newIORef =<< newTMVarIO ()
 
-  Connection.withConnection endpoint $ \connection -> do
+  Connection.withConnection endpoint receiveTimeout $ \connection -> do
     connVar :: TMVar Connection <-
       newTMVarIO connection
 

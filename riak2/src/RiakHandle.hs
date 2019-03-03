@@ -33,6 +33,7 @@ import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
 import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
                            managedBusReady, withManagedBus)
+import RiakUtils          (difftimeToMicros)
 
 import qualified Libriak.Proto  as Proto
 import qualified RiakManagedBus as ManagedBus
@@ -40,6 +41,7 @@ import qualified RiakManagedBus as ManagedBus
 import Control.Concurrent.STM (TVar, atomically, readTVar, retry)
 import Control.Foldl          (FoldM)
 import Control.Lens           ((.~), (^.))
+import Data.Time              (NominalDiffTime)
 import GHC.Conc               (registerDelay)
 import GHC.TypeLits           (KnownNat)
 
@@ -53,6 +55,8 @@ data Handle
 data HandleConfig
   = HandleConfig
   { endpoint :: !Endpoint
+    -- | How long to wait for a response from Riak before timing out.
+  , timeout :: !NominalDiffTime
   , handlers :: !EventHandlers
   }
 
@@ -71,8 +75,8 @@ withHandle ::
      HandleConfig
   -> (Handle -> IO a)
   -> IO a
-withHandle HandleConfig { endpoint, handlers } callback =
-  withManagedBus endpoint handlers $ \bus ->
+withHandle HandleConfig { endpoint, handlers, timeout } callback =
+  withManagedBus endpoint (difftimeToMicros timeout) handlers $ \bus ->
     callback (Handle bus handlers)
 
 delete ::

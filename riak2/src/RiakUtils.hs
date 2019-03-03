@@ -26,6 +26,12 @@ retrying delay0 action =
         Just result ->
           pure result
 
+difftimeToMicros :: NominalDiffTime -> Int
+difftimeToMicros time =
+  case nominalDiffTimeToSeconds time of
+    MkFixed picoseconds ->
+      fromIntegral (picoseconds `div` 1000000)
+
 difftimeToMillis :: NominalDiffTime -> Word32
 difftimeToMillis time =
   case nominalDiffTimeToSeconds time of

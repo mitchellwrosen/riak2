@@ -63,6 +63,8 @@ main = do
               { address = host
               , port = port
               }
+        , timeout =
+            5
         , handlers =
             EventHandlers
               { onSend =

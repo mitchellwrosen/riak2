@@ -131,10 +131,11 @@ managedBusReady ManagedBus { statusVar } =
 -- /Throws/. This function will never throw an exception.
 withManagedBus ::
      Endpoint
+  -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
   -> (ManagedBus -> IO a)
   -> IO a
-withManagedBus endpoint handlers callback = do
+withManagedBus endpoint receiveTimeout handlers callback = do
   statusVar :: TVar Status <-
     newTVarIO Disconnected
 
@@ -161,7 +162,7 @@ withManagedBus endpoint handlers callback = do
     acquire :: IO ThreadId
     acquire =
       forkIOWithUnmask $ \unmask ->
-        tryAny (unmask (managerThread endpoint bus)) >>= \case
+        tryAny (unmask (managerThread endpoint receiveTimeout bus)) >>= \case
           Left err ->
             throwTo threadId (ManagedBusCrashed err)
           Right void ->
@@ -174,9 +175,14 @@ withManagedBus endpoint handlers callback = do
 
 managerThread ::
      Endpoint
+  -> Int
   -> ManagedBus
   -> IO Void
-managerThread endpoint ManagedBus { handlers, inFlightVar, lastUsedRef, statusVar } =
+managerThread
+    endpoint
+    receiveTimeout
+    ManagedBus { handlers, inFlightVar, lastUsedRef, statusVar } =
+
   disconnected
 
   where
@@ -185,7 +191,7 @@ managerThread endpoint ManagedBus { handlers, inFlightVar, lastUsedRef, statusVa
       debug "managed bus: connecting;"
 
       result :: Either ConnectError (IO Void) <-
-        Bus.withBus endpoint busHandlers $ \bus -> do
+        Bus.withBus endpoint receiveTimeout busHandlers $ \bus -> do
           atomically (writeTVar statusVar Unhealthy)
           unhealthy bus 1
 
