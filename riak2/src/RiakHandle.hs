@@ -31,8 +31,9 @@ module RiakHandle
 import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
+import RiakBusPool        (BusPool, withBusPool, withManagedBus)
 import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
-                           managedBusReady, withManagedBus)
+                           managedBusReady)
 import RiakUtils          (difftimeToMicros)
 
 import qualified Libriak.Proto  as Proto
@@ -48,7 +49,7 @@ import GHC.TypeLits           (KnownNat)
 
 data Handle
   = Handle
-  { bus :: !ManagedBus
+  { pool :: !BusPool
   , retries :: !Natural
   , handlers :: !EventHandlers
   }
@@ -95,7 +96,7 @@ withHandle ::
   -> (Handle -> IO a)
   -> IO a
 withHandle HandleConfig { endpoint, handlers, retries, requestTimeout } callback =
-  withManagedBus endpoint (difftimeToMicros requestTimeout) handlers $ \bus ->
+  withBusPool endpoint (difftimeToMicros requestTimeout) handlers $ \bus ->
     callback (Handle bus retries handlers)
 
 delete ::
@@ -294,12 +295,13 @@ exchange ::
   => Handle -- ^
   -> Request code -- ^
   -> IO (Either HandleError (Either ByteString (Response code)))
-exchange Handle { bus, retries } request =
-  doExchangeOrStream
-    retries
-    (ManagedBus.exchange bus request)
-    (waitForManagedBus bus)
-    0
+exchange Handle { pool, retries } request =
+  withManagedBus pool $ \bus ->
+    doExchangeOrStream
+      retries
+      (ManagedBus.exchange bus request)
+      (waitForManagedBus bus)
+      0
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
@@ -309,12 +311,13 @@ stream ::
   -> Request code -- ^
   -> FoldM IO (Response code) r
   -> IO (Either HandleError (Either ByteString r))
-stream Handle { bus, retries } request responseFold =
-  doExchangeOrStream
-    retries
-    (ManagedBus.stream bus request responseFold)
-    (waitForManagedBus bus)
-    0
+stream Handle { pool, retries } request responseFold =
+  withManagedBus pool $ \bus ->
+    doExchangeOrStream
+      retries
+      (ManagedBus.stream bus request responseFold)
+      (waitForManagedBus bus)
+      0
 
 doExchangeOrStream ::
      forall a.

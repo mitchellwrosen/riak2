@@ -49,6 +49,8 @@ data Connection
 -- | Acquire a connection.
 --
 -- /Throws/. This function will never throw an exception.
+--
+-- TODO interruptible connect
 withConnection ::
      Endpoint
   -> Int -- ^ Receive timeout (microseconds)
@@ -70,6 +72,8 @@ withConnection endpoint receiveTimeout onTeardown onSuccess = do
 -- array fragments. Sends as many bytes as possible (up to 4kb) per syscall.
 --
 -- /Throws/. This function will never throw an exception.
+--
+-- TODO writev
 send ::
      Connection -- ^ Connection
   -> [ByteArray] -- ^ Payload

@@ -4,6 +4,7 @@ module Prelude
 
 import Control.Applicative     as X ((<|>))
 import Control.Category        as X ((>>>))
+import Control.Concurrent      as X (ThreadId, myThreadId)
 import Control.Concurrent.MVar as X
 import Control.Exception       as X (Exception, SomeException)
 import Control.Monad           as X (guard, join, void)

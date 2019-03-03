@@ -186,6 +186,7 @@ library riak2-internal
     RiakBucketProperties
     RiakBucketType
     RiakBus
+    RiakBusPool
     RiakContent
     RiakContext
     RiakConvergentCounter
