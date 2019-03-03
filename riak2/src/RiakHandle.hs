@@ -57,7 +57,7 @@ data HandleConfig
   = HandleConfig
   { endpoint :: !Endpoint
     -- | How long to wait for a response from Riak before timing out.
-  , timeout :: !NominalDiffTime
+  , requestTimeout :: !NominalDiffTime
     -- | The additional number of times to attempt a request if it results in a
     -- non-Riak error.
     --
@@ -94,8 +94,8 @@ withHandle ::
      HandleConfig
   -> (Handle -> IO a)
   -> IO a
-withHandle HandleConfig { endpoint, handlers, retries, timeout } callback =
-  withManagedBus endpoint (difftimeToMicros timeout) handlers $ \bus ->
+withHandle HandleConfig { endpoint, handlers, retries, requestTimeout } callback =
+  withManagedBus endpoint (difftimeToMicros requestTimeout) handlers $ \bus ->
     callback (Handle bus retries handlers)
 
 delete ::

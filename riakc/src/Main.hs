@@ -65,7 +65,7 @@ main = do
               }
         , retries =
             3
-        , timeout =
+        , requestTimeout =
             5
         , handlers =
             EventHandlers
