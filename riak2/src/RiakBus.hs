@@ -48,11 +48,11 @@ data BusError :: Type where
 
 data EventHandlers
   = EventHandlers
-  { onSend :: forall code. Request code -> IO ()
+  { onSend :: !(forall code. Request code -> IO ())
     -- ^ Called just prior to sending a request.
-  , onReceive :: forall code. Response code -> IO ()
+  , onReceive :: !(forall code. Response code -> IO ())
     -- ^ Called just after receiving a response.
-  , onConnectionError :: ConnectionError -> IO ()
+  , onConnectionError :: !(ConnectionError -> IO ())
   }
 
 instance Monoid EventHandlers where

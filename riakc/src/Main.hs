@@ -73,10 +73,10 @@ main = do
                   if verbose
                     then \msg -> putStrLn ("<<< " ++ show msg)
                     else mempty
+              , onConnectError =
+                  print
               , onConnectionError =
-                  if verbose
-                    then \err -> putStrLn ("*** " ++ show err)
-                    else mempty
+                  print
               }
         }
 

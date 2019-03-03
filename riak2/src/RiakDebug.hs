@@ -1,9 +1,12 @@
+{-# language CPP #-}
+
 module RiakDebug
   ( debug
   ) where
 
-import System.IO.Unsafe (unsafePerformIO)
+#ifdef DEBUG
 
+import System.IO.Unsafe (unsafePerformIO)
 
 lock :: MVar ()
 lock =
@@ -13,3 +16,11 @@ lock =
 debug :: [Char] -> IO ()
 debug msg =
   withMVar lock $ \_ -> putStrLn ("[riak debug] " ++ msg)
+
+#else
+
+debug :: [Char] -> IO ()
+debug _ =
+  pure ()
+
+#endif

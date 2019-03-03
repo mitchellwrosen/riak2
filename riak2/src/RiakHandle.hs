@@ -31,9 +31,8 @@ module RiakHandle
 import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
-import RiakBus            (EventHandlers(..))
-import RiakManagedBus     (ManagedBus, ManagedBusError(..), managedBusReady,
-                           withManagedBus)
+import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
+                           managedBusReady, withManagedBus)
 
 import qualified Libriak.Proto  as Proto
 import qualified RiakManagedBus as ManagedBus
@@ -308,6 +307,14 @@ doExchangeOrStream action wait !attempts =
         Left err ->
           case err of
             ManagedBusConnectingError ->
+              wait >>= \case
+                Left err ->
+                  pure (Left err)
+
+                Right () ->
+                  doExchangeOrStream action wait 0
+
+            ManagedBusUnhealthyError ->
               wait >>= \case
                 Left err ->
                   pure (Left err)

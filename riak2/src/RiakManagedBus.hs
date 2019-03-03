@@ -18,9 +18,11 @@
 --   Request failure  ==> [CONNECTING]
 --   Ping nack        ==> [UNHEALTHY]
 --   Idle timeout     ==> [DISCONNECTED]
+
 module RiakManagedBus
   ( ManagedBus
   , ManagedBusError(..)
+  , EventHandlers(..)
   , managedBusReady
   , withManagedBus
   , exchange
@@ -31,7 +33,7 @@ module RiakManagedBus
 import Libriak.Connection (ConnectError, ConnectionError, Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
-import RiakBus            (Bus, BusError(..), EventHandlers(..))
+import RiakBus            (Bus, BusError(..))
 import RiakDebug          (debug)
 
 import qualified RiakBus as Bus
@@ -89,6 +91,25 @@ newtype ManagedBusCrashed
 instance Exception ManagedBusCrashed where
   toException = asyncExceptionToException
   fromException = asyncExceptionFromException
+
+data EventHandlers
+  = EventHandlers
+  { onSend :: !(forall code. Request code -> IO ())
+    -- ^ Called just prior to sending a request.
+  , onReceive :: !(forall code. Response code -> IO ())
+    -- ^ Called just after receiving a response.
+  , onConnectError :: !(ConnectError -> IO ())
+  , onConnectionError :: !(ConnectionError -> IO ())
+  }
+
+instance Monoid EventHandlers where
+  mempty = EventHandlers mempty mempty mempty mempty
+  mappend = (<>)
+
+instance Semigroup EventHandlers where
+  EventHandlers a1 b1 c1 d1 <> EventHandlers a2 b2 c2 d2 =
+    EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2)
+
 
 -- | An STM action that returns when the managed bus is connected and healthy.
 managedBusReady :: ManagedBus -> STM ()
@@ -157,12 +178,14 @@ managerThread endpoint handlers statusVar lastUsedRef =
       debug "managed bus: connecting;"
 
       result :: Either ConnectError (IO Void) <-
-        Bus.withBus endpoint handlers $ \bus -> do
+        Bus.withBus endpoint busHandlers $ \bus -> do
           atomically (writeTVar statusVar (Unhealthy bus))
           unhealthy bus 1
 
       case result of
         Left err -> do
+          onConnectError handlers err
+
           debug ("managed bus: connecting; connect failed: " ++ show err)
           sleep seconds
           connecting (seconds * 1.5)
@@ -220,6 +243,14 @@ managerThread endpoint handlers statusVar lastUsedRef =
           Healthy _ -> undefined
 
       connecting 1
+
+    busHandlers :: Bus.EventHandlers
+    busHandlers =
+      Bus.EventHandlers
+        { Bus.onSend = onSend handlers
+        , Bus.onReceive = onReceive handlers
+        , Bus.onConnectionError = onConnectionError handlers
+        }
 
 healthCheckThread ::
      TVar Status

@@ -69,6 +69,11 @@ description:
   * "Riak.Error"
   * "Riak.Quorum"
 
+flag debug
+  description: Print debug statements
+  manual: True
+  default: False
+
 library
   build-depends:
     base,
@@ -242,6 +247,9 @@ library riak2-internal
     RiakProtoPair
     RiakMapReduceInput
     RiakUtils
+
+  if flag(debug)
+    cpp-options: -DDEBUG
 
 test-suite tests
   build-depends:
