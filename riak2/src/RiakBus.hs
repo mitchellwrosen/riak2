@@ -19,6 +19,7 @@ import qualified Libriak.Proto      as Proto
 import qualified Libriak.Response   as Libriak
 
 import Control.Concurrent.STM
+import Control.Exception.Safe (catchAsync, mask, throwIO)
 import Control.Foldl          (FoldM(..))
 import GHC.TypeLits           (KnownNat)
 
@@ -96,15 +97,16 @@ ping bus =
   exchange bus (ReqRpbPing Proto.defMessage)
 
 withConnection ::
+     forall a.
      Bus
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
 withConnection Bus { connVar, handlers } callback =
   atomically (tryReadTMVar connVar) >>= \case
-    Just connection -> do
-      callback connection >>= \case
+    Just connection ->
+      doCallback connection >>= \case
         Left err -> do
-          void (atomically (tryTakeTMVar connVar))
+          teardown
 
           case err of
             BusClosedError ->
@@ -123,6 +125,18 @@ withConnection Bus { connVar, handlers } callback =
 
     Nothing ->
       pure (Left BusClosedError)
+
+  where
+    doCallback :: Connection -> IO (Either BusError a)
+    doCallback connection =
+      mask $ \unmask ->
+        unmask (callback connection) `catchAsync` \(e :: SomeException) -> do
+          teardown
+          throwIO e
+
+    teardown :: IO ()
+    teardown =
+      void (atomically (tryTakeTMVar connVar))
 
 send ::
      EventHandlers
@@ -154,9 +168,6 @@ receive handlers connection =
           pure (Right response)
 
 -- | Send a request and receive the response (a single message).
---
--- TODO: Handle sooo many race conditions wrt. async exceptions (important use
--- case: killing a thread after a timeout)
 exchange ::
      KnownNat code
   => Bus -- ^

@@ -5,7 +5,7 @@ module Prelude
 import Control.Applicative     as X ((<|>))
 import Control.Category        as X ((>>>))
 import Control.Concurrent.MVar as X
-import Control.Exception       as X (Exception)
+import Control.Exception       as X (Exception, SomeException)
 import Control.Monad           as X (guard, join, void)
 import Control.Monad.IO.Class  as X (MonadIO, liftIO)
 import Data.Bifunctor          as X (bimap, first)
