@@ -84,7 +84,7 @@ main = do
               }
         }
 
-  withHandle config run
+  createHandle config >>= run
 
   where
     parseHost :: IO (IPv4, Word16)

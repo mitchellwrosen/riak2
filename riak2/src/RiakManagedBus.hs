@@ -28,8 +28,8 @@ module RiakManagedBus
   ( ManagedBus
   , ManagedBusError(..)
   , EventHandlers(..)
+  , createManagedBus
   , managedBusReady
-  , withManagedBus
   , withBus
   , ManagedBusCrashed(..)
   ) where
@@ -47,7 +47,8 @@ import Control.Concurrent.Async
 import Control.Concurrent.STM
 import Control.Exception        (asyncExceptionFromException,
                                  asyncExceptionToException)
-import Control.Exception.Safe   (Exception(..), SomeException, bracket, bracket_, tryAny)
+import Control.Exception.Safe   (Exception(..), SomeException, bracket_, mask_,
+                                 tryAny)
 import Data.Fixed               (Fixed(..))
 import Data.Time.Clock          (NominalDiffTime, nominalDiffTimeToSeconds)
 
@@ -60,6 +61,8 @@ data ManagedBus
   , lastUsedRef :: !(IORef Word64)
     -- ^ The last time the bus was used.
   , handlers :: !EventHandlers
+  , aliveRef :: !(IORef ())
+    -- ^ Used for finalization.
   }
 
 data Status :: Type where
@@ -118,24 +121,15 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 c1 d1 <> EventHandlers a2 b2 c2 d2 =
     EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2)
 
-
--- | An STM action that returns when the managed bus is connected and healthy.
-managedBusReady :: ManagedBus -> STM ()
-managedBusReady ManagedBus { statusVar } =
-  readTVar statusVar >>= \case
-    Disconnected _ -> retry
-    Healthy _ _ _ -> pure ()
-
--- | Acquire a managed bus.
+-- | Create a managed bus.
 --
 -- /Throws/. This function will never throw an exception.
-withManagedBus ::
+createManagedBus ::
      Endpoint
   -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
-  -> (ManagedBus -> IO a)
-  -> IO a
-withManagedBus endpoint receiveTimeout handlers callback = do
+  -> IO ManagedBus
+createManagedBus endpoint receiveTimeout handlers = do
   connectVar :: TPing <-
     newTPing
 
@@ -148,45 +142,65 @@ withManagedBus endpoint receiveTimeout handlers callback = do
   lastUsedRef :: IORef Word64 <-
     newIORef =<< getMonotonicTimeNSec
 
+  aliveRef :: IORef () <-
+    newIORef ()
+
   threadId :: ThreadId <-
     myThreadId
 
-  let
-    bus :: ManagedBus
-    bus =
-      ManagedBus
-        { statusVar = statusVar
-        , inFlightVar = inFlightVar
-        , lastUsedRef = lastUsedRef
-        , handlers = handlers
-        }
 
-  let
-    acquire :: IO ThreadId
-    acquire =
+  mask_ $ do
+    managerThreadId :: ThreadId <-
       forkIOWithUnmask $ \unmask ->
-        tryAny (unmask (managerThread endpoint receiveTimeout connectVar bus)) >>= \case
+        tryAny
+          (unmask
+            (managerThread
+              endpoint
+              receiveTimeout
+              connectVar
+              statusVar
+              inFlightVar
+              lastUsedRef
+              handlers)) >>= \case
           Left err ->
             throwTo threadId (ManagedBusCrashed err)
           Right void ->
             absurd void
 
-  bracket
-    acquire
-    killThread
-    (\_ -> callback bus)
+    void (mkWeakIORef aliveRef (killThread managerThreadId))
+
+  pure ManagedBus
+    { statusVar = statusVar
+    , inFlightVar = inFlightVar
+    , lastUsedRef = lastUsedRef
+    , handlers = handlers
+    , aliveRef = aliveRef
+    }
+
+-- | An STM action that returns when the managed bus is connected and healthy.
+managedBusReady :: ManagedBus -> STM ()
+managedBusReady ManagedBus { statusVar } =
+  readTVar statusVar >>= \case
+    Disconnected _ -> retry
+    Healthy _ _ _ -> pure ()
 
 managerThread ::
      Endpoint
   -> Int
   -> TPing
-  -> ManagedBus
+  -> TVar Status
+  -> TVar Int
+  -> IORef Word64
+  -> EventHandlers
   -> IO Void
 managerThread
     endpoint
     receiveTimeout
     connectVar
-    ManagedBus { handlers, inFlightVar, lastUsedRef, statusVar } =
+    statusVar
+    inFlightVar
+    lastUsedRef
+    handlers =
 
   disconnected connectVar
 

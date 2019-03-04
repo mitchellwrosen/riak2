@@ -1,6 +1,6 @@
 module Riak
   ( -- * Handle
-    withHandle
+    createHandle
     -- * Object operations
     -- ** Get object
   , get
@@ -182,7 +182,7 @@ import Riak.ConvergentSet
 import Riak.ErlangTerm
 import Riak.Error
 import Riak.Handle                (EventHandlers(..), Handle, HandleConfig(..),
-                                   HandleError, withHandle)
+                                   HandleError, createHandle)
 import Riak.Index
 import Riak.Key
 import Riak.MapReduce

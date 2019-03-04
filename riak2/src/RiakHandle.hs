@@ -3,7 +3,7 @@ module RiakHandle
   , HandleConfig(..)
   , EventHandlers(..)
   , HandleError(..)
-  , withHandle
+  , createHandle
   , delete
   , deleteIndex
   , get
@@ -31,7 +31,7 @@ module RiakHandle
 import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
-import RiakBusPool        (BusPool, withBusPool, withManagedBus)
+import RiakBusPool        (BusPool, createBusPool, withManagedBus)
 import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
                            managedBusReady)
 import RiakUtils          (difftimeToMicros)
@@ -89,16 +89,21 @@ data HandleError :: Type where
   deriving stock (Eq, Show)
 
 
--- | Acquire a handle.
+-- | Create a handle.
 --
 -- /Throws/: This function will never throw an exception.
-withHandle ::
+createHandle ::
      HandleConfig
-  -> (Handle -> IO a)
-  -> IO a
-withHandle HandleConfig { endpoint, handlers, retries, requestTimeout } callback =
-  withBusPool endpoint (difftimeToMicros requestTimeout) handlers $ \bus ->
-    callback (Handle bus retries handlers)
+  -> IO Handle
+createHandle HandleConfig { endpoint, handlers, retries, requestTimeout } = do
+  pool :: BusPool <-
+    createBusPool endpoint (difftimeToMicros requestTimeout) handlers
+
+  pure Handle
+    { pool = pool
+    , retries = retries
+    , handlers = handlers
+    }
 
 delete ::
      Handle -- ^
@@ -364,8 +369,8 @@ doExchangeOrStream retries action wait =
                     Right () ->
                       loop wasReady (attempts+1)
 
-                -- Weird to treat a decode error (very unexpected) like a connection
-                -- error (expected)
+                -- Weird to treat a decode error (very unexpected) like a
+                -- connection error (expected)
                 ManagedBusDecodeError _ ->
                   wait >>= \case
                     Left err ->

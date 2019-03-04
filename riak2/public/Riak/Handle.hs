@@ -3,7 +3,7 @@ module Riak.Handle
   , HandleConfig(..)
   , EventHandlers(..)
   , HandleError(..)
-  , withHandle
+  , createHandle
     -- * Re-exports
   , Endpoint(..)
   ) where
