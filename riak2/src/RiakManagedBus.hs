@@ -30,8 +30,7 @@ module RiakManagedBus
   , EventHandlers(..)
   , managedBusReady
   , withManagedBus
-  , exchange
-  , stream
+  , withBus
   , ManagedBusCrashed(..)
   ) where
 
@@ -49,10 +48,8 @@ import Control.Concurrent.STM
 import Control.Exception        (asyncExceptionFromException,
                                  asyncExceptionToException)
 import Control.Exception.Safe   (Exception(..), SomeException, bracket, bracket_, tryAny)
-import Control.Foldl            (FoldM)
 import Data.Fixed               (Fixed(..))
 import Data.Time.Clock          (NominalDiffTime, nominalDiffTimeToSeconds)
-import GHC.TypeLits             (KnownNat)
 
 
 data ManagedBus
@@ -66,20 +63,25 @@ data ManagedBus
   }
 
 data Status :: Type where
-  -- | Disconnected until a request comes in.
-  Disconnected :: Status
-  -- | Attempting to establish a connection.
-  Connecting :: Status
-  -- | Connected, but unhealthy (haven't gotten a successful response from the
-  -- initial ping).
-  Unhealthy :: Status
+  -- | * Disconnected due to never being used
+  --   * Disconnected due to idle timeout
+  --   * Connected but haven't pinged once yet
+  --   * Connected but unhealthy (pings began failing)
+  Disconnected ::
+       !(STM ()) -- "Please connect"
+    -> Status
+
   -- | Connected and healthy.
-  Healthy :: !Bus -> Status
+  Healthy ::
+       !Bus
+    -> !(STM ()) -- Idle timeout
+    -> !(STM ()) -- Request failed
+    -> Status
 
 data ManagedBusError :: Type where
   -- | The bus is not ready to accept requests, either because it is connecting,
   -- unhealthy, or draining connections and about to reconnect.
-  ManagedBusNotReadyError :: ManagedBusError
+  ManagedBusDisconnectedError :: ManagedBusError
   -- | A connection error occurred during a send or receive.
   ManagedBusConnectionError :: !ConnectionError -> ManagedBusError
   -- | A protobuf decode error occurred.
@@ -121,10 +123,8 @@ instance Semigroup EventHandlers where
 managedBusReady :: ManagedBus -> STM ()
 managedBusReady ManagedBus { statusVar } =
   readTVar statusVar >>= \case
-    Disconnected -> retry
-    Connecting -> retry
-    Unhealthy -> retry
-    Healthy _ -> pure ()
+    Disconnected _ -> retry
+    Healthy _ _ _ -> pure ()
 
 -- | Acquire a managed bus.
 --
@@ -136,8 +136,11 @@ withManagedBus ::
   -> (ManagedBus -> IO a)
   -> IO a
 withManagedBus endpoint receiveTimeout handlers callback = do
+  connectVar :: TPing <-
+    newTPing
+
   statusVar :: TVar Status <-
-    newTVarIO Disconnected
+    newTVarIO (Disconnected (ping connectVar))
 
   inFlightVar :: TVar Int <-
     newTVarIO 0
@@ -162,7 +165,7 @@ withManagedBus endpoint receiveTimeout handlers callback = do
     acquire :: IO ThreadId
     acquire =
       forkIOWithUnmask $ \unmask ->
-        tryAny (unmask (managerThread endpoint receiveTimeout bus)) >>= \case
+        tryAny (unmask (managerThread endpoint receiveTimeout connectVar bus)) >>= \case
           Left err ->
             throwTo threadId (ManagedBusCrashed err)
           Right void ->
@@ -176,70 +179,111 @@ withManagedBus endpoint receiveTimeout handlers callback = do
 managerThread ::
      Endpoint
   -> Int
+  -> TPing
   -> ManagedBus
   -> IO Void
 managerThread
     endpoint
     receiveTimeout
+    connectVar
     ManagedBus { handlers, inFlightVar, lastUsedRef, statusVar } =
 
-  disconnected
+  disconnected connectVar
 
   where
     connecting :: NominalDiffTime -> IO Void
-    connecting seconds = do
-      debug "managed bus: connecting;"
+    connecting seconds0 = do
+      debug "handle: connecting"
+      loop seconds0
 
-      result :: Either ConnectError (IO Void) <-
-        Bus.withBus endpoint receiveTimeout busHandlers $ \bus -> do
-          atomically (writeTVar statusVar Unhealthy)
-          unhealthy bus 1
+      where
+        loop :: NominalDiffTime -> IO Void
+        loop seconds = do
+          result :: Either ConnectError (IO Void) <-
+            Bus.withBus endpoint receiveTimeout busHandlers $ \bus -> do
+              timeoutVar :: TPing <-
+                newTPing
 
-      case result of
-        Left err -> do
-          onConnectError handlers err
+              requestFailedVar :: TPing <-
+                newTPing
 
-          debug ("managed bus: connecting; connect failed: " ++ show err)
-          sleep seconds
-          connecting (seconds * 1.5)
+              unhealthy bus timeoutVar requestFailedVar 1
 
-        Right next ->
-          next
+          case result of
+            Left err -> do
+              void (tryAny (onConnectError handlers err))
+              debug ("handle: " ++ show err)
+              sleep seconds
+              loop (seconds * 1.5)
 
-    healthy :: Bus -> IO (IO Void)
-    healthy bus =
+            Right next ->
+              next
+
+    healthy ::
+         Bus
+      -> TPing -- Idle timeout
+      -> TPing -- Request failed
+      -> IO (IO Void)
+    healthy bus timeoutVar requestFailedVar = do
+      debug "handle: healthy"
+
+      unhealthyVar :: TPing <-
+        newTPing
+
       join .
-        withAsync (healthCheckThread statusVar bus) $ \_ ->
-        withAsync (idleTimeoutThread statusVar inFlightVar lastUsedRef) $ \_ ->
-          atomically $
-            readTVar statusVar >>= \case
-              Disconnected -> pure (pure disconnected)
-              Connecting -> pure draining
-              Unhealthy -> pure (unhealthy bus 1)
-              Healthy _ -> retry
+        withAsync (healthCheckThread (ping unhealthyVar) (ping requestFailedVar) bus) $ \_ ->
+        withAsync (idleTimeoutThread (ping timeoutVar) inFlightVar lastUsedRef) $ \_ ->
+          atomically (asum
+            [ recvPing timeoutVar $> pure (do
+                connectVar <- newTPing
+                atomically (writeTVar statusVar (Disconnected (ping connectVar)))
+                debug "handle: disconnected"
+                disconnected connectVar)
 
-    unhealthy :: Bus -> NominalDiffTime -> IO (IO Void)
-    unhealthy bus seconds = do
-      debug "managed bus: unhealthy; pinging"
+            , recvPing unhealthyVar $> do
+                atomically (writeTVar statusVar (Disconnected (pure ())))
+                debug "handle: unhealthy"
+                unhealthy bus timeoutVar requestFailedVar 1
 
-      Bus.ping bus >>= \case
-        Left err -> do
-          debug ("managed bus: unhealthy; ping failed: " ++ show err)
-          sleep seconds
-          draining
+            , recvPing requestFailedVar $> do
+                atomically (writeTVar statusVar (Disconnected (pure ())))
+                draining
+            ])
 
-        Right (Left err) -> do
-          debug ("managed bus: unhealthy; ping failed: " ++ show err)
-          sleep seconds
-          unhealthy bus (seconds * 1.5)
+    unhealthy ::
+         Bus
+      -> TPing -- Idle timeout
+      -> TPing -- Request failed
+      -> NominalDiffTime
+      -> IO (IO Void)
+    unhealthy bus timeoutVar requestFailedVar =
+      loop
 
-        Right (Right _) -> do
-          atomically (writeTVar statusVar (Healthy bus))
-          healthy bus
+      where
+        loop :: NominalDiffTime -> IO (IO Void)
+        loop seconds = do
+          Bus.ping bus >>= \case
+            Left err -> do
+              debug ("handle: " ++ show err)
+              sleep seconds
+              draining
+
+            Right (Left err) -> do
+              debug ("handle: " ++ show err)
+              sleep seconds
+              loop (seconds * 1.5)
+
+            Right (Right _) -> do
+              atomically
+                (writeTVar
+                  statusVar
+                    (Healthy bus (ping timeoutVar) (ping requestFailedVar)))
+
+              healthy bus timeoutVar requestFailedVar
 
     draining :: IO (IO Void)
     draining = do
-      debug "managed bus: draining;"
+      debug "handle: draining"
 
       atomically $
         readTVar inFlightVar >>= \case
@@ -248,17 +292,9 @@ managerThread
 
       pure (connecting 1)
 
-    disconnected :: IO Void
-    disconnected = do
-      debug "managed bus: disconnected;"
-
-      atomically $ do
-        readTVar statusVar >>= \case
-          Disconnected -> retry
-          Connecting -> pure ()
-          Unhealthy -> undefined
-          Healthy _ -> undefined
-
+    disconnected :: TPing -> IO Void
+    disconnected connectVar = do
+      atomically (recvPing connectVar)
       connecting 1
 
     busHandlers :: Bus.EventHandlers
@@ -270,11 +306,11 @@ managerThread
         }
 
 healthCheckThread ::
-     TVar Status
+     STM () -- Unhealthy
+  -> STM () -- Request failed
   -> Bus
   -> IO ()
-healthCheckThread statusVar bus = do
-  debug "managed bus: healthy; spawned health check thread"
+healthCheckThread unhealthy requestFailed bus =
   loop
 
   where
@@ -283,39 +319,24 @@ healthCheckThread statusVar bus = do
       -- TODO configurable ping frequency
       threadDelay (1*1000*1000)
 
-      debug "managed bus: healthy; pinging"
-
       Bus.ping bus >>= \case
         Left err -> do
-          debug ("managed bus: healthy; ping failed: " ++ show err)
-
-          atomically $
-            readTVar statusVar >>= \case
-              Disconnected -> pure ()
-              Connecting -> pure ()
-              Unhealthy -> undefined
-              Healthy _ -> writeTVar statusVar Connecting
+          debug ("handle: health check failed: " ++ show err)
+          atomically requestFailed
 
         Right (Left err) -> do
-          debug ("managed bus: healthy; ping failed: " ++ show err)
-
-          atomically $ do
-            readTVar statusVar >>= \case
-              Disconnected -> pure ()
-              Connecting -> pure ()
-              Unhealthy -> undefined
-              Healthy _ -> writeTVar statusVar Unhealthy
+          debug ("handle: health check failed: " ++ show err)
+          atomically unhealthy
 
         Right (Right _) ->
           loop
 
 idleTimeoutThread ::
-     TVar Status
+     STM ()
   -> TVar Int
   -> IORef Word64
   -> IO ()
-idleTimeoutThread statusVar inFlightVar lastUsedRef = do
-  debug "managed bus: healthy; spawning idle timeout thread"
+idleTimeoutThread timeout inFlightVar lastUsedRef =
   loop
 
   where
@@ -333,15 +354,9 @@ idleTimeoutThread statusVar inFlightVar lastUsedRef = do
             atomically $
               readTVar inFlightVar >>= \case
                 -- We have no in-flight requests, and the idle timeout has
-                -- elapsed. Set the status to Disconnected, but only if it's
-                -- still Healthy.
+                -- elapsed.
                 0 -> do
-                  readTVar statusVar >>= \case
-                    Disconnected -> pure ()
-                    Connecting -> pure ()
-                    Unhealthy -> pure ()
-                    Healthy _ -> writeTVar statusVar Disconnected
-
+                  timeout
                   pure (pure ())
 
                 -- We have an in-flight request, so even though the idle timeout
@@ -358,20 +373,17 @@ withBus ::
      ManagedBus
   -> (Bus -> IO (Either BusError a))
   -> IO (Either ManagedBusError a)
-withBus ManagedBus { inFlightVar, lastUsedRef, statusVar } callback =
+withBus
+    ManagedBus { inFlightVar, lastUsedRef, statusVar }
+    callback =
+
   join . atomically $
     readTVar statusVar >>= \case
-      Disconnected -> do
-        writeTVar statusVar Connecting
-        pure (pure (Left ManagedBusNotReadyError))
+      Disconnected connect -> do
+        connect
+        pure (pure (Left ManagedBusDisconnectedError))
 
-      Connecting ->
-        pure (pure (Left ManagedBusNotReadyError))
-
-      Unhealthy ->
-        pure (pure (Left ManagedBusNotReadyError))
-
-      Healthy bus -> pure $ do
+      Healthy bus _timeout requestFailed -> pure $ do
         writeIORef lastUsedRef =<< getMonotonicTimeNSec
 
         -- It's ok that this code is not exception-safe. If a callback results
@@ -380,12 +392,7 @@ withBus ManagedBus { inFlightVar, lastUsedRef, statusVar } callback =
         -- the dead connection and see a similar bus error.
         doCallback bus >>= \case
           Left err -> do
-            atomically $
-              modifyTVar' statusVar $ \case
-                Disconnected -> Disconnected
-                Connecting -> Connecting
-                Unhealthy -> Unhealthy
-                Healthy _ -> Connecting
+            atomically requestFailed
             pure (Left (fromBusError err))
           Right result ->
             pure (Right result)
@@ -400,32 +407,26 @@ withBus ManagedBus { inFlightVar, lastUsedRef, statusVar } callback =
 
     fromBusError :: BusError -> ManagedBusError
     fromBusError = \case
-      BusClosedError -> ManagedBusNotReadyError
+      BusClosedError -> ManagedBusDisconnectedError
       BusConnectionError err -> ManagedBusConnectionError err
       BusDecodeError err -> ManagedBusDecodeError err
       BusUnexpectedResponseError -> ManagedBusUnexpectedResponseError
 
 
--- | Send a request and receive the response (a single message).
-exchange ::
-     forall code.
-     KnownNat code
-  => ManagedBus
-  -> Request code
-  -> IO (Either ManagedBusError (Either (Response 0) (Response code)))
-exchange managedBus request =
-  withBus managedBus (\bus -> Bus.exchange bus request)
+newtype TPing
+  = TPing (TMVar ())
 
--- | Send a request and stream the response (one or more messages).
-stream ::
-     ∀ code r.
-     KnownNat code
-  => ManagedBus -- ^
-  -> Request code -- ^
-  -> FoldM IO (Response code) r
-  -> IO (Either ManagedBusError (Either (Response 0) r))
-stream managedBus request responseFold =
-  withBus managedBus (\bus -> Bus.stream bus request responseFold)
+newTPing :: IO TPing
+newTPing =
+  TPing <$> newEmptyTMVarIO
+
+ping :: TPing -> STM ()
+ping (TPing var) =
+  void (tryPutTMVar var ())
+
+recvPing :: TPing -> STM ()
+recvPing (TPing var) =
+  readTMVar var
 
 sleep :: NominalDiffTime -> IO ()
 sleep seconds =

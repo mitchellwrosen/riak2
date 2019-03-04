@@ -37,6 +37,7 @@ import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
 import RiakUtils          (difftimeToMicros)
 
 import qualified Libriak.Proto  as Proto
+import qualified RiakBus        as Bus
 import qualified RiakManagedBus as ManagedBus
 
 import Control.Concurrent.STM (TVar, atomically, readTVar, retry)
@@ -296,11 +297,11 @@ exchange ::
   -> Request code -- ^
   -> IO (Either HandleError (Either ByteString (Response code)))
 exchange Handle { pool, retries } request =
-  withManagedBus pool $ \bus ->
+  withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
-      (ManagedBus.exchange bus request)
-      (waitForManagedBus bus)
+      (ManagedBus.withBus managedBus (\bus -> Bus.exchange bus request))
+      (waitForManagedBus managedBus)
       0
 
 -- | Send a request and stream the response (one or more messages).
@@ -312,11 +313,11 @@ stream ::
   -> FoldM IO (Response code) r
   -> IO (Either HandleError (Either ByteString r))
 stream Handle { pool, retries } request responseFold =
-  withManagedBus pool $ \bus ->
+  withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
-      (ManagedBus.stream bus request responseFold)
-      (waitForManagedBus bus)
+      (ManagedBus.withBus managedBus (\bus -> Bus.stream bus request responseFold))
+      (waitForManagedBus managedBus)
       0
 
 doExchangeOrStream ::
@@ -347,7 +348,7 @@ doExchangeOrStream retries action wait =
           action >>= \case
             Left err ->
               case err of
-                ManagedBusNotReadyError ->
+                ManagedBusDisconnectedError ->
                   wait >>= \case
                     Left err ->
                       pure (Left err)

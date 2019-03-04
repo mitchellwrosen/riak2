@@ -7,17 +7,13 @@ module RiakBusPool
   ) where
 
 import Libriak.Connection (Endpoint)
-import Libriak.Request    (Request(..))
-import Libriak.Response   (Response)
-import RiakManagedBus     (EventHandlers, ManagedBus, ManagedBusError)
+import RiakManagedBus     (EventHandlers, ManagedBus)
 
 import qualified RiakManagedBus as ManagedBus
 
-import Control.Foldl (FoldM)
 import Control.Monad (ap)
 import Data.Hashable (hash)
 import Data.Vector   (Vector, (!))
-import GHC.TypeLits  (KnownNat)
 
 import qualified Data.Vector as Vector
 

@@ -6,14 +6,15 @@ module RiakBus
   , EventHandlers(..)
   , withBus
   , connect
+  , disconnect
   , ping
   , exchange
   , stream
   , BusError(..)
   ) where
 
-import Libriak.Connection (ConnectError(..), Connection, ConnectionError(..),
-                           Endpoint(..))
+import Libriak.Connection (CloseException(..), ConnectError(..), Connection,
+                           ConnectionError(..), Endpoint(..))
 import Libriak.Request    (Request(..), encodeRequest)
 import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
                            decodeResponse, responseDone)
@@ -121,6 +122,13 @@ connect endpoint receiveTimeout handlers =
         , doneVarRef = doneVarRef
         , handlers = handlers
         })
+
+disconnect ::
+     Bus
+  -> IO (Either CloseException ())
+disconnect Bus { connVar } =
+  readTVarIO connVar >>=
+    either Connection.disconnect Connection.disconnect
 
 ping ::
      Bus
