@@ -27,26 +27,27 @@ import Libriak.Response            (DecodeError(..), EncodedResponse(..))
 import qualified Libriak.Internal.Connection as Connection
 
 import Data.Bifunctor (bimap, first)
+import Data.Kind (Type)
 
 
-data ConnectError
-  = ConnectFirewalled
-  | ConnectRefused
-  | ConnectTimedOut
-  | NetworkUnreachable
-  | NoEphemeralPortsAvailable
-  | TooManyOpenFiles
+data ConnectError :: Type where
+  ConnectFirewalled :: ConnectError
+  ConnectRefused :: ConnectError
+  ConnectTimedOut :: ConnectError
+  NetworkUnreachable :: ConnectError
+  NoEphemeralPortsAvailable :: ConnectError
+  TooManyOpenFiles :: ConnectError
   deriving stock (Eq, Show)
 
-data ConnectionError
-    -- | The socket write channel is shut down.
-  = LocalShutdown
-    -- | The remote peer reset the connection.
-  | RemoteReset
-    -- | The remote peer's write channel is shut down.
-  | RemoteShutdown
-    -- | We timed out waiting for a message from the remote peer.
-  | RemoteTimeout
+data ConnectionError :: Type where
+  -- | The socket write channel is shut down.
+  LocalShutdown :: ConnectionError
+  -- | The remote peer reset the connection.
+  RemoteReset :: ConnectionError
+  -- | The remote peer's write channel is shut down.
+  RemoteShutdown :: ConnectionError
+  -- | We timed out waiting for a message from the remote peer.
+  RemoteTimeout :: ConnectionError
   deriving stock (Eq, Show)
 
 -- | Acquire a connection.

@@ -1,13 +1,14 @@
 module RiakServerInfo where
 
-import Libriak.Response   (Response(..))
-import RiakHandle         (Handle, HandleError)
+import Libriak.Response (Response(..))
+import RiakHandle       (Handle, HandleError)
 
-import qualified Libriak.Proto as Proto
-import qualified RiakHandle    as Handle
+import qualified RiakHandle as Handle
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
+
+import qualified Data.Riak.Proto as Proto
 
 
 data ServerInfo

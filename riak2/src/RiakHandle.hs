@@ -36,7 +36,6 @@ import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
                            managedBusReady)
 import RiakUtils          (difftimeToMicros)
 
-import qualified Libriak.Proto  as Proto
 import qualified RiakBus        as Bus
 import qualified RiakManagedBus as ManagedBus
 
@@ -46,6 +45,8 @@ import Control.Lens           ((.~), (^.))
 import Data.Time              (NominalDiffTime)
 import GHC.Conc               (registerDelay)
 import GHC.TypeLits           (KnownNat)
+
+import qualified Data.Riak.Proto as Proto
 
 
 data Handle
@@ -372,16 +373,6 @@ doExchangeOrStream retries action wait =
                 -- Weird to treat a decode error (very unexpected) like a
                 -- connection error (expected)
                 ManagedBusDecodeError _ ->
-                  wait >>= \case
-                    Left err ->
-                      pure (Left err)
-
-                    Right () ->
-                      loop wasReady (attempts+1)
-
-                -- Weird to treat an unexpected response error (very unexpected)
-                -- like a connection error (expected)
-                ManagedBusUnexpectedResponseError ->
                   wait >>= \case
                     Left err ->
                       pure (Left err)

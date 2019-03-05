@@ -5,9 +5,11 @@ import RiakContent (Content(..))
 import Control.Lens ((^.))
 import Data.Time    (UTCTime)
 
-import qualified Libriak.Proto      as Proto
 import qualified RiakProtoContent   as Proto.Content
 import qualified RiakSecondaryIndex as SecondaryIndex
+
+import qualified Data.Riak.Proto as Proto
+
 
 data Sibling a
   = Sibling !(Content a)

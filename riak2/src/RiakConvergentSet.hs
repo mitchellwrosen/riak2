@@ -16,15 +16,15 @@ import RiakHandle       (Handle)
 import RiakKey          (Key(..), isGeneratedKey)
 import RiakUtils        (retrying)
 
-import qualified Libriak.Proto as Proto
-import qualified RiakHandle    as Handle
-import qualified RiakKey       as Key
+import qualified RiakHandle as Handle
+import qualified RiakKey    as Key
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
 
 import qualified Data.ByteString as ByteString
 import qualified Data.HashSet    as HashSet
+import qualified Data.Riak.Proto as Proto
 
 
 -- | An eventually-convergent set.

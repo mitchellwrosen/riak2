@@ -16,7 +16,6 @@ import RiakMapReduceInput (MapReduceInput(..))
 import RiakMapReducePhase (MapReducePhase(..))
 import RiakUtils          (retrying)
 
-import qualified Libriak.Proto      as Proto
 import qualified RiakErlangTerm     as ErlangTerm
 import qualified RiakHandle         as Handle
 import qualified RiakMapReduceInput as MapReduceInput
@@ -27,7 +26,8 @@ import Control.Lens       ((.~))
 import Data.Profunctor    (lmap)
 import Data.Text.Encoding (decodeUtf8)
 
-import qualified Data.Vector as Vector
+import qualified Data.Riak.Proto as Proto
+import qualified Data.Vector     as Vector
 
 
 -- | Perform a MapReduce job over all keys in a bucket.

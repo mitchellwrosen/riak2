@@ -6,13 +6,14 @@ import RiakHandle       (Handle)
 import RiakIndexName
 import RiakSchema       (defaultSchema)
 
-import qualified Libriak.Proto as Proto
-import qualified RiakHandle    as Handle
+import qualified RiakHandle as Handle
 
 import Control.Lens       ((.~), (^.))
 import Data.Default.Class (Default(..))
 import Data.List          (head)
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+
+import qualified Data.Riak.Proto as Proto
 
 
 -- | A Solr index.

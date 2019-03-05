@@ -8,7 +8,6 @@ import RiakHandle           (Handle)
 import RiakIndexName        (IndexName(..))
 import RiakUtils            (retrying)
 
-import qualified Libriak.Proto        as Proto
 import qualified RiakBucketProperties as BucketProperties
 import qualified RiakHandle           as Handle
 
@@ -16,7 +15,8 @@ import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~), (^.))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 
-import qualified Control.Foldl as Foldl
+import qualified Control.Foldl   as Foldl
+import qualified Data.Riak.Proto as Proto
 
 
 -- | A bucket type.

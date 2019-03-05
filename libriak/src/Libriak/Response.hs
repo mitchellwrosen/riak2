@@ -8,15 +8,11 @@ module Libriak.Response
   , DecodeError(..)
   ) where
 
-import Libriak.Proto hiding (DecodeError(..))
-
-import qualified Libriak.Proto as Proto
-
 import Control.Exception        (Exception)
 import Control.Lens             ((^.))
 import Control.Monad.ST
 import Control.Monad.ST.Unsafe
-import Data.Bifunctor           (bimap)
+import Data.Bifunctor           (first, second)
 import Data.ByteString          (ByteString)
 import Data.Kind                (Type)
 import Data.Primitive.Addr
@@ -28,33 +24,36 @@ import GHC.TypeLits             (KnownNat, Nat, natVal')
 import Unsafe.Coerce
 
 import qualified Data.ByteString.Internal as ByteString
+import qualified Data.Riak.Proto          as Proto
 
 
-data DecodeError
-  = ProtobufDecodeError !ByteString !String
-  | UnexpectedMessageCode !Word8
-  deriving stock (Eq, Show)
+data DecodeError :: Type where
+  ProtobufDecodeError :: ByteString -> String -> DecodeError
+  UnexpectedResponse :: Word8 -> Response code -> DecodeError
+  UnexpectedMessageCode :: Word8 -> Word8 -> DecodeError
   deriving anyclass (Exception)
 
+deriving instance Show DecodeError
+
 data Response :: Nat -> Type where
-  RespRpbError             :: RpbErrorResp             -> Response 0
-  RespRpbPing              :: RpbPingResp              -> Response 2
-  RespRpbGetServerInfo     :: RpbGetServerInfoResp     -> Response 8
-  RespRpbGet               :: RpbGetResp               -> Response 10
-  RespRpbPut               :: RpbPutResp               -> Response 12
-  RespRpbDel               :: RpbDelResp               -> Response 14
-  RespRpbListBuckets       :: RpbListBucketsResp       -> Response 16
-  RespRpbListKeys          :: RpbListKeysResp          -> Response 18
-  RespRpbGetBucket         :: RpbGetBucketResp         -> Response 20
-  RespRpbSetBucket         :: RpbSetBucketResp         -> Response 22
-  RespRpbMapRed            :: RpbMapRedResp            -> Response 24
-  RespRpbIndex             :: RpbIndexResp             -> Response 26
-  RespRpbSearchQuery       :: RpbSearchQueryResp       -> Response 28
-  RespRpbResetBucket       :: RpbResetBucketResp       -> Response 30
-  RespRpbYokozunaIndexGet  :: RpbYokozunaIndexGetResp  -> Response 55
-  RespRpbYokozunaSchemaGet :: RpbYokozunaSchemaGetResp -> Response 59
-  RespDtFetch              :: DtFetchResp              -> Response 81
-  RespDtUpdate             :: DtUpdateResp             -> Response 83
+  RespRpbError             :: Proto.RpbErrorResp             -> Response 0
+  RespRpbPing              :: Proto.RpbPingResp              -> Response 2
+  RespRpbGetServerInfo     :: Proto.RpbGetServerInfoResp     -> Response 8
+  RespRpbGet               :: Proto.RpbGetResp               -> Response 10
+  RespRpbPut               :: Proto.RpbPutResp               -> Response 12
+  RespRpbDel               :: Proto.RpbDelResp               -> Response 14
+  RespRpbListBuckets       :: Proto.RpbListBucketsResp       -> Response 16
+  RespRpbListKeys          :: Proto.RpbListKeysResp          -> Response 18
+  RespRpbGetBucket         :: Proto.RpbGetBucketResp         -> Response 20
+  RespRpbSetBucket         :: Proto.RpbSetBucketResp         -> Response 22
+  RespRpbMapRed            :: Proto.RpbMapRedResp            -> Response 24
+  RespRpbIndex             :: Proto.RpbIndexResp             -> Response 26
+  RespRpbSearchQuery       :: Proto.RpbSearchQueryResp       -> Response 28
+  RespRpbResetBucket       :: Proto.RpbResetBucketResp       -> Response 30
+  RespRpbYokozunaIndexGet  :: Proto.RpbYokozunaIndexGetResp  -> Response 55
+  RespRpbYokozunaSchemaGet :: Proto.RpbYokozunaSchemaGetResp -> Response 59
+  RespDtFetch              :: Proto.DtFetchResp              -> Response 81
+  RespDtUpdate             :: Proto.DtUpdateResp             -> Response 83
 
 deriving stock instance Show (Response code)
 
@@ -89,47 +88,61 @@ decode ::
   -> Either DecodeError (Either (Response 0) (Response code))
 decode actual bytes
   | actual == 0 =
-      doDecode (Left . RespRpbError)
+      second (Left . RespRpbError) (decodeBytes bytes)
   | actual == expected =
-      case actual of
-        2  -> recode (Right (Right (RespRpbPing Proto.defMessage)))
-        8  -> recode (doDecode (Right . RespRpbGetServerInfo))
-        10 -> recode (doDecode (Right . RespRpbGet))
-        12 -> recode (doDecode (Right . RespRpbPut))
-        14 -> recode (Right (Right (RespRpbDel Proto.defMessage)))
-        16 -> recode (doDecode (Right . RespRpbListBuckets))
-        18 -> recode (doDecode (Right . RespRpbListKeys))
-        20 -> recode (doDecode (Right . RespRpbGetBucket))
-        22 -> recode (Right (Right (RespRpbSetBucket Proto.defMessage)))
-        24 -> recode (doDecode (Right . RespRpbMapRed))
-        26 -> recode (doDecode (Right . RespRpbIndex))
-        28 -> recode (doDecode (Right . RespRpbSearchQuery))
-        30 -> recode (Right (Right (RespRpbResetBucket Proto.defMessage)))
-        55 -> recode (doDecode (Right . RespRpbYokozunaIndexGet))
-        59 -> recode (doDecode (Right . RespRpbYokozunaSchemaGet))
-        81 -> recode (doDecode (Right . RespDtFetch))
-        83 -> recode (doDecode (Right . RespDtUpdate))
-        _  -> error ("unknown message code " ++ show actual)
+      Right <$> decodeExpected actual bytes
   | otherwise =
-      Left (UnexpectedMessageCode actual)
+      case decodeExpected actual bytes of
+        -- Didn't even decode as the unexpected response, it's garbage data
+        Left _ ->
+          Left (UnexpectedMessageCode actual expected)
 
+        -- We got someone else's response somehow.
+        Right response ->
+          Left (UnexpectedResponse expected response)
 
   where
     expected :: Word8
     expected =
       fromIntegral (natVal' (proxy# :: Proxy# code))
 
-    doDecode ::
-         forall a b.
-         Proto.Message a
-      => (a -> b)
-      -> Either DecodeError b
-    doDecode f =
-      bimap (ProtobufDecodeError bytes) f (Proto.decodeMessage bytes)
+decodeExpected ::
+     forall code.
+     Word8
+  -> ByteString
+  -> Either DecodeError (Response code)
+decodeExpected code bytes =
+  case code of
+    2  -> recode (Right (RespRpbPing Proto.defMessage))
+    8  -> recode (RespRpbGetServerInfo <$> decodeBytes bytes)
+    10 -> recode (RespRpbGet <$> decodeBytes bytes)
+    12 -> recode (RespRpbPut <$> decodeBytes bytes)
+    14 -> recode (Right (RespRpbDel Proto.defMessage))
+    16 -> recode (RespRpbListBuckets <$> decodeBytes bytes)
+    18 -> recode (RespRpbListKeys <$> decodeBytes bytes)
+    20 -> recode (RespRpbGetBucket <$> decodeBytes bytes)
+    22 -> recode (Right (RespRpbSetBucket Proto.defMessage))
+    24 -> recode (RespRpbMapRed <$> decodeBytes bytes)
+    26 -> recode (RespRpbIndex <$> decodeBytes bytes)
+    28 -> recode (RespRpbSearchQuery <$> decodeBytes bytes)
+    30 -> recode (Right (RespRpbResetBucket Proto.defMessage))
+    55 -> recode (RespRpbYokozunaIndexGet <$> decodeBytes bytes)
+    59 -> recode (RespRpbYokozunaSchemaGet <$> decodeBytes bytes)
+    81 -> recode (RespDtFetch <$> decodeBytes bytes)
+    83 -> recode (RespDtUpdate <$> decodeBytes bytes)
+    _  -> error ("unknown message code " ++ show code)
+
+decodeBytes ::
+     forall a.
+     Proto.Message a
+  => ByteString
+  -> Either DecodeError a
+decodeBytes bytes =
+  first (ProtobufDecodeError bytes) (Proto.decodeMessage bytes)
 
 recode ::
-     Either DecodeError (Either (Response 0) (Response a))
-  -> Either DecodeError (Either (Response 0) (Response b))
+     Either DecodeError (Response a)
+  -> Either DecodeError (Response b)
 recode =
   unsafeCoerce
 

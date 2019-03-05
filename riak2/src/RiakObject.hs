@@ -15,7 +15,6 @@ import RiakPutOpts      (PutOpts(..))
 import RiakSibling      (Sibling(..))
 import RiakUtils        (difftimeToMillis, retrying)
 
-import qualified Libriak.Proto      as Proto
 import qualified RiakHandle         as Handle
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
@@ -30,6 +29,7 @@ import Data.Text.Encoding    (decodeUtf8)
 
 import qualified Data.ByteString    as ByteString
 import qualified Data.List.NonEmpty as List1
+import qualified Data.Riak.Proto    as Proto
 
 
 data Object a

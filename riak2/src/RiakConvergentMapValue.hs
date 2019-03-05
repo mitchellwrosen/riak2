@@ -5,7 +5,6 @@ module RiakConvergentMapValue
   , toProto
   ) where
 
-import qualified Libriak.Proto     as Proto
 import qualified RiakConvergentSet as ConvergentSet
 
 import Control.Lens          ((%~), (.~), (^.))
@@ -15,6 +14,7 @@ import Data.Maybe            (mapMaybe)
 
 import qualified Data.HashMap.Strict as HashMap
 import qualified Data.HashSet        as HashSet
+import qualified Data.Riak.Proto     as Proto
 
 
 -- | The map data.

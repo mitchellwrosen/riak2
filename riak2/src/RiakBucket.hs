@@ -27,17 +27,18 @@ import RiakIntIndexQuery    (IntIndexQuery(..))
 import RiakKey              (Key(..))
 import RiakUtils            (bs2int, int2bs, retrying)
 
-import qualified Libriak.Proto        as Proto
 import qualified RiakBinaryIndexQuery as BinaryIndexQuery
 import qualified RiakBucketProperties as BucketProperties
 import qualified RiakHandle           as Handle
 
-import Control.Foldl      (FoldM(..))
-import Control.Lens       (folded, to, (.~), (^.))
-import Data.Profunctor    (lmap)
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Control.Foldl                      (FoldM(..))
+import Control.Lens                       (folded, to, (.~), (^.))
+import Data.Profunctor                    (lmap)
+import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
+import Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
 
-import qualified Control.Foldl as Foldl
+import qualified Control.Foldl   as Foldl
+import qualified Data.Riak.Proto as Proto
 
 
 -- | Get bucket properties.
@@ -433,8 +434,8 @@ parseListKeysError bucketType err
       Just (UnknownError (decodeUtf8 err))
 
 setProto ::
-     ( Proto.HasLens' a "bucket" ByteString
-     , Proto.HasLens' a "maybe'type'" (Maybe ByteString)
+     ( HasLens' a "bucket" ByteString
+     , HasLens' a "maybe'type'" (Maybe ByteString)
      )
   => Bucket
   -> a

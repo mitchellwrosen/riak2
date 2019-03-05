@@ -1,13 +1,12 @@
 module RiakProtoContent where
 
-import qualified Libriak.Proto as Proto
-
 import Control.Lens          ((.~), (^.))
 import Data.List             (foldl')
 import Data.Time             (NominalDiffTime, UTCTime)
 import Data.Time.Clock.POSIX (posixSecondsToUTCTime)
 
 import qualified Data.HashMap.Strict as HashMap
+import qualified Data.Riak.Proto     as Proto
 
 
 lastModified :: Proto.RpbContent -> UTCTime

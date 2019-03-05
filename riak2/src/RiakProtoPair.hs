@@ -1,8 +1,8 @@
 module RiakProtoPair where
 
-import qualified Libriak.Proto as Proto
-
 import Control.Lens ((.~), (^.))
+
+import qualified Data.Riak.Proto as Proto
 
 
 fromTuple :: (ByteString, ByteString) -> Proto.RpbPair

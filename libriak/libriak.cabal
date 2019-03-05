@@ -34,6 +34,7 @@ library
     NamedFieldPuns
     ScopedTypeVariables
     StandaloneDeriving
+    StrictData
     TupleSections
     TypeApplications
     ViewPatterns
@@ -43,7 +44,6 @@ library
 
   exposed-modules:
     Libriak.Connection
-    Libriak.Proto
     Libriak.Request
     Libriak.Response
 

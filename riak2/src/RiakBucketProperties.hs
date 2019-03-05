@@ -4,12 +4,14 @@ import RiakIndexName   (IndexName(..))
 import RiakReadQuorum  (ReadQuorum(..))
 import RiakWriteQuorum (WriteQuorum(..))
 
-import qualified Libriak.Proto   as Proto
 import qualified RiakReadQuorum  as ReadQuorum
 import qualified RiakWriteQuorum as WriteQuorum
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
+
+import qualified Data.Riak.Proto as Proto
+
 
 data BucketProperties
   = BucketPropertiesCounter CounterBucketProperties

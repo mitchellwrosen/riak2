@@ -39,12 +39,12 @@ gSendBufferSize =
 
 data Connection
   = Connection
-  { connection :: !(Socket.Connection)
+  { connection :: Socket.Connection
     -- ^ Underlying connection.
-  , sendBuffer :: !(MutableByteArray RealWorld)
+  , sendBuffer :: MutableByteArray RealWorld
     -- ^ Fixed-size send buffer. Used during a send as a scrap buffer to fill up
     -- and send out. Not useful between sends.
-  , receiveTimeout :: !Int
+  , receiveTimeout :: Int
     -- ^ Number of microseconds to wait before giving up on a receive.
   }
 

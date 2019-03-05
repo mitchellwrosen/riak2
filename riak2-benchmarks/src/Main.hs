@@ -1,21 +1,12 @@
 module Main where
 
-import Riak.Handle.Impl.Exclusive (Endpoint(..))
-
-import qualified Riak.Handle.Impl.Exclusive        as Handle.Exclusive
-import qualified Riak.Handle.Impl.Pipeline         as Handle.Pipeline
-import qualified Riak.Handle.Impl.StripedExclusive as Handle.StripedExclusive
-import qualified Riak.Handle.Impl.StripedPipeline  as Handle.StripedPipeline
-import qualified Riak.WithExclusiveHandle
-import qualified Riak.WithPipelineHandle
-import qualified Riak.WithStripedExclusiveHandle
-import qualified Riak.WithStripedPipelineHandle
-
 import Control.Concurrent      (forkIO)
 import Control.Concurrent.MVar
 import Control.Lens
 import Control.Monad           (join, replicateM_)
 import Data.Default.Class      (Default(..))
+import Data.Foldable           (asum)
+import Data.Time
 import GHC.Clock               (getMonotonicTime)
 import Net.IPv4                (ipv4)
 import Text.Printf             (printf)
@@ -25,7 +16,7 @@ import qualified Network.Riak.Connection      as RHK
 import qualified Network.Riak.Connection.Pool as RHK
 import qualified Network.Riak.Types           as RHK
 import qualified Options.Applicative          as Opt
-
+import qualified Riak
 
 main :: IO ()
 main =
@@ -36,158 +27,117 @@ main =
         (Opt.helper <*> commandParser)
         (Opt.progDesc "Benchmarks")))
 
+{-
+main :: IO ()
+main = do
+  handle <-
+    Riak.createHandle
+      Riak.HandleConfig
+        { Riak.endpoint =
+            Riak.Endpoint
+              { Riak.address = ipv4 127 0 0 1
+              , Riak.port = 8087
+              }
+          , Riak.requestTimeout =
+              1
+          , Riak.retries =
+              1
+          , Riak.handlers =
+              Riak.EventHandlers
+                { Riak.onSend = \msg -> Riak.debug (">>> " ++ show msg)
+                , Riak.onReceive = \msg -> Riak.debug ("<<< " ++ show msg)
+                , Riak.onConnectionError = \err -> Riak.debug ("*** " ++ show err)
+                , Riak.onConnectError = \err -> Riak.debug ("*** " ++ show err)
+                }
+          }
+
+  doneVar <- newEmptyMVar
+
+  _ <- forkIO $ do
+    replicateM_
+      500
+      (Riak.put
+        handle
+        (Riak.newObject
+          (Riak.generatedKey (Riak.Bucket "default" "a"))
+          (Riak.newContent ""))
+        def >>= \case
+          Left err -> Riak.debug ("Put failed --> " ++ show err)
+          Right _ -> pure ())
+    putMVar doneVar ()
+
+  _ <- forkIO $ do
+    replicateM_
+      500
+      (Riak.ping handle >>= \case
+        Left err -> Riak.debug ("Ping failed --> " ++ show err)
+        Right _ -> pure ())
+    putMVar doneVar ()
+
+  takeMVar doneVar
+  takeMVar doneVar
+-}
+
 commandParser :: Opt.Parser (IO ())
 commandParser =
-  Opt.hsubparser
-    (mconcat
-      [ Opt.commandGroup "riak2"
-      , Opt.command
-          "exclusive-socket"
-          (Opt.info
-            exclusiveSocketParser
-            (Opt.progDesc "Benchmark exclusive socket handle"))
-      , Opt.command
-          "pipeline-socket"
-          (Opt.info
-            pipelineSocketParser
-            (Opt.progDesc "Benchmark pipeline socket handle"))
-      , Opt.command
-          "striped-exclusive-socket"
-          (Opt.info
-            stripedExclusiveSocketParser
-            (Opt.progDesc "Benchmark striped exclusive socket handle"))
-      , Opt.command
-          "striped-pipeline-socket"
-          (Opt.info
-            stripedPipelineSocketParser
-            (Opt.progDesc "Benchmark striped pipeline socket handle"))
+  asum
+    [ Opt.hsubparser
+        (mconcat
+          [ Opt.commandGroup "riak2"
+          , Opt.command
+              "put"
+              (Opt.info
+                riak2PingParser
+                (Opt.progDesc "Put empty objects to random keys"))
+          ])
+    , Opt.hsubparser
+        (mconcat
+          [ Opt.commandGroup "riak-haskell-client"
+          , Opt.command
+              "riak-haskell-client"
+              (Opt.info
+                riakPingParser
+                (Opt.progDesc "Benchmark riak-haskell-client"))
+          ])
+    ]
 
-      , Opt.commandGroup "riak-haskell-client"
-      , Opt.command
-          "riak-haskell-client"
-          (Opt.info
-            riakHaskellClientParser
-            (Opt.progDesc "Benchmark riak-haskell-client"))
-      ])
-
-exclusiveSocketParser :: Opt.Parser (IO ())
-exclusiveSocketParser =
+riak2PingParser :: Opt.Parser (IO ())
+riak2PingParser =
   pure $ do
-    Right () <-
-      Handle.Exclusive.withHandle
-        (Handle.Exclusive.HandleConfig
-          { Handle.Exclusive.endpoint =
-              Endpoint
-                { address = ipv4 127 0 0 1
-                , port = 8087
+    handle <-
+      Riak.createHandle
+        Riak.HandleConfig
+          { Riak.endpoint =
+              Riak.Endpoint
+                { Riak.address = ipv4 127 0 0 1
+                , Riak.port = 8087
                 }
-          , Handle.Exclusive.handlers =
-              mempty
-          })
-        (\handle ->
-          runBenchWith
-            (do
-              Right _ <-
-                Riak.WithExclusiveHandle.put
-                  handle
-                  (Riak.WithExclusiveHandle.newObject
-                    (Riak.WithExclusiveHandle.generatedKey
-                      (Riak.WithExclusiveHandle.Bucket "default" "a"))
-                    (Riak.WithExclusiveHandle.newContent ""))
-                  def
-              pure ()))
+            , Riak.requestTimeout =
+                1
+            , Riak.retries =
+                3
+            , Riak.handlers =
+                mempty
+                -- Riak.EventHandlers
+                --   { Riak.onSend = \msg -> putStrLn (">>> " ++ show msg)
+                --   , Riak.onReceive = \msg -> putStrLn ("<<< " ++ show msg)
+                --   , Riak.onConnectionError = print
+                --   , Riak.onConnectError = print
+                --   }
+            }
 
-    pure ()
+    runBenchWith $ do
+      _ <-
+        Riak.put
+          handle
+          (Riak.newObject
+            (Riak.generatedKey (Riak.Bucket "default" "a"))
+            (Riak.newContent ""))
+          def
+      pure ()
 
-pipelineSocketParser :: Opt.Parser (IO ())
-pipelineSocketParser =
-  pure $ do
-    Right () <-
-      Handle.Pipeline.withHandle
-        (Handle.Pipeline.HandleConfig
-          { Handle.Pipeline.endpoint =
-              Endpoint
-                { address = ipv4 127 0 0 1
-                , port = 8087
-                }
-          , Handle.Pipeline.handlers =
-              mempty
-          })
-        (\handle ->
-          runBenchWith
-            (do
-              Right _ <-
-                Riak.WithPipelineHandle.put
-                  handle
-                  (Riak.WithPipelineHandle.newObject
-                    (Riak.WithPipelineHandle.generatedKey
-                      (Riak.WithPipelineHandle.Bucket "default" "a"))
-                    (Riak.WithPipelineHandle.newContent ""))
-                  def
-              pure ()))
-
-    pure ()
-
-stripedExclusiveSocketParser :: Opt.Parser (IO ())
-stripedExclusiveSocketParser =
-  pure $ do
-    Right () <-
-      Handle.StripedExclusive.withHandle
-        (Handle.Exclusive.HandleConfig
-          { Handle.Exclusive.endpoint =
-              Endpoint
-                { address = ipv4 127 0 0 1
-                , port = 8087
-                }
-          , Handle.Exclusive.handlers =
-              mempty
-          })
-        (\handle ->
-          runBenchWith
-            (do
-              Right _ <-
-                Riak.WithStripedExclusiveHandle.put
-                  handle
-                  (Riak.WithStripedExclusiveHandle.newObject
-                    (Riak.WithStripedExclusiveHandle.generatedKey
-                      (Riak.WithStripedExclusiveHandle.Bucket "default" "a"))
-                    (Riak.WithStripedExclusiveHandle.newContent ""))
-                  def
-              pure ()))
-
-    pure ()
-
-stripedPipelineSocketParser :: Opt.Parser (IO ())
-stripedPipelineSocketParser =
-  pure $ do
-    Right () <-
-      Handle.StripedPipeline.withHandle
-        (Handle.Pipeline.HandleConfig
-          { Handle.Pipeline.endpoint =
-              Endpoint
-                { address = ipv4 127 0 0 1
-                , port = 8087
-                }
-          , Handle.Pipeline.handlers =
-              mempty
-          })
-        (\handle ->
-          runBenchWith
-            (do
-              Right _ <-
-                Riak.WithStripedPipelineHandle.put
-                  handle
-                  (Riak.WithStripedPipelineHandle.newObject
-                    (Riak.WithStripedPipelineHandle.generatedKey
-                      (Riak.WithStripedPipelineHandle.Bucket "default" "a"))
-                    (Riak.WithStripedPipelineHandle.newContent ""))
-                  def
-              pure ()))
-
-    pure ()
-
-riakHaskellClientParser :: Opt.Parser (IO ())
-riakHaskellClientParser =
+riakPingParser :: Opt.Parser (IO ())
+riakPingParser =
   pure $ do
     pool :: RHK.Pool <-
       RHK.create

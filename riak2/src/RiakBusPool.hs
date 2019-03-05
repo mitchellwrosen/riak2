@@ -31,9 +31,9 @@ createBusPool ::
   -> IO BusPool
 createBusPool endpoint receiveTimeout handlers = do
   pool :: Vector ManagedBus <-
-    Vector.replicateM
-      256 -- TODO configure bus pool size
-      (createManagedBus endpoint receiveTimeout handlers)
+    Vector.generateM
+      2 -- TODO configure bus pool size
+      (\i -> createManagedBus i endpoint receiveTimeout handlers)
 
   pure BusPool
     { pool = pool }

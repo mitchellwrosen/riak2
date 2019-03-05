@@ -5,13 +5,14 @@ import RiakError
 import RiakHandle       (Handle)
 import RiakIndexName    (IndexName(..))
 
-import qualified Libriak.Proto as Proto
 import qualified RiakHandle    as Handle
 import qualified RiakProtoPair as Proto.Pair
 
 import Control.Lens       ((.~), (^.))
 import Data.Default.Class (Default(..))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+
+import qualified Data.Riak.Proto as Proto
 
 
 data SearchResults

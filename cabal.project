@@ -1,7 +1,7 @@
 packages:
   libriak,
   riak2,
-  -- riak2-benchmarks,
+  riak2-benchmarks,
   riakc,
   ../riak-haskell-client,
   ../riak-haskell-client/protobuf

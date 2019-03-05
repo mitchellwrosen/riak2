@@ -2,10 +2,12 @@ module RiakWriteQuorum where
 
 import RiakQuorum (Quorum)
 
-import qualified Libriak.Proto as Proto
-import qualified RiakQuorum    as Quorum
+import qualified RiakQuorum as Quorum
 
-import Control.Lens ((.~), (^.))
+import Control.Lens                       ((.~), (^.))
+import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
+
+import qualified Data.Riak.Proto as Proto
 
 
 data WriteQuorum
@@ -16,9 +18,9 @@ data WriteQuorum
   } deriving stock (Generic, Show)
 
 fromProto ::
-     ( Proto.HasLens' a "dw" Word32
-     , Proto.HasLens' a "pw" Word32
-     , Proto.HasLens' a "w" Word32
+     ( HasLens' a "dw" Word32
+     , HasLens' a "pw" Word32
+     , HasLens' a "w" Word32
      )
   => a
   -> WriteQuorum
@@ -30,9 +32,9 @@ fromProto proto =
     }
 
 setProto ::
-     ( Proto.HasLens' a "dw" Word32
-     , Proto.HasLens' a "pw" Word32
-     , Proto.HasLens' a "w" Word32
+     ( HasLens' a "dw" Word32
+     , HasLens' a "pw" Word32
+     , HasLens' a "w" Word32
      )
   => Maybe WriteQuorum
   -> a

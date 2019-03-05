@@ -2,12 +2,12 @@ module RiakKey where
 
 import RiakBucketInternal (Bucket(..))
 
-import qualified Libriak.Proto as Proto
-
-import Control.Lens (Lens', (.~))
-import Data.Hashable (Hashable)
+import Control.Lens                       (Lens', (.~))
+import Data.Hashable                      (Hashable)
+import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 
 import qualified Data.ByteString as ByteString
+import qualified Data.Riak.Proto as Proto
 
 
 -- | A bucket type, bucket, and key.
@@ -36,9 +36,9 @@ isGeneratedKey (Key _ _ key) =
   ByteString.null key
 
 setProto ::
-     ( Proto.HasLens' a "bucket" ByteString
-     , Proto.HasLens' a "key" ByteString
-     , Proto.HasLens' a "type'" ByteString
+     ( HasLens' a "bucket" ByteString
+     , HasLens' a "key" ByteString
+     , HasLens' a "type'" ByteString
      )
   => Key
   -> a
@@ -50,9 +50,9 @@ setProto (Key bucketType bucket key) proto =
     & Proto.type' .~ bucketType
 
 setMaybeProto ::
-     ( Proto.HasLens' a "bucket" ByteString
-     , Proto.HasLens' a "maybe'key" (Maybe ByteString)
-     , Proto.HasLens' a "type'" ByteString
+     ( HasLens' a "bucket" ByteString
+     , HasLens' a "maybe'key" (Maybe ByteString)
+     , HasLens' a "type'" ByteString
      )
   => Key
   -> a

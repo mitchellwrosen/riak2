@@ -11,15 +11,14 @@ executable riak2-benchmarks
     , data-default-class
     , ip
     , lens
+    , optparse-applicative
     , riak == 1.2.0.0
     , riak-protobuf == 1.0.0
     , riak2
-    , riak2-handle-impl-exclusive
-    , riak2-handle-impl-pipeline
-    , riak2-handle-impl-striped
-    , optparse-applicative
+    , time
 
   default-extensions:
+    LambdaCase
     OverloadedStrings
     ScopedTypeVariables
 
@@ -28,6 +27,7 @@ executable riak2-benchmarks
 
   ghc-options:
     -Wall
+    -O
     -rtsopts
     -threaded
     "-with-rtsopts=-N"
@@ -37,17 +37,3 @@ executable riak2-benchmarks
 
   main-is:
     Main.hs
-
-  mixins:
-    riak2 (Riak as Riak.WithExclusiveHandle)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive),
-    riak2 (Riak as Riak.WithPipelineHandle)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline),
-    riak2 (Riak as Riak.WithStripedExclusiveHandle)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.StripedExclusive),
-    riak2 (Riak as Riak.WithStripedPipelineHandle)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.StripedPipeline),
-    riak2-handle-impl-striped (Riak.Handle.Impl.Striped as Riak.Handle.Impl.StripedExclusive)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Exclusive),
-    riak2-handle-impl-striped (Riak.Handle.Impl.Striped as Riak.Handle.Impl.StripedPipeline)
-      requires (Riak.Handle.Signature as Riak.Handle.Impl.Pipeline)

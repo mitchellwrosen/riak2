@@ -16,11 +16,12 @@ import RiakHandle       (Handle)
 import RiakKey          (Key(..), isGeneratedKey)
 import RiakUtils        (retrying)
 
-import qualified Libriak.Proto as Proto
-import qualified RiakHandle    as Handle
-import qualified RiakKey       as Key
+import qualified RiakHandle as Handle
+import qualified RiakKey    as Key
 
 import Control.Lens ((.~), (^.))
+
+import qualified Data.Riak.Proto as Proto
 
 
 -- | An eventually-convergent HyperLogLog, which provides an approximate

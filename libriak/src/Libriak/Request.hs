@@ -4,8 +4,6 @@ module Libriak.Request
   , encodeRequest
   ) where
 
-import Libriak.Proto
-
 import Control.Monad.ST
 import Data.ByteString.Internal (ByteString(..))
 import Data.Kind                (Type)
@@ -15,35 +13,36 @@ import Data.Word                (Word8)
 import GHC.ForeignPtr           (ForeignPtr(..))
 import GHC.TypeLits             (Nat)
 
-import qualified Data.ProtoLens as Proto
+import qualified Data.ProtoLens  as Proto
+import qualified Data.Riak.Proto as Proto
 
 
 -- TODO request 33 is of riak_kv so handle unknown message code by retrying
 
 -- | Request indexed by message code of the expected response.
 data Request :: Nat -> Type where
-  ReqDtFetch                :: DtFetchReq                -> Request 81
-  ReqDtUpdate               :: DtUpdateReq               -> Request 83
-  ReqRpbDel                 :: RpbDelReq                 -> Request 14
-  ReqRpbGet                 :: RpbGetReq                 -> Request 10
-  ReqRpbGetBucket           :: RpbGetBucketReq           -> Request 20
-  ReqRpbGetBucketType       :: RpbGetBucketTypeReq       -> Request 20
-  ReqRpbGetServerInfo       :: RpbGetServerInfoReq       -> Request 8
-  ReqRpbIndex               :: RpbIndexReq               -> Request 26
-  ReqRpbListBuckets         :: RpbListBucketsReq         -> Request 16
-  ReqRpbListKeys            :: RpbListKeysReq            -> Request 18
-  ReqRpbMapRed              :: RpbMapRedReq              -> Request 24
-  ReqRpbPing                :: RpbPingReq                -> Request 2
-  ReqRpbPut                 :: RpbPutReq                 -> Request 12
-  ReqRpbResetBucket         :: RpbResetBucketReq         -> Request 30
-  ReqRpbSearchQuery         :: RpbSearchQueryReq         -> Request 28
-  ReqRpbSetBucket           :: RpbSetBucketReq           -> Request 22
-  ReqRpbSetBucketType       :: RpbSetBucketTypeReq       -> Request 22
-  ReqRpbYokozunaIndexDelete :: RpbYokozunaIndexDeleteReq -> Request 14
-  ReqRpbYokozunaIndexGet    :: RpbYokozunaIndexGetReq    -> Request 55
-  ReqRpbYokozunaIndexPut    :: RpbYokozunaIndexPutReq    -> Request 12
-  ReqRpbYokozunaSchemaGet   :: RpbYokozunaSchemaGetReq   -> Request 59
-  ReqRpbYokozunaSchemaPut   :: RpbYokozunaSchemaPutReq   -> Request 12
+  ReqDtFetch                :: Proto.DtFetchReq                -> Request 81
+  ReqDtUpdate               :: Proto.DtUpdateReq               -> Request 83
+  ReqRpbDel                 :: Proto.RpbDelReq                 -> Request 14
+  ReqRpbGet                 :: Proto.RpbGetReq                 -> Request 10
+  ReqRpbGetBucket           :: Proto.RpbGetBucketReq           -> Request 20
+  ReqRpbGetBucketType       :: Proto.RpbGetBucketTypeReq       -> Request 20
+  ReqRpbGetServerInfo       :: Proto.RpbGetServerInfoReq       -> Request 8
+  ReqRpbIndex               :: Proto.RpbIndexReq               -> Request 26
+  ReqRpbListBuckets         :: Proto.RpbListBucketsReq         -> Request 16
+  ReqRpbListKeys            :: Proto.RpbListKeysReq            -> Request 18
+  ReqRpbMapRed              :: Proto.RpbMapRedReq              -> Request 24
+  ReqRpbPing                :: Proto.RpbPingReq                -> Request 2
+  ReqRpbPut                 :: Proto.RpbPutReq                 -> Request 12
+  ReqRpbResetBucket         :: Proto.RpbResetBucketReq         -> Request 30
+  ReqRpbSearchQuery         :: Proto.RpbSearchQueryReq         -> Request 28
+  ReqRpbSetBucket           :: Proto.RpbSetBucketReq           -> Request 22
+  ReqRpbSetBucketType       :: Proto.RpbSetBucketTypeReq       -> Request 22
+  ReqRpbYokozunaIndexDelete :: Proto.RpbYokozunaIndexDeleteReq -> Request 14
+  ReqRpbYokozunaIndexGet    :: Proto.RpbYokozunaIndexGetReq    -> Request 55
+  ReqRpbYokozunaIndexPut    :: Proto.RpbYokozunaIndexPutReq    -> Request 12
+  ReqRpbYokozunaSchemaGet   :: Proto.RpbYokozunaSchemaGetReq   -> Request 59
+  ReqRpbYokozunaSchemaPut   :: Proto.RpbYokozunaSchemaPutReq   -> Request 12
 
 deriving stock instance Show (Request code)
 

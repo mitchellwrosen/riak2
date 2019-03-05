@@ -1,10 +1,12 @@
+{-# LANGUAGE CPP #-}
+
 -- TODO perhaps don't ruin the whole bus if one thread, during an exchange, gets
 -- killed before it receives?
 
 module RiakBus
   ( Bus
   , EventHandlers(..)
-  , withBus
+  , inFlight
   , connect
   , disconnect
   , ping
@@ -16,17 +18,21 @@ module RiakBus
 import Libriak.Connection (CloseException(..), ConnectError(..), Connection,
                            ConnectionError(..), Endpoint(..))
 import Libriak.Request    (Request(..), encodeRequest)
-import Libriak.Response   (DecodeError, EncodedResponse(..), Response(..),
-                           decodeResponse, responseDone)
+import Libriak.Response   (DecodeError, Response(..), decodeResponse,
+                           responseDone)
 
 import qualified Libriak.Connection as Connection
-import qualified Libriak.Proto      as Proto
-import qualified Libriak.Response   as Libriak
 
 import Control.Concurrent.STM
-import Control.Exception.Safe (catchAsync, mask, throwIO)
+import Control.Exception.Safe (catchAsync, throwIO, uninterruptibleMask)
 import Control.Foldl          (FoldM(..))
 import GHC.TypeLits           (KnownNat)
+
+#ifdef CHAOS
+import System.Random (randomIO)
+#endif
+
+import qualified Data.Riak.Proto as Proto
 
 
 data Bus
@@ -37,8 +43,13 @@ data Bus
   , sendLock :: !(MVar ())
     -- ^ Lock acquired during sending a request.
   , doneVarRef :: !(IORef (TMVar ()))
+  , inFlightVar :: !(TVar Int)
   , handlers :: !EventHandlers
   }
+
+instance Eq Bus where
+  bus1 == bus2 =
+    sendLock bus1 == sendLock bus2
 
 data BusError :: Type where
   -- | The bus is permanently closed.
@@ -47,9 +58,6 @@ data BusError :: Type where
   BusConnectionError :: !ConnectionError -> BusError
   -- | A protobuf decode error occurred.
   BusDecodeError :: !DecodeError -> BusError
-  -- | A response with an unexpcected message code was received.
-  -- TODO put request/response inside
-  BusUnexpectedResponseError :: BusError
   deriving stock (Show)
 
 data EventHandlers
@@ -69,33 +77,13 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 c1 <> EventHandlers a2 b2 c2 =
     EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
+inFlight :: Bus -> STM Int
+inFlight Bus { inFlightVar } =
+  readTVar inFlightVar
+
 -- | Acquire a bus.
 --
 -- /Throws/: This function will never throw an exception.
-withBus ::
-     Endpoint
-  -> Int -- ^ Receive timeout (microseconds)
-  -> EventHandlers
-  -> (Bus -> IO a)
-  -> IO (Either ConnectError a)
-withBus endpoint receiveTimeout handlers callback = do
-  sendLock :: MVar () <-
-    newMVar ()
-
-  doneVarRef :: IORef (TMVar ()) <-
-    newIORef =<< newTMVarIO ()
-
-  Connection.withConnection endpoint receiveTimeout $ \connection -> do
-    connVar :: TVar (Either Connection Connection) <-
-      newTVarIO (Right connection)
-
-    callback Bus
-      { connVar = connVar
-      , sendLock = sendLock
-      , doneVarRef = doneVarRef
-      , handlers = handlers
-      }
-
 connect ::
      Endpoint
   -> Int -- ^ Receive timeout (microseconds)
@@ -107,19 +95,23 @@ connect endpoint receiveTimeout handlers =
       pure (Left err)
 
     Right connection -> do
+      connVar :: TVar (Either Connection Connection) <-
+        newTVarIO (Right connection)
+
       sendLock :: MVar () <-
         newMVar ()
 
       doneVarRef :: IORef (TMVar ()) <-
         newIORef =<< newTMVarIO ()
 
-      connVar :: TVar (Either Connection Connection) <-
-        newTVarIO (Right connection)
+      inFlightVar :: TVar Int <-
+        newTVarIO 0
 
       pure (Right Bus
         { connVar = connVar
         , sendLock = sendLock
         , doneVarRef = doneVarRef
+        , inFlightVar = inFlightVar
         , handlers = handlers
         })
 
@@ -141,7 +133,7 @@ withConnection ::
      Bus
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
-withConnection Bus { connVar, handlers } callback =
+withConnection Bus { connVar, handlers, inFlightVar } callback =
   readTVarIO connVar >>= \case
     Left _ ->
       pure (Left BusClosedError)
@@ -149,7 +141,7 @@ withConnection Bus { connVar, handlers } callback =
     Right connection ->
       doCallback connection >>= \case
         Left err -> do
-          teardown
+          markAsUnusable
 
           case err of
             BusClosedError ->
@@ -157,8 +149,6 @@ withConnection Bus { connVar, handlers } callback =
             BusConnectionError err ->
               onConnectionError handlers err
             BusDecodeError _ ->
-              pure ()
-            BusUnexpectedResponseError ->
               pure ()
 
           pure (Left err)
@@ -169,13 +159,21 @@ withConnection Bus { connVar, handlers } callback =
   where
     doCallback :: Connection -> IO (Either BusError a)
     doCallback connection =
-      mask $ \unmask ->
-        unmask (callback connection) `catchAsync` \(e :: SomeException) -> do
-          teardown
-          throwIO e
+      uninterruptibleMask $ \unmask -> do
+        atomically (modifyTVar' inFlightVar (+1))
 
-    teardown :: IO ()
-    teardown =
+        result :: Either BusError a <-
+          unmask (callback connection) `catchAsync` \ex -> do
+            markAsUnusable
+            atomically (modifyTVar' inFlightVar (subtract 1))
+            throwIO (ex :: SomeException)
+
+        atomically (modifyTVar' inFlightVar (subtract 1))
+
+        pure result
+
+    markAsUnusable :: IO ()
+    markAsUnusable =
       atomically $
         readTVar connVar >>= \case
           Left _ -> pure ()
@@ -188,7 +186,31 @@ send ::
   -> IO (Either ConnectionError ())
 send handlers connection request = do
   onSend handlers request
-  Connection.send connection (encodeRequest request)
+
+#ifdef CHAOS
+
+  pct :: Double <-
+    randomIO
+
+  case pct of
+    _ | pct < 0.0025 -> pure (Left LocalShutdown)
+      | pct < 0.0050 -> pure (Left RemoteReset)
+      | pct < 0.0075 -> pure (Left RemoteShutdown)
+      | pct < 0.0100 -> do
+                          threadDelay (1*1000*1000)
+                          pure (Left RemoteTimeout)
+      | otherwise    -> doSend
+
+#else
+
+  doSend
+
+#endif
+
+  where
+    doSend :: IO (Either ConnectionError ())
+    doSend =
+      Connection.send connection (encodeRequest request)
 
 receive ::
      forall code.
@@ -196,19 +218,44 @@ receive ::
   => EventHandlers
   -> Connection
   -> IO (Either BusError (Either (Response 0) (Response code)))
-receive handlers connection =
-  Connection.receive connection >>= \case
-    Left err ->
-      pure (Left (BusConnectionError err))
+receive handlers connection = do
 
-    Right (Libriak.EncodedResponse bytes) ->
-      case decodeResponse (EncodedResponse bytes) of
-        Left err -> do
-          pure (Left (BusDecodeError err))
+#ifdef CHAOS
 
-        Right response -> do
-          either (onReceive handlers) (onReceive handlers) response
-          pure (Right response)
+  pct :: Double <-
+    randomIO
+
+  case pct of
+    _ | pct < 0.0025 -> pure (Left (BusConnectionError LocalShutdown))
+      | pct < 0.0050 -> pure (Left (BusConnectionError RemoteReset))
+      | pct < 0.0075 -> pure (Left (BusConnectionError RemoteShutdown))
+      | pct < 0.0100 -> do
+                          threadDelay (1*1000*1000)
+                          pure (Left (BusConnectionError RemoteTimeout))
+      | otherwise    ->
+          doRecv
+
+#else
+
+  doRecv
+
+#endif
+
+  where
+    doRecv :: IO (Either BusError (Either (Response 0) (Response code)))
+    doRecv =
+      Connection.receive connection >>= \case
+        Left err ->
+          pure (Left (BusConnectionError err))
+
+        Right bytes ->
+          case decodeResponse bytes of
+            Left err -> do
+              pure (Left (BusDecodeError err))
+
+            Right response -> do
+              either (onReceive handlers) (onReceive handlers) response
+              pure (Right response)
 
 -- | Send a request and receive the response (a single message).
 exchange ::

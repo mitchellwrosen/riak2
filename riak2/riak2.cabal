@@ -69,6 +69,11 @@ description:
   * "Riak.Error"
   * "Riak.Quorum"
 
+flag chaos
+  description: Chaos monkey
+  manual: True
+  default: False
+
 flag debug
   description: Print debug statements
   manual: True
@@ -80,6 +85,9 @@ library
     data-default-class,
     libriak,
     riak2-internal,
+
+  if flag(debug)
+    cpp-options: -DDEBUG
 
   default-language:
     Haskell2010
@@ -131,15 +139,24 @@ library riak2-internal
     lens ^>= 4.17,
     lens-labels,
     libriak,
-    -- primitive,
     profunctors ^>= 5.3,
-    -- proto-lens,
+    proto-lens-runtime,
     safe-exceptions,
     stm,
     text ^>= 1.2.3,
     time,
     unordered-containers ^>= 0.2.9,
     vector,
+
+  if flag(chaos)
+    build-depends:
+      random,
+
+  if flag(chaos)
+    cpp-options: -DCHAOS
+
+  if flag(debug)
+    cpp-options: -DDEBUG
 
   default-extensions:
     BangPatterns
@@ -247,9 +264,6 @@ library riak2-internal
     RiakProtoPair
     RiakMapReduceInput
     RiakUtils
-
-  if flag(debug)
-    cpp-options: -DDEBUG
 
 test-suite tests
   build-depends:

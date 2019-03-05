@@ -1,3 +1,5 @@
+{-# LANGUAGE CPP #-}
+
 module Riak
   ( -- * Handle
     createHandle
@@ -161,6 +163,9 @@ module Riak
     -- ** Re-exports
   , Endpoint(..)
   , def
+#ifdef DEBUG
+  , debug
+#endif
   ) where
 
 -- TODO rename Config/Error export them
@@ -198,5 +203,8 @@ import Riak.ServerInfo
 import Riak.Sibling
 import RiakBucket
 import RiakPing
+#ifdef DEBUG
+import RiakDebug (debug)
+#endif
 
 import Data.Default.Class (def)

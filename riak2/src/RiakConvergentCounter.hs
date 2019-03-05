@@ -13,13 +13,14 @@ import RiakKey          (Key(..))
 import RiakPutOpts      (PutOpts(..))
 import RiakUtils        (difftimeToMillis, retrying)
 
-import qualified Libriak.Proto   as Proto
 import qualified RiakHandle      as Handle
 import qualified RiakKey         as Key
 import qualified RiakReadQuorum  as ReadQuorum
 import qualified RiakWriteQuorum as WriteQuorum
 
 import Control.Lens ((.~), (^.))
+
+import qualified Data.Riak.Proto as Proto
 
 
 -- | An eventually-convergent counter.

@@ -1,9 +1,10 @@
 module RiakSecondaryIndex where
 
-import Libriak.Proto           (RpbPair)
 import RiakPanic
 import RiakSecondaryIndexValue (SecondaryIndexValue)
 import RiakUtils
+
+import Data.Riak.Proto (RpbPair)
 
 import qualified RiakProtoPair           as Pair
 import qualified RiakSecondaryIndexValue as SecondaryIndexValue
