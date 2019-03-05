@@ -13,13 +13,14 @@ import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakBus            (Bus, BusError(..))
 
-import qualified RiakBus as Bus
+import qualified RiakBus   as Bus
 import qualified RiakDebug as Debug
 
 import Control.Concurrent.STM
 import Control.Exception      (asyncExceptionFromException,
                                asyncExceptionToException)
-import Control.Exception.Safe (Exception(..), SomeException, tryAny)
+import Control.Exception.Safe (Exception(..), SomeException, tryAny,
+                               uninterruptibleMask_)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
 -- import System.Mem.Weak        (Weak, deRefWeak)
@@ -55,7 +56,7 @@ data Status :: Type where
 
 data State :: Type where
   Disconnected :: State
-  Disconnecting :: State
+  Disconnecting :: !Bus -> State
   Connecting :: State
   Unhealthy :: !Bus -> State
   Healthy :: !Bus -> State
@@ -64,7 +65,7 @@ data State :: Type where
 showState :: State -> [Char]
 showState = \case
   Disconnected -> "disconnected"
-  Disconnecting -> "disconnecting"
+  Disconnecting _ -> "disconnecting"
   Connecting -> "connecting"
   Unhealthy _ -> "unhealthy"
   Healthy _ -> "healthy"
@@ -140,7 +141,7 @@ managedBusReady :: ManagedBus -> STM ()
 managedBusReady ManagedBus { statusVar } =
   readTVar statusVar >>= \case
     Status _ Disconnected -> retry
-    Status _ Disconnecting -> retry
+    Status _ (Disconnecting _) -> retry
     Status _ Connecting -> retry
     Status _ (Unhealthy _) -> retry
     Status _ (Healthy _) -> pure ()
@@ -150,48 +151,66 @@ withBus ::
      ManagedBus
   -> (Bus -> IO (Either BusError a))
   -> IO (Either ManagedBusError a)
-withBus bus@(ManagedBus { lastUsedRef, statusVar, uuid }) callback = do
-  Status generation state <-
-    readTVarIO statusVar
+withBus managedBus@(ManagedBus { lastUsedRef, statusVar }) callback = do
+  readTVarIO statusVar >>= \case
+    Status _ Disconnected ->
+      uninterruptibleMask_ $
+        join . atomically $
+          readTVar statusVar >>= \case
+            Status generation Disconnected -> do
+              writeTVar statusVar (Status generation Connecting)
 
-  case state of
-    Disconnected -> do
-      void . forkIO $ do
-        debug uuid generation "possibly connecting"
-        connect bus_ generation
+              pure $ do
+                void (forkIO (connect managedBus_))
+                pure (Left ManagedBusDisconnectedError)
 
+            _ ->
+              pure (pure (Left ManagedBusDisconnectedError))
+
+    Status _ (Disconnecting _) ->
       pure (Left ManagedBusDisconnectedError)
 
-    Disconnecting ->
+    Status _ Connecting ->
       pure (Left ManagedBusDisconnectedError)
 
-    Connecting ->
+    Status _ (Unhealthy _) ->
       pure (Left ManagedBusDisconnectedError)
 
-    Unhealthy _ ->
-      pure (Left ManagedBusDisconnectedError)
-
-    Healthy bus -> do
+    Status _ (Healthy bus) -> do
       writeIORef lastUsedRef =<<
         getMonotonicTimeNSec
 
       callback bus >>= \case
         -- FIXME we must disconnect if callback throws an exception, but can
         -- it?
-        Left err -> do
-          void . forkIO $ do
-            debug uuid generation "request failed, disconnecting"
-            disconnect bus_ generation True
+        Left err ->
+          uninterruptibleMask_ $
+            join . atomically $
+              readTVar statusVar >>= \case
+                Status generation (Healthy bus) -> do
+                  writeTVar statusVar (Status generation (Disconnecting bus))
 
-          pure (Left (fromBusError err))
+                  pure $ do
+                    disconnect managedBus_ True
+                    pure (Left (fromBusError err))
+
+                Status generation (Unhealthy bus) -> do
+                  writeTVar statusVar (Status generation (Disconnecting bus))
+
+                  pure $ do
+                    disconnect managedBus_ True
+                    pure (Left (fromBusError err))
+
+                _ ->
+                  pure (pure (Left (fromBusError err)))
 
         Right result ->
           pure (Right result)
 
   where
-    bus_ :: ManagedBus_
-    bus_ =
-      case bus of
+    managedBus_ :: ManagedBus_
+    managedBus_ =
+      case managedBus of
         ManagedBus{..} ->
           ManagedBus_{..}
 
@@ -205,33 +224,17 @@ withBus bus@(ManagedBus { lastUsedRef, statusVar, uuid }) callback = do
 -- TODO give up if bus gc'd
 connect ::
      ManagedBus_
-  -> Word64
   -> IO ()
 connect
     managedBus@(ManagedBus_ { endpoint, handlers, receiveTimeout, statusVar,
-                              uuid })
-    expectedGen =
+                              uuid }) = do
 
-  join . atomically $
-    readTVar statusVar >>= \case
-      Status actualGen state | actualGen == expectedGen ->
-        case state of
-          Disconnected -> do
-            writeTVar statusVar (Status actualGen Connecting)
-
-            pure $ do
-              debug uuid expectedGen "connecting"
-              connectLoop expectedGen 1
-
-          _ ->
-            pure $
-              debug uuid expectedGen $
-                "was going to connect, but handle is " ++ showState state
-
-      Status actualGen _ ->
-        pure $
-          debug uuid expectedGen $
-            "was going to connect, but found gen " ++ show actualGen
+  readTVarIO statusVar >>= \case
+    Status generation Connecting -> do
+      debug uuid generation "connecting"
+      connectLoop generation 1
+    _ ->
+      assert False (pure ())
 
   where
     connectLoop ::
@@ -288,9 +291,7 @@ monitorHealth ::
      ManagedBus_
   -> Word64
   -> IO ()
-monitorHealth
-    managedBus@(ManagedBus_ { statusVar, uuid }) expectedGen = do
-
+monitorHealth managedBus@(ManagedBus_ { statusVar, uuid }) expectedGen = do
   debug uuid expectedGen "monitoring health"
   monitorLoop
 
@@ -304,10 +305,17 @@ monitorHealth
       readTVarIO statusVar >>= \case
         Status actualGen (Healthy bus) | actualGen == expectedGen -> do
           Bus.ping bus >>= \case
-            Left err -> do
-              debug uuid expectedGen $
-                "health check failed: " ++ show err ++ ", disconnecting"
-              disconnect managedBus expectedGen True
+            Left err ->
+              join . atomically $
+                readTVar statusVar >>= \case
+                  Status actualGen (Healthy bus) | actualGen == expectedGen -> do
+                    writeTVar statusVar (Status actualGen (Disconnecting bus))
+                    pure $ do
+                      debug uuid expectedGen $
+                        "health check failed: " ++ show err ++ ", disconnecting"
+                      disconnect managedBus True
+                  _ ->
+                    pure (pure ())
 
             Right (Left err) -> do
               debug uuid expectedGen ("health check failed: " ++ show err)
@@ -349,10 +357,18 @@ monitorHealth
           case state of
             Unhealthy bus ->
               Bus.ping bus >>= \case
-                Left err -> do
-                  debug uuid expectedGen $
-                    "ping failed: " ++ show err ++ ", disconnecting"
-                  disconnect managedBus expectedGen True
+                Left err ->
+                  join . atomically $
+                    readTVar statusVar >>= \case
+                      Status actualGen (Unhealthy bus) | actualGen == expectedGen -> do
+                        writeTVar statusVar (Status actualGen (Disconnecting bus))
+                        pure $ do
+                          debug uuid expectedGen $
+                            "ping failed: " ++ show err ++ ", disconnecting"
+                          disconnect managedBus True
+
+                      _ ->
+                        pure (pure ())
 
                 Right (Left err) -> do
                   debug uuid expectedGen $
@@ -423,42 +439,11 @@ idleTimeout bus@(ManagedBus_ { lastUsedRef, statusVar }) =
 
 disconnect ::
      ManagedBus_
-  -> Word64
   -> Bool
   -> IO ()
-disconnect
-    managedBus@(ManagedBus_ { statusVar, uuid })
-    expectedGen
-    reconnectAfter =
-
-  join . atomically $ do
-    Status actualGen state <-
-      readTVar statusVar
-
-    if actualGen == expectedGen
-      then
-        case state of
-          Unhealthy bus -> do
-            writeTVar statusVar (Status actualGen Disconnecting)
-            pure (doDisconnect bus actualGen)
-
-          Healthy bus -> do
-            writeTVar statusVar (Status actualGen Disconnecting)
-            pure (doDisconnect bus actualGen)
-
-          _ ->
-            pure $
-              debug uuid expectedGen $
-                "was going to disconnect, but handle was " ++ showState state
-
-      else
-        pure $
-          debug uuid expectedGen
-            ("was going to disconnect, but found gen " ++ show actualGen)
-
-  where
-    doDisconnect :: Bus -> Word64 -> IO ()
-    doDisconnect bus generation = do
+disconnect managedBus@(ManagedBus_ { statusVar, uuid }) reconnectAfter =
+  readTVarIO statusVar >>= \case
+    Status generation (Disconnecting bus) -> do
       debug uuid generation "draining connections"
 
       atomically $
@@ -470,15 +455,22 @@ disconnect
 
       void (Bus.disconnect bus)
 
-      atomically $ do
-        status <- readTVar statusVar
-        assert (status == Status generation Disconnecting) (pure ())
-        writeTVar statusVar (Status (generation+1) Disconnected)
+      atomically (writeTVar statusVar (Status (generation+1) Disconnected))
 
       debug uuid generation "disconnected"
 
-      when reconnectAfter
-        (connect managedBus (generation+1))
+      when reconnectAfter $
+        join . atomically $
+          readTVar statusVar >>= \case
+            Status generation Disconnected -> do
+              writeTVar statusVar (Status generation Connecting)
+              pure (connect managedBus)
+            _ ->
+              pure (pure ())
+
+    _ ->
+      assert False (pure ())
+
 
 debug :: Int -> Word64 -> [Char] -> IO ()
 debug uuid gen msg =
