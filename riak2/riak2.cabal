@@ -118,7 +118,6 @@ library
 
 library riak2-internal
   build-depends:
-    async,
     attoparsec,
     base ^>= 4.11.1 || ^>= 4.12.0,
     base64-bytestring ^>= 1.0.0,

@@ -7,7 +7,7 @@ import Control.Category        as X ((>>>))
 import Control.Concurrent      as X (ThreadId, myThreadId)
 import Control.Concurrent.MVar as X
 import Control.Exception       as X (Exception, SomeException)
-import Control.Monad           as X (guard, join, void)
+import Control.Monad           as X (guard, join, void, when)
 import Control.Monad.IO.Class  as X (MonadIO, liftIO)
 import Data.Bifunctor          as X (bimap, first)
 import Data.ByteString         as X (ByteString)
