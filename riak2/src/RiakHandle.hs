@@ -32,18 +32,15 @@ import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
 import RiakBusPool        (BusPool, createBusPool, withManagedBus)
-import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..),
-                           managedBusReady)
+import RiakManagedBus     (EventHandlers(..), ManagedBusError(..))
 import RiakUtils          (difftimeToMicros)
 
 import qualified RiakBus        as Bus
 import qualified RiakManagedBus as ManagedBus
 
-import Control.Concurrent.STM (TVar, atomically, readTVar, retry)
 import Control.Foldl          (FoldM)
 import Control.Lens           ((.~), (^.))
 import Data.Time              (NominalDiffTime)
-import GHC.Conc               (registerDelay)
 import GHC.TypeLits           (KnownNat)
 
 import qualified Data.Riak.Proto as Proto
@@ -306,10 +303,11 @@ exchange Handle { pool, retries } request =
   withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
-      (ManagedBus.withBus managedBus (\bus -> Bus.exchange bus request))
-      (waitForManagedBus managedBus)
+      (ManagedBus.withBus
+        managedBus
+        (5*1000*1000) -- TODO configure connecting wait time
+        (\bus -> Bus.exchange bus request))
       0
-
 -- | Send a request and stream the response (one or more messages).
 stream ::
      ∀ code r.
@@ -322,29 +320,26 @@ stream Handle { pool, retries } request responseFold =
   withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
-      (ManagedBus.withBus managedBus (\bus -> Bus.stream bus request responseFold))
-      (waitForManagedBus managedBus)
+      (ManagedBus.withBus
+        managedBus
+        (5*1000*1000)
+        (\bus -> Bus.stream bus request responseFold))
       0
 
 doExchangeOrStream ::
      forall a.
      Natural
   -> IO (Either ManagedBusError (Either (Response 0) a))
-  -> IO (Either HandleError ())
   -> Natural
   -> IO (Either HandleError (Either ByteString a))
-doExchangeOrStream retries action wait =
-  loop False
+doExchangeOrStream retries action =
+  loop
 
   where
     loop ::
-         -- Have we waited for the handle to become ready at least once? If so,
-         -- treat handle-not-ready errors against the retry count (to prevent
-         -- continuously resetting the attempts to 0).
-         Bool
-      -> Natural
+         Natural
       -> IO (Either HandleError (Either ByteString a))
-    loop wasReady attempts =
+    loop attempts =
       if attempts > retries
         then
           -- TODO accumulate errors and return them
@@ -352,52 +347,22 @@ doExchangeOrStream retries action wait =
 
         else
           action >>= \case
-            Left err ->
-              case err of
-                ManagedBusDisconnectedError ->
-                  wait >>= \case
-                    Left err ->
-                      pure (Left err)
+            Left ManagedBusTimeoutError ->
+              pure (Left HandleTimeoutError)
 
-                    Right () ->
-                      loop True (if wasReady then attempts+1 else attempts)
+            Left ManagedBusPipelineError ->
+              loop attempts
 
-                ManagedBusConnectionError _ ->
-                  wait >>= \case
-                    Left err ->
-                      pure (Left err)
+            Left (ManagedBusConnectionError _) ->
+              loop (attempts+1)
 
-                    Right () ->
-                      loop wasReady (attempts+1)
-
-                -- Weird to treat a decode error (very unexpected) like a
-                -- connection error (expected)
-                ManagedBusDecodeError _ ->
-                  wait >>= \case
-                    Left err ->
-                      pure (Left err)
-
-                    Right () ->
-                      loop wasReady (attempts+1)
+            -- Weird to treat a decode error (very unexpected) like a
+            -- connection error (expected)
+            Left (ManagedBusDecodeError _) ->
+              loop (attempts+1)
 
             Right (Left (RespRpbError err)) ->
               pure (Right (Left (err ^. Proto.errmsg)))
 
             Right (Right response) ->
               pure (Right (Right response))
-
-
-waitForManagedBus ::
-     ManagedBus
-  -> IO (Either HandleError ())
-waitForManagedBus bus = do
-  -- TODO configure connecting wait time
-  timeoutVar :: TVar Bool <-
-    registerDelay (5*1000*1000)
-
-  atomically $ do
-    (readTVar timeoutVar >>= \case
-      True -> pure (Left HandleTimeoutError)
-      False -> retry)
-    <|>
-    (Right () <$ managedBusReady bus)

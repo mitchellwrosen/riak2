@@ -1,9 +1,67 @@
+-- |
+--
+-- The managed bus state machine.
+--
+-- [Disconnected]
+--   We are not connected, because no requests have been made yet, or we idly
+--   timed out.
+--
+--   When a request is received,
+--     ==> [Connecting]
+--
+-- [Connecting]
+--   We are attempting to connect to Riak.
+--
+--   If the connect succeeds,
+--     ==> [Foreground Health Checking]
+--
+--   If the connect fails,
+--     ==> [Connecting]
+--
+--   TODO eventually stop trying to connect
+--
+-- [Foreground Health Checking]
+--   We are either attempting to successfully ping the server for the first
+--   time before declaring ourselves healthy, or the background health check
+--   failed.
+--
+--   If a ping fails with a connection error,
+--     ==> [Reconnecting]
+--
+--   If a ping fails with a Riak error,
+--     ==> [Foreground Health Checking]
+--
+--   If a ping succeeds,
+--     ==> [Connected]
+--
+-- [Connected]
+--   We are connected and healthy. This is the only state that we successfully
+--   accept requests in. We fork two background threads for periodic health
+--   checking and idle timeout.
+--
+--   If a request fails with a connection error,
+--     ==> [Reconnecting]
+--
+--   If a ping fails with a connection error,
+--     ==> [Reconnecting]
+--
+--   If a ping fails with a Riak error,
+--     ==> [Foreground Health Checking]
+--
+--   If we idly time out,
+--     ==> [Disconnected]
+--
+-- [Reconnecting]
+--   We intend to disconnect, then reconnect.
+--
+--   After disconnecting,
+--     ==> [Connecting]
+
 module RiakManagedBus
   ( ManagedBus
   , ManagedBusError(..)
   , EventHandlers(..)
   , createManagedBus
-  , managedBusReady
   , withBus
   ) where
 
@@ -57,9 +115,9 @@ data State :: Type where
   deriving stock (Eq)
 
 data ManagedBusError :: Type where
-  -- | The bus is not ready to accept requests, either because it is connecting,
-  -- unhealthy, or draining connections and about to reconnect.
-  ManagedBusDisconnectedError :: ManagedBusError
+  -- | The bus timed out waiting to become ready to accept requests.
+  ManagedBusTimeoutError :: ManagedBusError
+  ManagedBusPipelineError :: ManagedBusError
   -- | A connection error occurred during a send or receive.
   ManagedBusConnectionError :: !ConnectionError -> ManagedBusError
   -- | A protobuf decode error occurred.
@@ -113,25 +171,19 @@ createManagedBus uuid endpoint receiveTimeout handlers = do
     , aliveRef = aliveRef
     }
 
--- | An STM action that returns when the managed bus is connected and healthy.
-managedBusReady :: ManagedBus -> STM ()
-managedBusReady ManagedBus { statusVar } =
-  readTVar statusVar >>= \case
-    Status _ (Connected _ True) -> pure ()
-    _ -> retry
-
 withBus ::
      forall a.
      ManagedBus
+  -> Int -- Microsecond wait
   -> (Bus -> IO (Either BusError a))
   -> IO (Either ManagedBusError a)
-withBus managedBus@(ManagedBus { lastUsedRef, statusVar }) callback =
+withBus managedBus@(ManagedBus { lastUsedRef, statusVar }) timeout callback =
   readTVarIO statusVar >>= \case
     -- Disconnected: if we successfully CAS a blackhole into the status var,
     -- fork a background thread to connect.
     Status generation Disconnected -> do
       maybeConnect managedBus_ generation
-      pure (Left ManagedBusDisconnectedError)
+      wait
 
     -- Connected and healthy: record the last used time, perform the callback
     -- with the healthy bus, and if it failed, if we successfully CAS a
@@ -152,6 +204,16 @@ withBus managedBus@(ManagedBus { lastUsedRef, statusVar }) callback =
               (\bus ->
                 void (forkIO (disconnect managedBus_ bus True)))
 
+          -- Wait for us to transition off of a healthy status before returning,
+          -- so that the client may immediately retry (and hit a 'wait', rather
+          -- than this same code path)
+          atomically $
+            readTVar statusVar >>= \case
+              Status generation' (Connected _ True) | generation == generation' ->
+                retry
+              _ ->
+                pure ()
+
           pure (Left (fromBusError err))
 
         Right result ->
@@ -159,7 +221,7 @@ withBus managedBus@(ManagedBus { lastUsedRef, statusVar }) callback =
 
     -- Blackhole (connecting/disconnecting) or connected but unhealthy
     _ ->
-      pure (Left ManagedBusDisconnectedError)
+      wait
 
   where
     managedBus_ :: ManagedBus_
@@ -168,9 +230,28 @@ withBus managedBus@(ManagedBus { lastUsedRef, statusVar }) callback =
         ManagedBus{..} ->
           ManagedBus_{..}
 
+    wait :: IO (Either ManagedBusError a)
+    wait = do
+      timeoutVar :: TVar Bool <-
+        registerDelay timeout
+
+      join . atomically $
+        (readTVar timeoutVar >>= \case
+          False ->
+            retry
+          True ->
+            pure (pure (Left ManagedBusTimeoutError)))
+        <|>
+        (readTVar statusVar >>= \case
+          Status _ (Connected _ True) ->
+            -- TODO don't call withBus, just jump into correct branch
+            pure (withBus managedBus timeout callback)
+          _ ->
+            retry)
+
     fromBusError :: BusError -> ManagedBusError
     fromBusError = \case
-      BusClosedError -> ManagedBusDisconnectedError
+      BusClosedError -> ManagedBusPipelineError
       BusConnectionError err -> ManagedBusConnectionError err
       BusDecodeError err -> ManagedBusDecodeError err
 
@@ -285,15 +366,13 @@ monitorHealth managedBus@(ManagedBus_ { statusVar, uuid }) expectedGen = do
       readTVarIO statusVar >>= \case
         Status actualGen (Connected bus True) | actualGen == expectedGen -> do
           Bus.ping bus >>= \case
-            Left err -> do
-              debug uuid expectedGen ("health check failed: " ++ show err)
-
-              blackholeIfConnected statusVar expectedGen $ \bus ->
+            Left err ->
+              blackholeIfConnected statusVar expectedGen $ \bus ->  do
+                debug uuid expectedGen ("health check failed: " ++ show err)
                 disconnect managedBus bus True
 
             Right (Left err) -> do
-              debug uuid expectedGen ("health check failed: " ++ show err)
-              maybePingLoop
+              maybePingLoop err
 
             Right (Right _) ->
               monitorLoop
@@ -301,15 +380,16 @@ monitorHealth managedBus@(ManagedBus_ { statusVar, uuid }) expectedGen = do
         _ ->
           pure ()
 
-    maybePingLoop :: IO ()
-    maybePingLoop =
+    maybePingLoop :: Response 0 -> IO ()
+    maybePingLoop err =
       join . atomically $ do
         readTVar statusVar >>= \case
           Status actualGen (Connected bus True) | actualGen == expectedGen -> do
             writeTVar statusVar (Status actualGen (Connected bus False))
 
             pure $ do
-              debug uuid expectedGen "pinging until healthy"
+              debug uuid expectedGen $
+                "health check failed: " ++ show err ++ ", pinging until healthy"
               pingLoop 1
 
           _ ->
