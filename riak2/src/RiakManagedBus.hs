@@ -62,7 +62,8 @@ module RiakManagedBus
   , ManagedBusError(..)
   , EventHandlers(..)
   , createManagedBus
-  , withBus
+  , exchange
+  , stream
   ) where
 
 import Libriak.Connection (ConnectError, ConnectionError, Endpoint)
@@ -76,8 +77,10 @@ import qualified RiakDebug as Debug
 
 import Control.Concurrent.STM
 import Control.Exception.Safe (tryAny, uninterruptibleMask_)
+import Control.Foldl          (FoldM)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
+import GHC.TypeLits           (KnownNat)
 -- import System.Mem.Weak        (Weak, deRefWeak)
 
 
@@ -182,13 +185,39 @@ createManagedBus
     , aliveRef = aliveRef
     }
 
+exchange ::
+     KnownNat code
+  => ManagedBus -- ^
+  -> Int -- ^ Timeout (microseconds)
+  -> Request code -- ^
+  -> IO (Either ManagedBusError (Either (Response 0) (Response code)))
+exchange managedBus timeout request =
+  withBus managedBus timeout $ \bus ->
+    Bus.exchange bus request
+
+stream ::
+     forall code r.
+     KnownNat code
+  => ManagedBus -- ^
+  -> Int -- ^ Timeout (microseconds)
+  -> Request code -- ^
+  -> FoldM IO (Response code) r
+  -> IO (Either ManagedBusError (Either (Response 0) r))
+stream managedBus timeout request responseFold =
+  withBus managedBus timeout $ \bus ->
+    Bus.stream bus request responseFold
+
 withBus ::
      forall a.
      ManagedBus
-  -> Int -- Microsecond wait
+  -> Int
+     -- ^ Timeout (microseconds)
   -> (Bus -> IO (Either BusError a))
+     -- ^ Bus callback, which may not throw an exception
   -> IO (Either ManagedBusError a)
-withBus managedBus@(ManagedBus { lastUsedRef, statusVar, uuid }) timeout callback =
+withBus
+    managedBus@(ManagedBus { lastUsedRef, statusVar, uuid }) timeout callback =
+
   readTVarIO statusVar >>= \case
     -- Disconnected: if we successfully CAS a blackhole into the status var,
     -- fork a background thread to connect.
@@ -200,13 +229,25 @@ withBus managedBus@(ManagedBus { lastUsedRef, statusVar, uuid }) timeout callbac
     -- with the healthy bus, and if it failed, if we successfully CAS a
     -- blackhole into the status var, fork a background thread to disconnect and
     -- reconnect.
-    Status generation (Connected bus True) -> do
+    Status generation (Connected bus True) ->
+      withHealthyBus generation bus
+
+    -- Blackhole (connecting/disconnecting) or connected but unhealthy
+    _ ->
+      wait
+
+  where
+    withHealthyBus ::
+         Word64
+      -> Bus
+      -> IO (Either ManagedBusError a)
+    withHealthyBus generation bus = do
       writeIORef lastUsedRef =<<
         getMonotonicTimeNSec
 
+      -- TODO Fix race condition here, we might disconnect before using this
+      -- bus (in-flight count is bumped too late)
       callback bus >>= \case
-        -- FIXME we must disconnect if callback throws an exception, but can
-        -- it?
         Left err -> do
           uninterruptibleMask_ $
             blackholeIfConnected
@@ -234,11 +275,6 @@ withBus managedBus@(ManagedBus { lastUsedRef, statusVar, uuid }) timeout callbac
         Right result ->
           pure (Right result)
 
-    -- Blackhole (connecting/disconnecting) or connected but unhealthy
-    _ ->
-      wait
-
-  where
     managedBus_ :: ManagedBus_
     managedBus_ =
       case managedBus of
@@ -254,9 +290,8 @@ withBus managedBus@(ManagedBus { lastUsedRef, statusVar, uuid }) timeout callbac
         (pure (Left ManagedBusTimeoutError) <$ timedOut)
         <|>
         (readTVar statusVar >>= \case
-          Status _ (Connected _ True) ->
-            -- TODO don't call withBus, just jump into correct branch
-            pure (withBus managedBus timeout callback)
+          Status generation (Connected bus True) ->
+            pure (withHealthyBus generation bus)
           _ ->
             retry)
 

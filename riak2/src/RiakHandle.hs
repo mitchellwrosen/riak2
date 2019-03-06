@@ -35,13 +35,12 @@ import RiakBusPool        (BusPool, createBusPool, withManagedBus)
 import RiakManagedBus     (EventHandlers(..), ManagedBusError(..))
 import RiakUtils          (difftimeToMicros)
 
-import qualified RiakBus        as Bus
 import qualified RiakManagedBus as ManagedBus
 
-import Control.Foldl          (FoldM)
-import Control.Lens           ((.~), (^.))
-import Data.Time              (NominalDiffTime)
-import GHC.TypeLits           (KnownNat)
+import Control.Foldl (FoldM)
+import Control.Lens  ((.~), (^.))
+import Data.Time     (NominalDiffTime)
+import GHC.TypeLits  (KnownNat)
 
 import qualified Data.Riak.Proto as Proto
 
@@ -314,10 +313,10 @@ exchange Handle { pool, retries } request =
   withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
-      (ManagedBus.withBus
+      (ManagedBus.exchange
         managedBus
         (5*1000*1000) -- TODO configure connecting wait time
-        (\bus -> Bus.exchange bus request))
+        request)
       0
 -- | Send a request and stream the response (one or more messages).
 stream ::
@@ -331,10 +330,11 @@ stream Handle { pool, retries } request responseFold =
   withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
-      (ManagedBus.withBus
+      (ManagedBus.stream
         managedBus
         (5*1000*1000)
-        (\bus -> Bus.stream bus request responseFold))
+        request
+        responseFold)
       0
 
 doExchangeOrStream ::

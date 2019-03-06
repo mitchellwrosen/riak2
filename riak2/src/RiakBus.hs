@@ -307,8 +307,6 @@ exchange bus@(Bus { connVar, sendLock, doneVarRef, handlers }) request =
             pure (Left err)
 
 -- | Send a request and stream the response (one or more messages).
---
--- /Throws/: If response decoding fails, throws 'DecodeError'.
 stream ::
      ∀ code r.
      KnownNat code
