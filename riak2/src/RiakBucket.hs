@@ -79,10 +79,17 @@ setBucketIndex ::
   => Handle -- ^
   -> Bucket -- ^
   -> IndexName -- ^ Index name
-  -> m (Either HandleError (Either ByteString ()))
-setBucketIndex handle bucket (IndexName index) = liftIO $
-  (fmap.fmap) (() <$)
-    (Handle.setBucket handle request)
+  -> m (Either SetBucketIndexError ())
+setBucketIndex handle bucket@(Bucket bucketType _) index = liftIO $
+  Handle.setBucket handle request >>= \case
+    Left err ->
+      pure (Left (HandleError err))
+
+    Right (Left err) ->
+      pure (Left (parseSetBucketIndexError bucketType index err))
+
+    Right (Right _) ->
+      pure (Right ())
 
   where
     request :: Proto.RpbSetBucketReq
@@ -91,16 +98,31 @@ setBucketIndex handle bucket (IndexName index) = liftIO $
         & setProto bucket
         & Proto.props .~
             (Proto.defMessage
-              & Proto.searchIndex .~ encodeUtf8 index)
+              & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
+
+parseSetBucketIndexError ::
+     ByteString
+  -> IndexName
+  -> ByteString
+  -> SetBucketIndexError
+parseSetBucketIndexError bucketType index err
+  | isBucketTypeDoesNotExistError4 err =
+      BucketTypeDoesNotExistError bucketType
+  | isIndexDoesNotExistError0 err =
+      IndexDoesNotExistError index
+  | isInvalidNodesError1 err =
+      InvalidNodesError
+  | otherwise =
+      UnknownError (decodeUtf8 err)
 
 -- | Unset the index of a bucket.
 unsetBucketIndex ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either HandleError (Either ByteString ()))
+  -> m (Either SetBucketIndexError ())
 unsetBucketIndex handle bucket =
-  setBucketIndex handle bucket (IndexName "_dont_index")
+  setBucketIndex handle bucket (IndexName "_dont_index_")
 
 -- | Reset bucket properties.
 resetBucket ::

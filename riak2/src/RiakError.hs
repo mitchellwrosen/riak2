@@ -10,6 +10,7 @@ import qualified Data.ByteString as ByteString
 
 -- TODO "Key cannot be zero-length" when putting with empty key
 -- TODO retry on insufficient vnodes
+--        - list keys
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.
@@ -108,6 +109,7 @@ data Op
   | PutSchemaOp
   | SearchOp
   | SecondaryIndexQueryOp
+  | SetBucketIndexOp
   | SetBucketTypeIndexOp
   | UpdateCrdtOp
 
@@ -133,6 +135,7 @@ type PutSchemaError                   = Error 'PutSchemaOp
 type QueryExactError                  = Error 'SecondaryIndexQueryOp
 type QueryRangeError                  = Error 'SecondaryIndexQueryOp
 type SearchError                      = Error 'SearchOp
+type SetBucketIndexError              = Error 'SetBucketIndexOp
 type SetBucketTypeIndexError          = Error 'SetBucketTypeIndexOp
 type UpdateConvergentCounterError     = Error 'UpdateCrdtOp
 type UpdateConvergentHyperLogLogError = Error 'UpdateCrdtOp
@@ -143,12 +146,14 @@ type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'ListBucketsOp = 'True
   MayReturnBucketTypeDoesNotExist 'ListKeysOp = 'True
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
   MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 
 type family MayReturnIndexDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'SearchOp = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 
@@ -161,6 +166,7 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'GetOp = 'True
   MayReturnInvalidNodes 'PutOp = 'True
   MayReturnInvalidNodes 'PutIndexOp = 'True
+  MayReturnInvalidNodes 'SetBucketIndexOp = 'True
   MayReturnInvalidNodes 'SetBucketTypeIndexOp = 'True
   MayReturnInvalidNodes _ = 'False
 

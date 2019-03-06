@@ -116,7 +116,7 @@ unsetBucketTypeIndex ::
   -> BucketType -- ^
   -> m (Either SetBucketTypeIndexError ())
 unsetBucketTypeIndex handle bucketType =
-  setBucketTypeIndex handle bucketType (IndexName "_dont_index")
+  setBucketTypeIndex handle bucketType (IndexName "_dont_index_")
 
 parseSetBucketTypeIndexError ::
      ByteString

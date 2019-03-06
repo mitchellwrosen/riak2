@@ -1133,11 +1133,7 @@ setBucketIndexParser =
               print err
               exitFailure
 
-            Right (Left err) -> do
-              print err
-              exitFailure
-
-            Right (Right ()) ->
+            Right () ->
               pure ()
 
 updateCounterParser :: Parser (Handle -> IO ())
