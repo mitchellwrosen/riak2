@@ -65,6 +65,8 @@ main = do
               }
         , retries =
             3
+        , healthCheckInterval =
+            1
         , requestTimeout =
             5
         , handlers =

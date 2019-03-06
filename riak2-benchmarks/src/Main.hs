@@ -111,6 +111,8 @@ riak2PingParser =
                 { Riak.address = ipv4 127 0 0 1
                 , Riak.port = 8087
                 }
+            , Riak.healthCheckInterval =
+                1
             , Riak.requestTimeout =
                 1
             , Riak.retries =

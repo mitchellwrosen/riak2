@@ -56,6 +56,9 @@ data Handle
 data HandleConfig
   = HandleConfig
   { endpoint :: !Endpoint
+    -- | How often to perform a health check on each underlying connection. Use
+    -- @0@ to disable.
+  , healthCheckInterval :: !NominalDiffTime
     -- | How long to wait for a response from Riak before timing out.
   , requestTimeout :: !NominalDiffTime
     -- | The additional number of times to attempt a request if it results in a
@@ -63,18 +66,17 @@ data HandleConfig
     --
     -- This covers a many possible conditions, including:
     --
-    -- * A remote reset or remote shutdown due to Riak not being fully
-    --   initialized.
+    -- * A remote reset or remote shutdown due to Riak restarting.
     --
     -- * A remote timeout, configurable via @timeout@.
     --
     -- * A protobuf decode error or incorrect message code (very unexpected
     --   failure conditions, but they exist nonetheless).
     --
-    -- A sensible, low number like @3@ should be appropriate for persisting
-    -- through common, ephemeral network failures, while still giving up
-    -- eventually in the case of a catastrophic error, like accidentally
-    -- connecting to an endpoint that isn't Riak.
+    -- A low number like @3@ should be appropriate for persisting through
+    -- common, ephemeral network failures, while still giving up eventually in
+    -- the case of a catastrophic error, like accidentally connecting to an
+    -- endpoint that isn't Riak.
   , retries :: !Natural
   , handlers :: !EventHandlers
   }
@@ -93,9 +95,16 @@ data HandleError :: Type where
 createHandle ::
      HandleConfig
   -> IO Handle
-createHandle HandleConfig { endpoint, handlers, retries, requestTimeout } = do
+createHandle
+    HandleConfig { endpoint, handlers, healthCheckInterval, retries,
+                   requestTimeout } = do
+
   pool :: BusPool <-
-    createBusPool endpoint (difftimeToMicros requestTimeout) handlers
+    createBusPool
+      endpoint
+      (difftimeToMicros healthCheckInterval)
+      (difftimeToMicros requestTimeout)
+      handlers
 
   pure Handle
     { pool = pool

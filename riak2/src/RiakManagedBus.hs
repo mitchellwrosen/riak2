@@ -85,7 +85,8 @@ data ManagedBus
   = ManagedBus
   { uuid :: !Int
   , endpoint :: !Endpoint
-  , receiveTimeout :: !Int
+  , healthCheckInterval :: !Int -- Microseconds
+  , receiveTimeout :: !Int -- Microseconds
   , statusVar :: !(TVar Status)
   , lastUsedRef :: !(IORef Word64)
     -- ^ The last time the bus was used.
@@ -99,6 +100,7 @@ data ManagedBus_
   = ManagedBus_
   { uuid :: !Int
   , endpoint :: !Endpoint
+  , healthCheckInterval :: !Int
   , receiveTimeout :: !Int
   , statusVar :: !(TVar Status)
   , lastUsedRef :: !(IORef Word64)
@@ -149,10 +151,11 @@ instance Semigroup EventHandlers where
 createManagedBus ::
      Int
   -> Endpoint
+  -> Int -- ^ Health check interval
   -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
   -> IO ManagedBus
-createManagedBus uuid endpoint receiveTimeout handlers = do
+createManagedBus uuid endpoint healthCheckInterval receiveTimeout handlers = do
   statusVar :: TVar Status <-
     newTVarIO (Status 0 Disconnected)
 
@@ -165,6 +168,7 @@ createManagedBus uuid endpoint receiveTimeout handlers = do
   pure ManagedBus
     { uuid = uuid
     , endpoint = endpoint
+    , healthCheckInterval = healthCheckInterval
     , receiveTimeout = receiveTimeout
     , statusVar = statusVar
     , lastUsedRef = lastUsedRef
@@ -296,8 +300,8 @@ connect ::
   -> Word64
   -> IO ()
 connect
-    managedBus@(ManagedBus_ { endpoint, handlers, receiveTimeout, statusVar,
-                              uuid })
+    managedBus@(ManagedBus_ { endpoint, handlers, healthCheckInterval,
+                              receiveTimeout, statusVar, uuid })
     generation =
 
   connectLoop generation 1
@@ -338,7 +342,9 @@ connect
           atomically
             (writeTVar statusVar (Status generation (Connected bus True)))
 
-          void (forkIO (monitorHealth managedBus generation))
+          when (healthCheckInterval > 0)
+            (void (forkIO (monitorHealth managedBus generation)))
+
           void (forkIO (idleTimeout managedBus generation))
 
     busHandlers :: Bus.EventHandlers

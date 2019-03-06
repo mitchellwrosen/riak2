@@ -26,14 +26,15 @@ data BusPool
 -- /Throws/. This function will never throw an exception.
 createBusPool ::
      Endpoint
+  -> Int -- ^ Health check interval (microseconds)
   -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
   -> IO BusPool
-createBusPool endpoint receiveTimeout handlers = do
+createBusPool endpoint healthCheckInterval receiveTimeout handlers = do
   pool :: Vector ManagedBus <-
     Vector.generateM
       256 -- TODO configure bus pool size
-      (\i -> createManagedBus i endpoint receiveTimeout handlers)
+      (\i -> createManagedBus i endpoint healthCheckInterval receiveTimeout handlers)
 
   pure BusPool
     { pool = pool }

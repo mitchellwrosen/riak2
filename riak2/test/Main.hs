@@ -10,7 +10,7 @@ import RiakContext             (newContext)
 import RiakError               (Error(..))
 import RiakGetOpts             (GetOpts(..))
 import RiakHandle              (EventHandlers(..), Handle, HandleConfig(..),
-                                HandleError, withHandle)
+                                HandleError, createHandle)
 import RiakIndexName           (unsafeMakeIndexName)
 import RiakIntIndexQuery       (IntIndexQuery(..))
 import RiakKey                 (Key(..), generatedKey, keyBucket)
@@ -41,11 +41,8 @@ import qualified Data.ByteString.Char8 as Latin1
 
 main :: IO ()
 main = do
-  withHandle
-    config
-    (\handle ->
-      defaultMain
-        (testGroup "Riak integration tests" (integrationTests handle)))
+  handle <- createHandle config
+  defaultMain (testGroup "Riak integration tests" (integrationTests handle))
 
   where
     config :: HandleConfig
@@ -56,6 +53,12 @@ main = do
               { address = ipv4 127 0 0 1
               , port = 8087
               }
+        , retries =
+            3
+        , healthCheckInterval =
+            1
+        , requestTimeout =
+            1
         , handlers =
             mempty
             -- EventHandlers
