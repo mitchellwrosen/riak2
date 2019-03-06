@@ -15,7 +15,6 @@ executable riak2-benchmarks
     , riak == 1.2.0.0
     , riak-protobuf == 1.0.0
     , riak2
-    , time
 
   default-extensions:
     LambdaCase

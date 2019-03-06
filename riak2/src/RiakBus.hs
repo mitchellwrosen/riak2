@@ -196,9 +196,7 @@ send handlers connection request = do
     _ | pct < 0.0025 -> pure (Left LocalShutdown)
       | pct < 0.0050 -> pure (Left RemoteReset)
       | pct < 0.0075 -> pure (Left RemoteShutdown)
-      | pct < 0.0100 -> do
-                          threadDelay (1*1000*1000)
-                          pure (Left RemoteTimeout)
+      | pct < 0.0100 -> pure (Left RemoteTimeout)
       | otherwise    -> doSend
 
 #else

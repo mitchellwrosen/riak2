@@ -6,7 +6,6 @@ import Control.Lens
 import Control.Monad           (join, replicateM_)
 import Data.Default.Class      (Default(..))
 import Data.Foldable           (asum)
-import Data.Time
 import GHC.Clock               (getMonotonicTime)
 import Net.IPv4                (ipv4)
 import Text.Printf             (printf)
@@ -144,7 +143,7 @@ riakPingParser =
         (RHK.Client "localhost" "8087" "")
         1 -- stripes
         10 -- seconds to keep idle connections open
-        10 -- conns per stripe
+        256 -- conns per stripe
 
     runBenchWith
       (RHK.withConnection pool $ \conn -> do
