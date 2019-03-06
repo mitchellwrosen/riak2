@@ -27,14 +27,24 @@ data BusPool
 createBusPool ::
      Endpoint
   -> Int -- ^ Health check interval (microseconds)
+  -> Int -- ^ Idle timeout (microseconds)
   -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
   -> IO BusPool
-createBusPool endpoint healthCheckInterval receiveTimeout handlers = do
+createBusPool
+    endpoint healthCheckInterval idleTimeout receiveTimeout handlers = do
+
   pool :: Vector ManagedBus <-
     Vector.generateM
       256 -- TODO configure bus pool size
-      (\i -> createManagedBus i endpoint healthCheckInterval receiveTimeout handlers)
+      (\i ->
+        createManagedBus
+          i
+          endpoint
+          healthCheckInterval
+          idleTimeout
+          receiveTimeout
+          handlers)
 
   pure BusPool
     { pool = pool }

@@ -59,6 +59,7 @@ data HandleConfig
     -- | How often to perform a health check on each underlying connection. Use
     -- @0@ to disable.
   , healthCheckInterval :: !NominalDiffTime
+  , idleTimeout :: !NominalDiffTime
     -- | How long to wait for a response from Riak before timing out.
   , requestTimeout :: !NominalDiffTime
     -- | The additional number of times to attempt a request if it results in a
@@ -96,13 +97,14 @@ createHandle ::
      HandleConfig
   -> IO Handle
 createHandle
-    HandleConfig { endpoint, handlers, healthCheckInterval, retries,
-                   requestTimeout } = do
+    HandleConfig { endpoint, handlers, healthCheckInterval, idleTimeout,
+                   retries, requestTimeout } = do
 
   pool :: BusPool <-
     createBusPool
       endpoint
       (difftimeToMicros healthCheckInterval)
+      (difftimeToMicros idleTimeout)
       (difftimeToMicros requestTimeout)
       handlers
 

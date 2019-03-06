@@ -67,6 +67,8 @@ main = do
             3
         , healthCheckInterval =
             1
+        , idleTimeout =
+            10
         , requestTimeout =
             5
         , handlers =

@@ -86,6 +86,7 @@ data ManagedBus
   { uuid :: !Int
   , endpoint :: !Endpoint
   , healthCheckInterval :: !Int -- Microseconds
+  , idleTimeout :: !Int -- Microseconds
   , receiveTimeout :: !Int -- Microseconds
   , statusVar :: !(TVar Status)
   , lastUsedRef :: !(IORef Word64)
@@ -101,6 +102,7 @@ data ManagedBus_
   { uuid :: !Int
   , endpoint :: !Endpoint
   , healthCheckInterval :: !Int
+  , idleTimeout :: !Int
   , receiveTimeout :: !Int
   , statusVar :: !(TVar Status)
   , lastUsedRef :: !(IORef Word64)
@@ -151,11 +153,14 @@ instance Semigroup EventHandlers where
 createManagedBus ::
      Int
   -> Endpoint
-  -> Int -- ^ Health check interval
+  -> Int -- ^ Health check interval (microseconds)
+  -> Int -- ^ Idle timeout (microseconds)
   -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
   -> IO ManagedBus
-createManagedBus uuid endpoint healthCheckInterval receiveTimeout handlers = do
+createManagedBus
+    uuid endpoint healthCheckInterval idleTimeout receiveTimeout handlers = do
+
   statusVar :: TVar Status <-
     newTVarIO (Status 0 Disconnected)
 
@@ -169,6 +174,7 @@ createManagedBus uuid endpoint healthCheckInterval receiveTimeout handlers = do
     { uuid = uuid
     , endpoint = endpoint
     , healthCheckInterval = healthCheckInterval
+    , idleTimeout = idleTimeout
     , receiveTimeout = receiveTimeout
     , statusVar = statusVar
     , lastUsedRef = lastUsedRef
@@ -301,7 +307,7 @@ connect ::
   -> IO ()
 connect
     managedBus@(ManagedBus_ { endpoint, handlers, healthCheckInterval,
-                              receiveTimeout, statusVar, uuid })
+                              idleTimeout, receiveTimeout, statusVar, uuid })
     generation =
 
   connectLoop generation 1
@@ -345,7 +351,8 @@ connect
           when (healthCheckInterval > 0)
             (void (forkIO (monitorHealth managedBus generation)))
 
-          void (forkIO (idleTimeout managedBus generation))
+          when (idleTimeout > 0)
+            (void (forkIO (monitorUsage managedBus generation)))
 
     busHandlers :: Bus.EventHandlers
     busHandlers =
@@ -359,16 +366,17 @@ monitorHealth ::
      ManagedBus_
   -> Word64
   -> IO ()
-monitorHealth managedBus@(ManagedBus_ { statusVar, uuid }) expectedGen = do
+monitorHealth
+     managedBus@(ManagedBus_ { healthCheckInterval, statusVar, uuid })
+     expectedGen = do
+
   debug uuid expectedGen "healthy"
   monitorLoop
 
   where
     monitorLoop :: IO ()
     monitorLoop = do
-      -- TODO configurable ping frequency
-      -- threadDelay (1*1000*1000)
-      threadDelay (125*1000)
+      threadDelay healthCheckInterval
 
       readTVarIO statusVar >>= \case
         Status actualGen (Connected bus True) | actualGen == expectedGen -> do
@@ -443,19 +451,20 @@ monitorHealth managedBus@(ManagedBus_ { statusVar, uuid }) expectedGen = do
           _ ->
             pure (pure ())
 
-idleTimeout ::
+monitorUsage ::
      ManagedBus_
   -> Word64
   -> IO ()
-idleTimeout (ManagedBus_ { lastUsedRef, statusVar, uuid }) expectedGen =
+monitorUsage
+    (ManagedBus_ { idleTimeout, lastUsedRef, statusVar, uuid }) expectedGen =
+
   loop
 
   where
     loop :: IO ()
     loop = do
-      -- TODO configurable idle timeout
       timer :: STM () <-
-        registerOneShotEvent (5*1000*1000)
+        registerOneShotEvent (idleTimeout `div` 2)
 
       join . atomically $
         (timer $> handleTimer)
@@ -478,7 +487,7 @@ idleTimeout (ManagedBus_ { lastUsedRef, statusVar, uuid }) expectedGen =
           now <- getMonotonicTimeNSec
           lastUsed <- readIORef lastUsedRef
 
-          if now - lastUsed > (10*1000*1000*1000)
+          if now - lastUsed > fromIntegral (idleTimeout * 1000)
             then
               blackholeIfConnected statusVar expectedGen $ \bus -> do
                 debug uuid expectedGen "idle timeout"

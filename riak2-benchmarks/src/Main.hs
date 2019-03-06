@@ -113,6 +113,8 @@ riak2PingParser =
                 }
             , Riak.healthCheckInterval =
                 1
+            , Riak.idleTimeout =
+                5
             , Riak.requestTimeout =
                 1
             , Riak.retries =
