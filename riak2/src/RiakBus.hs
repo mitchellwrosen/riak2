@@ -6,7 +6,6 @@
 module RiakBus
   ( Bus
   , EventHandlers(..)
-  , inFlight
   , connect
   , disconnect
   , ping
@@ -43,7 +42,6 @@ data Bus
   , sendLock :: !(MVar ())
     -- ^ Lock acquired during sending a request.
   , doneVarRef :: !(IORef (TMVar ()))
-  , inFlightVar :: !(TVar Int)
   , handlers :: !EventHandlers
   }
 
@@ -77,10 +75,6 @@ instance Semigroup EventHandlers where
   EventHandlers a1 b1 c1 <> EventHandlers a2 b2 c2 =
     EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2)
 
-inFlight :: Bus -> STM Int
-inFlight Bus { inFlightVar } =
-  readTVar inFlightVar
-
 -- | Acquire a bus.
 --
 -- /Throws/: This function will never throw an exception.
@@ -104,14 +98,10 @@ connect endpoint receiveTimeout handlers =
       doneVarRef :: IORef (TMVar ()) <-
         newIORef =<< newTMVarIO ()
 
-      inFlightVar :: TVar Int <-
-        newTVarIO 0
-
       pure (Right Bus
         { connVar = connVar
         , sendLock = sendLock
         , doneVarRef = doneVarRef
-        , inFlightVar = inFlightVar
         , handlers = handlers
         })
 
@@ -133,7 +123,7 @@ withConnection ::
      Bus
   -> (Connection -> IO (Either BusError a))
   -> IO (Either BusError a)
-withConnection Bus { connVar, handlers, inFlightVar } callback =
+withConnection Bus { connVar, handlers } callback =
   readTVarIO connVar >>= \case
     Left _ ->
       pure (Left BusClosedError)
@@ -159,18 +149,9 @@ withConnection Bus { connVar, handlers, inFlightVar } callback =
   where
     doCallback :: Connection -> IO (Either BusError a)
     doCallback connection =
-      uninterruptibleMask $ \unmask -> do
-        atomically (modifyTVar' inFlightVar (+1))
-
-        result :: Either BusError a <-
-          unmask (callback connection) `catchAsync` \ex -> do
-            markAsUnusable
-            atomically (modifyTVar' inFlightVar (subtract 1))
-            throwIO (ex :: SomeException)
-
-        atomically (modifyTVar' inFlightVar (subtract 1))
-
-        pure result
+      callback connection `catchAsync` \ex -> do
+        markAsUnusable
+        throwIO (ex :: SomeException)
 
     markAsUnusable :: IO ()
     markAsUnusable =
