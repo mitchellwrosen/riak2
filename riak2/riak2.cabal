@@ -235,6 +235,7 @@ library riak2-internal
     RiakSecondaryIndexValue
     RiakServerInfo
     RiakSibling
+    RiakSTM
     RiakWriteQuorum
 
   ghc-options:
