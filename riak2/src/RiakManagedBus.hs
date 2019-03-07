@@ -72,12 +72,11 @@ import Libriak.Connection (ConnectException, ConnectionError, Endpoint,
                            Interruptibility(..))
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
-import RiakBus            (Bus, BusError(..))
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter, registerOneShotEvent)
 
-import qualified RiakBus   as Bus
-import qualified RiakDebug as Debug
+import qualified Libriak.Handle as Handle
+import qualified RiakDebug      as Debug
 
 import Control.Concurrent.STM
 import Control.Exception.Safe (throwIO, tryAny, tryAsync, uninterruptibleMask)
@@ -124,7 +123,7 @@ data Status :: Type where
 
 data State :: Type where
   Disconnected :: State
-  Connected :: !Bus -> !Bool -> State
+  Connected :: !Handle.Handle -> !Bool -> State
   Blackhole :: State
   deriving stock (Eq)
 
@@ -202,8 +201,8 @@ exchange ::
   -> Request code -- ^
   -> IO (Either ManagedBusError (Either (Response 0) (Response code)))
 exchange managedBus timeout request =
-  withBus managedBus timeout $ \bus ->
-    Bus.exchange bus request
+  withHandle managedBus timeout $ \handle ->
+    Handle.exchange handle request
 
 stream ::
      forall code r.
@@ -214,18 +213,17 @@ stream ::
   -> FoldM IO (Response code) r
   -> IO (Either ManagedBusError (Either (Response 0) r))
 stream managedBus timeout request responseFold =
-  withBus managedBus timeout $ \bus ->
-    Bus.stream bus request responseFold
+  withHandle managedBus timeout $ \handle ->
+    Handle.stream handle request responseFold
 
-withBus ::
+withHandle ::
      forall a.
      ManagedBus
   -> Int
      -- ^ Timeout (microseconds)
-  -> (Bus -> IO (Either BusError a))
-     -- ^ Bus callback, which may not throw an exception
+  -> (Handle.Handle -> IO (Either Handle.HandleError a))
   -> IO (Either ManagedBusError a)
-withBus
+withHandle
     managedBus@(ManagedBus { inFlightVar, lastUsedRef, statusVar, uuid })
     timeout callback =
 
@@ -240,32 +238,32 @@ withBus
             unmask wait
 
         -- Connected and healthy: record the last used time, perform the
-        -- callback with the healthy bus, and if it failed, if we successfully
-        -- CAS a blackhole into the status var, fork a background thread to
-        -- disconnect and reconnect.
-        Status generation (Connected bus True) -> do
+        -- callback with the healthy handle, and if it failed, if we
+        -- successfully CAS a blackhole into the status var, fork a background
+        -- thread to disconnect and reconnect.
+        Status generation (Connected handle True) -> do
           incrTCounter inFlightVar
-          pure (withHealthyBus unmask generation bus)
+          pure (withHealthyHandle unmask generation handle)
 
         -- Blackhole (connecting/disconnecting) or connected but unhealthy
         _ ->
           pure (unmask wait)
 
   where
-    -- Perform an action with a healthy bus. This function is called with
+    -- Perform an action with a healthy handle. This function is called with
     -- asynchronous exceptions masked, and the in-flight count has already been
     -- bumped.
-    withHealthyBus ::
+    withHealthyHandle ::
          (forall x. IO x -> IO x)
       -> Word64
-      -> Bus
+      -> Handle.Handle
       -> IO (Either ManagedBusError a)
-    withHealthyBus unmask generation bus = do
+    withHealthyHandle unmask generation handle = do
       writeIORef lastUsedRef =<<
         getMonotonicTimeNSec
 
-      result :: Either SomeException (Either BusError a) <-
-        tryAsync (unmask (callback bus))
+      result :: Either SomeException (Either Handle.HandleError a) <-
+        tryAsync (unmask (callback handle))
 
       atomically (decrTCounter inFlightVar)
 
@@ -274,10 +272,10 @@ withBus
           blackholeIfConnected
             statusVar
             generation
-            (\bus ->
+            (\handle ->
               void . forkIO $ do
                 debug uuid generation ("thread died: " ++ show ex)
-                drainAndDisconnect inFlightVar bus
+                drainAndDisconnect inFlightVar handle
                 debug uuid generation "disconnected, reconnecting"
                 connect managedBus_ (generation+1))
 
@@ -287,10 +285,10 @@ withBus
           blackholeIfConnected
             statusVar
             generation
-            (\bus ->
+            (\handle ->
               void . forkIO $ do
                 debug uuid generation ("request failed: " ++ show err)
-                drainAndDisconnect inFlightVar bus
+                drainAndDisconnect inFlightVar handle
                 debug uuid generation "disconnected, reconnecting"
                 connect managedBus_ (generation+1))
 
@@ -305,7 +303,7 @@ withBus
                 _ ->
                   pure ()
 
-            pure (Left (fromBusError err))
+            pure (Left (fromHandleError err))
 
         Right (Right result) ->
           pure (Right result)
@@ -326,17 +324,17 @@ withBus
         <|>
         (readTVar statusVar >>= \case
           Status _ (Connected _ True) ->
-            pure (withBus managedBus timeout callback)
+            pure (withHandle managedBus timeout callback)
           Status _ Disconnected ->
-            pure (withBus managedBus timeout callback)
+            pure (withHandle managedBus timeout callback)
           _ ->
             retry)
 
-    fromBusError :: BusError -> ManagedBusError
-    fromBusError = \case
-      BusClosedError -> ManagedBusPipelineError
-      BusConnectionError err -> ManagedBusConnectionError err
-      BusDecodeError err -> ManagedBusDecodeError err
+    fromHandleError :: Handle.HandleError -> ManagedBusError
+    fromHandleError = \case
+      Handle.HandleClosedError -> ManagedBusPipelineError
+      Handle.HandleConnectionError err -> ManagedBusConnectionError err
+      Handle.HandleDecodeError err -> ManagedBusDecodeError err
 
 maybeConnect ::
      ManagedBus_
@@ -358,14 +356,14 @@ maybeConnect bus@(ManagedBus_ { statusVar, uuid }) expectedGen =
 blackholeIfConnected ::
      TVar Status
   -> Word64
-  -> (Bus -> IO ()) -- Action to call if we blackholed
+  -> (Handle.Handle -> IO ()) -- Action to call if we blackholed
   -> IO ()
 blackholeIfConnected statusVar expectedGen action =
   join . atomically $
     readTVar statusVar >>= \case
-      Status actualGen (Connected bus _) | actualGen == expectedGen -> do
+      Status actualGen (Connected handle _) | actualGen == expectedGen -> do
         writeTVar statusVar (Status actualGen Blackhole)
-        pure (action bus)
+        pure (action handle)
 
       _ ->
         pure (pure ())
@@ -390,35 +388,35 @@ connect
       -> NominalDiffTime
       -> IO ()
     connectLoop generation seconds =
-      Bus.connect endpoint receiveTimeout busHandlers >>= \case
+      Handle.connect endpoint receiveTimeout handleHandlers >>= \case
         Left err -> do
           void (tryAny (onConnectError handlers err))
           debug uuid generation (show err ++ ", reconnecting in " ++ show seconds)
           sleep seconds
           connectLoop generation (seconds * 1.5)
 
-        Right bus -> do
+        Right handle -> do
           debug uuid generation "connected, pinging until healthy"
-          pingLoop bus generation seconds
+          pingLoop handle generation seconds
 
-    pingLoop :: Bus -> Word64 -> NominalDiffTime -> IO ()
-    pingLoop bus generation seconds = do
-      Bus.ping bus >>= \case
+    pingLoop :: Handle.Handle -> Word64 -> NominalDiffTime -> IO ()
+    pingLoop handle generation seconds = do
+      Handle.ping handle >>= \case
         Left err -> do
           debug uuid generation $
             show err ++ ", reconnecting in " ++ show seconds
-          void (Bus.disconnect bus)
+          void (Handle.disconnect handle)
           sleep seconds
           connectLoop generation (seconds * 1.5)
 
         Right (Left err) -> do
           debug uuid generation (show err ++ ", pinging in " ++ show seconds)
           sleep seconds
-          pingLoop bus generation (seconds * 1.5)
+          pingLoop handle generation (seconds * 1.5)
 
         Right (Right _) -> do
           atomically
-            (writeTVar statusVar (Status generation (Connected bus True)))
+            (writeTVar statusVar (Status generation (Connected handle True)))
 
           when (healthCheckInterval > 0)
             (void (forkIO (monitorHealth managedBus generation)))
@@ -426,12 +424,12 @@ connect
           when (idleTimeout > 0)
             (void (forkIO (monitorUsage managedBus generation)))
 
-    busHandlers :: Bus.EventHandlers
-    busHandlers =
-      Bus.EventHandlers
-        { Bus.onSend = onSend handlers
-        , Bus.onReceive = onReceive handlers
-        , Bus.onConnectionError = onConnectionError handlers
+    handleHandlers :: Handle.EventHandlers
+    handleHandlers =
+      Handle.EventHandlers
+        { Handle.onSend = onSend handlers
+        , Handle.onReceive = onReceive handlers
+        , Handle.onError = mempty -- FIXME
         }
 
 monitorHealth ::
@@ -453,19 +451,19 @@ monitorHealth
 
       join . atomically $
         readTVar statusVar >>= \case
-          Status actualGen (Connected bus True) | actualGen == expectedGen -> do
+          Status actualGen (Connected handle True) | actualGen == expectedGen -> do
             incrTCounter inFlightVar
             pure $ do
-              result :: Either BusError (Either (Response 0) (Response 2)) <-
-                Bus.ping bus
+              result :: Either Handle.HandleError (Either (Response 0) (Response 2)) <-
+                Handle.ping handle
 
               atomically (decrTCounter inFlightVar)
 
               case result of
                 Left err ->
-                  blackholeIfConnected statusVar expectedGen $ \bus ->  do
+                  blackholeIfConnected statusVar expectedGen $ \handle ->  do
                     debug uuid expectedGen ("health check failed: " ++ show err)
-                    drainAndDisconnect inFlightVar bus
+                    drainAndDisconnect inFlightVar handle
                     debug uuid expectedGen "disconnected, reconnecting"
                     connect managedBus (expectedGen+1)
 
@@ -482,8 +480,8 @@ monitorHealth
     maybePingLoop err =
       join . atomically $
         readTVar statusVar >>= \case
-          Status actualGen (Connected bus True) | actualGen == expectedGen -> do
-            writeTVar statusVar (Status actualGen (Connected bus False))
+          Status actualGen (Connected handle True) | actualGen == expectedGen -> do
+            writeTVar statusVar (Status actualGen (Connected handle False))
 
             pure $ do
               debug uuid expectedGen $
@@ -499,20 +497,20 @@ monitorHealth
 
       join . atomically $
         readTVar statusVar >>= \case
-          Status actualGen (Connected bus False) | actualGen == expectedGen -> do
+          Status actualGen (Connected handle False) | actualGen == expectedGen -> do
             incrTCounter inFlightVar
 
             pure $ do
-              result :: Either BusError (Either (Response 0) (Response 2)) <-
-                Bus.ping bus
+              result :: Either Handle.HandleError (Either (Response 0) (Response 2)) <-
+                Handle.ping handle
 
               atomically (decrTCounter inFlightVar)
 
               case result of
                 Left err ->
-                  blackholeIfConnected statusVar expectedGen $ \bus -> do
+                  blackholeIfConnected statusVar expectedGen $ \handle -> do
                     debug uuid expectedGen ("ping failed: " ++ show err)
-                    drainAndDisconnect inFlightVar bus
+                    drainAndDisconnect inFlightVar handle
                     debug uuid expectedGen "disconnected, reconnecting"
                     connect managedBus (expectedGen+1)
 
@@ -531,8 +529,8 @@ monitorHealth
     maybeMonitorLoop =
       join . atomically $
         readTVar statusVar >>= \case
-          Status actualGen (Connected bus False) | actualGen == expectedGen -> do
-            writeTVar statusVar (Status actualGen (Connected bus True))
+          Status actualGen (Connected handle False) | actualGen == expectedGen -> do
+            writeTVar statusVar (Status actualGen (Connected handle True))
 
             pure $ do
               debug uuid expectedGen "healthy"
@@ -580,9 +578,9 @@ monitorUsage
 
           if now - lastUsed > fromIntegral (idleTimeout * 1000)
             then
-              blackholeIfConnected statusVar expectedGen $ \bus -> do
+              blackholeIfConnected statusVar expectedGen $ \handle -> do
                 debug uuid expectedGen "idle timeout"
-                drainAndDisconnect inFlightVar bus
+                drainAndDisconnect inFlightVar handle
                 debug uuid expectedGen "disconnected"
                 atomically
                   (writeTVar statusVar (Status (expectedGen+1) Disconnected))
@@ -609,15 +607,15 @@ monitorUsage
 
 drainAndDisconnect ::
      TCounter
-  -> Bus
+  -> Handle.Handle
   -> IO ()
-drainAndDisconnect inFlightVar bus = do
+drainAndDisconnect inFlightVar handle = do
   atomically $
     readTCounter inFlightVar >>= \case
       0 -> pure ()
       _ -> retry
 
-  void (Bus.disconnect bus)
+  void (Handle.disconnect handle)
 
 debug :: Int -> Word64 -> [Char] -> IO ()
 debug uuid gen msg =

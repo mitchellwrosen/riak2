@@ -69,11 +69,6 @@ description:
   * "Riak.Error"
   * "Riak.Quorum"
 
-flag chaos
-  description: Chaos monkey
-  manual: True
-  default: False
-
 flag debug
   description: Print debug statements
   manual: True
@@ -148,13 +143,6 @@ library riak2-internal
     unordered-containers ^>= 0.2.9,
     vector,
 
-  if flag(chaos)
-    build-depends:
-      random,
-
-  if flag(chaos)
-    cpp-options: -DCHAOS
-
   if flag(debug)
     cpp-options: -DDEBUG
 
@@ -202,7 +190,6 @@ library riak2-internal
     RiakBucketProperties
     RiakBucketType
     RiakBucketTypeInternal
-    RiakBus
     RiakBusPool
     RiakContent
     RiakContext

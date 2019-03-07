@@ -15,7 +15,9 @@ library
     primitive,
     proto-lens ^>= 0.4.0,
     riak-protobuf ^>= 1.0.0,
+    safe-exceptions,
     sockets ^>= 0.3.0,
+    stm,
 
   default-extensions:
     BangPatterns
@@ -32,6 +34,7 @@ library
     LambdaCase
     OverloadedLabels
     NamedFieldPuns
+    RankNTypes
     ScopedTypeVariables
     StandaloneDeriving
     StrictData

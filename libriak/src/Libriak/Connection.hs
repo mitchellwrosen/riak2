@@ -49,8 +49,6 @@ data Connection
   , sendBuffer :: MutableByteArray RealWorld
     -- ^ Fixed-size send buffer. Used during a send as a scrap buffer to fill up
     -- and send out. Not useful between sends.
-  , receiveTimeout :: Int
-    -- ^ Number of microseconds to wait before giving up on a receive.
   }
 
 data ConnectionError :: Type where
@@ -71,11 +69,10 @@ data ConnectionError :: Type where
 -- TODO interruptible connect
 withConnection ::
      Endpoint
-  -> Int -- ^ Receive timeout (microseconds)
   -> (Either CloseException () -> a -> IO b)
   -> (Connection -> IO a)
   -> IO (Either (ConnectException 'Uninterruptible) b)
-withConnection endpoint receiveTimeout onTeardown onSuccess =
+withConnection endpoint onTeardown onSuccess =
   Socket.withConnection endpoint onTeardown $ \connection -> do
     sendBuffer :: MutableByteArray RealWorld <-
       newByteArray gSendBufferSize
@@ -83,7 +80,6 @@ withConnection endpoint receiveTimeout onTeardown onSuccess =
     onSuccess Connection
       { connection = connection
       , sendBuffer = sendBuffer
-      , receiveTimeout = receiveTimeout
       }
 
 -- | Acquire a connection.
@@ -91,9 +87,8 @@ withConnection endpoint receiveTimeout onTeardown onSuccess =
 -- /Throws/. This function will never throw an exception.
 connect ::
      Endpoint
-  -> Int -- ^ Receive timeout (microseconds)
   -> IO (Either (ConnectException 'Uninterruptible) Connection)
-connect endpoint receiveTimeout =
+connect endpoint =
   Socket.connect endpoint >>= \case
     Left err ->
       pure (Left err)
@@ -105,7 +100,6 @@ connect endpoint receiveTimeout =
       pure (Right Connection
         { connection = connection
         , sendBuffer = sendBuffer
-        , receiveTimeout = receiveTimeout
         })
 
 disconnect ::
@@ -245,14 +239,17 @@ sendall Connection { sendBuffer, connection } =
 -- TODO benchmark receive
 receive ::
      Connection
+  -> Int -- ^ Timeout (microseconds)
   -> IO (Either ConnectionError EncodedResponse)
-receive =
-  fmap (bimap fromReceiveException coerce) . receive_
+receive connection timeout =
+  bimap fromReceiveException coerce <$>
+    receive_ connection timeout
 
 receive_ ::
      Connection
+  -> Int
   -> IO (Either (ReceiveException 'Interruptible) ByteArray)
-receive_ Connection { connection, receiveTimeout } = do
+receive_ Connection { connection } receiveTimeout = do
   timeoutVar :: TVar Bool <-
     registerDelay receiveTimeout
 
