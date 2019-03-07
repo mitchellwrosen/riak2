@@ -53,6 +53,14 @@ instance Default PutIndexOpts where
 
 
 -- | Get a Solr index.
+--
+-- +----------------------------------+----------------------------------------+
+-- | Error                            | Meaning                                |
+-- +==================================+========================================+
+-- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
+-- |                                  | or the search service is temporarily   |
+-- |                                  | unavailable.                           |
+-- +----------------------------------+----------------------------------------+
 getIndex ::
      MonadIO m
   => Handle -- ^
@@ -81,6 +89,14 @@ parseGetIndexError err
       Left (UnknownError (decodeUtf8 err))
 
 -- | Get all Solr indexes.
+--
+-- +----------------------------------+----------------------------------------+
+-- | Error                            | Meaning                                |
+-- +==================================+========================================+
+-- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
+-- |                                  | or the search service is temporarily   |
+-- |                                  | unavailable.                           |
+-- +----------------------------------+----------------------------------------+
 getIndexes ::
      MonadIO m
   => Handle -- ^
@@ -105,7 +121,29 @@ parseGetIndexesError err
 
 -- | Put a Solr index.
 --
--- /See also/: 'Riak.Schema.defaultSchema'
+-- +----------------------------------+----------------------------------------+
+-- | Error                            | Meaning                                |
+-- +==================================+========================================+
+-- | 'IndexHasAssociatedBucketsError' | A put was attempted that would change  |
+-- |                                  | options of an existing index. Rather   |
+-- |                                  | than silently ignore the request as    |
+-- |                                  | Riak would, this library attempts to   |
+-- |                                  | delete and recreate the index.         |
+-- |                                  | However, an index may only be deleted  |
+-- |                                  | if it is not associated with any       |
+-- |                                  | buckets. The buckets must first each   |
+-- |                                  | be unassociated using                  |
+-- |                                  | 'Riak.Bucket.unsetSearchIndex'.        |
+-- +----------------------------------+----------------------------------------+
+-- | 'SchemaDoesNotExistError'        | The schema does not exist. You must    |
+-- |                                  | first create it with                   |
+-- |                                  | 'Riak.Schema.putSchema', or use the    |
+-- |                                  | 'Riak.Schema.defaultSchema'.           |
+-- +----------------------------------+----------------------------------------+
+-- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
+-- |                                  | or the search service is temporarily   |
+-- |                                  | unavailable.                           |
+-- +----------------------------------+----------------------------------------+
 putIndex ::
      MonadIO m
   => Handle -- ^
@@ -199,6 +237,19 @@ parsePutIndexError err
       UnknownError (decodeUtf8 err)
 
 -- | Delete a Solr index. Returns whether or not there was an index to delete.
+--
+-- +----------------------------------+----------------------------------------+
+-- | Error                            | Meaning                                |
+-- +==================================+========================================+
+-- | 'IndexHasAssociatedBucketsError' | A delete was attempted on an index     |
+-- |                                  | with associated buckets. The buckets   |
+-- |                                  | must first each be unassociated using  |
+-- |                                  | 'Riak.Bucket.unsetBucketIndex'.        |
+-- +----------------------------------+----------------------------------------+
+-- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
+-- |                                  | or the search service is temporarily   |
+-- |                                  | unavailable.                           |
+-- +----------------------------------+----------------------------------------+
 deleteIndex ::
      MonadIO m
   => Handle -- ^

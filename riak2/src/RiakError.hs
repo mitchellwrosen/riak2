@@ -42,6 +42,7 @@ data Error :: Op -> Type where
     => !IndexName
     -> Error op
 
+  -- | The index is associated with buckets.
   IndexHasAssociatedBucketsError ::
        MayReturnIndexHasAssociatedBuckets op ~ 'True
     => !IndexName
@@ -184,6 +185,7 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'SetBucketTypeIndexOp = 'True
   MayReturnInvalidNodes _ = 'False
 
+-- | @overload@
 type family MayReturnOverload (op :: Op) :: Bool where
   MayReturnOverload 'DeleteOp = 'True
   MayReturnOverload 'GetOp = 'True
