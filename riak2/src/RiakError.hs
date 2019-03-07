@@ -312,12 +312,6 @@ isNotfound :: ByteString -> Bool
 isNotfound =
   (== "notfound")
 
-isMapFieldDoesNotExistError :: ByteString -> Maybe ByteString
-isMapFieldDoesNotExistError bytes0 = do
-  bytes1 <- ByteString.stripPrefix "{precondition,{not_present," bytes0
-  -- At least give back an error with balanced { }
-  ByteString.stripSuffix "}}" bytes1
-
 isOverloadError :: ByteString -> Bool
 isOverloadError =
   (== "overload")
