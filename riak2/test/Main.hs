@@ -6,6 +6,7 @@ import Libriak.Connection      (Endpoint(..))
 import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
 import RiakBucket              (Bucket(..), queryBinaryIndex, queryIntIndex,
                                 setBucketIndex)
+import RiakBucketType          (defaultBucketType)
 import RiakContent             (Content, newContent)
 import RiakContext             (newContext)
 import RiakError               (Error(..))
@@ -68,12 +69,9 @@ main = do
             10
         , handlers =
             mempty
-            -- EventHandlers
-            --   { onSend = \req -> putStrLn (">>> " ++ show req)
-            --   , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
-            --   , onConnectError = print
-            --   , onConnectionError = print
-            --   }
+              { onSend = \req -> putStrLn (">>> " ++ show req)
+              , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
+              }
         }
 
 integrationTests :: Handle -> [TestTree]
@@ -152,7 +150,7 @@ riakBucketTests handle =
 
   , testGroup "setBucketIndex"
     [ testCase "success" $ do
-        bucket <- Bucket "default" <$> randomByteString 32
+        bucket <- randomDefaultBucket
         setBucketIndex handle bucket index3 `shouldReturn`
           Right ()
 
@@ -164,13 +162,13 @@ riakBucketTests handle =
             Left (BucketTypeDoesNotExistError bucketType)
 
       , testCase "index does not exist" $ do
-          bucket <- Bucket "default" <$> randomByteString 32
+          bucket <- randomDefaultBucket
           index <- unsafeMakeIndexName <$> randomText 32
           setBucketIndex handle bucket index `shouldReturn`
             Left (IndexDoesNotExistError index)
 
       , testCase "invalid n_val" $ do
-          bucket <- Bucket "default" <$> randomByteString 32
+          bucket <- randomDefaultBucket
           setBucketIndex handle bucket index1 `shouldReturn`
             Left InvalidNodesError
       ]
@@ -203,10 +201,12 @@ riakIndexTests handle =
       [ testCase "delete index with associated buckets" $ do
           index <- randomIndexName
           putIndex handle index defaultSchema def `shouldReturn` Right ()
-          bucket <- randomObjectBucket
-          setBucketIndex handle bucket index `shouldReturn` Right ()
+          bucket1 <- randomDefaultBucket
+          bucket2 <- randomObjectBucket
+          setBucketIndex handle bucket1 index `shouldReturn` Right ()
+          setBucketIndex handle bucket2 index `shouldReturn` Right ()
           deleteIndex handle index `shouldReturn`
-            Left (IndexHasAssociatedBucketsError index [bucket])
+            Left (IndexHasAssociatedBucketsError index [bucket1, bucket2])
       ]
     ]
   ]
@@ -521,6 +521,11 @@ index3 =
 randomByteString :: Int -> IO ByteString
 randomByteString n =
   Latin1.pack <$> replicateM n (randomRIO ('a', 'z'))
+
+randomDefaultBucket :: IO Bucket
+randomDefaultBucket =
+  Bucket defaultBucketType
+    <$> randomByteString 32
 
 randomIndexName :: IO IndexName
 randomIndexName =
