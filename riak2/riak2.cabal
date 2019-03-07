@@ -201,6 +201,7 @@ library riak2-internal
     RiakBucket
     RiakBucketProperties
     RiakBucketType
+    RiakBucketTypeInternal
     RiakBus
     RiakBusPool
     RiakContent
@@ -279,7 +280,8 @@ test-suite tests
     random,
     riak2-internal,
     tasty,
-    tasty-hunit
+    tasty-hunit,
+    text,
 
   default-extensions:
     DataKinds

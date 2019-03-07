@@ -51,6 +51,8 @@
 --   If we idly time out,
 --     ==> [Disconnected]
 --
+--     TODO Should't reject requests while disconnecting tue to idle timeout
+--
 -- [Reconnecting]
 --   We intend to disconnect, then reconnect.
 --
@@ -273,9 +275,9 @@ withBus
             generation
             (\bus ->
               void . forkIO $ do
-                debug uuid generation $
-                  "thread died: " ++ show ex ++ ", reconnecting"
+                debug uuid generation ("thread died: " ++ show ex)
                 drainAndDisconnect inFlightVar bus
+                debug uuid generation "disconnected, reconnecting"
                 connect managedBus_ (generation+1))
 
           throwIO ex
@@ -286,9 +288,9 @@ withBus
             generation
             (\bus ->
               void . forkIO $ do
-                debug uuid generation $
-                  "request failed: " ++ show err ++ ", reconnecting"
+                debug uuid generation ("request failed: " ++ show err)
                 drainAndDisconnect inFlightVar bus
+                debug uuid generation "disconnected, reconnecting"
                 connect managedBus_ (generation+1))
 
           unmask $ do
@@ -323,6 +325,8 @@ withBus
         <|>
         (readTVar statusVar >>= \case
           Status _ (Connected _ True) ->
+            pure (withBus managedBus timeout callback)
+          Status _ Disconnected ->
             pure (withBus managedBus timeout callback)
           _ ->
             retry)
@@ -459,9 +463,9 @@ monitorHealth
               case result of
                 Left err ->
                   blackholeIfConnected statusVar expectedGen $ \bus ->  do
-                    debug uuid expectedGen $
-                      "health check failed: " ++ show err ++ ", reconnecting"
+                    debug uuid expectedGen ("health check failed: " ++ show err)
                     drainAndDisconnect inFlightVar bus
+                    debug uuid expectedGen "disconnected, reconnecting"
                     connect managedBus (expectedGen+1)
 
                 Right (Left err) -> do
@@ -506,9 +510,9 @@ monitorHealth
               case result of
                 Left err ->
                   blackholeIfConnected statusVar expectedGen $ \bus -> do
-                    debug uuid expectedGen $
-                      "ping failed: " ++ show err ++ ", reconnecting"
+                    debug uuid expectedGen ("ping failed: " ++ show err)
                     drainAndDisconnect inFlightVar bus
+                    debug uuid expectedGen "disconnected, reconnecting"
                     connect managedBus (expectedGen+1)
 
                 Right (Left err) -> do
@@ -578,6 +582,7 @@ monitorUsage
               blackholeIfConnected statusVar expectedGen $ \bus -> do
                 debug uuid expectedGen "idle timeout"
                 drainAndDisconnect inFlightVar bus
+                debug uuid expectedGen "disconnected"
                 atomically
                   (writeTVar statusVar (Status (expectedGen+1) Disconnected))
             else

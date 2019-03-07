@@ -1,11 +1,14 @@
 module RiakError where
 
-import RiakBucketInternal (Bucket)
-import RiakIndexName      (IndexName)
+import RiakBucketInternal     (Bucket(..))
+import RiakBucketTypeInternal (defaultBucketType)
+import RiakIndexName          (IndexName)
 
 import qualified RiakHandle as Handle (HandleError)
 
-import qualified Data.ByteString as ByteString
+import qualified Data.Attoparsec.ByteString       as Atto (Parser)
+import qualified Data.Attoparsec.ByteString.Char8 as Atto
+import qualified Data.ByteString                  as ByteString
 
 
 -- TODO "Key cannot be zero-length" when putting with empty key
@@ -37,6 +40,12 @@ data Error :: Op -> Type where
   IndexDoesNotExistError ::
        MayReturnIndexDoesNotExist op ~ 'True
     => !IndexName
+    -> Error op
+
+  IndexHasAssociatedBucketsError ::
+       MayReturnIndexHasAssociatedBuckets op ~ 'True
+    => !IndexName
+    -> [Bucket]
     -> Error op
 
   -- | Insufficient nodes are available to service the request.
@@ -157,6 +166,11 @@ type family MayReturnIndexDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 
+type family MayReturnIndexHasAssociatedBuckets  (op :: Op) :: Bool where
+  MayReturnIndexHasAssociatedBuckets 'DeleteIndexOp = 'True
+  MayReturnIndexHasAssociatedBuckets 'PutIndexOp = 'True
+  MayReturnIndexHasAssociatedBuckets _ = 'False
+
 type family MayReturnInsufficientNodes (op :: Op) :: Bool where
   MayReturnInsufficientNodes 'SecondaryIndexQueryOp = 'True
   MayReturnInsufficientNodes _ = 'False
@@ -210,10 +224,66 @@ isBucketTypeDoesNotExistError4 :: ByteString -> Bool
 isBucketTypeDoesNotExistError4 =
   ByteString.isPrefixOf "No bucket-type named '"
 
+-- Can't delete index with associate buckets [{<<\"objects\">>,<<\"foo\">>},\n    {<<\"objects\">>,<<\"bar\">>}]
+isHasAssociatedBucketsError :: ByteString -> Maybe [Bucket]
+isHasAssociatedBucketsError err = do
+  bytes :: ByteString <-
+    ByteString.stripPrefix "Can't delete index with associate buckets" err
+
+  case Atto.parseOnly bucketsParser bytes of
+    Left _ ->
+      Nothing
+
+    Right buckets ->
+      Just buckets
+
+  where
+    bucketsParser :: Atto.Parser [Bucket]
+    bucketsParser = do
+      Atto.skipSpace
+      Atto.char '[' *> Atto.skipSpace
+
+      buckets :: [Bucket] <-
+        Atto.sepBy1'
+          bucketOrBucketTypeParser
+          (Atto.char ',' *> Atto.skipSpace)
+
+      Atto.char ']' *> Atto.skipSpace
+      Atto.endOfInput
+      pure buckets
+
+    bucketOrBucketTypeParser :: Atto.Parser Bucket
+    bucketOrBucketTypeParser =
+      bucketTypeParser <|> bucketParser
+
+    bucketTypeParser :: Atto.Parser Bucket
+    bucketTypeParser = do
+      Atto.char '{' *> Atto.skipSpace
+      bucketType <- binaryParser
+      Atto.char ',' *> Atto.skipSpace
+      bucket <- binaryParser
+      Atto.char '}' $> Bucket bucketType bucket
+
+    bucketParser :: Atto.Parser Bucket
+    bucketParser =
+      Bucket defaultBucketType <$>
+        binaryParser
+
+    binaryParser :: Atto.Parser ByteString
+    binaryParser = do
+      _      <- Atto.char '<'
+      _      <- Atto.char '<'
+      _      <- Atto.char '"'
+      bucket <- Atto.takeWhile (/= '"')
+      _      <- Atto.char '"'
+      _      <- Atto.char '>'
+      _      <- Atto.char '>'
+      Atto.skipSpace $> bucket
+
 -- Invalid bucket properties: [{search_index,<<"foo does not exist">>}]
 isIndexDoesNotExistError0 :: ByteString -> Bool
 isIndexDoesNotExistError0 msg =
-  ByteString.isPrefixOf "Invalid bucket properties: [{search_index,<<\"" msg &&
+  ByteString.isPrefixOf "Invalid bucket properties: [{search_index," msg &&
     ByteString.isSuffixOf " does not exist\">>}]" msg
 
 -- No index <<"foo">> found.

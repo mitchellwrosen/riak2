@@ -4,20 +4,23 @@ module Main where
 
 import Libriak.Connection      (Endpoint(..))
 import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
-import RiakBucket              (Bucket(..), queryBinaryIndex, queryIntIndex)
+import RiakBucket              (Bucket(..), queryBinaryIndex, queryIntIndex,
+                                setBucketIndex)
 import RiakContent             (Content, newContent)
 import RiakContext             (newContext)
 import RiakError               (Error(..))
 import RiakGetOpts             (GetOpts(..))
 import RiakHandle              (EventHandlers(..), Handle, HandleConfig(..),
                                 HandleError, createHandle)
-import RiakIndexName           (unsafeMakeIndexName)
+import RiakIndex               (Index, deleteIndex, putIndex)
+import RiakIndexName           (IndexName, unsafeMakeIndexName)
 import RiakIntIndexQuery       (IntIndexQuery(..))
 import RiakKey                 (Key(..), generatedKey, keyBucket)
 import RiakObject              (Object(..), delete, get, getHead, getIfModified,
                                 newObject, put, putGet, putGetHead)
 import RiakPing                (ping)
 import RiakPutOpts             (PutOpts(..))
+import RiakSchema              (defaultSchema)
 import RiakSecondaryIndex      (SecondaryIndex(..))
 import RiakSecondaryIndexValue (SecondaryIndexValue(..))
 import RiakServerInfo          (ServerInfo(..), getServerInfo)
@@ -30,6 +33,7 @@ import Data.Default.Class    (def)
 import Data.Either           (isRight)
 import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
+import Data.Text             (Text)
 import Net.IPv4              (ipv4)
 import System.Exit           (exitFailure)
 import System.Random         (randomRIO)
@@ -38,6 +42,7 @@ import Test.Tasty.HUnit
 
 import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.Text             as Text
 
 main :: IO ()
 main = do
@@ -58,20 +63,23 @@ main = do
         , healthCheckInterval =
             1
         , idleTimeout =
-            1
+            30
         , requestTimeout =
-            1
+            10
         , handlers =
             mempty
             -- EventHandlers
             --   { onSend = \req -> putStrLn (">>> " ++ show req)
             --   , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
+            --   , onConnectError = print
+            --   , onConnectionError = print
             --   }
         }
 
 integrationTests :: Handle -> [TestTree]
 integrationTests handle =
   [ testGroup "RiakBucket" (riakBucketTests handle)
+  , testGroup "RiakIndex" (riakIndexTests handle)
   , testGroup "RiakObject" (riakObjectTests handle)
   , testGroup "RiakPing" (riakPingTests handle)
   , testGroup "RiakServerInfo" (riakServerInfoTests handle)
@@ -79,29 +87,11 @@ integrationTests handle =
 
 riakBucketTests :: Handle -> [TestTree]
 riakBucketTests handle =
-  [ testGroup "exact query"
-    [ testCase "empty index" $ do
-        bucket <- randomObjectBucket
-        idx <- randomByteString 32
-        queryIntIndex
-          handle
-          (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
-          (Foldl.generalize Foldl.length)
-          `shouldReturn` Right 0
+  [ testGroup "getBucket" [ ]
+  , testGroup "listKeys" [ ]
 
-    , testCase "int index" $ do
-        object <- randomObject
-        let bucket = object ^. field @"key" . keyBucket
-        idx <- randomByteString 32
-        let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Integer 1)]
-        put handle object' def `shouldReturnSatisfy` isRight
-        queryIntIndex
-          handle
-          (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
-          (Foldl.generalize Foldl.length)
-          `shouldReturn` Right 1
-
-    , testCase "bin index" $ do
+  , testGroup "queryBinaryIndex"
+    [ testCase "one-elem index" $ do
         object <- randomObject
         let bucket = object ^. field @"key" . keyBucket
         idx <- randomByteString 32
@@ -116,15 +106,109 @@ riakBucketTests handle =
     , testCase "in bucket" $ do
         let n = 10
         bucket <- randomObjectBucket
-        replicateM_ n $ do
-          put handle (newObject (generatedKey bucket) (newContent "")) def
+        let object = newObject (generatedKey bucket) (newContent "")
+        replicateM_ n $
+          put handle object def `shouldReturnSatisfy` isRight
         queryBinaryIndex
           handle
           (inBucket bucket)
           (Foldl.generalize Foldl.length)
           `shouldReturn` Right n
+    , testGroup "failures"
+      [ ]
     ]
 
+  , testGroup "queryBinaryIndexTerms" [ ]
+
+  , testGroup "queryIntIndex"
+    [ testCase "empty index" $ do
+        bucket <- randomObjectBucket
+        idx <- randomByteString 32
+        queryIntIndex
+          handle
+          (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 0
+
+    , testCase "one-elem index" $ do
+        object <- randomObject
+        let bucket = object ^. field @"key" . keyBucket
+        idx <- randomByteString 32
+        let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Integer 1)]
+        put handle object' def `shouldReturnSatisfy` isRight
+        queryIntIndex
+          handle
+          (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 1
+
+    , testGroup "failures"
+      [ ]
+    ]
+
+  , testGroup "queryIntIndexTerms" [ ]
+
+  , testGroup "resetBucket" [ ]
+
+  , testGroup "setBucketIndex"
+    [ testCase "success" $ do
+        bucket <- Bucket "default" <$> randomByteString 32
+        setBucketIndex handle bucket index3 `shouldReturn`
+          Right ()
+
+    , testGroup "failures"
+      [ testCase "bucket type does not exist" $ do
+          bucket@(Bucket bucketType _) <-
+            Bucket <$> randomByteString 32 <*> randomByteString 32
+          setBucketIndex handle bucket index3 `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+
+      , testCase "index does not exist" $ do
+          bucket <- Bucket "default" <$> randomByteString 32
+          index <- unsafeMakeIndexName <$> randomText 32
+          setBucketIndex handle bucket index `shouldReturn`
+            Left (IndexDoesNotExistError index)
+
+      , testCase "invalid n_val" $ do
+          bucket <- Bucket "default" <$> randomByteString 32
+          setBucketIndex handle bucket index1 `shouldReturn`
+            Left InvalidNodesError
+      ]
+    ]
+
+  , testGroup "streamKeys" [ ]
+
+  , testGroup "unsetBucketIndex" [ ]
+  ]
+
+riakIndexTests :: Handle -> [TestTree]
+riakIndexTests handle =
+  [ testGroup "getIndex" []
+
+  , testGroup "getIndexes" []
+
+  , testGroup "putIndex" []
+
+  , testGroup "deleteIndex"
+    [ testCase "success" $ do
+        index <- randomIndexName
+        putIndex handle index defaultSchema def `shouldReturn` Right ()
+        deleteIndex handle index `shouldReturn` Right True
+
+    , testCase "delete nothing" $ do
+        index <- randomIndexName
+        deleteIndex handle index `shouldReturn` Right False
+
+    , testGroup "failures"
+      [ testCase "delete index with associated buckets" $ do
+          index <- randomIndexName
+          putIndex handle index defaultSchema def `shouldReturn` Right ()
+          bucket <- randomObjectBucket
+          setBucketIndex handle bucket index `shouldReturn` Right ()
+          deleteIndex handle index `shouldReturn`
+            Left (IndexHasAssociatedBucketsError index [bucket])
+      ]
+    ]
   ]
 
 riakObjectTests :: Handle -> [TestTree]
@@ -145,46 +229,52 @@ riakObjectTests handle =
               (object ^. field @"content" . field @"value")
           result -> assertFailure (show result)
 
-    , testCase "bucket type not found" $ do
-        bucketType <- randomByteString 32
-        bucket <- randomByteString 32
-        key <- randomByteString 32
-        get handle (Key bucketType bucket key) def `shouldReturn`
-          Left (BucketTypeDoesNotExistError bucketType)
+    , testGroup "failures"
+      [ testCase "bucket type not found" $ do
+          bucketType <- randomByteString 32
+          bucket <- randomByteString 32
+          key <- randomByteString 32
+          get handle (Key bucketType bucket key) def `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
 
-    , testCase "invalid nval" $ do
-        key <- randomObjectKey
-        get handle key (def { nodes = Just 4 }) `shouldReturn`
-          Left InvalidNodesError
+      , testCase "invalid nval" $ do
+          key <- randomObjectKey
+          get handle key (def { nodes = Just 4 }) `shouldReturn`
+            Left InvalidNodesError
+      ]
 
-    , testCase "head 404" $ do
-        key <- randomObjectKey
-        getHead handle key def >>= \case
-          Right Object { content = [] } -> pure ()
-          result -> assertFailure (show result)
+    , testGroup "getHead"
+      [ testCase "404" $ do
+          key <- randomObjectKey
+          getHead handle key def >>= \case
+            Right Object { content = [] } -> pure ()
+            result -> assertFailure (show result)
 
-    , testCase "head success" $ do
-        object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        getHead handle (object ^. field @"key") def `shouldReturnSatisfy` isRight
+      , testCase "success" $ do
+          object <- randomObject
+          put handle object def `shouldReturnSatisfy` isRight
+          getHead handle (object ^. field @"key") def `shouldReturnSatisfy` isRight
+      ]
 
-    , testCase "if modified (not modified)" $ do
-        object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        get handle (object ^. field @"key") def >>= \case
-          Right object -> do
-            getIfModified handle object def `shouldReturnSatisfy` isRightNothing
-          result -> assertFailure (show result)
+    , testGroup "getIfModified"
+      [ testCase "if modified (not modified)" $ do
+          object <- randomObject
+          put handle object def `shouldReturnSatisfy` isRight
+          get handle (object ^. field @"key") def >>= \case
+            Right object -> do
+              getIfModified handle object def `shouldReturnSatisfy` isRightNothing
+            result -> assertFailure (show result)
 
-    , testCase "if modified (modified)" $ do
-        object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        get handle (object ^. field @"key") def >>= \case
-          Right object@(Object { content = [Sibling content] }) -> do
-            let object' = object & field @"content" .~ content
-            _ <- put handle object' def
-            getIfModified handle object' def `shouldReturnSatisfy` isRightJust
-          result -> assertFailure (show result)
+      , testCase "if modified (modified)" $ do
+          object <- randomObject
+          put handle object def `shouldReturnSatisfy` isRight
+          get handle (object ^. field @"key") def >>= \case
+            Right object@(Object { content = [Sibling content] }) -> do
+              let object' = object & field @"content" .~ content
+              _ <- put handle object' def
+              getIfModified handle object' def `shouldReturnSatisfy` isRightJust
+            result -> assertFailure (show result)
+      ]
     ]
 
   , testGroup "put"
@@ -206,27 +296,31 @@ riakObjectTests handle =
         let object = newObject key (newContent "")
         put handle object (def { nodes = Just 4 }) `shouldReturn`
           Left InvalidNodesError
+    ]
 
-    , testCase "return body" $ do
+  , testGroup "putGet"
+    [ testCase "success" $ do
         object <- randomObject
         putGet handle object def >>= \case
           Right Object { content = _:|[] } -> pure ()
           result -> assertFailure (show result)
 
-    , testCase "return body (siblings)" $ do
+    , testCase "siblings" $ do
         object <- randomObject
         put handle object def `shouldReturnSatisfy` isRight
         putGet handle object def >>= \case
           Right Object { content = _:|[_] } -> pure ()
           result -> assertFailure (show result)
+    ]
 
-    , testCase "return head" $ do
+  , testGroup "putGetHead"
+    [ testCase "success" $ do
         object  <- randomObject
         putGetHead handle object def >>= \case
           Right Object { content = _:|[] } -> pure ()
           result -> assertFailure (show result)
 
-    , testCase "return head (siblings)" $ do
+    , testCase "siblings" $ do
         object <- randomObject
         put handle object def `shouldReturnSatisfy` isRight
         putGetHead handle object def >>= \case
@@ -263,8 +357,10 @@ riakPingTests handle =
 
 riakServerInfoTests :: Handle -> [TestTree]
 riakServerInfoTests handle =
-  [ testCase "getServerInfo" $ do
-      getServerInfo handle `shouldReturnSatisfy` isRight
+  [ testGroup "getServerInfo"
+    [ testCase "success" $ do
+        getServerInfo handle `shouldReturnSatisfy` isRight
+    ]
   ]
 
 --   , testCase "exact int query" $ do
@@ -414,12 +510,28 @@ riakServerInfoTests handle =
 -- randomKeyNameString :: IO [Char]
 -- randomKeyNameString = randomBucketNameString
 
--- randomText :: IO Text
--- randomText = Text.pack <$> replicateM 32 (randomRIO ('a', 'z'))
+index1 :: IndexName
+index1 =
+  unsafeMakeIndexName "default1"
+
+index3 :: IndexName
+index3 =
+  unsafeMakeIndexName "default3"
 
 randomByteString :: Int -> IO ByteString
 randomByteString n =
   Latin1.pack <$> replicateM n (randomRIO ('a', 'z'))
+
+randomIndexName :: IO IndexName
+randomIndexName =
+  unsafeMakeIndexName <$> randomText 32
+
+randomObject :: IO (Object (Content ByteString))
+randomObject = do
+  bucket <- randomByteString 32
+  key <- randomByteString 32
+  value <- randomByteString 6
+  pure (newObject (Key "objects" bucket key) (newContent value))
 
 randomObjectBucket :: IO Bucket
 randomObjectBucket =
@@ -432,12 +544,9 @@ randomObjectKey =
     <$> randomByteString 32
     <*> randomByteString 32
 
-randomObject :: IO (Object (Content ByteString))
-randomObject = do
-  bucket <- randomByteString 32
-  key <- randomByteString 32
-  value <- randomByteString 6
-  pure (newObject (Key "objects" bucket key) (newContent value))
+randomText :: Int -> IO Text
+randomText n =
+  Text.pack <$> replicateM n (randomRIO ('a', 'z'))
 
 -- randomObjectKeyIn :: ByteString -> IO RiakKey
 -- randomObjectKeyIn bucket = do

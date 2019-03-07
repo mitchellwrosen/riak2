@@ -1,12 +1,21 @@
-module RiakBucketType where
+module RiakBucketType
+  ( BucketType
+  , defaultBucketType
+  , getBucketType
+  , setBucketTypeIndex
+  , unsetBucketTypeIndex
+  , listBuckets
+  , streamBuckets
+  ) where
 
-import Libriak.Response     (Response(..))
-import RiakBucket           (Bucket(..))
-import RiakBucketProperties (BucketProperties)
+import Libriak.Response       (Response(..))
+import RiakBucket             (Bucket(..))
+import RiakBucketProperties   (BucketProperties)
+import RiakBucketTypeInternal (BucketType, defaultBucketType)
 import RiakError
-import RiakHandle           (Handle)
-import RiakIndexName        (IndexName(..))
-import RiakUtils            (retrying)
+import RiakHandle             (Handle)
+import RiakIndexName          (IndexName(..))
+import RiakUtils              (retrying)
 
 import qualified RiakBucketProperties as BucketProperties
 import qualified RiakHandle           as Handle
@@ -18,17 +27,6 @@ import Data.Text.Encoding (decodeUtf8, encodeUtf8)
 import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
-
--- | A bucket type.
---
--- /Note/: Must be UTF-8 encoded.
-type BucketType
-  = ByteString
-
--- | The default bucket type.
-defaultBucketType :: BucketType
-defaultBucketType =
-  "default"
 
 -- | Get bucket type properties.
 getBucketType ::

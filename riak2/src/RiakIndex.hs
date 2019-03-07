@@ -1,4 +1,11 @@
-module RiakIndex where
+module RiakIndex
+  ( Index(..)
+  , getIndex
+  , getIndexes
+  , putIndex
+  , PutIndexOpts(..)
+  , deleteIndex
+  ) where
 
 import Libriak.Response (Response(..))
 import RiakError
@@ -137,10 +144,7 @@ putIndex_ handle index schema nodes timeout = do
         then
           deleteIndex handle index >>= \case
             Left err ->
-              case err of
-                SearchNotEnabledError -> pure (Left SearchNotEnabledError)
-                HandleError err' -> pure (Left (HandleError err'))
-                UnknownError err' -> pure (Left (UnknownError err'))
+              pure (Left (fromDeleteIndexError err))
 
             Right _success ->
               doPutIndex
@@ -174,6 +178,17 @@ putIndex_ handle index schema nodes timeout = do
         Right (Right _) ->
           pure (Right ())
 
+    fromDeleteIndexError :: DeleteIndexError -> PutIndexError
+    fromDeleteIndexError = \case
+      HandleError err ->
+        HandleError err
+      IndexHasAssociatedBucketsError name buckets ->
+        IndexHasAssociatedBucketsError name buckets
+      SearchNotEnabledError ->
+        SearchNotEnabledError
+      UnknownError err ->
+        UnknownError err
+
 parsePutIndexError :: ByteString -> PutIndexError
 parsePutIndexError err
   | isSchemaDoesNotExistError err =
@@ -184,9 +199,6 @@ parsePutIndexError err
       UnknownError (decodeUtf8 err)
 
 -- | Delete a Solr index. Returns whether or not there was an index to delete.
---
--- TODO Parse this delete index error:
--- Can't delete index with associate buckets [{<<\"objects\">>,<<\"foo\">>},\n    {<<\"objects\">>,<<\"bar\">>}]
 deleteIndex ::
      MonadIO m
   => Handle -- ^
@@ -198,15 +210,18 @@ deleteIndex handle name = liftIO $
       pure (Left (HandleError err))
 
     Right (Left err) ->
-      pure (parseDeleteIndexError err)
+      pure (parseDeleteIndexError name err)
 
     Right (Right _) ->
       pure (Right True)
 
 parseDeleteIndexError ::
-     ByteString
+     IndexName
+  -> ByteString
   -> Either DeleteIndexError Bool
-parseDeleteIndexError err
+parseDeleteIndexError name err
+  | Just buckets <- isHasAssociatedBucketsError err =
+      Left (IndexHasAssociatedBucketsError name buckets)
   | isNotfound err =
       Right False
   | isUnknownMessageCode err =
