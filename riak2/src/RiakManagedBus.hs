@@ -68,7 +68,8 @@ module RiakManagedBus
   , stream
   ) where
 
-import Libriak.Connection (ConnectError, ConnectionError, Endpoint)
+import Libriak.Connection (ConnectException, ConnectionError, Endpoint,
+                           Interruptibility(..))
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakBus            (Bus, BusError(..))
@@ -143,7 +144,7 @@ data EventHandlers
     -- ^ Called just prior to sending a request.
   , onReceive :: !(forall code. Response code -> IO ())
     -- ^ Called just after receiving a response.
-  , onConnectError :: !(ConnectError -> IO ())
+  , onConnectError :: !(ConnectException 'Uninterruptible -> IO ())
   , onConnectionError :: !(ConnectionError -> IO ())
   }
 

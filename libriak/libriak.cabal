@@ -43,6 +43,7 @@ library
     Haskell2010
 
   exposed-modules:
+    Libriak.Handle
     Libriak.Connection
     Libriak.Request
     Libriak.Response
@@ -53,10 +54,6 @@ library
 
   hs-source-dirs:
     src
-
-  other-modules:
-    Libriak.Internal.Connection
-    Libriak.Internal.Utils
 
   reexported-modules:
     Data.Riak.Proto

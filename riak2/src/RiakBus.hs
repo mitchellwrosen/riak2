@@ -14,8 +14,9 @@ module RiakBus
   , BusError(..)
   ) where
 
-import Libriak.Connection (CloseException(..), ConnectError(..), Connection,
-                           ConnectionError(..), Endpoint(..))
+import Libriak.Connection (CloseException(..), ConnectException(..), Connection,
+                           ConnectionError(..), Endpoint(..),
+                           Interruptibility(..))
 import Libriak.Request    (Request(..), encodeRequest)
 import Libriak.Response   (DecodeError, Response(..), decodeResponse,
                            responseDone)
@@ -23,7 +24,7 @@ import Libriak.Response   (DecodeError, Response(..), decodeResponse,
 import qualified Libriak.Connection as Connection
 
 import Control.Concurrent.STM
-import Control.Exception.Safe (catchAsync, throwIO, uninterruptibleMask)
+import Control.Exception.Safe (catchAsync, throwIO)
 import Control.Foldl          (FoldM(..))
 import GHC.TypeLits           (KnownNat)
 
@@ -82,7 +83,7 @@ connect ::
      Endpoint
   -> Int -- ^ Receive timeout (microseconds)
   -> EventHandlers
-  -> IO (Either ConnectError Bus)
+  -> IO (Either (ConnectException 'Uninterruptible) Bus)
 connect endpoint receiveTimeout handlers =
   Connection.connect endpoint receiveTimeout >>= \case
     Left err ->
