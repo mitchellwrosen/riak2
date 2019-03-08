@@ -61,10 +61,34 @@
 
 module RiakManagedBus
   ( ManagedBus
-  , ManagedBusError(..)
+  , ManagedBusConfig(..)
   , EventHandlers(..)
+  , ManagedBusError(..)
   , createManagedBus
-  , exchange
+    -- * API
+  , delete
+  , deleteIndex
+  , get
+  , getBucket
+  , getBucketType
+  , getCrdt
+  , getIndex
+  , getSchema
+  , getServerInfo
+  -- , listBuckets
+  -- , listKeys
+  -- , mapReduce
+  , ping
+  , put
+  , putIndex
+  , putSchema
+  , resetBucket
+  , search
+  -- , secondaryIndex
+  , setBucket
+  , setBucketType
+  , updateCrdt
+
   , stream
   ) where
 
@@ -86,19 +110,25 @@ import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
 import GHC.TypeLits           (KnownNat)
 -- import System.Mem.Weak        (Weak, deRefWeak)
 
+import qualified Data.Riak.Proto as Proto
+
+-- TODO configure connecting wait time
+waitTimeout :: Int
+waitTimeout = 5*1000*1000
 
 data ManagedBus
   = ManagedBus
   { uuid :: !Int
   , endpoint :: !Endpoint
-  , healthCheckInterval :: !Int -- Microseconds
-  , idleTimeout :: !Int -- Microseconds
-  , receiveTimeout :: !Int -- Microseconds
+  , healthCheckInterval :: !Int
+  , idleTimeout :: !Int
+  , receiveTimeout :: !Int
+  , handlers :: !EventHandlers
+
   , statusVar :: !(TVar Status)
   , inFlightVar :: !TCounter
   , lastUsedRef :: !(IORef Word64)
     -- ^ The last time the bus was used.
-  , handlers :: !EventHandlers
   , aliveRef :: !(IORef ())
     -- ^ Used for finalization.
   }
@@ -126,6 +156,16 @@ data State :: Type where
   Connected :: !Handle.Handle -> !Bool -> State
   Blackhole :: State
   deriving stock (Eq)
+
+data ManagedBusConfig
+  = ManagedBusConfig
+  { uuid :: !Int
+  , endpoint :: !Endpoint
+  , healthCheckInterval :: !Int -- Microseconds
+  , idleTimeout :: !Int -- Microseconds
+  , receiveTimeout :: !Int -- Microseconds
+  , handlers :: !EventHandlers
+  }
 
 data ManagedBusError :: Type where
   -- | The bus timed out waiting to become ready to accept requests.
@@ -159,15 +199,12 @@ instance Semigroup EventHandlers where
 --
 -- /Throws/. This function will never throw an exception.
 createManagedBus ::
-     Int
-  -> Endpoint
-  -> Int -- ^ Health check interval (microseconds)
-  -> Int -- ^ Idle timeout (microseconds)
-  -> Int -- ^ Receive timeout (microseconds)
-  -> EventHandlers
+     ManagedBusConfig
   -> IO ManagedBus
 createManagedBus
-    uuid endpoint healthCheckInterval idleTimeout receiveTimeout handlers = do
+    ManagedBusConfig { endpoint, handlers, healthCheckInterval, idleTimeout,
+                       receiveTimeout, uuid
+                     } = do
 
   statusVar :: TVar Status <-
     newTVarIO (Status 0 Disconnected)
@@ -194,38 +231,14 @@ createManagedBus
     , aliveRef = aliveRef
     }
 
-exchange ::
-     KnownNat code
-  => ManagedBus -- ^
-  -> Int -- ^ Timeout (microseconds)
-  -> Request code -- ^
-  -> IO (Either ManagedBusError (Either (Response 0) (Response code)))
-exchange managedBus timeout request =
-  withHandle managedBus timeout $ \handle ->
-    Handle.exchange handle request
-
-stream ::
-     forall code r.
-     KnownNat code
-  => ManagedBus -- ^
-  -> Int -- ^ Timeout (microseconds)
-  -> Request code -- ^
-  -> FoldM IO (Response code) r
-  -> IO (Either ManagedBusError (Either (Response 0) r))
-stream managedBus timeout request responseFold =
-  withHandle managedBus timeout $ \handle ->
-    Handle.stream handle request responseFold
-
 withHandle ::
      forall a.
      ManagedBus
-  -> Int
-     -- ^ Timeout (microseconds)
   -> (Handle.Handle -> IO (Either Handle.HandleError a))
   -> IO (Either ManagedBusError a)
 withHandle
     managedBus@(ManagedBus { inFlightVar, lastUsedRef, statusVar, uuid })
-    timeout callback =
+    callback =
 
   uninterruptibleMask $ \unmask ->
     join . atomically $ do
@@ -317,16 +330,16 @@ withHandle
     wait :: IO (Either ManagedBusError a)
     wait = do
       timedOut :: STM () <-
-        registerOneShotEvent timeout
+        registerOneShotEvent waitTimeout
 
       join . atomically $
         (pure (Left ManagedBusTimeoutError) <$ timedOut)
         <|>
         (readTVar statusVar >>= \case
           Status _ (Connected _ True) ->
-            pure (withHandle managedBus timeout callback)
+            pure (withHandle managedBus callback)
           Status _ Disconnected ->
-            pure (withHandle managedBus timeout callback)
+            pure (withHandle managedBus callback)
           _ ->
             retry)
 
@@ -454,7 +467,7 @@ monitorHealth
           Status actualGen (Connected handle True) | actualGen == expectedGen -> do
             incrTCounter inFlightVar
             pure $ do
-              result :: Either Handle.HandleError (Either (Response 0) (Response 2)) <-
+              result :: Either Handle.HandleError (Either ByteString ()) <-
                 Handle.ping handle
 
               atomically (decrTCounter inFlightVar)
@@ -476,7 +489,7 @@ monitorHealth
           _ ->
             pure (pure ())
 
-    maybePingLoop :: Response 0 -> IO ()
+    maybePingLoop :: ByteString -> IO ()
     maybePingLoop err =
       join . atomically $
         readTVar statusVar >>= \case
@@ -501,7 +514,7 @@ monitorHealth
             incrTCounter inFlightVar
 
             pure $ do
-              result :: Either Handle.HandleError (Either (Response 0) (Response 2)) <-
+              result :: Either Handle.HandleError (Either ByteString ()) <-
                 Handle.ping handle
 
               atomically (decrTCounter inFlightVar)
@@ -626,3 +639,190 @@ sleep seconds =
   case nominalDiffTimeToSeconds seconds of
     MkFixed picoseconds ->
       threadDelay (fromIntegral (picoseconds `div` 1000000))
+
+--------------------------------------------------------------------------------
+-- Libriak.Handle wrappers
+--------------------------------------------------------------------------------
+
+delete ::
+     ManagedBus -- ^
+  -> Proto.RpbDelReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+delete bus request =
+  withHandle bus $ \handle ->
+    Handle.delete handle request
+
+deleteIndex ::
+     ManagedBus
+  -> Proto.RpbYokozunaIndexDeleteReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+deleteIndex bus request =
+  withHandle bus $ \handle ->
+    Handle.deleteIndex handle request
+
+get ::
+     ManagedBus
+  -> Proto.RpbGetReq
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetResp))
+get bus request =
+  withHandle bus $ \handle ->
+    Handle.get handle request
+
+getBucket ::
+     ManagedBus -- ^
+  -> Proto.RpbGetBucketReq -- ^
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetBucketResp))
+getBucket bus request =
+  withHandle bus $ \handle ->
+    Handle.getBucket handle request
+
+getBucketType ::
+     ManagedBus -- ^
+  -> Proto.RpbGetBucketTypeReq -- ^
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetBucketResp))
+getBucketType bus request =
+  withHandle bus $ \handle ->
+    Handle.getBucketType handle request
+
+getCrdt ::
+     ManagedBus
+  -> Proto.DtFetchReq
+  -> IO (Either ManagedBusError (Either ByteString Proto.DtFetchResp))
+getCrdt bus request =
+  withHandle bus $ \handle ->
+    Handle.getCrdt handle request
+
+getIndex ::
+     ManagedBus
+  -> Proto.RpbYokozunaIndexGetReq
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbYokozunaIndexGetResp))
+getIndex bus request =
+  withHandle bus $ \handle ->
+    Handle.getIndex handle request
+
+getSchema ::
+     ManagedBus
+  -> Proto.RpbYokozunaSchemaGetReq
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbYokozunaSchemaGetResp))
+getSchema bus request =
+  withHandle bus $ \handle ->
+    Handle.getSchema handle request
+
+getServerInfo ::
+     ManagedBus
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetServerInfoResp))
+getServerInfo bus =
+  withHandle bus Handle.getServerInfo
+
+-- listBuckets ::
+--      Handle
+--   -> Proto.RpbListBucketsReq
+--   -> FoldM IO (Response 16) r
+--   -> IO (Either HandleError (Either (Response 0) r))
+-- listBuckets handle request =
+--   stream handle (ReqRpbListBuckets request)
+
+-- listKeys ::
+--      Handle
+--   -> Proto.RpbListKeysReq
+--   -> FoldM IO (Response 18) r
+--   -> IO (Either HandleError (Either (Response 0) r))
+-- listKeys handle request =
+--   stream handle (ReqRpbListKeys request)
+
+-- mapReduce ::
+--      Handle
+--   -> Proto.RpbMapRedReq
+--   -> FoldM IO (Response 24) r
+--   -> IO (Either HandleError (Either (Response 0) r))
+-- mapReduce handle request =
+--   stream handle (ReqRpbMapRed request)
+
+ping ::
+     ManagedBus
+  -> IO (Either ManagedBusError (Either ByteString ()))
+ping bus =
+  withHandle bus Handle.ping
+
+put ::
+     ManagedBus
+  -> Proto.RpbPutReq
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbPutResp))
+put bus request =
+  withHandle bus $ \handle ->
+    Handle.put handle request
+
+putIndex ::
+     ManagedBus
+  -> Proto.RpbYokozunaIndexPutReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+putIndex bus request =
+  withHandle bus $ \handle ->
+    Handle.putIndex handle request
+
+putSchema ::
+     ManagedBus
+  -> Proto.RpbYokozunaSchemaPutReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+putSchema bus request =
+  withHandle bus $ \handle ->
+    Handle.putSchema handle request
+
+resetBucket ::
+     ManagedBus
+  -> Proto.RpbResetBucketReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+resetBucket bus request =
+  withHandle bus $ \handle ->
+    Handle.resetBucket handle request
+
+setBucket ::
+     ManagedBus
+  -> Proto.RpbSetBucketReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+setBucket bus request =
+  withHandle bus $ \handle ->
+    Handle.setBucket handle request
+
+setBucketType ::
+     ManagedBus
+  -> Proto.RpbSetBucketTypeReq
+  -> IO (Either ManagedBusError (Either ByteString ()))
+setBucketType bus request =
+  withHandle bus $ \handle ->
+    Handle.setBucketType handle request
+
+search ::
+     ManagedBus
+  -> Proto.RpbSearchQueryReq
+  -> IO (Either ManagedBusError (Either ByteString Proto.RpbSearchQueryResp))
+search bus request =
+  withHandle bus $ \handle ->
+    Handle.search handle request
+
+-- secondaryIndex ::
+--      Handle
+--   -> Proto.RpbIndexReq
+--   -> FoldM IO (Response 26) r
+--   -> IO (Either HandleError (Either (Response 0) r))
+-- secondaryIndex handle request =
+--   stream handle (ReqRpbIndex request)
+
+updateCrdt ::
+     ManagedBus -- ^
+  -> Proto.DtUpdateReq -- ^
+  -> IO (Either ManagedBusError (Either ByteString Proto.DtUpdateResp))
+updateCrdt bus request =
+  withHandle bus $ \handle ->
+    Handle.updateCrdt handle request
+
+stream ::
+     forall code r.
+     KnownNat code
+  => ManagedBus -- ^
+  -> Request code -- ^
+  -> FoldM IO (Response code) r
+  -> IO (Either ManagedBusError (Either ByteString r))
+stream managedBus request responseFold =
+  withHandle managedBus $ \handle ->
+    Handle.stream handle request responseFold

@@ -7,7 +7,8 @@ module RiakBusPool
   ) where
 
 import Libriak.Connection (Endpoint)
-import RiakManagedBus     (EventHandlers, ManagedBus, createManagedBus)
+import RiakManagedBus     (EventHandlers, ManagedBus, ManagedBusConfig(..),
+                           createManagedBus)
 
 import Data.Hashable (hash)
 import Data.Vector   (Vector, (!))
@@ -37,17 +38,22 @@ createBusPool
   pool :: Vector ManagedBus <-
     Vector.generateM
       256 -- TODO configure bus pool size
-      (\i ->
-        createManagedBus
-          i
-          endpoint
-          healthCheckInterval
-          idleTimeout
-          receiveTimeout
-          handlers)
+      (\uuid -> createManagedBus (makeManagedBusConfig uuid))
 
   pure BusPool
     { pool = pool }
+
+  where
+    makeManagedBusConfig :: Int -> ManagedBusConfig
+    makeManagedBusConfig uuid =
+      ManagedBusConfig
+        { uuid = uuid
+        , endpoint = endpoint
+        , healthCheckInterval = healthCheckInterval
+        , idleTimeout = idleTimeout
+        , receiveTimeout = receiveTimeout
+        , handlers = handlers
+        }
 
 withManagedBus ::
      BusPool

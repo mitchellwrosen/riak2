@@ -3,17 +3,16 @@
 
 module RiakObject where
 
-import Libriak.Response (Response(..))
-import RiakContent      (Content(..))
-import RiakContext      (Context(..), newContext)
-import RiakDeleteOpts   (DeleteOpts(..))
+import RiakContent    (Content(..))
+import RiakContext    (Context(..), newContext)
+import RiakDeleteOpts (DeleteOpts(..))
 import RiakError
-import RiakGetOpts      (GetOpts(..))
-import RiakHandle       (Handle)
-import RiakKey          (Key(..))
-import RiakPutOpts      (PutOpts(..))
-import RiakSibling      (Sibling(..))
-import RiakUtils        (difftimeToMillis, retrying)
+import RiakGetOpts    (GetOpts(..))
+import RiakHandle     (Handle)
+import RiakKey        (Key(..))
+import RiakPutOpts    (PutOpts(..))
+import RiakSibling    (Sibling(..))
+import RiakUtils      (difftimeToMillis, retrying)
 
 import qualified RiakHandle         as Handle
 import qualified RiakKey            as Key
@@ -195,7 +194,7 @@ doGet_ handle request =
     Right (Left err) ->
       pure (Left <$> parseGetError request err)
 
-    Right (Right (RespRpbGet response)) ->
+    Right (Right response) ->
       pure (Just (Right response))
 
 parseGetError :: Proto.RpbGetReq -> ByteString -> Maybe GetError
@@ -320,7 +319,7 @@ doPut_ handle request = do
     Right (Left err) ->
       pure (Left <$> parsePutError request err)
 
-    Right (Right (RespRpbPut response)) ->
+    Right (Right response) ->
       pure (Just (Right response))
 
 parsePutError :: Proto.RpbPutReq -> ByteString -> Maybe PutError

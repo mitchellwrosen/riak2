@@ -74,7 +74,7 @@ getIndex handle (IndexName name) = liftIO $
     Right (Left err) ->
       pure (parseGetIndexError err)
 
-    Right (Right (RespRpbYokozunaIndexGet response)) ->
+    Right (Right response) ->
       pure (Right (Just (fromProto (head (response ^. Proto.index)))))
 
 parseGetIndexError ::
@@ -109,7 +109,7 @@ getIndexes handle = liftIO $
     Right (Left err) ->
       pure (Left (parseGetIndexesError err))
 
-    Right (Right (RespRpbYokozunaIndexGet response)) ->
+    Right (Right response) ->
       pure (Right (map fromProto (response ^. Proto.index)))
 
 parseGetIndexesError :: ByteString -> GetIndexError

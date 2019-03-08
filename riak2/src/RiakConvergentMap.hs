@@ -8,7 +8,6 @@ module RiakConvergentMap
   , convergentMapValue
   ) where
 
-import Libriak.Response       (Response(..))
 import RiakContext            (Context(..), newContext)
 import RiakConvergentMapValue (ConvergentMapValue(..), emptyConvergentMapValue)
 import RiakCrdt               (parseGetCrdtError, parseUpdateCrdtError)
@@ -102,9 +101,9 @@ getConvergentMap_ handle key@(Key bucketType _ _) =
         -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
-         Response 81
+         Proto.DtFetchResp
       -> Maybe (ConvergentMap ConvergentMapValue)
-    fromResponse (RespDtFetch response) = do
+    fromResponse response = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
 
@@ -170,9 +169,9 @@ putConvergentMap_
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
     fromResponse ::
-         Response 83
+         Proto.DtUpdateResp
       -> ConvergentMap ConvergentMapValue
-    fromResponse (RespDtUpdate response) =
+    fromResponse response =
       ConvergentMap
         { _context = Context (response ^. Proto.context)
         , _key =

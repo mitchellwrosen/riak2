@@ -69,9 +69,9 @@ main = do
             10
         , handlers =
             mempty
-              { onSend = \req -> putStrLn (">>> " ++ show req)
-              , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
-              }
+              -- { onSend = \req -> putStrLn (">>> " ++ show req)
+              -- , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
+              -- }
         }
 
 integrationTests :: Handle -> [TestTree]

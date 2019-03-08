@@ -68,7 +68,7 @@ search
     Right (Left err) ->
       pure (Left (parseSearchError index err))
 
-    Right (Right (RespRpbSearchQuery response)) ->
+    Right (Right response) ->
       pure (Right (fromResponse response))
 
   where

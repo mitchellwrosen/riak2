@@ -42,7 +42,7 @@ getBucketType handle bucketType = liftIO $
     Right (Left err) ->
       pure (parseGetBucketTypeError err)
 
-    Right (Right (RespRpbGetBucket response)) ->
+    Right (Right response) ->
       pure (Right (Just (BucketProperties.fromProto (response ^. Proto.props))))
 
 parseGetBucketTypeError ::

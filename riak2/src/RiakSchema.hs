@@ -43,7 +43,7 @@ getSchema handle name = liftIO $
     Right (Left err) ->
       pure (parseGetSchemaError err)
 
-    Right (Right (RespRpbYokozunaSchemaGet response)) ->
+    Right (Right response) ->
       pure (Right (Just (fromProto (response ^. Proto.schema))))
 
 parseGetSchemaError ::

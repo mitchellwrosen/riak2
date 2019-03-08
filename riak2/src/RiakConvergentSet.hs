@@ -101,9 +101,9 @@ getConvergentSet_ handle key@(Key bucketType _ _) =
         -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
-         Response 81
+         Proto.DtFetchResp
       -> Maybe (ConvergentSet ByteString)
-    fromResponse (RespDtFetch response) = do
+    fromResponse response = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
 
@@ -169,9 +169,9 @@ putConvergentSet_
 -- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
 
     fromResponse ::
-         Response 83
+         Proto.DtUpdateResp
       -> ConvergentSet ByteString
-    fromResponse (RespDtUpdate response) =
+    fromResponse response =
       ConvergentSet
         { _context = Context (response ^. Proto.context)
         , _key =

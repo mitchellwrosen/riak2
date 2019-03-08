@@ -28,8 +28,8 @@ getServerInfo handle = liftIO $
     (Handle.getServerInfo handle)
 
   where
-    fromResponse :: Response 8 -> ServerInfo
-    fromResponse (RespRpbGetServerInfo response) =
+    fromResponse :: Proto.RpbGetServerInfoResp -> ServerInfo
+    fromResponse response =
       ServerInfo
         { name = decodeUtf8 (response ^. Proto.node)
         , version = decodeUtf8 (response ^. Proto.serverVersion)

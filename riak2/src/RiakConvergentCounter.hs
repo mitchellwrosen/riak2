@@ -4,14 +4,13 @@ module RiakConvergentCounter
   , updateConvergentCounter
   ) where
 
-import Libriak.Response (Response(..))
 import RiakCrdt
 import RiakError
-import RiakGetOpts      (GetOpts(..))
-import RiakHandle       (Handle)
-import RiakKey          (Key(..))
-import RiakPutOpts      (PutOpts(..))
-import RiakUtils        (difftimeToMillis, retrying)
+import RiakGetOpts (GetOpts(..))
+import RiakHandle  (Handle)
+import RiakKey     (Key(..))
+import RiakPutOpts (PutOpts(..))
+import RiakUtils   (difftimeToMillis, retrying)
 
 import qualified RiakHandle      as Handle
 import qualified RiakKey         as Key
@@ -78,9 +77,9 @@ getConvergentCounter_
         & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
     fromResponse ::
-         Response 81
+         Proto.DtFetchResp
       -> Maybe ConvergentCounter
-    fromResponse (RespDtFetch response) = do
+    fromResponse response = do
       crdt :: Proto.DtValue <-
         response ^. Proto.maybe'value
       pure ConvergentCounter
@@ -139,9 +138,9 @@ updateConvergentCounter_
         & Proto.returnBody .~ True
 
     fromResponse ::
-         Response 83
+         Proto.DtUpdateResp
       -> ConvergentCounter
-    fromResponse (RespDtUpdate response) =
+    fromResponse response =
       ConvergentCounter
         { key =
             if Key.isGeneratedKey key

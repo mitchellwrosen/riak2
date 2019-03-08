@@ -31,14 +31,15 @@ module RiakHandle
 import Libriak.Connection (Endpoint)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
-import RiakBusPool        (BusPool, createBusPool, withManagedBus)
-import RiakManagedBus     (EventHandlers(..), ManagedBusError(..))
+import RiakBusPool        (BusPool, createBusPool)
+import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..))
 import RiakUtils          (difftimeToMicros)
 
+import qualified RiakBusPool    as BusPool
 import qualified RiakManagedBus as ManagedBus
 
 import Control.Foldl (FoldM)
-import Control.Lens  ((.~), (^.))
+import Control.Lens  ((.~))
 import Data.Time     (NominalDiffTime)
 import GHC.TypeLits  (KnownNat)
 
@@ -113,19 +114,60 @@ createHandle
     , handlers = handlers
     }
 
+withManagedBus ::
+     forall a.
+     Handle
+  -> (ManagedBus -> IO (Either ManagedBusError (Either ByteString a)))
+  -> IO (Either HandleError (Either ByteString a))
+withManagedBus Handle { pool, retries } action =
+  BusPool.withManagedBus pool go
+
+  where
+    go :: ManagedBus -> IO (Either HandleError (Either ByteString a))
+    go bus =
+      loop 0
+
+      where
+        loop :: Natural -> IO (Either HandleError (Either ByteString a))
+        loop attempts =
+          if attempts > retries
+            then
+              -- TODO accumulate errors and return them
+              pure (Left HandleRetryError)
+
+            else
+              action bus >>= \case
+                Left ManagedBusTimeoutError ->
+                  pure (Left HandleTimeoutError)
+
+                Left ManagedBusPipelineError ->
+                  loop attempts
+
+                Left (ManagedBusConnectionError _) ->
+                  loop (attempts+1)
+
+                -- Weird to treat a decode error (very unexpected) like a
+                -- connection error (expected)
+                Left (ManagedBusDecodeError _) ->
+                  loop (attempts+1)
+
+                Right response ->
+                  pure (Right response)
+
 delete ::
      Handle -- ^
   -> Proto.RpbDelReq
-  -> IO (Either HandleError (Either ByteString (Response 14)))
+  -> IO (Either HandleError (Either ByteString ()))
 delete handle request =
-  exchange handle (ReqRpbDel request)
+  withManagedBus handle (\bus -> ManagedBus.delete bus request)
 
 deleteIndex ::
      Handle
   -> ByteString
-  -> IO (Either HandleError (Either ByteString (Response 14)))
+  -> IO (Either HandleError (Either ByteString ()))
 deleteIndex handle name =
-  exchange handle (ReqRpbYokozunaIndexDelete request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.deleteIndex bus request
 
   where
     request :: Proto.RpbYokozunaIndexDeleteReq
@@ -136,23 +178,26 @@ deleteIndex handle name =
 get ::
      Handle
   -> Proto.RpbGetReq
-  -> IO (Either HandleError (Either ByteString (Response 10)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbGetResp))
 get handle request =
-  exchange handle (ReqRpbGet request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.get bus request
 
 getBucket ::
      Handle -- ^
   -> Proto.RpbGetBucketReq -- ^
-  -> IO (Either HandleError (Either ByteString (Response 20)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbGetBucketResp))
 getBucket handle request =
-  exchange handle (ReqRpbGetBucket request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.getBucket bus request
 
 getBucketType ::
      Handle -- ^
   -> ByteString -- ^ Bucket type
-  -> IO (Either HandleError (Either ByteString (Response 20)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbGetBucketResp))
 getBucketType handle bucketType =
-  exchange handle (ReqRpbGetBucketType request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.getBucketType bus request
 
   where
     request :: Proto.RpbGetBucketTypeReq
@@ -163,16 +208,18 @@ getBucketType handle bucketType =
 getCrdt ::
      Handle
   -> Proto.DtFetchReq
-  -> IO (Either HandleError (Either ByteString (Response 81)))
+  -> IO (Either HandleError (Either ByteString Proto.DtFetchResp))
 getCrdt handle request =
-  exchange handle (ReqDtFetch request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.getCrdt bus request
 
 getIndex ::
      Handle
   -> Maybe ByteString
-  -> IO (Either HandleError (Either ByteString (Response 55)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbYokozunaIndexGetResp))
 getIndex handle name =
-  exchange handle (ReqRpbYokozunaIndexGet request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.getIndex bus request
 
   where
     request :: Proto.RpbYokozunaIndexGetReq
@@ -183,9 +230,10 @@ getIndex handle name =
 getSchema ::
      Handle
   -> ByteString
-  -> IO (Either HandleError (Either ByteString (Response 59)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbYokozunaSchemaGetResp))
 getSchema handle name =
-  exchange handle (ReqRpbYokozunaSchemaGet request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.getSchema bus request
 
   where
     request :: Proto.RpbYokozunaSchemaGetReq
@@ -195,9 +243,9 @@ getSchema handle name =
 
 getServerInfo ::
      Handle
-  -> IO (Either HandleError (Either ByteString (Response 8)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbGetServerInfoResp))
 getServerInfo handle =
-  exchange handle (ReqRpbGetServerInfo Proto.defMessage)
+  withManagedBus handle ManagedBus.getServerInfo
 
 listBuckets ::
      Handle
@@ -225,30 +273,33 @@ mapReduce handle request =
 
 ping ::
      Handle
-  -> IO (Either HandleError (Either ByteString (Response 2)))
+  -> IO (Either HandleError (Either ByteString ()))
 ping handle =
-  exchange handle (ReqRpbPing Proto.defMessage)
+  withManagedBus handle ManagedBus.ping
 
 put ::
      Handle
   -> Proto.RpbPutReq
-  -> IO (Either HandleError (Either ByteString (Response 12)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbPutResp))
 put handle request =
-  exchange handle (ReqRpbPut request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.put bus request
 
 putIndex ::
      Handle
   -> Proto.RpbYokozunaIndexPutReq
-  -> IO (Either HandleError (Either ByteString (Response 12)))
+  -> IO (Either HandleError (Either ByteString ()))
 putIndex handle request =
-  exchange handle (ReqRpbYokozunaIndexPut request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.putIndex bus request
 
 putSchema ::
      Handle
   -> Proto.RpbYokozunaSchema
-  -> IO (Either HandleError (Either ByteString (Response 12)))
+  -> IO (Either HandleError (Either ByteString ()))
 putSchema handle schema =
-  exchange handle (ReqRpbYokozunaSchemaPut request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.putSchema bus request
 
   where
     request :: Proto.RpbYokozunaSchemaPutReq
@@ -259,30 +310,34 @@ putSchema handle schema =
 resetBucket ::
      Handle
   -> Proto.RpbResetBucketReq
-  -> IO (Either HandleError (Either ByteString (Response 30)))
+  -> IO (Either HandleError (Either ByteString ()))
 resetBucket handle request =
-  exchange handle (ReqRpbResetBucket request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.resetBucket bus request
 
 setBucket ::
      Handle
   -> Proto.RpbSetBucketReq
-  -> IO (Either HandleError (Either ByteString (Response 22)))
+  -> IO (Either HandleError (Either ByteString ()))
 setBucket handle request =
-  exchange handle (ReqRpbSetBucket request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.setBucket bus request
 
 setBucketType ::
      Handle
   -> Proto.RpbSetBucketTypeReq
-  -> IO (Either HandleError (Either ByteString (Response 22)))
+  -> IO (Either HandleError (Either ByteString ()))
 setBucketType handle request =
-  exchange handle (ReqRpbSetBucketType request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.setBucketType bus request
 
 search ::
      Handle
   -> Proto.RpbSearchQueryReq
-  -> IO (Either HandleError (Either ByteString (Response 28)))
+  -> IO (Either HandleError (Either ByteString Proto.RpbSearchQueryResp))
 search handle request =
-  exchange handle (ReqRpbSearchQuery request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.search bus request
 
 secondaryIndex ::
      Handle
@@ -295,29 +350,11 @@ secondaryIndex handle request =
 updateCrdt ::
      Handle -- ^
   -> Proto.DtUpdateReq -- ^
-  -> IO (Either HandleError (Either ByteString (Response 83)))
+  -> IO (Either HandleError (Either ByteString Proto.DtUpdateResp))
 updateCrdt handle request =
-  exchange handle (ReqDtUpdate request)
+  withManagedBus handle $ \bus ->
+    ManagedBus.updateCrdt bus request
 
--- | Send a request and receive the response (a single message).
---
--- /Throws/: If another prior thread crashed while using this socket, throws
--- 'Control.Exception.BlockedIndefinitelyOnMVar'.
-exchange ::
-     forall code.
-     KnownNat code
-  => Handle -- ^
-  -> Request code -- ^
-  -> IO (Either HandleError (Either ByteString (Response code)))
-exchange Handle { pool, retries } request =
-  withManagedBus pool $ \managedBus ->
-    doExchangeOrStream
-      retries
-      (ManagedBus.exchange
-        managedBus
-        (5*1000*1000) -- TODO configure connecting wait time
-        request)
-      0
 -- | Send a request and stream the response (one or more messages).
 stream ::
      ∀ code r.
@@ -327,12 +364,11 @@ stream ::
   -> FoldM IO (Response code) r
   -> IO (Either HandleError (Either ByteString r))
 stream Handle { pool, retries } request responseFold =
-  withManagedBus pool $ \managedBus ->
+  BusPool.withManagedBus pool $ \managedBus ->
     doExchangeOrStream
       retries
       (ManagedBus.stream
         managedBus
-        (5*1000*1000)
         request
         responseFold)
       0
@@ -340,7 +376,7 @@ stream Handle { pool, retries } request responseFold =
 doExchangeOrStream ::
      forall a.
      Natural
-  -> IO (Either ManagedBusError (Either (Response 0) a))
+  -> IO (Either ManagedBusError (Either ByteString a))
   -> Natural
   -> IO (Either HandleError (Either ByteString a))
 doExchangeOrStream retries action =
@@ -372,8 +408,5 @@ doExchangeOrStream retries action =
             Left (ManagedBusDecodeError _) ->
               loop (attempts+1)
 
-            Right (Left (RespRpbError err)) ->
-              pure (Right (Left (err ^. Proto.errmsg)))
-
-            Right (Right response) ->
-              pure (Right (Right response))
+            Right response ->
+              pure (Right response)

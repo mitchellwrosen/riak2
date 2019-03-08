@@ -55,7 +55,7 @@ getBucket handle bucket = liftIO $
     Right (Left err) ->
       pure (parseGetBucketError err)
 
-    Right (Right (RespRpbGetBucket response)) ->
+    Right (Right response) ->
       pure (Right (Just (BucketProperties.fromProto (response ^. Proto.props))))
 
   where
