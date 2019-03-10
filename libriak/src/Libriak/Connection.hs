@@ -186,11 +186,11 @@ sendall Connection { sendBuffer, connection } =
               -- Running example:
               --
               -- bytesUnsent =
-              --   98 + 6 - 100 (4)
+              --   6 - 2 (4)
               let
                 bytesUnsent :: Int
                 bytesUnsent =
-                  buffered + nbytes - gSendBufferSize
+                  nbytes - bytesSent
 
               -- Running example:
               --

@@ -8,7 +8,6 @@ module RiakConvergentSet
   , toProto
   ) where
 
-import Libriak.Response (Response(..))
 import RiakContext      (Context(..), newContext)
 import RiakCrdt         (parseGetCrdtError, parseUpdateCrdtError)
 import RiakError

@@ -1,9 +1,8 @@
 module RiakSearch where
 
-import Libriak.Response (Response(..))
 import RiakError
-import RiakHandle       (Handle)
-import RiakIndexName    (IndexName(..))
+import RiakHandle    (Handle)
+import RiakIndexName (IndexName(..))
 
 import qualified RiakHandle    as Handle
 import qualified RiakProtoPair as Proto.Pair

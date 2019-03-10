@@ -7,7 +7,6 @@ module RiakIndex
   , deleteIndex
   ) where
 
-import Libriak.Response (Response(..))
 import RiakError
 import RiakHandle       (Handle)
 import RiakIndexName

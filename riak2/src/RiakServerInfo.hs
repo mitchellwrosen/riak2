@@ -1,7 +1,6 @@
 module RiakServerInfo where
 
-import Libriak.Response (Response(..))
-import RiakHandle       (Handle, HandleError)
+import RiakHandle (Handle, HandleError)
 
 import qualified RiakHandle as Handle
 
