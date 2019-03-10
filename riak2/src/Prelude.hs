@@ -2,7 +2,7 @@ module Prelude
   ( module X
   ) where
 
-import Control.Applicative     as X ((<|>))
+import Control.Applicative     as X (Alternative(..))
 import Control.Category        as X ((>>>))
 import Control.Concurrent      as X (ThreadId, forkIO, myThreadId, threadDelay)
 import Control.Concurrent.MVar as X

@@ -1,7 +1,11 @@
 -- | Misc. STM helpers
 
 module RiakSTM
-  ( TCounter
+  ( TransactionalIO
+  , transactionally
+  , liftSTM
+
+  , TCounter
   , newTCounter
   , readTCounter
   , incrTCounter
@@ -11,6 +15,51 @@ module RiakSTM
   ) where
 
 import Control.Concurrent.STM
+import Control.Monad          (ap)
+
+
+newtype TransactionalIO a
+  = TransactionalIO { unTransactionalIO :: STM (Either a (IO a)) }
+
+instance Applicative TransactionalIO where
+  pure x =
+    TransactionalIO (pure (Left x))
+
+  (<*>) =
+    ap
+
+instance Alternative TransactionalIO where
+  empty =
+    TransactionalIO empty
+
+  TransactionalIO x <|> TransactionalIO y =
+    TransactionalIO (x <|> y)
+
+instance Functor TransactionalIO where
+  fmap f (TransactionalIO action) =
+    TransactionalIO (bimap f (fmap f) <$> action)
+
+instance Monad TransactionalIO where
+  TransactionalIO mx >>= f =
+    TransactionalIO $
+      mx >>= \case
+        Left x ->
+          unTransactionalIO (f x)
+
+        Right my ->
+          pure (Right (my >>= transactionally . f))
+
+instance MonadIO TransactionalIO where
+  liftIO action =
+    TransactionalIO (pure (Right action))
+
+transactionally :: TransactionalIO a -> IO a
+transactionally (TransactionalIO action) =
+  atomically action >>= either pure id
+
+liftSTM :: STM a -> TransactionalIO a
+liftSTM action =
+  TransactionalIO (Left <$> action)
 
 
 newtype TCounter
