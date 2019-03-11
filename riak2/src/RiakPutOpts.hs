@@ -8,9 +8,9 @@ import Data.Time          (NominalDiffTime)
 
 data PutOpts
   = PutOpts
-  { nodes :: !(Maybe Natural)
-  , quorum :: !(Maybe WriteQuorum)
-  , timeout :: !(Maybe NominalDiffTime)
+  { nodes :: Maybe Natural
+  , quorum :: Maybe WriteQuorum
+  , timeout :: Maybe NominalDiffTime
   } deriving stock (Generic, Show)
 
 instance Default PutOpts where

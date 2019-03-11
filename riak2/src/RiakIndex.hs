@@ -31,15 +31,15 @@ import qualified Data.Riak.Proto as Proto
 -- /See also/: Riak.BucketType.setBucketTypeIndex
 data Index
   = Index
-  { name :: !IndexName
-  , nodes :: !Natural
-  , schema :: !Text
+  { name :: IndexName
+  , nodes :: Natural
+  , schema :: Text
   } deriving stock (Generic, Show)
 
 data PutIndexOpts
   = PutIndexOpts
-  { nodes :: !(Maybe Natural) -- ^ Must be positive
-  , timeout :: !(Maybe Word32)
+  { nodes :: Maybe Natural -- ^ Must be positive
+  , timeout :: Maybe Word32
   } deriving stock (Generic, Show)
 
 instance Default PutIndexOpts where

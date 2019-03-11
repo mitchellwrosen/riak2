@@ -118,24 +118,24 @@ waitTimeout = 5*1000*1000
 
 data ManagedBus
   = ManagedBus
-  { uuid :: !Int
-  , endpoint :: !Endpoint
-  , healthCheckInterval :: !Int
-  , idleTimeout :: !Int
-  , receiveTimeout :: !Int
-  , handlers :: !EventHandlers
+  { uuid :: Int
+  , endpoint :: Endpoint
+  , healthCheckInterval :: Int
+  , idleTimeout :: Int
+  , receiveTimeout :: Int
+  , handlers :: EventHandlers
 
-  , generationVar :: !(TVar Word64)
-  , stateVar :: !(TVar State)
-  , inFlightVar :: !TCounter
-  , lastUsedRef :: !(IORef Word64)
+  , generationVar :: TVar Word64
+  , stateVar :: TVar State
+  , inFlightVar :: TCounter
+  , lastUsedRef :: IORef Word64
     -- ^ The last time the bus was used.
   }
 
 data State :: Type where
   Disconnected :: State
   Connecting :: State
-  Connected :: !Handle.Handle -> !Health -> State
+  Connected :: Handle.Handle -> Health -> State
   Disconnecting :: State
   deriving stock (Eq)
 
@@ -146,12 +146,12 @@ data Health
 
 data ManagedBusConfig
   = ManagedBusConfig
-  { uuid :: !Int
-  , endpoint :: !Endpoint
-  , healthCheckInterval :: !Int -- Microseconds
-  , idleTimeout :: !Int -- Microseconds
-  , receiveTimeout :: !Int -- Microseconds
-  , handlers :: !EventHandlers
+  { uuid :: Int
+  , endpoint :: Endpoint
+  , healthCheckInterval :: Int -- Microseconds
+  , idleTimeout :: Int -- Microseconds
+  , receiveTimeout :: Int -- Microseconds
+  , handlers :: EventHandlers
   } deriving stock (Show)
 
 data ManagedBusError :: Type where
@@ -159,19 +159,19 @@ data ManagedBusError :: Type where
   ManagedBusTimeoutError :: ManagedBusError
   ManagedBusPipelineError :: ManagedBusError
   -- | A connection error occurred during a send or receive.
-  ManagedBusConnectionError :: !ConnectionError -> ManagedBusError
+  ManagedBusConnectionError :: ConnectionError -> ManagedBusError
   -- | A protobuf decode error occurred.
-  ManagedBusDecodeError :: !DecodeError -> ManagedBusError
+  ManagedBusDecodeError :: DecodeError -> ManagedBusError
   deriving stock (Show)
 
 data EventHandlers
   = EventHandlers
-  { onSend :: !(forall code. Request code -> IO ())
+  { onSend :: forall code. Request code -> IO ()
     -- ^ Called just prior to sending a request.
-  , onReceive :: !(forall code. Response code -> IO ())
+  , onReceive :: forall code. Response code -> IO ()
     -- ^ Called just after receiving a response.
-  , onConnectError :: !(ConnectException 'Uninterruptible -> IO ())
-  , onConnectionError :: !(ConnectionError -> IO ())
+  , onConnectError :: ConnectException 'Uninterruptible -> IO ()
+  , onConnectionError :: ConnectionError -> IO ()
   }
 
 instance Monoid EventHandlers where

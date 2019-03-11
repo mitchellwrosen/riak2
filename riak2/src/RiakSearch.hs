@@ -16,23 +16,23 @@ import qualified Data.Riak.Proto as Proto
 
 data SearchResults
   = SearchResults
-  { documents :: ![[(ByteString, ByteString)]]
+  { documents :: [[(ByteString, ByteString)]]
     -- ^ Search results
-  , maxScore :: !Float
-  , numFound :: !Word32
+  , maxScore :: Float
+  , numFound :: Word32
     -- ^ Number of search results (not all of which may have been returned,
     -- per @rows@).
   } deriving stock (Generic, Show)
 
 data SearchOpts
   = SearchOpts
-  { fieldList :: ![ByteString]
+  { fieldList :: [ByteString]
     -- ^ The fields to return (the empty list means all fields).
-  , filter :: !(Maybe ByteString)
-  , presort :: !(Maybe ByteString)
-  , rows :: !(Maybe Word32)
-  , sort :: !(Maybe ByteString)
-  , start :: !(Maybe Word32)
+  , filter :: Maybe ByteString
+  , presort :: Maybe ByteString
+  , rows :: Maybe Word32
+  , sort :: Maybe ByteString
+  , start :: Maybe Word32
   } deriving stock (Generic, Show)
 
 instance Default SearchOpts where

@@ -46,20 +46,20 @@ import qualified Data.Riak.Proto as Proto
 
 data Handle
   = Handle
-  { pool :: !BusPool
-  , retries :: !Natural
-  , handlers :: !EventHandlers
+  { pool :: BusPool
+  , retries :: Natural
+  , handlers :: EventHandlers
   }
 
 data HandleConfig
   = HandleConfig
-  { endpoint :: !Endpoint
+  { endpoint :: Endpoint
     -- | How often to perform a health check on each underlying connection. Use
     -- @0@ to disable.
-  , healthCheckInterval :: !NominalDiffTime
-  , idleTimeout :: !NominalDiffTime
+  , healthCheckInterval :: NominalDiffTime
+  , idleTimeout :: NominalDiffTime
     -- | How long to wait for a response from Riak before timing out.
-  , requestTimeout :: !NominalDiffTime
+  , requestTimeout :: NominalDiffTime
     -- | The additional number of times to attempt a request if it results in a
     -- non-Riak error.
     --
@@ -76,8 +76,8 @@ data HandleConfig
     -- common, ephemeral network failures, while still giving up eventually in
     -- the case of a catastrophic error, like accidentally connecting to an
     -- endpoint that isn't Riak.
-  , retries :: !Natural
-  , handlers :: !EventHandlers
+  , retries :: Natural
+  , handlers :: EventHandlers
   }
 
 data HandleError :: Type where

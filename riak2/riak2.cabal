@@ -175,6 +175,7 @@ library riak2-internal
     RecordWildCards
     ScopedTypeVariables
     StandaloneDeriving
+    StrictData
     TupleSections
     TypeApplications
     TypeFamilies

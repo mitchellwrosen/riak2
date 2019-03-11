@@ -9,11 +9,11 @@ import Data.Time          (NominalDiffTime)
 -- TODO basicQuorum/notfoundOk -> NotfoundBehavior
 data GetOpts
   = GetOpts
-  { basicQuorum :: !(Maybe Bool)
-  , nodes :: !(Maybe Natural)
-  , notfoundOk :: !(Maybe Bool)
-  , quorum :: !(Maybe ReadQuorum)
-  , timeout :: !(Maybe NominalDiffTime)
+  { basicQuorum :: Maybe Bool
+  , nodes :: Maybe Natural
+  , notfoundOk :: Maybe Bool
+  , quorum :: Maybe ReadQuorum
+  , timeout :: Maybe NominalDiffTime
   } deriving stock (Generic, Show)
 
 instance Default GetOpts where

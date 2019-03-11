@@ -15,7 +15,7 @@ import qualified Data.Riak.Proto as Proto
 --
 -- /Note/: The bucket type must be UTF-8 encoded.
 data Key
-  = Key !ByteString !ByteString !ByteString
+  = Key ByteString ByteString ByteString
   deriving stock (Eq, Generic, Show)
   deriving anyclass (Hashable)
 

@@ -6,10 +6,10 @@ import RiakBucketInternal (Bucket(..))
 -- | A query on a binary secondary index.
 data BinaryIndexQuery
   = BinaryIndexQuery
-  { bucket :: !Bucket
-  , index :: !ByteString
-  , minValue :: !ByteString
-  , maxValue :: !ByteString
+  { bucket :: Bucket
+  , index :: ByteString
+  , minValue :: ByteString
+  , maxValue :: ByteString
   } deriving stock (Generic, Show)
 
 -- | Build a query on the built-in index @\"\$bucket\"@, which indexes each

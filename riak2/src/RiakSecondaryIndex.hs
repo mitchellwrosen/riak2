@@ -15,7 +15,7 @@ import qualified Data.ByteString as ByteString
 -- | A secondary index.
 data SecondaryIndex
   = forall a.
-    SecondaryIndex !ByteString !(SecondaryIndexValue a)
+    SecondaryIndex ByteString (SecondaryIndexValue a)
 
 deriving stock instance Show SecondaryIndex
 

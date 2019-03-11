@@ -12,8 +12,8 @@ import qualified Data.Riak.Proto as Proto
 
 
 data Sibling a
-  = Sibling !(Content a)
-  | Tombstone !UTCTime
+  = Sibling (Content a)
+  | Tombstone UTCTime
   deriving stock (Eq, Functor, Show)
 
 fromProtoContent :: Proto.RpbContent -> Sibling ByteString

@@ -19,8 +19,8 @@ import qualified Data.Riak.Proto as Proto
 -- | A Solr schema.
 data Schema
   = Schema
-  { name :: !Text
-  , content :: !ByteString
+  { name :: Text
+  , content :: ByteString
   } deriving stock (Generic, Show)
 
 -- | The default search schema @"_yz_default"@.

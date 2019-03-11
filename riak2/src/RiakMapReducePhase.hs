@@ -8,8 +8,8 @@ import qualified RiakMapReduceFunction as MapReduceFunction
 
 
 data MapReducePhase
-  = MapReducePhaseMap !MapReduceFunction !ErlangTerm !Bool
-  | MapReducePhaseReduce !MapReduceFunction !ErlangTerm !Bool
+  = MapReducePhaseMap MapReduceFunction ErlangTerm Bool
+  | MapReducePhaseReduce MapReduceFunction ErlangTerm Bool
   deriving stock (Show)
 
 toErlangTerm :: MapReducePhase -> ErlangTerm

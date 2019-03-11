@@ -23,11 +23,11 @@ import qualified Data.Riak.Proto     as Proto
 -- possible to have both a counter and a flag at key @"foo"@, for example).
 data ConvergentMapValue
   = ConvergentMapValue
-  { counters :: !(HashMap ByteString Int64) -- ^ Counters
-  , flags :: !(HashMap ByteString Bool) -- ^ Flags
-  , maps :: !(HashMap ByteString ConvergentMapValue) -- ^ Maps
-  , registers :: !(HashMap ByteString ByteString) -- ^ Registers
-  , sets :: !(HashMap ByteString (HashSet ByteString)) -- ^ Sets
+  { counters :: HashMap ByteString Int64 -- ^ Counters
+  , flags :: HashMap ByteString Bool -- ^ Flags
+  , maps :: HashMap ByteString ConvergentMapValue -- ^ Maps
+  , registers :: HashMap ByteString ByteString -- ^ Registers
+  , sets :: HashMap ByteString (HashSet ByteString) -- ^ Sets
   } deriving stock (Generic, Show)
 
 -- | An empty map value.

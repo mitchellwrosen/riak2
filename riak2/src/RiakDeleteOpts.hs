@@ -9,10 +9,10 @@ import Data.Time          (NominalDiffTime)
 
 data DeleteOpts
   = DeleteOpts
-  { nodes :: !(Maybe Natural)
-  , readQuorum :: !(Maybe ReadQuorum)
-  , timeout :: !(Maybe NominalDiffTime)
-  , writeQuorum :: !(Maybe WriteQuorum)
+  { nodes :: Maybe Natural
+  , readQuorum :: Maybe ReadQuorum
+  , timeout :: Maybe NominalDiffTime
+  , writeQuorum :: Maybe WriteQuorum
   } deriving stock (Generic, Show)
 
 instance Default DeleteOpts where

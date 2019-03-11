@@ -17,11 +17,11 @@ import qualified Data.Vector as Vector
 
 
 data MapReduceInput
-  = MapReduceInputBucket !Bucket
-  | MapReduceInputKeys ![Key]
-  | MapReduceInputFunction !Text !Text
-  | MapReduceInputIntIndexQuery !IntIndexQuery
-  | MapReduceInputBinaryIndexQuery !BinaryIndexQuery
+  = MapReduceInputBucket Bucket
+  | MapReduceInputKeys [Key]
+  | MapReduceInputFunction Text Text
+  | MapReduceInputIntIndexQuery IntIndexQuery
+  | MapReduceInputBinaryIndexQuery BinaryIndexQuery
   -- TODO MapReduceInputSearch
   -- see riak_kv_mapred_term.erl
 

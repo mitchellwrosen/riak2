@@ -10,7 +10,7 @@ import qualified Data.Text as Text
 
 
 data Panic
-  = forall a. Panicked a => Panic !Text a
+  = forall a. Panicked a => Panic Text a
   deriving anyclass (Exception)
 
 instance Show Panic where

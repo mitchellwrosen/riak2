@@ -6,8 +6,8 @@ import qualified RiakErlangTerm as ErlangTerm
 
 
 data MapReduceFunction
-  = MapReduceFunctionCompiled !Text !Text
-  | MapReduceFunctionInterpreted !ByteString
+  = MapReduceFunctionCompiled Text Text
+  | MapReduceFunctionInterpreted ByteString
   deriving stock (Show)
 
 toErlangTerm :: MapReduceFunction -> ErlangTerm

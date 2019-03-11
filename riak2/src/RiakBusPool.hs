@@ -19,7 +19,7 @@ import qualified Data.Vector as Vector
 -- TODO pool finalizer
 data BusPool
   = BusPool
-  { pool :: !(Vector ManagedBus)
+  { pool :: Vector ManagedBus
   }
 
 -- | Create a bus pool.

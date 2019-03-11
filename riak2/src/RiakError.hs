@@ -28,24 +28,24 @@ import qualified Data.ByteString                  as ByteString
 data Error :: Op -> Type where
   BucketTypeDoesNotExistError ::
        MayReturnBucketTypeDoesNotExist op ~ 'True
-    => !ByteString
+    => ByteString
     -> Error op
 
   -- | Secondary indexes are not supported by this bucket's backend.
   SecondaryIndexesNotSupportedError ::
-       !Bucket
+       Bucket
     -> Error 'SecondaryIndexQueryOp
 
   -- | The search index does not exist.
   IndexDoesNotExistError ::
        MayReturnIndexDoesNotExist op ~ 'True
-    => !IndexName
+    => IndexName
     -> Error op
 
   -- | The index is associated with buckets.
   IndexHasAssociatedBucketsError ::
        MayReturnIndexHasAssociatedBuckets op ~ 'True
-    => !IndexName
+    => IndexName
     -> [Bucket]
     -> Error op
 
@@ -56,7 +56,7 @@ data Error :: Op -> Type where
 
   -- | The bucket type was "invalid" for some reason (operation-specific).
   InvalidBucketTypeError ::
-       !ByteString
+       ByteString
     -> Error 'SetBucketTypeIndexOp
 
   InvalidNodesError ::
@@ -65,7 +65,7 @@ data Error :: Op -> Type where
 
   -- | The schema is invalid.
   InvalidSchemaError ::
-       !Text
+       Text
     -> Error 'PutSchemaOp
 
   -- | Riak is overloaded.
@@ -89,13 +89,13 @@ data Error :: Op -> Type where
 
   -- | An error was returned by the underlying handle, not Riak itself.
   HandleError ::
-       !Handle.HandleError
+       Handle.HandleError
     -> Error op
 
   -- | An error was returned by Riak, but this library couldn't parse it. Please
   -- file an issue!
   UnknownError ::
-       !Text
+       Text
     -> Error op
 
 deriving stock instance Eq (Error op)

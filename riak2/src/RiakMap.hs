@@ -32,10 +32,10 @@ import qualified Data.Riak.Proto as Proto
 -- Maps must be stored in a bucket type with the __@datatype = map@__ property.
 data ConvergentMap a
   = ConvergentMap
-  { _context :: !Context
-  , _key :: !Key
-  , _newValue :: !a
-  , _oldValue :: !a
+  { _context :: Context
+  , _key :: Key
+  , _newValue :: a
+  , _oldValue :: a
   } deriving stock (Functor, Generic, Show)
 
 -- | Create a new eventually-convergent map.

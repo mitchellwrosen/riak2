@@ -12,8 +12,8 @@ import qualified Data.Riak.Proto as Proto
 
 data ReadQuorum
   = ReadQuorum
-  { nodes :: !Quorum
-  , primary :: !Quorum
+  { nodes :: Quorum
+  , primary :: Quorum
   } deriving stock (Eq, Generic, Show)
 
 fromProto ::

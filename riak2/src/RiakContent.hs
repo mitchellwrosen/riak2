@@ -14,14 +14,14 @@ import qualified Data.HashMap.Strict as HashMap
 -- | Object content.
 data Content a
   = Content
-  { charset :: !(Maybe ByteString) -- ^ Charset
-  , encoding :: !(Maybe ByteString) -- ^ Content encoding
-  , indexes :: ![SecondaryIndex] -- ^ Secondary indexes
-  , lastModified :: !UTCTime -- ^ Last modified.
-  , metadata :: !(HashMap ByteString ByteString) -- ^ User metadata
-  , type' :: !(Maybe ByteString) -- ^ Content type
-  , ttl :: !(Maybe Word32) -- ^ Time to live. Unused on write. TODO NominalDiffTime
-  , value :: !a -- ^ Value
+  { charset :: Maybe ByteString -- ^ Charset
+  , encoding :: Maybe ByteString -- ^ Content encoding
+  , indexes :: [SecondaryIndex] -- ^ Secondary indexes
+  , lastModified :: UTCTime -- ^ Last modified.
+  , metadata :: HashMap ByteString ByteString -- ^ User metadata
+  , type' :: Maybe ByteString -- ^ Content type
+  , ttl :: Maybe Word32 -- ^ Time to live. Unused on write. TODO NominalDiffTime
+  , value :: a -- ^ Value
   } deriving stock (Eq, Functor, Generic, Show)
 
 -- | Create a new content from a value.

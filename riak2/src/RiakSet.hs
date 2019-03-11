@@ -31,10 +31,10 @@ import qualified Data.Riak.Proto as Proto
 -- Sets must be stored in a bucket type with the__@datatype = set@__ property.
 data ConvergentSet a
   = ConvergentSet
-  { _context :: !Context
-  , _key :: !Key
-  , _newValue :: !(HashSet a)
-  , _oldValue :: !(HashSet a)
+  { _context :: Context
+  , _key :: Key
+  , _newValue :: HashSet a
+  , _oldValue :: HashSet a
   } deriving stock (Generic, Show)
 
 -- | Create a new eventually-convergent set.

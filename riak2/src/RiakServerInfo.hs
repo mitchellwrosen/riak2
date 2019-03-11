@@ -12,8 +12,8 @@ import qualified Data.Riak.Proto as Proto
 
 data ServerInfo
   = ServerInfo
-  { name :: !Text
-  , version :: !Text
+  { name :: Text
+  , version :: Text
   } deriving stock (Eq, Generic, Show)
 
 -- | Get server info.

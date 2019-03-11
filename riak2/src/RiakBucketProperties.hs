@@ -25,59 +25,59 @@ data BucketProperties
 
 data CounterBucketProperties
   = CounterBucketProperties
-  { index :: !(Maybe IndexName) -- ^ Search index
-  , nodes :: !Natural
-  , notfoundBehavior :: !NotfoundBehavior
-  , postcommitHooks :: ![Proto.RpbCommitHook]
-  , precommitHooks :: ![Proto.RpbCommitHook]
-  , readQuorum :: !ReadQuorum
-  , writeQuorum :: !WriteQuorum
+  { index :: Maybe IndexName -- ^ Search index
+  , nodes :: Natural
+  , notfoundBehavior :: NotfoundBehavior
+  , postcommitHooks :: [Proto.RpbCommitHook]
+  , precommitHooks :: [Proto.RpbCommitHook]
+  , readQuorum :: ReadQuorum
+  , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
 
 -- TODO hll precision
 data HyperLogLogBucketProperties
   = HyperLogLogBucketProperties
-  { index :: !(Maybe IndexName) -- ^ Search index
-  , nodes :: !Natural
-  , notfoundBehavior :: !NotfoundBehavior
-  , postcommitHooks :: ![Proto.RpbCommitHook]
-  , precommitHooks :: ![Proto.RpbCommitHook]
-  , readQuorum :: !ReadQuorum
-  , writeQuorum :: !WriteQuorum
+  { index :: Maybe IndexName -- ^ Search index
+  , nodes :: Natural
+  , notfoundBehavior :: NotfoundBehavior
+  , postcommitHooks :: [Proto.RpbCommitHook]
+  , precommitHooks :: [Proto.RpbCommitHook]
+  , readQuorum :: ReadQuorum
+  , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
 
 data MapBucketProperties
   = MapBucketProperties
-  { index :: !(Maybe IndexName) -- ^ Search index
-  , nodes :: !Natural
-  , notfoundBehavior :: !NotfoundBehavior
-  , postcommitHooks :: ![Proto.RpbCommitHook]
-  , precommitHooks :: ![Proto.RpbCommitHook]
-  , readQuorum :: !ReadQuorum
-  , writeQuorum :: !WriteQuorum
+  { index :: Maybe IndexName -- ^ Search index
+  , nodes :: Natural
+  , notfoundBehavior :: NotfoundBehavior
+  , postcommitHooks :: [Proto.RpbCommitHook]
+  , precommitHooks :: [Proto.RpbCommitHook]
+  , readQuorum :: ReadQuorum
+  , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
 
 data ObjectBucketProperties
   = ObjectBucketProperties
-  { conflictResolution :: !(Maybe ConflictResolution)
-  , index :: !(Maybe IndexName) -- ^ Search index
-  , nodes :: !Natural
-  , notfoundBehavior :: !NotfoundBehavior
-  , postcommitHooks :: ![Proto.RpbCommitHook]
-  , precommitHooks :: ![Proto.RpbCommitHook]
-  , readQuorum :: !ReadQuorum
-  , writeQuorum :: !WriteQuorum
+  { conflictResolution :: Maybe ConflictResolution
+  , index :: Maybe IndexName -- ^ Search index
+  , nodes :: Natural
+  , notfoundBehavior :: NotfoundBehavior
+  , postcommitHooks :: [Proto.RpbCommitHook]
+  , precommitHooks :: [Proto.RpbCommitHook]
+  , readQuorum :: ReadQuorum
+  , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
 
 data SetBucketProperties
   = SetBucketProperties
-  { index :: !(Maybe IndexName) -- ^ Search index
-  , nodes :: !Natural
-  , notfoundBehavior :: !NotfoundBehavior
-  , postcommitHooks :: ![Proto.RpbCommitHook]
-  , precommitHooks :: ![Proto.RpbCommitHook]
-  , readQuorum :: !ReadQuorum
-  , writeQuorum :: !WriteQuorum
+  { index :: Maybe IndexName -- ^ Search index
+  , nodes :: Natural
+  , notfoundBehavior :: NotfoundBehavior
+  , postcommitHooks :: [Proto.RpbCommitHook]
+  , precommitHooks :: [Proto.RpbCommitHook]
+  , readQuorum :: ReadQuorum
+  , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
 
 -- | The conflict resolution strategy used by Riak, for normal KV (non-CRDT)

@@ -12,9 +12,9 @@ import qualified Data.Riak.Proto as Proto
 
 data WriteQuorum
   = WriteQuorum
-  { durable :: !Quorum
-  , nodes :: !Quorum
-  , primary :: !Quorum
+  { durable :: Quorum
+  , nodes :: Quorum
+  , primary :: Quorum
   } deriving stock (Eq, Generic, Show)
 
 fromProto ::

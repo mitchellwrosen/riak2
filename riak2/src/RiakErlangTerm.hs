@@ -34,29 +34,29 @@ import qualified Data.Vector                as Vector
 
 -- TODO ErlSmallAtomUtf8
 data ErlangTerm
-  -- ErlAtomCacheRef !Word8
-  = ErlAtom !Text -- Latin1
-  | ErlAtomUtf8 !Text
-  | ErlBinary !ByteString
+  -- ErlAtomCacheRef Word8
+  = ErlAtom Text -- Latin1
+  | ErlAtomUtf8 Text
+  | ErlBinary ByteString
   -- ErlBitBinary ...
   -- ErlExport ...
-  | ErlInteger !Int32
+  | ErlInteger Int32
   -- ErlLargeBig ...
-  -- ErlLargeTuple !(Vector ErlangTerm)
-  | ErlList !(Vector ErlangTerm) !ErlangTerm
-  -- ErlMap !(HashMap ErlangTerm ErlangTerm)
+  -- ErlLargeTuple (Vector ErlangTerm)
+  | ErlList (Vector ErlangTerm) ErlangTerm
+  -- ErlMap (HashMap ErlangTerm ErlangTerm)
   -- ErlNewFloat ...
   -- ErlNewFun ...
   -- ErlNewReference ...
   | ErlNil
-  -- ErlPid !ByteString !Word32 !Word32 !Word8
-  -- ErlPort !ByteString !Word32 !Word8
+  -- ErlPid ByteString Word32 Word32 Word8
+  -- ErlPort ByteString Word32 Word8
   -- ErlSmallAtomUtf8 ...
   -- ErlSmallBig ...
-  | ErlSmallBig !Integer
-  | ErlSmallInteger !Word8
-  | ErlSmallTuple !(Vector ErlangTerm)
-  -- ErlString !ByteString
+  | ErlSmallBig Integer
+  | ErlSmallInteger Word8
+  | ErlSmallTuple (Vector ErlangTerm)
+  -- ErlString ByteString
   deriving (Eq, Show)
 
 
