@@ -18,17 +18,17 @@ module RiakBucket
 
 import RiakBinaryIndexQuery (BinaryIndexQuery(..))
 import RiakBucketInternal   (Bucket(..))
-import RiakBucketProperties (BucketProperties)
 import RiakError
 import RiakHandle           (Handle, HandleError)
 import RiakIndexName        (IndexName(..))
 import RiakIntIndexQuery    (IntIndexQuery(..))
 import RiakKey              (Key(..))
+import RiakSomeBucketProps  (SomeBucketProps)
 import RiakUtils            (bs2int, int2bs, retrying)
 
 import qualified RiakBinaryIndexQuery as BinaryIndexQuery
-import qualified RiakBucketProperties as BucketProperties
 import qualified RiakHandle           as Handle
+import qualified RiakSomeBucketProps  as SomeBucketProps
 
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       (folded, to, (.~), (^.))
@@ -45,7 +45,7 @@ getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either GetBucketError (Maybe BucketProperties))
+  -> m (Either GetBucketError (Maybe SomeBucketProps))
 getBucket handle bucket = liftIO $
   Handle.getBucket handle request >>= \case
     Left err ->
@@ -55,7 +55,7 @@ getBucket handle bucket = liftIO $
       pure (parseGetBucketError err)
 
     Right (Right response) ->
-      pure (Right (Just (BucketProperties.fromProto (response ^. Proto.props))))
+      pure (Right (Just (SomeBucketProps.fromProto (response ^. Proto.props))))
 
   where
     request :: Proto.RpbGetBucketReq
@@ -65,7 +65,7 @@ getBucket handle bucket = liftIO $
 
 parseGetBucketError ::
      ByteString
-  -> Either GetBucketError (Maybe BucketProperties)
+  -> Either GetBucketError (Maybe a)
 parseGetBucketError err
   | isBucketTypeDoesNotExistError4 err =
       Right Nothing

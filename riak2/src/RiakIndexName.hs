@@ -1,6 +1,15 @@
-module RiakIndexName where
+module RiakIndexName
+  ( IndexName(..)
+  , makeIndexName
+  , unsafeMakeIndexName
+  , fromBucketProps
+  ) where
 
-import qualified Data.Text as Text
+import Control.Lens       ((^.))
+import Data.Text.Encoding (decodeUtf8)
+
+import qualified Data.Riak.Proto as Proto
+import qualified Data.Text       as Text
 
 
 -- | An valid index name contains ASCII characters in the range @32-127@, less
@@ -23,3 +32,8 @@ makeIndexName name = do
 unsafeMakeIndexName :: Text -> IndexName
 unsafeMakeIndexName =
   IndexName
+
+fromBucketProps :: Proto.RpbBucketProps -> Maybe IndexName
+fromBucketProps props =
+  IndexName . decodeUtf8 <$>
+    (props ^. Proto.maybe'searchIndex)

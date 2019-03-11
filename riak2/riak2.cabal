@@ -43,7 +43,7 @@ description:
   * "Riak.BucketType"
   * "Riak.Bucket"
   * "Riak.Key"
-  * "Riak.BucketProperties"
+  * "Riak.BucketProps"
   .
   Secondary index types:
   .
@@ -93,7 +93,7 @@ library
   exposed-modules:
     Riak
     Riak.Bucket
-    Riak.BucketProperties
+    Riak.BucketProps
     Riak.BucketType
     Riak.Content
     Riak.Context
@@ -189,7 +189,7 @@ library riak2-internal
   exposed-modules:
     RiakBinaryIndexQuery
     RiakBucket
-    RiakBucketProperties
+    RiakBucketProps
     RiakBucketType
     RiakBusPool
     RiakContent
@@ -203,12 +203,14 @@ library riak2-internal
     RiakGetOpts
     RiakHandle
     RiakHyperLogLog
+    RiakHyperLogLogBucketProps
     RiakIndex
     RiakIndexName
     RiakIntIndexQuery
     RiakKey
     RiakManagedBus
     RiakMap
+    RiakMapBucketProps
     RiakMapReduce
     RiakMapReduceFunction
     RiakMapReducePhase
@@ -226,7 +228,9 @@ library riak2-internal
     RiakSecondaryIndexValue
     RiakServerInfo
     RiakSet
+    RiakSetBucketProps
     RiakSibling
+    RiakSomeBucketProps
     RiakWriteQuorum
 
   ghc-options:

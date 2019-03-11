@@ -1,5 +1,5 @@
-module RiakCounterBucketProps
-  ( CounterBucketProps(..)
+module RiakSetBucketProps
+  ( SetBucketProps(..)
   , fromProto
   ) where
 
@@ -18,8 +18,8 @@ import Control.Lens ((^.))
 import qualified Data.Riak.Proto as Proto
 
 
-data CounterBucketProps
-  = CounterBucketProps
+data SetBucketProps
+  = SetBucketProps
   { index :: Maybe IndexName -- ^ Search index
   , nodes :: Natural
   , notfoundBehavior :: NotfoundBehavior
@@ -29,10 +29,10 @@ data CounterBucketProps
   , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
 
--- | Parse from bucket props. Does not check that datatype is "counter".
-fromProto :: Proto.RpbBucketProps -> CounterBucketProps
+-- | Parse from bucket props. Does not check that datatype is "set".
+fromProto :: Proto.RpbBucketProps -> SetBucketProps
 fromProto props =
-  CounterBucketProps
+  SetBucketProps
     { index            = IndexName.fromBucketProps props
     , nodes            = fromIntegral (props ^. Proto.nVal)
     , notfoundBehavior = NotfoundBehavior.fromProto props

@@ -29,7 +29,6 @@ module RiakHandle
   ) where
 
 import Libriak.Connection (Endpoint)
-import Libriak.Response   (Response(..))
 import RiakBusPool        (BusPool, createBusPool)
 import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..))
 import RiakUtils          (difftimeToMicros)

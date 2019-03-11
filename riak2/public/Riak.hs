@@ -69,7 +69,7 @@ module Riak
   , BinaryIndexQuery(..)
   , inBucket
   , Bucket(..)
-  , BucketProperties(..)
+  , BucketProps(..)
   , BucketType
   , defaultBucketType
   , ConflictResolution(..)
@@ -90,7 +90,7 @@ module Riak
   , newSet
   , setKey
   , setValue
-  , CounterBucketProperties(..)
+  , CounterBucketProps(..)
   , ErlangTerm(..)
   , Error(..)
   , EventHandlers(..)
@@ -110,7 +110,7 @@ module Riak
   , Handle
   , HandleConfig(..)
   , HandleError(..)
-  , HyperLogLogBucketProperties(..)
+  , HyperLogLogBucketProps(..)
   , Index(..)
   , IndexName
   , makeIndexName
@@ -124,7 +124,7 @@ module Riak
   , generatedKey
   , ListBucketsError
   , ListKeysError
-  , MapBucketProperties(..)
+  , MapBucketProps(..)
   , MapReduceBucketError
   , MapReduceFunction(..)
   , MapReducePhase(..)
@@ -136,7 +136,6 @@ module Riak
   , NotfoundBehavior(..)
   , Object(..)
   , newObject
-  , ObjectBucketProperties(..)
   , Op(..)
   , PutError
   , PutIndexError
@@ -157,9 +156,10 @@ module Riak
   , SecondaryIndex(..)
   , SecondaryIndexValue(..)
   , ServerInfo(..)
-  , SetBucketProperties(..)
+  , SetBucketProps(..)
   , SetBucketTypeIndexError
   , Sibling(..)
+  , SomeBucketProps(..)
   , UpdateCounterError
   , UpdateHyperLogLogError
   , WriteQuorum(..)
@@ -174,13 +174,11 @@ module Riak
 -- TODO rename Config/Error export them
 import Libriak.Connection         (Endpoint(..))
 import Riak.Bucket
-import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
-                                   CounterBucketProperties(..),
-                                   HyperLogLogBucketProperties(..),
-                                   MapBucketProperties(..),
-                                   NotfoundBehavior(..),
-                                   ObjectBucketProperties(..),
-                                   SetBucketProperties(..))
+import Riak.BucketProps           (BucketProps(..), ConflictResolution(..),
+                                   CounterBucketProps(..),
+                                   HyperLogLogBucketProps(..),
+                                   MapBucketProps(..), NotfoundBehavior(..),
+                                   SetBucketProps(..), SomeBucketProps(..))
 import Riak.BucketType
 import Riak.Content
 import Riak.Context

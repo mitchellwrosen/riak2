@@ -88,8 +88,6 @@ module RiakManagedBus
   , setBucket
   , setBucketType
   , updateCrdt
-
-  , stream
   ) where
 
 import Libriak.Connection (ConnectException, ConnectionError, Endpoint,
@@ -107,8 +105,6 @@ import Control.Exception.Safe (throwIO, tryAny, tryAsync, uninterruptibleMask)
 import Control.Foldl          (FoldM)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
-import GHC.TypeLits           (KnownNat)
--- import System.Mem.Weak        (Weak, deRefWeak)
 
 import qualified Data.Riak.Proto as Proto
 
@@ -875,14 +871,3 @@ updateCrdt ::
 updateCrdt bus request =
   withHandle bus $ \handle ->
     Handle.updateCrdt handle request
-
-stream ::
-     forall code r.
-     KnownNat code
-  => ManagedBus -- ^
-  -> Request code -- ^
-  -> FoldM IO (Response code) r
-  -> IO (Either ManagedBusError (Either ByteString r))
-stream managedBus request responseFold =
-  withHandle managedBus $ \handle ->
-    Handle.stream handle request responseFold

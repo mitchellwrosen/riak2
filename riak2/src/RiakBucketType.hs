@@ -9,15 +9,15 @@ module RiakBucketType
   ) where
 
 import RiakBucket             (Bucket(..))
-import RiakBucketProperties   (BucketProperties)
 import RiakBucketTypeInternal (BucketType, defaultBucketType)
 import RiakError
 import RiakHandle             (Handle)
 import RiakIndexName          (IndexName(..))
+import RiakSomeBucketProps    (SomeBucketProps)
 import RiakUtils              (retrying)
 
-import qualified RiakBucketProperties as BucketProperties
-import qualified RiakHandle           as Handle
+import qualified RiakHandle          as Handle
+import qualified RiakSomeBucketProps as SomeBucketProps
 
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~), (^.))
@@ -32,7 +32,7 @@ getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either GetBucketTypeError (Maybe BucketProperties))
+  -> m (Either GetBucketTypeError (Maybe SomeBucketProps))
 getBucketType handle bucketType = liftIO $
   Handle.getBucketType handle bucketType >>= \case
     Left err ->
@@ -42,16 +42,18 @@ getBucketType handle bucketType = liftIO $
       pure (parseGetBucketTypeError err)
 
     Right (Right response) ->
-      pure (Right (Just (BucketProperties.fromProto (response ^. Proto.props))))
+      pure (Right (Just (SomeBucketProps.fromProto (response ^. Proto.props))))
 
 parseGetBucketTypeError ::
      ByteString
-  -> Either GetBucketTypeError (Maybe BucketProperties)
+  -> Either GetBucketTypeError (Maybe a)
 parseGetBucketTypeError err
   | isBucketTypeDoesNotExistError3 err =
       Right Nothing
   | otherwise =
       Left (UnknownError (decodeUtf8 err))
+
+-- TODO getCounterBucketType, getHyperLogLogBucketType, getMapBucketType, getSetBucketType
 
 -- | Set the index of a bucket type.
 --

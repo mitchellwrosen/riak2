@@ -21,7 +21,7 @@ import Data.Int                as X (Int64)
 import Data.IORef              as X
 import Data.Kind               as X (Type)
 import Data.List.NonEmpty      as X (NonEmpty)
-import Data.Maybe              as X (fromMaybe)
+import Data.Maybe              as X (fromMaybe, isNothing)
 import Data.Set                as X (Set)
 import Data.Text               as X (Text)
 import Data.Void               as X (Void, absurd)
