@@ -99,7 +99,7 @@ doMapReduce_ handle input phases responseFold =
     Handle.mapReduce
       handle
       request
-      (lmap (\(RespRpbMapRed response) -> response) responseFold)
+      responseFold
 
   where
     request :: Proto.RpbMapRedReq

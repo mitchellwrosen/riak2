@@ -53,6 +53,7 @@ import Data.ByteString         (ByteString)
 import Data.Function           (on)
 import Data.IORef              (IORef, newIORef, readIORef, writeIORef)
 import Data.Kind               (Type)
+import Data.Profunctor         (lmap)
 import GHC.TypeLits            (KnownNat)
 
 import qualified Data.Riak.Proto as Proto
@@ -231,26 +232,35 @@ getServerInfo handle =
 listBuckets ::
      Handle
   -> Proto.RpbListBucketsReq
-  -> FoldM IO (Response 16) r
+  -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either HandleError (Either ByteString r))
-listBuckets handle request =
-  stream handle (ReqRpbListBuckets request)
+listBuckets handle request responseFold =
+  stream
+    handle
+    (ReqRpbListBuckets request)
+    (lmap (\(RespRpbListBuckets response) -> response) responseFold)
 
 listKeys ::
      Handle
   -> Proto.RpbListKeysReq
-  -> FoldM IO (Response 18) r
+  -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either HandleError (Either ByteString r))
-listKeys handle request =
-  stream handle (ReqRpbListKeys request)
+listKeys handle request responseFold =
+  stream
+    handle
+    (ReqRpbListKeys request)
+    (lmap (\(RespRpbListKeys response) -> response) responseFold)
 
 mapReduce ::
      Handle
   -> Proto.RpbMapRedReq
-  -> FoldM IO (Response 24) r
+  -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either HandleError (Either ByteString r))
-mapReduce handle request =
-  stream handle (ReqRpbMapRed request)
+mapReduce handle request responseFold =
+  stream
+    handle
+    (ReqRpbMapRed request)
+    (lmap (\(RespRpbMapRed response) -> response) responseFold)
 
 ping ::
      Handle
@@ -334,10 +344,13 @@ search handle request =
 secondaryIndex ::
      Handle
   -> Proto.RpbIndexReq
-  -> FoldM IO (Response 26) r
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either HandleError (Either ByteString r))
-secondaryIndex handle request =
-  stream handle (ReqRpbIndex request)
+secondaryIndex handle request responseFold =
+  stream
+    handle
+    (ReqRpbIndex request)
+    (lmap (\(RespRpbIndex response) -> response) responseFold)
 
 updateCrdt ::
      Handle -- ^

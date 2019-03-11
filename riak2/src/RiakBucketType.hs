@@ -8,7 +8,6 @@ module RiakBucketType
   , streamBuckets
   ) where
 
-import Libriak.Response       (Response(..))
 import RiakBucket             (Bucket(..))
 import RiakBucketProperties   (BucketProperties)
 import RiakBucketTypeInternal (BucketType, defaultBucketType)
@@ -200,14 +199,11 @@ makeResponseFold ::
      forall m r. Monad m
   => ByteString
   -> FoldM m Bucket r
-  -> FoldM m (Response 16) r
+  -> FoldM m Proto.RpbListBucketsResp r
 makeResponseFold bucketType =
   Foldl.handlesM handler
 
   where
-    handler :: Foldl.HandlerM m (Response 16) Bucket
+    handler :: Foldl.HandlerM m Proto.RpbListBucketsResp Bucket
     handler =
-      to (\(RespRpbListBuckets response) -> response) .
-      Proto.buckets .
-      folded .
-      to (Bucket bucketType)
+      Proto.buckets . folded . to (Bucket bucketType)

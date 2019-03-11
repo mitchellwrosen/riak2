@@ -16,7 +16,6 @@ module RiakBucket
   , streamKeys
   ) where
 
-import Libriak.Response     (Response(..))
 import RiakBinaryIndexQuery (BinaryIndexQuery(..))
 import RiakBucketInternal   (Bucket(..))
 import RiakBucketProperties (BucketProperties)
@@ -165,9 +164,9 @@ queryBinaryIndex handle query@(BinaryIndexQuery { bucket, minValue, maxValue }) 
         & Proto.qtype .~ Proto.RpbIndexReq'range -- TODO perform exact query if min == max
         & Proto.stream .~ True
 
-    handler :: Foldl.HandlerM IO (Response 26) Key
+    handler :: Foldl.HandlerM IO Proto.RpbIndexResp Key
     handler =
-      to (\(RespRpbIndex response) -> response) . Proto.keys . folded . to mkKey
+      Proto.keys . folded . to mkKey
 
     mkKey :: ByteString -> Key
     mkKey =
@@ -202,9 +201,9 @@ queryBinaryIndexTerms handle query@(BinaryIndexQuery { bucket, minValue, maxValu
         & Proto.qtype .~ Proto.RpbIndexReq'range
         & Proto.stream .~ True
 
-    handler :: Foldl.HandlerM IO (Response 26) (ByteString, Key)
+    handler :: Foldl.HandlerM IO Proto.RpbIndexResp (ByteString, Key)
     handler =
-     to (\(RespRpbIndex response) -> response) . Proto.results . folded . to fromResult
+     Proto.results . folded . to fromResult
 
     fromResult :: Proto.RpbPair -> (ByteString, Key)
     fromResult pair =
@@ -240,9 +239,9 @@ queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold
         & Proto.qtype .~ Proto.RpbIndexReq'range
         & Proto.stream .~ True
 
-    handler :: Foldl.HandlerM IO (Response 26) Key
+    handler :: Foldl.HandlerM IO Proto.RpbIndexResp Key
     handler =
-      to (\(RespRpbIndex response) -> response) . Proto.keys . folded . to mkKey
+      Proto.keys . folded . to mkKey
 
     mkKey :: ByteString -> Key
     mkKey =
@@ -275,9 +274,9 @@ queryIntIndexTerms handle IntIndexQuery { bucket, index, minValue, maxValue } ke
         & Proto.qtype .~ Proto.RpbIndexReq'range
         & Proto.stream .~ True
 
-    handler :: Foldl.HandlerM IO (Response 26) (Int64, Key)
+    handler :: Foldl.HandlerM IO Proto.RpbIndexResp (Int64, Key)
     handler =
-      to (\(RespRpbIndex response) -> response) . Proto.results . folded . to fromResult
+      Proto.results . folded . to fromResult
 
     fromResult :: Proto.RpbPair -> (Int64, Key)
     fromResult pair =
@@ -293,7 +292,7 @@ doIndex ::
      forall r.
      Handle
   -> Proto.RpbIndexReq
-  -> FoldM IO (Response 26) r
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either (Error 'SecondaryIndexQueryOp) r)
 doIndex handle request responseFold =
   retrying 1000000 (doIndex_ handle request responseFold)
@@ -302,7 +301,7 @@ doIndex_ ::
      forall r.
      Handle
   -> Proto.RpbIndexReq
-  -> FoldM IO (Response 26) r
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
 doIndex_ handle =
   loop
@@ -310,10 +309,10 @@ doIndex_ handle =
   where
     loop ::
          Proto.RpbIndexReq
-      -> FoldM IO (Response 26) r
+      -> FoldM IO Proto.RpbIndexResp r
       -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
     loop request responseFold = do
-      result :: Either HandleError (Either ByteString (FoldM IO (Response 26) r, Maybe ByteString)) <-
+      result :: Either HandleError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
           handle
           request
@@ -359,7 +358,7 @@ parseSecondaryIndexQueryError bucket err
 doIndexPage ::
      Handle
   -> Proto.RpbIndexReq
-  -> FoldM IO (Response 26) r
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either HandleError (Either ByteString (r, Maybe ByteString)))
 doIndexPage handle request fold =
   Handle.secondaryIndex
@@ -370,10 +369,10 @@ doIndexPage handle request fold =
       <*> continuation)
 
   where
-    continuation :: FoldM IO (Response 26) (Maybe ByteString)
+    continuation :: FoldM IO Proto.RpbIndexResp (Maybe ByteString)
     continuation =
       Foldl.last
-        & lmap ((\(RespRpbIndex response) -> response ^. Proto.maybe'continuation))
+        & lmap (\response -> response ^. Proto.maybe'continuation)
         & Foldl.generalize
         & fmap join
 
@@ -437,7 +436,7 @@ streamKeys_ handle b@(Bucket bucketType bucket) keyFold =
         handle
         request
         (Foldl.handlesM
-          (to (\(RespRpbListKeys response) -> response) . Proto.keys . folded . to (Key bucketType bucket))
+          (Proto.keys . folded . to (Key bucketType bucket))
           keyFold)
 
     request :: Proto.RpbListKeysReq

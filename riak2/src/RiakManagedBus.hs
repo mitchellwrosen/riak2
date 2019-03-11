@@ -75,16 +75,16 @@ module RiakManagedBus
   , getIndex
   , getSchema
   , getServerInfo
-  -- , listBuckets
-  -- , listKeys
-  -- , mapReduce
+  , listBuckets
+  , listKeys
+  , mapReduce
   , ping
   , put
   , putIndex
   , putSchema
   , resetBucket
   , search
-  -- , secondaryIndex
+  , secondaryIndex
   , setBucket
   , setBucketType
   , updateCrdt
@@ -770,29 +770,32 @@ getServerInfo ::
 getServerInfo bus =
   withHandle bus Handle.getServerInfo
 
--- listBuckets ::
---      Handle
---   -> Proto.RpbListBucketsReq
---   -> FoldM IO (Response 16) r
---   -> IO (Either HandleError (Either (Response 0) r))
--- listBuckets handle request =
---   stream handle (ReqRpbListBuckets request)
+listBuckets ::
+     ManagedBus
+  -> Proto.RpbListBucketsReq
+  -> FoldM IO Proto.RpbListBucketsResp r
+  -> IO (Either ManagedBusError (Either ByteString r))
+listBuckets bus request responseFold =
+  withHandle bus $ \handle ->
+    Handle.listBuckets handle request responseFold
 
--- listKeys ::
---      Handle
---   -> Proto.RpbListKeysReq
---   -> FoldM IO (Response 18) r
---   -> IO (Either HandleError (Either (Response 0) r))
--- listKeys handle request =
---   stream handle (ReqRpbListKeys request)
+listKeys ::
+     ManagedBus
+  -> Proto.RpbListKeysReq
+  -> FoldM IO Proto.RpbListKeysResp r
+  -> IO (Either ManagedBusError (Either ByteString r))
+listKeys bus request responseFold =
+  withHandle bus $ \handle ->
+    Handle.listKeys handle request responseFold
 
--- mapReduce ::
---      Handle
---   -> Proto.RpbMapRedReq
---   -> FoldM IO (Response 24) r
---   -> IO (Either HandleError (Either (Response 0) r))
--- mapReduce handle request =
---   stream handle (ReqRpbMapRed request)
+mapReduce ::
+     ManagedBus
+  -> Proto.RpbMapRedReq
+  -> FoldM IO Proto.RpbMapRedResp r
+  -> IO (Either ManagedBusError (Either ByteString r))
+mapReduce bus request responseFold =
+  withHandle bus $ \handle ->
+    Handle.mapReduce handle request responseFold
 
 ping ::
      ManagedBus
@@ -856,13 +859,14 @@ search bus request =
   withHandle bus $ \handle ->
     Handle.search handle request
 
--- secondaryIndex ::
---      Handle
---   -> Proto.RpbIndexReq
---   -> FoldM IO (Response 26) r
---   -> IO (Either HandleError (Either (Response 0) r))
--- secondaryIndex handle request =
---   stream handle (ReqRpbIndex request)
+secondaryIndex ::
+     ManagedBus
+  -> Proto.RpbIndexReq
+  -> FoldM IO Proto.RpbIndexResp r
+  -> IO (Either ManagedBusError (Either ByteString r))
+secondaryIndex bus request responseFold =
+  withHandle bus $ \handle ->
+    Handle.secondaryIndex handle request responseFold
 
 updateCrdt ::
      ManagedBus -- ^

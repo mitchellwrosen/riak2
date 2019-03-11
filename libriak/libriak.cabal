@@ -13,6 +13,7 @@ library
     lens,
     lens-labels,
     primitive,
+    profunctors,
     proto-lens ^>= 0.4.0,
     riak-protobuf ^>= 1.0.0,
     safe-exceptions,

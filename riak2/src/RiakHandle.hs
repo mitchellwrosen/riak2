@@ -29,7 +29,6 @@ module RiakHandle
   ) where
 
 import Libriak.Connection (Endpoint)
-import Libriak.Request    (Request(..))
 import Libriak.Response   (Response(..))
 import RiakBusPool        (BusPool, createBusPool)
 import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..))
@@ -41,7 +40,6 @@ import qualified RiakManagedBus as ManagedBus
 import Control.Foldl (FoldM)
 import Control.Lens  ((.~))
 import Data.Time     (NominalDiffTime)
-import GHC.TypeLits  (KnownNat)
 
 import qualified Data.Riak.Proto as Proto
 
@@ -250,26 +248,29 @@ getServerInfo handle =
 listBuckets ::
      Handle
   -> Proto.RpbListBucketsReq
-  -> FoldM IO (Response 16) r
+  -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either HandleError (Either ByteString r))
-listBuckets handle request =
-  stream handle (ReqRpbListBuckets request)
+listBuckets handle request responseFold =
+  withManagedBus handle $ \bus ->
+    ManagedBus.listBuckets bus request responseFold
 
 listKeys ::
      Handle
   -> Proto.RpbListKeysReq
-  -> FoldM IO (Response 18) r
+  -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either HandleError (Either ByteString r))
-listKeys handle request =
-  stream handle (ReqRpbListKeys request)
+listKeys handle request responseFold =
+  withManagedBus handle $ \bus ->
+    ManagedBus.listKeys bus request responseFold
 
 mapReduce ::
      Handle
   -> Proto.RpbMapRedReq
-  -> FoldM IO (Response 24) r
+  -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either HandleError (Either ByteString r))
-mapReduce handle request =
-  stream handle (ReqRpbMapRed request)
+mapReduce handle request responseFold =
+  withManagedBus handle $ \bus ->
+    ManagedBus.mapReduce bus request responseFold
 
 ping ::
      Handle
@@ -342,10 +343,11 @@ search handle request =
 secondaryIndex ::
      Handle
   -> Proto.RpbIndexReq
-  -> FoldM IO (Response 26) r
+  -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either HandleError (Either ByteString r))
-secondaryIndex handle request =
-  stream handle (ReqRpbIndex request)
+secondaryIndex handle request responseFold =
+  withManagedBus handle $ \bus ->
+    ManagedBus.secondaryIndex bus request responseFold
 
 updateCrdt ::
      Handle -- ^
@@ -354,59 +356,3 @@ updateCrdt ::
 updateCrdt handle request =
   withManagedBus handle $ \bus ->
     ManagedBus.updateCrdt bus request
-
--- | Send a request and stream the response (one or more messages).
-stream ::
-     ∀ code r.
-     KnownNat code
-  => Handle -- ^
-  -> Request code -- ^
-  -> FoldM IO (Response code) r
-  -> IO (Either HandleError (Either ByteString r))
-stream Handle { pool, retries } request responseFold =
-  BusPool.withManagedBus pool $ \managedBus ->
-    doExchangeOrStream
-      retries
-      (ManagedBus.stream
-        managedBus
-        request
-        responseFold)
-      0
-
-doExchangeOrStream ::
-     forall a.
-     Natural
-  -> IO (Either ManagedBusError (Either ByteString a))
-  -> Natural
-  -> IO (Either HandleError (Either ByteString a))
-doExchangeOrStream retries action =
-  loop
-
-  where
-    loop ::
-         Natural
-      -> IO (Either HandleError (Either ByteString a))
-    loop attempts =
-      if attempts > retries
-        then
-          -- TODO accumulate errors and return them
-          pure (Left HandleRetryError)
-
-        else
-          action >>= \case
-            Left ManagedBusTimeoutError ->
-              pure (Left HandleTimeoutError)
-
-            Left ManagedBusPipelineError ->
-              loop attempts
-
-            Left (ManagedBusConnectionError _) ->
-              loop (attempts+1)
-
-            -- Weird to treat a decode error (very unexpected) like a
-            -- connection error (expected)
-            Left (ManagedBusDecodeError _) ->
-              loop (attempts+1)
-
-            Right response ->
-              pure (Right response)
