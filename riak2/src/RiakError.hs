@@ -123,6 +123,7 @@ data Op
   | SecondaryIndexQueryOp
   | SetBucketIndexOp
   | SetBucketTypeIndexOp
+  | UnsetBucketIndexOp
   | UpdateCrdtOp
 
 type DeleteError               = Error 'DeleteOp
@@ -153,6 +154,7 @@ type QueryRangeError           = Error 'SecondaryIndexQueryOp
 type SearchError               = Error 'SearchOp
 type SetBucketIndexError       = Error 'SetBucketIndexOp
 type SetBucketTypeIndexError   = Error 'SetBucketTypeIndexOp
+type UnsetBucketIndexError     = Error 'UnsetBucketIndexOp
 type UpdateCounterError        = Error 'UpdateCrdtOp
 type UpdateHyperLogLogError    = Error 'UpdateCrdtOp
 
@@ -164,6 +166,7 @@ type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
+  MayReturnBucketTypeDoesNotExist 'UnsetBucketIndexOp = 'True
   MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp = 'True
   MayReturnBucketTypeDoesNotExist _ = 'False
 

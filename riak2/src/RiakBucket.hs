@@ -77,6 +77,8 @@ bucketBucketSegment f (Bucket bucketType bucket) =
 --
 -- If you know the bucket's type ahead of time, prefer 'getCounterBucket',
 -- 'getHyperLogLogBucket', 'getMapBucket', or 'getSetBucket'.
+--
+-- TODO don't return a Maybe here, use BucketTypeDoesNotExistError instead
 getBucket ::
      MonadIO m
   => Handle -- ^
@@ -110,12 +112,12 @@ getBucket handle bucket = liftIO $
 -- Prefer this to 'getBucket' if you are certain the given bucket contains
 -- counters.
 --
--- +--------------------------+----------------------------------------+
--- | Error                    | Meaning                                |
--- +==========================+========================================+
--- | 'InvalidBucketTypeError' | The given bucket does not contain      |
--- |                          | counters (@datatype = counter@).       |
--- +--------------------------+----------------------------------------+
+-- +--------------------------+------------------------------------------------+
+-- | Error                    | Meaning                                        |
+-- +==========================+================================================+
+-- | 'InvalidBucketTypeError' | The bucket does not contain counters           |
+-- |                          | (@datatype = counter@).                        |
+-- +--------------------------+------------------------------------------------+
 getCounterBucket ::
      MonadIO m
   => Handle -- ^
@@ -152,12 +154,12 @@ getCounterBucket handle bucket@(Bucket bucketType _) = liftIO $
 -- Prefer this to 'getBucket' if you are certain the given bucket contains
 -- HyperLogLogs.
 --
--- +--------------------------+----------------------------------------+
--- | Error                    | Meaning                                |
--- +==========================+========================================+
--- | 'InvalidBucketTypeError' | The given bucket does not contain      |
--- |                          | HyperLogLogs (@datatype = hll@).       |
--- +--------------------------+----------------------------------------+
+-- +--------------------------+------------------------------------------------+
+-- | Error                    | Meaning                                        |
+-- +==========================+================================================+
+-- | 'InvalidBucketTypeError' | The bucket does not contain HyperLogLogs       |
+-- |                          | (@datatype = hll@).                            |
+-- +--------------------------+------------------------------------------------+
 getHyperLogLogBucket ::
      MonadIO m
   => Handle -- ^
@@ -194,12 +196,12 @@ getHyperLogLogBucket handle bucket@(Bucket bucketType _) = liftIO $
 -- Prefer this to 'getBucket' if you are certain the given bucket contains
 -- maps.
 --
--- +--------------------------+----------------------------------------+
--- | Error                    | Meaning                                |
--- +==========================+========================================+
--- | 'InvalidBucketTypeError' | The given bucket does not contain maps |
--- |                          | (@datatype = map@).                    |
--- +--------------------------+----------------------------------------+
+-- +--------------------------+------------------------------------------------+
+-- | Error                    | Meaning                                        |
+-- +==========================+================================================+
+-- | 'InvalidBucketTypeError' | The bucket does not contain maps               |
+-- |                          | (@datatype = map@).                            |
+-- +--------------------------+------------------------------------------------+
 getMapBucket ::
      MonadIO m
   => Handle -- ^
@@ -236,12 +238,12 @@ getMapBucket handle bucket@(Bucket bucketType _) = liftIO $
 -- Prefer this to 'getBucket' if you are certain the given bucket contains
 -- sets.
 --
--- +--------------------------+----------------------------------------+
--- | Error                    | Meaning                                |
--- +==========================+========================================+
--- | 'InvalidBucketTypeError' | The given bucket does not contain sets |
--- |                          | (@datatype = set@).                    |
--- +--------------------------+----------------------------------------+
+-- +--------------------------+------------------------------------------------+
+-- | Error                    | Meaning                                        |
+-- +==========================+================================================+
+-- | 'InvalidBucketTypeError' | The bucket does not contain sets               |
+-- |                          | (@datatype = set@).                            |
+-- +--------------------------+------------------------------------------------+
 getSetBucket ::
      MonadIO m
   => Handle -- ^
@@ -283,6 +285,20 @@ parseGetBucketError err
       Left (UnknownError (decodeUtf8 err))
 
 -- | Set the index of a bucket.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
+-- | 'IndexDoesNotExistError'      | The index does not exist. You must first  |
+-- |                               | create it with 'Riak.Index.putIndex'.     |
+-- +-------------------------------+-------------------------------------------+
+-- | 'InvalidNodesError'           | The index's @nodes@ value does not equal  |
+-- |                               | the bucket's @nodes@ value.               |
+-- +-------------------------------+-------------------------------------------+
 setBucketIndex ::
      MonadIO m
   => Handle -- ^
@@ -290,29 +306,11 @@ setBucketIndex ::
   -> IndexName -- ^ Index name
   -> m (Either SetBucketIndexError ())
 setBucketIndex handle bucket@(Bucket bucketType _) index = liftIO $
-  fromResult <$> Handle.setBucket handle request
-
-  where
-    request :: Proto.RpbSetBucketReq
-    request =
-      Proto.defMessage
-        & setProto bucket
-        & Proto.props .~
-            (Proto.defMessage
-              & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
-
-    fromResult ::
-         Either HandleError (Either ByteString ())
-      -> Either SetBucketIndexError ()
-    fromResult = \case
-      Left err ->
-        Left (HandleError err)
-
-      Right (Left err) ->
-        Left (parseSetBucketIndexError bucketType index err)
-
-      Right (Right ()) ->
-        Right ()
+  setBucketIndex_
+    handle
+    bucket
+    index
+    (parseSetBucketIndexError bucketType index)
 
 parseSetBucketIndexError ::
      ByteString
@@ -330,13 +328,67 @@ parseSetBucketIndexError bucketType index err
       UnknownError (decodeUtf8 err)
 
 -- | Unset the index of a bucket.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 unsetBucketIndex ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either SetBucketIndexError ())
-unsetBucketIndex handle bucket =
-  setBucketIndex handle bucket (IndexName "_dont_index_")
+  -> m (Either UnsetBucketIndexError ())
+unsetBucketIndex handle bucket@(Bucket bucketType _) = liftIO $
+  setBucketIndex_
+    handle
+    bucket
+    (IndexName "_dont_index_")
+    (parseUnsetBucketIndexError bucketType)
+
+parseUnsetBucketIndexError ::
+     ByteString
+  -> ByteString
+  -> UnsetBucketIndexError
+parseUnsetBucketIndexError bucketType err
+  | isBucketTypeDoesNotExistError4 err =
+      BucketTypeDoesNotExistError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)
+
+setBucketIndex_ ::
+     forall op.
+     Handle
+  -> Bucket
+  -> IndexName
+  -> (ByteString -> Error op)
+  -> IO (Either (Error op) ())
+setBucketIndex_ handle bucket index parseError = liftIO $
+  fromResult <$> Handle.setBucket handle request
+
+  where
+    request :: Proto.RpbSetBucketReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+        & Proto.props .~
+            (Proto.defMessage
+              & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
+
+    fromResult ::
+         Either HandleError (Either ByteString ())
+      -> Either (Error op) ()
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseError err)
+
+      Right (Right ()) ->
+        Right ()
 
 -- | Reset bucket properties.
 resetBucket ::

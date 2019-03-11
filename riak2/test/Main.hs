@@ -2,12 +2,11 @@
 
 module Main where
 
-import Libriak.Connection      (Endpoint(..))
 import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
 import RiakBucket              (Bucket(..), getBucket, getCounterBucket,
                                 getHyperLogLogBucket, getMapBucket,
                                 getSetBucket, queryBinaryIndex, queryIntIndex,
-                                setBucketIndex)
+                                setBucketIndex, unsetBucketIndex)
 import RiakBucketProps         (BucketProps(..))
 import RiakBucketType          (defaultBucketType)
 import RiakContent             (Content, newContent)
@@ -40,6 +39,7 @@ import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
 import Data.Text             (Text)
 import Net.IPv4              (ipv4)
+import Socket.Stream.IPv4    (Endpoint(..))
 import System.Random         (randomRIO)
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -319,7 +319,19 @@ riakBucketTests handle =
 
   , testGroup "streamKeys" [ ]
 
-  , testGroup "unsetBucketIndex" [ ]
+  , testGroup "unsetBucketIndex"
+    [ testCase "success" $ do
+        bucket <- randomDefaultBucket
+        setBucketIndex handle bucket index3 `shouldReturn` Right ()
+        unsetBucketIndex handle bucket `shouldReturn` Right ()
+
+    , testGroup "failures"
+      [ testCase "bucket type does not exist" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          unsetBucketIndex handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
   ]
 
 riakIndexTests :: Handle -> [TestTree]
