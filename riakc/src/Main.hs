@@ -390,7 +390,7 @@ getCounterParser =
       -> Handle
       -> IO ()
     doGetCounter key nodes quorum handle =
-      getConvergentCounter handle key opts >>= \case
+      getCounter handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -448,7 +448,7 @@ getMapParser =
       -> Handle
       -> IO ()
     doGetMap key handle =
-      getConvergentMap handle key >>= \case
+      getMap handle key >>= \case
         Left err -> do
           print err
           exitFailure
@@ -456,7 +456,7 @@ getMapParser =
         Right Nothing ->
           putStrLn "Not found"
 
-        Right (Just (view convergentMapValue -> val)) ->
+        Right (Just (view mapValue -> val)) ->
           for_ (List.sortOn fst (valuePairs val)) $ \(k, v) ->
             putStrLn (k ++ " = " ++ v)
 
@@ -530,7 +530,7 @@ getSetParser =
       -> Handle
       -> IO ()
     doGetSet key handle =
-      getConvergentSet handle key >>= \case
+      getSet handle key >>= \case
         Left err -> do
           print err
           exitFailure
@@ -539,7 +539,7 @@ getSetParser =
           putStrLn "Not found"
 
         Right (Just set) ->
-          print (HashSet.toList (set ^. convergentSetValue))
+          print (HashSet.toList (set ^. setValue))
 
 infoParser :: Parser (Handle -> IO ())
 infoParser =
@@ -720,23 +720,23 @@ putSetParser =
     doPutSet bucketOrKey value handle =
       case bucketOrKey of
         Left bucket ->
-          go (newConvergentSet (generatedKey bucket) HashSet.empty)
+          go (newSet (generatedKey bucket) HashSet.empty)
 
         Right key ->
-          getConvergentSet handle key >>= \case
+          getSet handle key >>= \case
             Left err -> do
               print err
               exitFailure
 
             Right Nothing ->
-              go (newConvergentSet key HashSet.empty)
+              go (newSet key HashSet.empty)
 
             Right (Just set) ->
               go set
       where
         go :: ConvergentSet ByteString -> IO ()
         go set =
-          putConvergentSet handle  set' >>= \case
+          putSet handle  set' >>= \case
             Left err -> do
               print err
               exitFailure
@@ -747,7 +747,7 @@ putSetParser =
           where
             set' :: ConvergentSet ByteString
             set' =
-              set & convergentSetValue .~ HashSet.fromList value
+              set & setValue .~ HashSet.fromList value
 
 putMapParser :: Parser (Handle -> IO ())
 putMapParser =
@@ -764,16 +764,16 @@ putMapParser =
     doPutMap bucketOrKey value handle =
       case bucketOrKey of
         Left bucket ->
-          go (newConvergentMap (generatedKey bucket) emptyConvergentMapValue)
+          go (newMap (generatedKey bucket) emptyMapValue)
 
         Right key ->
-          getConvergentMap handle key >>= \case
+          getMap handle key >>= \case
             Left err -> do
               print err
               exitFailure
 
             Right Nothing ->
-              go (newConvergentMap key emptyConvergentMapValue)
+              go (newMap key emptyMapValue)
 
             Right (Just oldMap) ->
               go oldMap
@@ -781,7 +781,7 @@ putMapParser =
       where
         go :: ConvergentMap ConvergentMapValue -> IO ()
         go oldMap =
-          putConvergentMap handle newMap >>= \case
+          putMap handle (oldMap & mapValue .~ value) >>= \case
             Left err -> do
               print err
               exitFailure
@@ -789,15 +789,9 @@ putMapParser =
             Right _ ->
               pure ()
 
-          where
-            newMap :: ConvergentMap ConvergentMapValue
-            newMap =
-              oldMap
-                & convergentMapValue .~ value
-
     combineValues :: [ConvergentMapValue] -> ConvergentMapValue
     combineValues =
-      foldr step emptyConvergentMapValue
+      foldr step emptyMapValue
       where
         step ::
              ConvergentMapValue
@@ -879,7 +873,7 @@ putMapParser =
           where
             toCounterValue :: String -> Int64 -> ConvergentMapValue
             toCounterValue name val =
-              emptyConvergentMapValue
+              emptyMapValue
                 { counters =
                     HashMap.singleton (Latin1.pack name) val
                 }
@@ -893,7 +887,7 @@ putMapParser =
       where
         toFlagValue :: String -> ConvergentMapValue
         toFlagValue name =
-          emptyConvergentMapValue
+          emptyMapValue
             { flags =
                 HashMap.singleton (Latin1.pack name) True
             }
@@ -907,7 +901,7 @@ putMapParser =
       where
         toFlagValue :: String -> ConvergentMapValue
         toFlagValue name =
-          emptyConvergentMapValue
+          emptyMapValue
             { flags =
                 HashMap.singleton (Latin1.pack name) False
             }
@@ -934,7 +928,7 @@ putMapParser =
           where
             toRegisterValue :: String -> String -> ConvergentMapValue
             toRegisterValue name val =
-              emptyConvergentMapValue
+              emptyMapValue
                 { registers =
                     HashMap.singleton (Latin1.pack name) (Latin1.pack val)
                 }
@@ -961,7 +955,7 @@ putMapParser =
           where
             toSetValue :: String -> String -> ConvergentMapValue
             toSetValue name val =
-              emptyConvergentMapValue
+              emptyMapValue
                 { sets =
                     HashMap.singleton
                       (Latin1.pack name)
@@ -985,7 +979,7 @@ putMapParser =
             onLeaf leaf
 
           p:ps ->
-            emptyConvergentMapValue
+            emptyMapValue
               { maps =
                   HashMap.singleton (Latin1.pack p) (loop ps)
               }
@@ -1159,7 +1153,7 @@ updateCounterParser =
       -> Handle
       -> IO ()
     doUpdateCounter bucketOrKey amount nodes quorum timeout handle = do
-      updateConvergentCounter handle operation opts >>= \case
+      updateCounter handle operation opts >>= \case
         Left err -> do
           print err
           exitFailure
