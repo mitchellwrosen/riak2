@@ -38,6 +38,10 @@ module Riak
     -- * Bucket operations
     -- ** Bucket properties
   , getBucket
+  , getCounterBucket
+  , getHyperLogLogBucket
+  , getMapBucket
+  , getSetBucket
   , setBucketIndex
   , unsetBucketIndex
   , resetBucket

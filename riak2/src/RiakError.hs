@@ -56,8 +56,9 @@ data Error :: Op -> Type where
 
   -- | The bucket type was "invalid" for some reason (operation-specific).
   InvalidBucketTypeError ::
-       ByteString
-    -> Error 'SetBucketTypeIndexOp
+       MayReturnInvalidBucketType op ~ 'True
+    => ByteString
+    -> Error op
 
   InvalidNodesError ::
        MayReturnInvalidNodes op ~ 'True
@@ -103,19 +104,20 @@ deriving stock instance Show (Error op)
 
 -- | Operations used to index the 'Error' type.
 data Op
-  = DeleteOp
-  | DeleteIndexOp
-  | GetOp
+  = DeleteIndexOp
+  | DeleteOp
   | GetBucketOp
   | GetBucketTypeOp
-  | GetIndexOp
-  | GetSchemaOp
   | GetCrdtOp
+  | GetIndexOp
+  | GetOp
+  | GetSchemaOp
+  | GetSomeBucketOp
   | ListBucketsOp
   | ListKeysOp
   | MapReduceBucketOp
-  | PutOp
   | PutIndexOp
+  | PutOp
   | PutSchemaOp
   | SearchOp
   | SecondaryIndexQueryOp
@@ -123,32 +125,36 @@ data Op
   | SetBucketTypeIndexOp
   | UpdateCrdtOp
 
-type DeleteError             = Error 'DeleteOp
-type DeleteIndexError        = Error 'DeleteIndexOp
-type GetBucketError          = Error 'GetBucketOp
-type GetBucketTypeError      = Error 'GetBucketTypeOp
-type GetCounterError         = Error 'GetCrdtOp
-type GetHyperLogLogError     = Error 'GetCrdtOp
-type GetMapError             = Error 'GetCrdtOp
-type GetSetError             = Error 'GetCrdtOp
-type GetIndexError           = Error 'GetIndexOp
-type GetError                = Error 'GetOp
-type GetSchemaError          = Error 'GetSchemaOp
-type ListBucketsError        = Error 'ListBucketsOp
-type ListKeysError           = Error 'ListKeysOp
-type MapReduceBucketError    = Error 'MapReduceBucketOp
-type PutMapError             = Error 'UpdateCrdtOp
-type PutSetError             = Error 'UpdateCrdtOp
-type PutError                = Error 'PutOp
-type PutIndexError           = Error 'PutIndexOp
-type PutSchemaError          = Error 'PutSchemaOp
-type QueryExactError         = Error 'SecondaryIndexQueryOp
-type QueryRangeError         = Error 'SecondaryIndexQueryOp
-type SearchError             = Error 'SearchOp
-type SetBucketIndexError     = Error 'SetBucketIndexOp
-type SetBucketTypeIndexError = Error 'SetBucketTypeIndexOp
-type UpdateCounterError      = Error 'UpdateCrdtOp
-type UpdateHyperLogLogError  = Error 'UpdateCrdtOp
+type DeleteError               = Error 'DeleteOp
+type DeleteIndexError          = Error 'DeleteIndexOp
+type GetBucketError            = Error 'GetSomeBucketOp
+type GetBucketTypeError        = Error 'GetBucketTypeOp
+type GetCounterBucketError     = Error 'GetBucketOp
+type GetCounterError           = Error 'GetCrdtOp
+type GetError                  = Error 'GetOp
+type GetHyperLogLogBucketError = Error 'GetBucketOp
+type GetHyperLogLogError       = Error 'GetCrdtOp
+type GetIndexError             = Error 'GetIndexOp
+type GetMapBucketError         = Error 'GetBucketOp
+type GetMapError               = Error 'GetCrdtOp
+type GetSchemaError            = Error 'GetSchemaOp
+type GetSetBucketError         = Error 'GetBucketOp
+type GetSetError               = Error 'GetCrdtOp
+type ListBucketsError          = Error 'ListBucketsOp
+type ListKeysError             = Error 'ListKeysOp
+type MapReduceBucketError      = Error 'MapReduceBucketOp
+type PutError                  = Error 'PutOp
+type PutIndexError             = Error 'PutIndexOp
+type PutMapError               = Error 'UpdateCrdtOp
+type PutSchemaError            = Error 'PutSchemaOp
+type PutSetError               = Error 'UpdateCrdtOp
+type QueryExactError           = Error 'SecondaryIndexQueryOp
+type QueryRangeError           = Error 'SecondaryIndexQueryOp
+type SearchError               = Error 'SearchOp
+type SetBucketIndexError       = Error 'SetBucketIndexOp
+type SetBucketTypeIndexError   = Error 'SetBucketTypeIndexOp
+type UpdateCounterError        = Error 'UpdateCrdtOp
+type UpdateHyperLogLogError    = Error 'UpdateCrdtOp
 
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True
@@ -175,6 +181,11 @@ type family MayReturnIndexHasAssociatedBuckets  (op :: Op) :: Bool where
 type family MayReturnInsufficientNodes (op :: Op) :: Bool where
   MayReturnInsufficientNodes 'SecondaryIndexQueryOp = 'True
   MayReturnInsufficientNodes _ = 'False
+
+type family MayReturnInvalidBucketType (op :: Op) :: Bool where
+  MayReturnInvalidBucketType 'GetBucketOp = 'True
+  MayReturnInvalidBucketType 'SetBucketTypeIndexOp = 'True
+  MayReturnInvalidBucketType _ = 'False
 
 -- | @{n_val_violation,_}@
 type family MayReturnInvalidNodes (op :: Op) :: Bool where

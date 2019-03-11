@@ -4,8 +4,11 @@ module Main where
 
 import Libriak.Connection      (Endpoint(..))
 import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
-import RiakBucket              (Bucket(..), getBucket, queryBinaryIndex,
-                                queryIntIndex, setBucketIndex)
+import RiakBucket              (Bucket(..), getBucket, getCounterBucket,
+                                getHyperLogLogBucket, getMapBucket,
+                                getSetBucket, queryBinaryIndex, queryIntIndex,
+                                setBucketIndex)
+import RiakBucketProps         (BucketProps(..))
 import RiakBucketType          (defaultBucketType)
 import RiakContent             (Content, newContent)
 import RiakContext             (newContext)
@@ -26,6 +29,7 @@ import RiakSecondaryIndex      (SecondaryIndex(..))
 import RiakSecondaryIndexValue (SecondaryIndexValue(..))
 import RiakServerInfo          (ServerInfo(..), getServerInfo)
 import RiakSibling             (Sibling(..))
+import RiakSomeBucketProps     (SomeBucketProps(..))
 
 import Control.Lens
 import Control.Monad
@@ -36,7 +40,6 @@ import Data.Generics.Product (field)
 import Data.List.NonEmpty    (NonEmpty(..))
 import Data.Text             (Text)
 import Net.IPv4              (ipv4)
-import System.Exit           (exitFailure)
 import System.Random         (randomRIO)
 import Test.Tasty
 import Test.Tasty.HUnit
@@ -78,7 +81,7 @@ integrationTests :: Handle -> [TestTree]
 integrationTests handle =
   [ testGroup "RiakBinaryIndexQuery" []
   , testGroup "RiakBucket" (riakBucketTests handle)
-  , testGroup "RiakBucketProperties" []
+  , testGroup "RiakBucketProps" []
   , testGroup "RiakBucketType" []
   , testGroup "RiakBucketTypeInternal" []
   , testGroup "RiakBusPool" []
@@ -121,10 +124,112 @@ integrationTests handle =
 riakBucketTests :: Handle -> [TestTree]
 riakBucketTests handle =
   [ testGroup "getBucket"
-    [ testCase "XXX success 1" $ do
+    [ testCase "object bucket" $ do
         bucket <- randomDefaultBucket
-        getBucket handle bucket `shouldReturnSatisfy` isRightJust
+        getBucket handle bucket >>= \case
+          Right (Just SomeBucketProps{}) -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "counter bucket" $ do
+        bucket <- randomCounterBucket
+        getBucket handle bucket >>= \case
+          Right (Just SomeCounterBucketProps{}) -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "hll bucket" $ do
+        bucket <- randomHyperLogLogBucket
+        getBucket handle bucket >>= \case
+          Right (Just SomeHyperLogLogBucketProps{}) -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "map bucket" $ do
+        bucket <- randomMapBucket
+        getBucket handle bucket >>= \case
+          Right (Just SomeMapBucketProps{}) -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "set bucket" $ do
+        bucket <- randomSetBucket
+        getBucket handle bucket >>= \case
+          Right (Just SomeSetBucketProps{}) -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "bucket type not found" $ do
+        bucket <- randomBucket
+        getBucket handle bucket `shouldReturnSatisfy` isRightNothing
+
+    , testGroup "failures"
+      [ ]
     ]
+
+  , testGroup "getCounterBucket"
+    [ testCase "success" $ do
+        bucket <- randomCounterBucket
+        getCounterBucket handle bucket `shouldReturnSatisfy` isRightJust
+
+    , testCase "bucket type not found" $ do
+        bucket <- randomBucket
+        getCounterBucket handle bucket `shouldReturnSatisfy` isRightNothing
+
+    , testGroup "failures"
+      [ testCase "non-counter bucket" $ do
+          bucket@(Bucket bucketType _) <- randomDefaultBucket
+          getCounterBucket handle bucket `shouldReturn`
+            Left (InvalidBucketTypeError bucketType)
+      ]
+    ]
+
+  , testGroup "getHyperLogLogBucket"
+    [ testCase "success" $ do
+        bucket <- randomHyperLogLogBucket
+        getHyperLogLogBucket handle bucket `shouldReturnSatisfy` isRightJust
+
+    , testCase "bucket type not found" $ do
+        bucket <- randomBucket
+        getHyperLogLogBucket handle bucket `shouldReturnSatisfy` isRightNothing
+
+    , testGroup "failures"
+      [ testCase "non-hll bucket" $ do
+          bucket@(Bucket bucketType _) <- randomDefaultBucket
+          getHyperLogLogBucket handle bucket `shouldReturn`
+            Left (InvalidBucketTypeError bucketType)
+      ]
+    ]
+
+  , testGroup "getMapBucket"
+    [ testCase "success" $ do
+        bucket <- randomMapBucket
+        getMapBucket handle bucket `shouldReturnSatisfy` isRightJust
+
+    , testCase "bucket type not found" $ do
+        bucket <- randomBucket
+        getMapBucket handle bucket `shouldReturnSatisfy` isRightNothing
+
+    , testGroup "failures"
+      [ testCase "non-map bucket" $ do
+          bucket@(Bucket bucketType _) <- randomDefaultBucket
+          getMapBucket handle bucket `shouldReturn`
+            Left (InvalidBucketTypeError bucketType)
+      ]
+    ]
+
+  , testGroup "getSetBucket"
+    [ testCase "success" $ do
+        bucket <- randomSetBucket
+        getSetBucket handle bucket `shouldReturnSatisfy` isRightJust
+
+    , testCase "bucket type not found" $ do
+        bucket <- randomBucket
+        getSetBucket handle bucket `shouldReturnSatisfy` isRightNothing
+
+    , testGroup "failures"
+      [ testCase "non-set bucket" $ do
+          bucket@(Bucket bucketType _) <- randomDefaultBucket
+          getSetBucket handle bucket `shouldReturn`
+            Left (InvalidBucketTypeError bucketType)
+      ]
+    ]
+
   , testGroup "listKeys" [ ]
 
   , testGroup "queryBinaryIndex"
@@ -195,8 +300,7 @@ riakBucketTests handle =
 
     , testGroup "failures"
       [ testCase "bucket type does not exist" $ do
-          bucket@(Bucket bucketType _) <-
-            Bucket <$> randomByteString 32 <*> randomByteString 32
+          bucket@(Bucket bucketType _) <- randomBucket
           setBucketIndex handle bucket index3 `shouldReturn`
             Left (BucketTypeDoesNotExistError bucketType)
 
@@ -270,10 +374,8 @@ riakObjectTests handle =
 
     , testGroup "failures"
       [ testCase "bucket type not found" $ do
-          bucketType <- randomByteString 32
-          bucket <- randomByteString 32
-          key <- randomByteString 32
-          get handle (Key bucketType bucket key) def `shouldReturn`
+          key@(Key bucketType _ _) <- randomKey
+          get handle key def `shouldReturn`
             Left (BucketTypeDoesNotExistError bucketType)
 
       , testCase "invalid nval" $ do
@@ -318,8 +420,8 @@ riakObjectTests handle =
 
   , testGroup "put"
     [ testCase "generated key" $ do
-        bucket <- randomByteString 32
-        let object = newObject (generatedKey (Bucket "objects" bucket)) (newContent "")
+        bucket <- randomObjectBucket
+        let object = newObject (generatedKey bucket) (newContent "")
         put handle object def `shouldReturnSatisfy` isRight
 
     , testCase "bucket type not found" $ do
@@ -557,18 +659,46 @@ index3 :: IndexName
 index3 =
   unsafeMakeIndexName "default3"
 
+randomBucket :: IO Bucket
+randomBucket =
+  Bucket
+    <$> randomByteString 32
+    <*> randomByteString 32
+
 randomByteString :: Int -> IO ByteString
 randomByteString n =
   Latin1.pack <$> replicateM n (randomRIO ('a', 'z'))
+
+randomCounterBucket :: IO Bucket
+randomCounterBucket =
+  Bucket "counters"
+    <$> randomByteString 32
 
 randomDefaultBucket :: IO Bucket
 randomDefaultBucket =
   Bucket defaultBucketType
     <$> randomByteString 32
 
+randomHyperLogLogBucket :: IO Bucket
+randomHyperLogLogBucket =
+  Bucket "hlls"
+    <$> randomByteString 32
+
 randomIndexName :: IO IndexName
 randomIndexName =
   unsafeMakeIndexName <$> randomText 32
+
+randomKey :: IO Key
+randomKey =
+  Key
+    <$> randomByteString 32
+    <*> randomByteString 32
+    <*> randomByteString 32
+
+randomMapBucket :: IO Bucket
+randomMapBucket =
+  Bucket "maps"
+    <$> randomByteString 32
 
 randomObject :: IO (Object (Content ByteString))
 randomObject = do
@@ -587,6 +717,11 @@ randomObjectKey =
   Key "objects"
     <$> randomByteString 32
     <*> randomByteString 32
+
+randomSetBucket :: IO Bucket
+randomSetBucket =
+  Bucket "sets"
+    <$> randomByteString 32
 
 randomText :: Int -> IO Text
 randomText n =

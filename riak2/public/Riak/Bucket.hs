@@ -3,6 +3,10 @@ module Riak.Bucket
     Bucket(..)
     -- ** Properties
   , getBucket
+  , getCounterBucket
+  , getHyperLogLogBucket
+  , getMapBucket
+  , getSetBucket
   , setBucketIndex
   , unsetBucketIndex
   , resetBucket

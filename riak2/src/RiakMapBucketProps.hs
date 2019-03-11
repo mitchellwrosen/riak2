@@ -1,6 +1,7 @@
 module RiakMapBucketProps
   ( MapBucketProps(..)
   , fromProto
+  , maybeFromProto
   ) where
 
 import RiakIndexName        (IndexName)
@@ -41,3 +42,8 @@ fromProto props =
     , readQuorum       = ReadQuorum.fromProto props
     , writeQuorum      = WriteQuorum.fromProto props
     }
+
+maybeFromProto :: Proto.RpbBucketProps -> Maybe MapBucketProps
+maybeFromProto props = do
+  "map" <- props ^. Proto.maybe'datatype
+  pure (fromProto props)

@@ -3,6 +3,10 @@ module RiakBucket
     Bucket(..)
     -- ** Properties
   , getBucket
+  , getCounterBucket
+  , getHyperLogLogBucket
+  , getMapBucket
+  , getSetBucket
   , setBucketIndex
   , unsetBucketIndex
   , resetBucket
@@ -16,19 +20,27 @@ module RiakBucket
   , streamKeys
   ) where
 
-import RiakBinaryIndexQuery (BinaryIndexQuery(..))
-import RiakBucketInternal   (Bucket(..))
+import RiakBinaryIndexQuery       (BinaryIndexQuery(..))
+import RiakBucketInternal         (Bucket(..))
+import RiakCounterBucketProps     (CounterBucketProps)
 import RiakError
-import RiakHandle           (Handle, HandleError)
-import RiakIndexName        (IndexName(..))
-import RiakIntIndexQuery    (IntIndexQuery(..))
-import RiakKey              (Key(..))
-import RiakSomeBucketProps  (SomeBucketProps)
-import RiakUtils            (bs2int, int2bs, retrying)
+import RiakHandle                 (Handle, HandleError)
+import RiakHyperLogLogBucketProps (HyperLogLogBucketProps)
+import RiakIndexName              (IndexName(..))
+import RiakIntIndexQuery          (IntIndexQuery(..))
+import RiakKey                    (Key(..))
+import RiakMapBucketProps         (MapBucketProps)
+import RiakSetBucketProps         (SetBucketProps)
+import RiakSomeBucketProps        (SomeBucketProps)
+import RiakUtils                  (bs2int, int2bs, retrying)
 
-import qualified RiakBinaryIndexQuery as BinaryIndexQuery
-import qualified RiakHandle           as Handle
-import qualified RiakSomeBucketProps  as SomeBucketProps
+import qualified RiakBinaryIndexQuery       as BinaryIndexQuery
+import qualified RiakCounterBucketProps     as CounterBucketProps
+import qualified RiakHandle                 as Handle
+import qualified RiakHyperLogLogBucketProps as HyperLogLogBucketProps
+import qualified RiakMapBucketProps         as MapBucketProps
+import qualified RiakSetBucketProps         as SetBucketProps
+import qualified RiakSomeBucketProps        as SomeBucketProps
 
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       (folded, to, (.~), (^.))
@@ -40,22 +52,14 @@ import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
 
--- | Get bucket properties.
+-- | Get a bucket's properties.
 getBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
   -> m (Either GetBucketError (Maybe SomeBucketProps))
 getBucket handle bucket = liftIO $
-  Handle.getBucket handle request >>= \case
-    Left err ->
-      pure (Left (HandleError err))
-
-    Right (Left err) ->
-      pure (parseGetBucketError err)
-
-    Right (Right response) ->
-      pure (Right (Just (SomeBucketProps.fromProto (response ^. Proto.props))))
+  fromResult <$> Handle.getBucket handle request
 
   where
     request :: Proto.RpbGetBucketReq
@@ -63,9 +67,191 @@ getBucket handle bucket = liftIO $
       Proto.defMessage
         & setProto bucket
 
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+      -> Either GetBucketError (Maybe SomeBucketProps)
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        parseGetBucketError err
+
+      Right (Right response) ->
+        Right (Just (SomeBucketProps.fromProto (response ^. Proto.props)))
+
+
+-- | Get a counter bucket's properties.
+--
+-- Prefer this to 'getBucket' if you are certain the given bucket contains
+-- counters.
+--
+-- +--------------------------+----------------------------------------+
+-- | Error                    | Meaning                                |
+-- +==========================+========================================+
+-- | 'InvalidBucketTypeError' | The given bucket does not contain      |
+-- |                          | counters (@datatype = counter@).       |
+-- +--------------------------+----------------------------------------+
+getCounterBucket ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> m (Either GetCounterBucketError (Maybe CounterBucketProps))
+getCounterBucket handle bucket@(Bucket bucketType _) = liftIO $
+  fromResult <$> Handle.getBucket handle request
+
+  where
+    request :: Proto.RpbGetBucketReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+      -> Either GetCounterBucketError (Maybe CounterBucketProps)
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        parseGetBucketError err
+
+      Right (Right response) ->
+        case CounterBucketProps.maybeFromProto (response ^. Proto.props) of
+          Nothing ->
+            Left (InvalidBucketTypeError bucketType)
+          Just props ->
+            Right (Just props)
+
+-- | Get a HyperLogLog bucket's properties.
+--
+-- Prefer this to 'getBucket' if you are certain the given bucket contains
+-- HyperLogLogs.
+--
+-- +--------------------------+----------------------------------------+
+-- | Error                    | Meaning                                |
+-- +==========================+========================================+
+-- | 'InvalidBucketTypeError' | The given bucket does not contain      |
+-- |                          | HyperLogLogs (@datatype = hll@).       |
+-- +--------------------------+----------------------------------------+
+getHyperLogLogBucket ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> m (Either GetHyperLogLogBucketError (Maybe HyperLogLogBucketProps))
+getHyperLogLogBucket handle bucket@(Bucket bucketType _) = liftIO $
+  fromResult <$> Handle.getBucket handle request
+
+  where
+    request :: Proto.RpbGetBucketReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+      -> Either GetHyperLogLogBucketError (Maybe HyperLogLogBucketProps)
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        parseGetBucketError err
+
+      Right (Right response) ->
+        case HyperLogLogBucketProps.maybeFromProto (response ^. Proto.props) of
+          Nothing ->
+            Left (InvalidBucketTypeError bucketType)
+          Just props ->
+            Right (Just props)
+
+-- | Get a map bucket's properties.
+--
+-- Prefer this to 'getBucket' if you are certain the given bucket contains
+-- maps.
+--
+-- +--------------------------+----------------------------------------+
+-- | Error                    | Meaning                                |
+-- +==========================+========================================+
+-- | 'InvalidBucketTypeError' | The given bucket does not contain maps |
+-- |                          | (@datatype = map@).                    |
+-- +--------------------------+----------------------------------------+
+getMapBucket ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> m (Either GetMapBucketError (Maybe MapBucketProps))
+getMapBucket handle bucket@(Bucket bucketType _) = liftIO $
+  fromResult <$> Handle.getBucket handle request
+
+  where
+    request :: Proto.RpbGetBucketReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+      -> Either GetMapBucketError (Maybe MapBucketProps)
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        parseGetBucketError err
+
+      Right (Right response) ->
+        case MapBucketProps.maybeFromProto (response ^. Proto.props) of
+          Nothing ->
+            Left (InvalidBucketTypeError bucketType)
+          Just props ->
+            Right (Just props)
+
+-- | Get a set bucket's properties.
+--
+-- Prefer this to 'getBucket' if you are certain the given bucket contains
+-- sets.
+--
+-- +--------------------------+----------------------------------------+
+-- | Error                    | Meaning                                |
+-- +==========================+========================================+
+-- | 'InvalidBucketTypeError' | The given bucket does not contain sets |
+-- |                          | (@datatype = set@).                    |
+-- +--------------------------+----------------------------------------+
+getSetBucket ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> m (Either GetSetBucketError (Maybe SetBucketProps))
+getSetBucket handle bucket@(Bucket bucketType _) = liftIO $
+  fromResult <$> Handle.getBucket handle request
+
+  where
+    request :: Proto.RpbGetBucketReq
+    request =
+      Proto.defMessage
+        & setProto bucket
+
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+      -> Either GetSetBucketError (Maybe SetBucketProps)
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        parseGetBucketError err
+
+      Right (Right response) ->
+        case SetBucketProps.maybeFromProto (response ^. Proto.props) of
+          Nothing ->
+            Left (InvalidBucketTypeError bucketType)
+          Just props ->
+            Right (Just props)
+
 parseGetBucketError ::
      ByteString
-  -> Either GetBucketError (Maybe a)
+  -> Either (Error op) (Maybe a)
 parseGetBucketError err
   | isBucketTypeDoesNotExistError4 err =
       Right Nothing
@@ -80,15 +266,7 @@ setBucketIndex ::
   -> IndexName -- ^ Index name
   -> m (Either SetBucketIndexError ())
 setBucketIndex handle bucket@(Bucket bucketType _) index = liftIO $
-  Handle.setBucket handle request >>= \case
-    Left err ->
-      pure (Left (HandleError err))
-
-    Right (Left err) ->
-      pure (Left (parseSetBucketIndexError bucketType index err))
-
-    Right (Right _) ->
-      pure (Right ())
+  fromResult <$> Handle.setBucket handle request
 
   where
     request :: Proto.RpbSetBucketReq
@@ -98,6 +276,19 @@ setBucketIndex handle bucket@(Bucket bucketType _) index = liftIO $
         & Proto.props .~
             (Proto.defMessage
               & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
+
+    fromResult ::
+         Either HandleError (Either ByteString ())
+      -> Either SetBucketIndexError ()
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseSetBucketIndexError bucketType index err)
+
+      Right (Right ()) ->
+        Right ()
 
 parseSetBucketIndexError ::
      ByteString
