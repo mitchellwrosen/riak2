@@ -96,7 +96,8 @@ import Libriak.Connection (ConnectException, ConnectionError, Endpoint,
                            Interruptibility(..))
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
-import RiakSTM
+import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
+                           readTCounter, registerOneShotEvent)
 
 import qualified Libriak.Handle as Handle
 import qualified RiakDebug      as Debug
@@ -232,21 +233,23 @@ withHandle
     callback =
 
   uninterruptibleMask $ \unmask ->
-    transactionally $ do
-      liftSTM (readTVar stateVar) >>= \case
+    atomicallyIO $ do
+      readTVar stateVar >>= \case
         Disconnected -> do
-          liftSTM (writeTVar stateVar Connecting)
-          liftIO (void (forkIO (connect managedBus)))
-          liftIO (unmask (transactionally wait))
+          writeTVar stateVar Connecting
+
+          pure $ do
+            void (forkIO (connect managedBus))
+            unmask wait
 
         Connected handle Healthy -> do
-          liftSTM (incrTCounter inFlightVar)
-          generation <- liftSTM (readTVar generationVar)
-          withHealthyHandle unmask generation handle
+          incrTCounter inFlightVar
+          generation <- readTVar generationVar
+          pure (withHealthyHandle unmask generation handle)
 
-        Connecting            -> liftIO (unmask (transactionally wait))
-        Connected _ Unhealthy -> liftIO (unmask (transactionally wait))
-        Disconnecting         -> liftIO (unmask (transactionally wait))
+        Connecting            -> pure (unmask wait)
+        Connected _ Unhealthy -> pure (unmask wait)
+        Disconnecting         -> pure (unmask wait)
 
   where
     -- Perform an action with a healthy handle. This function is called with
@@ -256,75 +259,82 @@ withHandle
          (forall x. IO x -> IO x)
       -> Word64
       -> Handle.Handle
-      -> TransactionalIO (Either ManagedBusError a)
+      -> IO (Either ManagedBusError a)
     withHealthyHandle unmask generation handle = do
-      liftIO (writeIORef lastUsedRef =<< getMonotonicTimeNSec)
+      writeIORef lastUsedRef =<<
+        getMonotonicTimeNSec
 
       result :: Either SomeException (Either Handle.HandleError a) <-
-        liftIO (tryAsync (unmask (callback handle)))
+        tryAsync (unmask (callback handle))
 
-      liftSTM (decrTCounter inFlightVar)
+      atomically (decrTCounter inFlightVar)
 
       case result of
         Left ex -> do
-          actualGen :: Word64 <-
-            liftSTM (readTVar generationVar)
+          atomicallyIO $ do
+            actualGen <- readTVar generationVar
+            if generation == actualGen
+              then
+                readTVar stateVar >>= \case
+                  Connected handle _ -> do
+                    writeTVar stateVar Disconnecting
 
-          when (actualGen == generation) $
-            liftSTM (readTVar stateVar) >>= \case
-              Connected handle _ -> do
-                liftSTM (writeTVar stateVar Disconnecting)
+                    pure . void . forkIO $ do
+                      debug uuid generation ("thread died: " ++ show ex)
 
-                liftIO . void . forkIO $ do
-                  debug uuid generation ("thread died: " ++ show ex)
+                      drainAndDisconnect inFlightVar handle
 
-                  drainAndDisconnect inFlightVar handle
+                      debug uuid generation "disconnected, reconnecting"
 
-                  debug uuid generation "disconnected, reconnecting"
+                      atomically $ do
+                        modifyTVar' generationVar (+1)
+                        writeTVar stateVar Connecting
 
-                  atomically $ do
-                    modifyTVar' generationVar (+1)
-                    writeTVar stateVar Connecting
+                      connect managedBus
 
-                  connect managedBus
+                  Disconnecting ->
+                    pure (pure ())
 
-              Disconnecting ->
-                pure ()
+                  Disconnected  -> undefined
+                  Connecting    -> undefined
+              else
+                pure (pure ())
 
-              Disconnected  -> undefined
-              Connecting    -> undefined
-
-          liftIO (throwIO ex)
+          throwIO ex
 
         Right (Left err) -> do
-          actualGen :: Word64 <-
-            liftSTM (readTVar generationVar)
+          atomicallyIO $ do
+            actualGen <- readTVar generationVar
 
-          when (actualGen == generation) $
-            liftSTM (readTVar stateVar) >>= \case
-              Connected handle _ -> do
-                liftSTM (writeTVar stateVar Disconnecting)
+            if actualGen == generation
+              then
+                readTVar stateVar >>= \case
+                  Connected handle _ -> do
+                    writeTVar stateVar Disconnecting
 
-                liftIO . void . forkIO $ do
-                  debug uuid generation ("request failed: " ++ show err)
+                    pure . void . forkIO $ do
+                      debug uuid generation ("request failed: " ++ show err)
 
-                  drainAndDisconnect inFlightVar handle
+                      drainAndDisconnect inFlightVar handle
 
-                  debug uuid generation "disconnected, reconnecting"
+                      debug uuid generation "disconnected, reconnecting"
 
-                  atomically $ do
-                    modifyTVar' generationVar (+1)
-                    writeTVar stateVar Connecting
+                      atomically $ do
+                        modifyTVar' generationVar (+1)
+                        writeTVar stateVar Connecting
 
-                  connect managedBus
+                      connect managedBus
 
-              Disconnecting ->
-                pure ()
+                  Disconnecting ->
+                    pure (pure ())
 
-              Disconnected -> undefined
-              Connecting -> undefined
+                  Disconnected -> undefined
+                  Connecting -> undefined
 
-          liftIO . unmask $ do
+              else
+                pure (pure ())
+
+          unmask $ do
             -- Wait for us to transition off of a healthy status before
             -- returning, so that the client may immediately retry (and hit a
             -- 'wait', rather than this same code path)
@@ -343,25 +353,23 @@ withHandle
         Right (Right result) ->
           pure (Right result)
 
-    wait :: TransactionalIO (Either ManagedBusError a)
+    wait :: IO (Either ManagedBusError a)
     wait = do
       timedOut :: STM () <-
-        liftIO (registerOneShotEvent waitTimeout)
+        registerOneShotEvent waitTimeout
 
-      asum
-        [ do
-            liftSTM timedOut
-            pure (Left ManagedBusTimeoutError)
+      atomicallyIO $
+        (pure (Left ManagedBusTimeoutError) <$ timedOut)
+        <|>
+        (readTVar stateVar >>= \case
+          Connected _ Healthy ->
+            pure (withHandle managedBus callback)
+          Disconnected ->
+            pure (withHandle managedBus callback)
 
-        , do
-            liftSTM (readTVar stateVar) >>= \case
-              Connected _ Healthy   -> liftIO (withHandle managedBus callback)
-              Disconnected          -> liftIO (withHandle managedBus callback)
-
-              Connecting            -> liftSTM retry
-              Connected _ Unhealthy -> liftSTM retry
-              Disconnecting         -> liftSTM retry
-        ]
+          Connecting -> retry
+          Connected _ Unhealthy -> retry
+          Disconnecting -> retry)
 
     fromHandleError :: Handle.HandleError -> ManagedBusError
     fromHandleError = \case
@@ -450,155 +458,175 @@ monitorHealth
     monitorLoop = do
       threadDelay healthCheckInterval
 
-      transactionally $ do
-        actualGen :: Word64 <-
-          liftSTM (readTVar generationVar)
+      atomicallyIO $ do
+        actualGen <- readTVar generationVar
+        if actualGen == expectedGen
+          then
+            readTVar stateVar >>= \case
+              Connected handle Healthy -> do
+                incrTCounter inFlightVar
 
-        when (actualGen == expectedGen) $
-          liftSTM (readTVar stateVar) >>= \case
-            Connected handle Healthy -> do
-              liftSTM (incrTCounter inFlightVar)
+                pure $ do
+                  result :: Either Handle.HandleError (Either ByteString ()) <-
+                    Handle.ping handle
 
-              result :: Either Handle.HandleError (Either ByteString ()) <-
-                liftIO (Handle.ping handle)
+                  atomically (decrTCounter inFlightVar)
 
-              liftSTM (decrTCounter inFlightVar)
+                  case result of
+                    Left err ->
+                      atomicallyIO $ do
+                        actualGen <- readTVar generationVar
 
-              case result of
-                Left err -> do
-                  actualGen :: Word64 <-
-                    liftSTM (readTVar generationVar)
+                        if actualGen == expectedGen
+                          then
+                            readTVar stateVar >>= \case
+                              Connected handle Healthy -> do
+                                writeTVar stateVar Disconnecting
+                                pure $ do
+                                  debug uuid expectedGen ("health check failed: " ++ show err)
+                                  drainAndDisconnect inFlightVar handle
+                                  debug uuid expectedGen "disconnected, reconnecting"
+                                  atomically $ do
+                                    modifyTVar' generationVar (+1)
+                                    writeTVar stateVar Connecting
+                                  connect managedBus
 
-                  when (actualGen == expectedGen) $
-                    liftSTM (readTVar stateVar) >>= \case
-                      Connected handle Healthy -> do
-                        liftSTM (writeTVar stateVar Disconnecting)
+                              Disconnecting ->
+                                pure (pure ())
 
-                        debug uuid expectedGen ("health check failed: " ++ show err)
-                        liftIO (drainAndDisconnect inFlightVar handle)
-                        debug uuid expectedGen "disconnected, reconnecting"
-                        liftSTM $ do
-                          modifyTVar' generationVar (+1)
-                          writeTVar stateVar Connecting
-                        liftIO (connect managedBus)
+                              Disconnected -> undefined
+                              Connecting -> undefined
+                              Connected _ Unhealthy -> undefined
 
-                      Disconnecting ->
-                        pure ()
 
-                      Disconnected -> undefined
-                      Connecting -> undefined
-                      Connected _ Unhealthy -> undefined
+                          else
+                            pure (pure ())
 
-                Right (Left err) -> do
-                  liftIO (maybePingLoop err)
+                    Right (Left err) -> do
+                      maybePingLoop err
 
-                Right (Right _) ->
-                  liftIO monitorLoop
+                    Right (Right _) ->
+                      monitorLoop
 
-            Disconnecting ->
-              pure ()
+              Disconnecting ->
+                pure (pure ())
 
-            Disconnected -> undefined
-            Connecting -> undefined
-            Connected _ Unhealthy -> undefined
+              Disconnected -> undefined
+              Connecting -> undefined
+              Connected _ Unhealthy -> undefined
+
+          else
+            pure (pure ())
 
     maybePingLoop :: ByteString -> IO ()
     maybePingLoop err =
-      transactionally $ do
-        actualGen :: Word64 <-
-          liftSTM (readTVar generationVar)
+      atomicallyIO $ do
+        actualGen <- readTVar generationVar
+        if actualGen == expectedGen
+          then
+            readTVar stateVar >>= \case
+              Connected handle Healthy -> do
+                writeTVar stateVar (Connected handle Unhealthy)
 
-        when (actualGen == expectedGen) $ do
-          liftSTM (readTVar stateVar) >>= \case
-            Connected handle Healthy -> do
-              liftSTM (writeTVar stateVar (Connected handle Unhealthy))
+                pure $ do
+                  debug uuid expectedGen $
+                    "health check failed: " ++ show err ++ ", pinging until healthy"
+                  pingLoop 1
 
-              debug uuid expectedGen $
-                "health check failed: " ++ show err ++ ", pinging until healthy"
-              liftIO (pingLoop 1)
+              Disconnected -> undefined
+              Disconnecting -> undefined
+              Connecting -> undefined
+              Connected _ Unhealthy -> undefined
 
-            Disconnected -> undefined
-            Disconnecting -> undefined
-            Connecting -> undefined
-            Connected _ Unhealthy -> undefined
+          else
+            pure (pure ())
 
     pingLoop :: NominalDiffTime -> IO ()
     pingLoop seconds = do
       sleep seconds
 
-      transactionally $ do
-        actualGen :: Word64 <-
-          liftSTM (readTVar generationVar)
+      atomicallyIO $ do
+        actualGen <- readTVar generationVar
+        if actualGen == expectedGen
+          then
+            readTVar stateVar >>= \case
+              Connected handle Unhealthy -> do
+                incrTCounter inFlightVar
 
-        when (actualGen == expectedGen) $
-          liftSTM (readTVar stateVar) >>= \case
-            Connected handle Unhealthy -> do
-              liftSTM (incrTCounter inFlightVar)
+                pure $ do
+                  result :: Either Handle.HandleError (Either ByteString ()) <-
+                    Handle.ping handle
 
-              result :: Either Handle.HandleError (Either ByteString ()) <-
-                liftIO (Handle.ping handle)
+                  atomically (decrTCounter inFlightVar)
 
-              liftSTM (decrTCounter inFlightVar)
+                  case result of
+                    Left err ->
+                      atomicallyIO $ do
+                        actualGen <- readTVar generationVar
 
-              case result of
-                Left err -> do
-                  actualGen :: Word64 <-
-                    liftSTM (readTVar generationVar)
+                        if actualGen == expectedGen
+                          then
+                            readTVar stateVar >>= \case
+                              Connected handle Unhealthy -> do
+                                writeTVar stateVar Disconnecting
 
-                  when (actualGen == expectedGen) $
-                    liftSTM (readTVar stateVar) >>= \case
-                      Connected handle Unhealthy -> do
-                        liftSTM (writeTVar stateVar Disconnecting)
+                                pure $ do
+                                  debug uuid expectedGen ("ping failed: " ++ show err)
+                                  drainAndDisconnect inFlightVar handle
+                                  debug uuid expectedGen "disconnected, reconnecting"
+                                  atomically $ do
+                                    modifyTVar' generationVar (+1)
+                                    writeTVar stateVar Connecting
+                                  connect managedBus
 
-                        debug uuid expectedGen ("ping failed: " ++ show err)
-                        liftIO (drainAndDisconnect inFlightVar handle)
-                        debug uuid expectedGen "disconnected, reconnecting"
-                        liftSTM $ do
-                          modifyTVar' generationVar (+1)
-                          writeTVar stateVar Connecting
-                        liftIO (connect managedBus)
+                              Disconnecting ->
+                                pure (pure ())
 
-                      Disconnecting ->
-                        pure ()
+                              Disconnected -> undefined
+                              Connecting -> undefined
+                              Connected _ Healthy -> undefined
+                          else
+                            pure (pure ())
 
-                      Disconnected -> undefined
-                      Connecting -> undefined
-                      Connected _ Healthy -> undefined
+                    Right (Left err) -> do
+                      debug uuid expectedGen $
+                        "ping failed: " ++ show err ++ ", retrying in " ++ show seconds
+                      pingLoop (seconds * 1.5)
 
-                Right (Left err) -> do
-                  debug uuid expectedGen $
-                    "ping failed: " ++ show err ++ ", retrying in " ++ show seconds
-                  liftIO (pingLoop (seconds * 1.5))
+                    Right (Right _) ->
+                      maybeMonitorLoop
 
-                Right (Right _) ->
-                  liftIO maybeMonitorLoop
+              Disconnecting ->
+                pure (pure ())
 
-            Disconnecting ->
-              pure ()
+              Disconnected -> undefined
+              Connecting -> undefined
+              Connected _ Healthy -> undefined
 
-            Disconnected -> undefined
-            Connecting -> undefined
-            Connected _ Healthy -> undefined
+          else
+            pure (pure ())
 
     maybeMonitorLoop :: IO ()
     maybeMonitorLoop =
-      transactionally $ do
-        actualGen :: Word64 <-
-          liftSTM (readTVar generationVar)
+      atomicallyIO $ do
+        actualGen <- readTVar generationVar
+        if actualGen == expectedGen
+          then
+            readTVar stateVar >>= \case
+              Connected handle Unhealthy -> do
+                writeTVar stateVar (Connected handle Healthy)
+                pure $ do
+                  debug uuid expectedGen "healthy"
+                  monitorLoop
 
-        when (actualGen == expectedGen) $
-          liftSTM (readTVar stateVar) >>= \case
-            Connected handle Unhealthy -> do
-              liftSTM (writeTVar stateVar (Connected handle Healthy))
-              debug uuid expectedGen "healthy"
-              liftIO monitorLoop
+              Disconnecting ->
+                pure (pure ())
 
-            Disconnecting ->
-              pure ()
-
-            Disconnected -> undefined
-            Connecting -> undefined
-            Connected _ Healthy -> undefined
+              Disconnected -> undefined
+              Connecting -> undefined
+              Connected _ Healthy -> undefined
+          else
+            pure (pure ())
 
 monitorUsage ::
      ManagedBus
@@ -609,81 +637,84 @@ monitorUsage
                   stateVar, uuid })
     expectedGen =
 
-  transactionally loop
+  loop
 
   where
-    loop :: TransactionalIO ()
+    loop :: IO ()
     loop = do
       timer :: STM () <-
-        liftIO (registerOneShotEvent (idleTimeout `div` 2))
+        registerOneShotEvent (idleTimeout `div` 2)
 
-      asum
-        [ do
-            liftSTM timer
-            handleTimer
+      atomicallyIO $
+        (timer $> handleTimer)
+        <|>
+        (do
+          actualGen <- readTVar generationVar
+          if actualGen == expectedGen
+            then do
+              readTVar stateVar >>= \case
+                Connected _ Healthy -> retry
+                Connected _ Unhealthy -> pure handleUnhealthy
 
-        , do
-            actualGen :: Word64 <-
-              liftSTM (readTVar generationVar)
-
-            when (actualGen == expectedGen) $
-              liftSTM (readTVar stateVar) >>= \case
-                Connected _ Healthy -> liftSTM retry
-                Connected _ Unhealthy -> handleUnhealthy
-
-                Disconnecting -> pure () -- Should this be undefined?
+                Disconnecting -> pure (pure ()) -- Should this be undefined?
 
                 Disconnected -> undefined
                 Connecting -> undefined
-        ]
+            else
+              pure (pure ()))
 
       where
-        handleTimer :: TransactionalIO ()
+        handleTimer :: IO ()
         handleTimer = do
-          now <- liftIO getMonotonicTimeNSec
-          lastUsed <- liftIO (readIORef lastUsedRef)
+          now <- getMonotonicTimeNSec
+          lastUsed <- readIORef lastUsedRef
 
           if now - lastUsed > fromIntegral (idleTimeout * 1000)
-            then do
-              actualGen :: Word64 <-
-                liftSTM (readTVar generationVar)
+            then
+              atomicallyIO $ do
+                actualGen <- readTVar generationVar
+                if actualGen == expectedGen
+                  then do
+                    readTVar stateVar >>= \case
+                      Connected handle _ -> do
+                        writeTVar stateVar Disconnecting
 
-              when (actualGen == expectedGen) $
-                liftSTM (readTVar stateVar) >>= \case
-                  Connected handle _ -> do
-                    liftSTM (writeTVar stateVar Disconnecting)
-                    debug uuid expectedGen "idle timeout"
-                    liftIO (drainAndDisconnect inFlightVar handle)
-                    debug uuid expectedGen "disconnected"
-                    liftSTM $ do
-                      modifyTVar' generationVar (+1)
-                      writeTVar stateVar Disconnected
+                        pure $ do
+                          debug uuid expectedGen "idle timeout"
+                          drainAndDisconnect inFlightVar handle
+                          debug uuid expectedGen "disconnected"
+                          atomically $ do
+                            modifyTVar' generationVar (+1)
+                            writeTVar stateVar Disconnected
 
-                  Disconnecting ->
-                    pure ()
+                      Disconnecting -> pure (pure ())
 
-                  Connecting -> undefined
-                  Disconnected -> undefined
+                      Connecting -> undefined
+                      Disconnected -> undefined
 
+                  else
+                    pure (pure ())
             else
               loop
 
         -- Don't count an unhealthy socket against its idle timeout time,
         -- because requests cannot be made with it (so its lastUsed timestamp is
         -- static).
-        handleUnhealthy :: TransactionalIO ()
-        handleUnhealthy = do
-          actualGen :: Word64 <-
-            liftSTM (readTVar generationVar)
+        handleUnhealthy :: IO ()
+        handleUnhealthy =
+          atomicallyIO $ do
+            actualGen <- readTVar generationVar
+            if actualGen == expectedGen
+              then
+                readTVar stateVar >>= \case
+                  Connected _ Healthy -> pure loop
+                  Connected _ Unhealthy -> retry
+                  Disconnecting -> pure (pure ())
 
-          when (actualGen == expectedGen) $
-            liftSTM (readTVar stateVar) >>= \case
-              Connected _ Healthy -> loop
-              Connected _ Unhealthy -> liftSTM retry
-              Disconnecting -> pure ()
-
-              Connecting -> undefined
-              Disconnected -> undefined
+                  Connecting -> undefined
+                  Disconnected -> undefined
+              else
+                pure (pure ())
 
 drainAndDisconnect ::
      TCounter
@@ -697,16 +728,19 @@ drainAndDisconnect inFlightVar handle = do
 
   void (Handle.disconnect handle)
 
-debug :: MonadIO m => Int -> Word64 -> [Char] -> m ()
+debug :: Int -> Word64 -> [Char] -> IO ()
 debug uuid gen msg =
-  liftIO
-    (Debug.debug ("handle " ++ show uuid ++ "." ++ show gen ++ ": " ++ msg))
+  Debug.debug ("handle " ++ show uuid ++ "." ++ show gen ++ ": " ++ msg)
 
 sleep :: NominalDiffTime -> IO ()
 sleep seconds =
   case nominalDiffTimeToSeconds seconds of
     MkFixed picoseconds ->
       threadDelay (fromIntegral (picoseconds `div` 1000000))
+
+atomicallyIO :: STM (IO a) -> IO a
+atomicallyIO =
+  join . atomically
 
 
 --------------------------------------------------------------------------------
