@@ -6,20 +6,21 @@ build-type: Simple
 
 executable riakc
   build-depends:
-      base
-    , base64-bytestring
-    , bytestring
-    , data-default-class
-    , foldl
-    , generic-lens
-    , ip
-    , lens
-    , optparse-applicative
-    , riak2
-    , split
-    , text
-    , time
-    , unordered-containers
+    base,
+    base64-bytestring,
+    bytestring,
+    data-default-class,
+    foldl,
+    generic-lens,
+    ip,
+    lens,
+    optparse-applicative,
+    riak2,
+    sockets,
+    split,
+    text,
+    time,
+    unordered-containers,
 
   default-extensions:
     DataKinds

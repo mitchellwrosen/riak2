@@ -11,12 +11,6 @@ module Libriak.Connection
   , send
   , receive
   , ConnectionError(..)
-    -- * Re-exports
-  , CloseException(..)
-  , ConnectException(..)
-  , Endpoint(..)
-  , Interruptibility(..)
-  , SocketException(..)
   ) where
 
 import Libriak.Request  (EncodedRequest(..))

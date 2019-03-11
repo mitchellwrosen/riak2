@@ -1,7 +1,7 @@
 module RiakBucket
-  ( -- * Bucket
-    Bucket(..)
-    -- ** Properties
+  ( Bucket(..)
+  , bucketBucketType
+  , bucketBucketSegment
   , getBucket
   , getCounterBucket
   , getHyperLogLogBucket
@@ -10,18 +10,17 @@ module RiakBucket
   , setBucketIndex
   , unsetBucketIndex
   , resetBucket
-    -- ** Search
   , queryIntIndex
   , queryIntIndexTerms
   , queryBinaryIndex
   , queryBinaryIndexTerms
-    -- ** Full traversals
   , listKeys
   , streamKeys
   ) where
 
 import RiakBinaryIndexQuery       (BinaryIndexQuery(..))
 import RiakBucketInternal         (Bucket(..))
+import RiakBucketTypeInternal     (BucketType)
 import RiakCounterBucketProps     (CounterBucketProps)
 import RiakError
 import RiakHandle                 (Handle, HandleError)
@@ -43,7 +42,7 @@ import qualified RiakSetBucketProps         as SetBucketProps
 import qualified RiakSomeBucketProps        as SomeBucketProps
 
 import Control.Foldl                      (FoldM(..))
-import Control.Lens                       (folded, to, (.~), (^.))
+import Control.Lens                       (Lens', folded, to, (.~), (^.))
 import Data.Profunctor                    (lmap)
 import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 import Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
@@ -52,7 +51,32 @@ import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
 
+-- | A lens onto the bucket type of a bucket.
+--
+-- @
+-- Bucket bucketType bucket
+--        `————————´
+-- @
+bucketBucketType :: Lens' Bucket BucketType
+bucketBucketType f (Bucket bucketType bucket) =
+  (\bucketType -> Bucket bucketType bucket) <$>
+    f bucketType
+
+-- | A lens onto the bucket segment of a bucket.
+--
+-- @
+-- Bucket bucketType bucket
+--                   `————´
+-- @
+bucketBucketSegment :: Lens' Bucket ByteString
+bucketBucketSegment f (Bucket bucketType bucket) =
+  (\bucket -> Bucket bucketType bucket) <$>
+    f bucket
+
 -- | Get a bucket's properties.
+--
+-- If you know the bucket's type ahead of time, prefer 'getCounterBucket',
+-- 'getHyperLogLogBucket', 'getMapBucket', or 'getSetBucket'.
 getBucket ::
      MonadIO m
   => Handle -- ^
@@ -317,8 +341,8 @@ unsetBucketIndex handle bucket =
 -- | Reset bucket properties.
 resetBucket ::
      MonadIO m
-  => Handle
-  -> Bucket
+  => Handle -- ^
+  -> Bucket -- ^
   -> m (Either HandleError (Either ByteString ()))
 resetBucket handle (Bucket bucketType bucket) = liftIO $
   (fmap.fmap) (() <$)

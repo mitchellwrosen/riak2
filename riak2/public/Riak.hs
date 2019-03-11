@@ -73,6 +73,8 @@ module Riak
   , BinaryIndexQuery(..)
   , inBucket
   , Bucket(..)
+  , bucketBucketType
+  , bucketBucketSegment
   , BucketProps(..)
   , BucketType
   , defaultBucketType
@@ -167,16 +169,11 @@ module Riak
   , UpdateCounterError
   , UpdateHyperLogLogError
   , WriteQuorum(..)
-    -- ** Re-exports
-  , Endpoint(..)
-  , def
 #ifdef DEBUG
   , debug
 #endif
   ) where
 
--- TODO rename Config/Error export them
-import Libriak.Connection         (Endpoint(..))
 import Riak.Bucket
 import Riak.BucketProps           (BucketProps(..), ConflictResolution(..),
                                    CounterBucketProps(..),
@@ -211,5 +208,3 @@ import RiakPing
 #ifdef DEBUG
 import RiakDebug (debug)
 #endif
-
-import Data.Default.Class (def)

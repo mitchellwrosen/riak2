@@ -31,9 +31,7 @@ module Libriak.Handle
   , updateCrdt
   ) where
 
-import Libriak.Connection (CloseException(..), ConnectException(..), Connection,
-                           ConnectionError(..), Endpoint(..),
-                           Interruptibility(..))
+import Libriak.Connection (Connection, ConnectionError(..))
 import Libriak.Request    (Request(..), encodeRequest)
 import Libriak.Response   (DecodeError, Response(..), decodeResponse,
                            responseDone)
@@ -52,6 +50,8 @@ import Data.IORef              (IORef, newIORef, readIORef, writeIORef)
 import Data.Kind               (Type)
 import Data.Profunctor         (lmap)
 import GHC.TypeLits            (KnownNat)
+import Socket.Stream.IPv4      (CloseException(..), ConnectException(..),
+                                Endpoint(..), Interruptibility(..))
 
 import qualified Data.Riak.Proto as Proto
 

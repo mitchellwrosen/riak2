@@ -6,12 +6,12 @@ module RiakBusPool
   , withManagedBus
   ) where
 
-import Libriak.Connection (Endpoint)
-import RiakManagedBus     (EventHandlers, ManagedBus, ManagedBusConfig(..),
-                           createManagedBus)
+import RiakManagedBus (EventHandlers, ManagedBus, ManagedBusConfig(..),
+                       createManagedBus)
 
-import Data.Hashable (hash)
-import Data.Vector   (Vector, (!))
+import Data.Hashable      (hash)
+import Data.Vector        (Vector, (!))
+import Socket.Stream.IPv4 (Endpoint)
 
 import qualified Data.Vector as Vector
 

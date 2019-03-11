@@ -6,15 +6,16 @@ build-type: Simple
 
 executable riak2-benchmarks
   build-depends:
-      base
-    , bytestring
-    , data-default-class
-    , ip
-    , lens
-    , optparse-applicative
-    , riak == 1.2.0.0
-    , riak-protobuf == 1.0.0
-    , riak2
+    base,
+    bytestring,
+    data-default-class,
+    ip,
+    lens,
+    optparse-applicative,
+    riak == 1.2.0.0,
+    riak-protobuf == 1.0.0,
+    riak2,
+    sockets,
 
   default-extensions:
     LambdaCase

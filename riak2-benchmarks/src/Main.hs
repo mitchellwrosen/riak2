@@ -8,6 +8,7 @@ import Data.Default.Class      (Default(..))
 import Data.Foldable           (asum)
 import GHC.Clock               (getMonotonicTime)
 import Net.IPv4                (ipv4)
+import Socket.Stream.IPv4      (Endpoint(..))
 import Text.Printf             (printf)
 
 import qualified Data.Riak.Proto              as Proto
@@ -107,9 +108,9 @@ riak2PingParser =
       Riak.createHandle
         Riak.HandleConfig
           { Riak.endpoint =
-              Riak.Endpoint
-                { Riak.address = ipv4 127 0 0 1
-                , Riak.port = 8087
+              Endpoint
+                { address = ipv4 127 0 0 1
+                , port = 8087
                 }
             , Riak.healthCheckInterval =
                 1

@@ -28,17 +28,17 @@ module RiakHandle
   , updateCrdt
   ) where
 
-import Libriak.Connection (Endpoint)
-import RiakBusPool        (BusPool, createBusPool)
-import RiakManagedBus     (EventHandlers(..), ManagedBus, ManagedBusError(..))
-import RiakUtils          (difftimeToMicros)
+import RiakBusPool    (BusPool, createBusPool)
+import RiakManagedBus (EventHandlers(..), ManagedBus, ManagedBusError(..))
+import RiakUtils      (difftimeToMicros)
 
 import qualified RiakBusPool    as BusPool
 import qualified RiakManagedBus as ManagedBus
 
-import Control.Foldl (FoldM)
-import Control.Lens  ((.~))
-import Data.Time     (NominalDiffTime)
+import Control.Foldl      (FoldM)
+import Control.Lens       ((.~))
+import Data.Time          (NominalDiffTime)
+import Socket.Stream.IPv4 (Endpoint)
 
 import qualified Data.Riak.Proto as Proto
 

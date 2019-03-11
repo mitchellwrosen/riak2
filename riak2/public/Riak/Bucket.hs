@@ -1,8 +1,6 @@
 module Riak.Bucket
-  ( -- * Bucket
-    Bucket(..)
-    -- ** Properties
-  , getBucket
+  ( -- * Properties
+    getBucket
   , getCounterBucket
   , getHyperLogLogBucket
   , getMapBucket
@@ -10,14 +8,18 @@ module Riak.Bucket
   , setBucketIndex
   , unsetBucketIndex
   , resetBucket
-    -- ** Search
+    -- * Search
   , queryIntIndex
   , queryIntIndexTerms
   , queryBinaryIndex
   , queryBinaryIndexTerms
-    -- ** Full traversals
+    -- * Full traversals
   , listKeys
   , streamKeys
+    -- * Bucket
+  , Bucket(..)
+  , bucketBucketType
+  , bucketBucketSegment
   ) where
 
 import RiakBucket

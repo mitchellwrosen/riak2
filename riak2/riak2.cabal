@@ -138,6 +138,7 @@ library riak2-internal
     profunctors ^>= 5.3,
     proto-lens-runtime,
     safe-exceptions,
+    sockets,
     stm,
     text ^>= 1.2.3,
     time,

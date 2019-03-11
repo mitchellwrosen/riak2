@@ -90,8 +90,7 @@ module RiakManagedBus
   , updateCrdt
   ) where
 
-import Libriak.Connection (ConnectException, ConnectionError, Endpoint,
-                           Interruptibility(..))
+import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
@@ -105,6 +104,7 @@ import Control.Exception.Safe (throwIO, tryAny, tryAsync, uninterruptibleMask)
 import Control.Foldl          (FoldM)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
+import Socket.Stream.IPv4     (ConnectException, Endpoint, Interruptibility(..))
 
 import qualified Data.Riak.Proto as Proto
 
