@@ -1,7 +1,7 @@
 module Riak.ConvergentCounter
   ( ConvergentCounter(..)
-  , getConvergentCounter
-  , updateConvergentCounter
+  , getCounter
+  , updateCounter
   ) where
 
-import RiakConvergentCounter
+import RiakCounter

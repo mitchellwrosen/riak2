@@ -1,6 +1,7 @@
 module RiakKey where
 
-import RiakBucketInternal (Bucket(..))
+import RiakBucketInternal     (Bucket(..))
+import RiakBucketTypeInternal (BucketType)
 
 import Control.Lens                       (Lens', (.~))
 import Data.Hashable                      (Hashable)
@@ -18,10 +19,49 @@ data Key
   deriving stock (Eq, Generic, Show)
   deriving anyclass (Hashable)
 
+-- | A lens onto the bucket type of a key.
+--
+-- @
+-- Key bucketType bucket key
+--     `————————´
+-- @
+keyBucketType :: Lens' Key BucketType
+keyBucketType f (Key bucketType bucket key) =
+  (\bucketType -> Key bucketType bucket key) <$>
+    f bucketType
+
+-- | A lens onto the bucket of a key.
+--
+-- @
+-- Key bucketType bucket key
+--     `———————————————´
+-- @
 keyBucket :: Lens' Key Bucket
 keyBucket f (Key bucketType bucket key) =
   (\(Bucket bucketType bucket) -> Key bucketType bucket key) <$>
     f (Bucket bucketType bucket)
+
+-- | A lens onto the bucket segment of a key.
+--
+-- @
+-- Key bucketType bucket key
+--                `————´
+-- @
+keyBucketSegment :: Lens' Key ByteString
+keyBucketSegment f (Key bucketType bucket key) =
+  (\bucket -> Key bucketType bucket key) <$>
+    f bucket
+
+-- | A lens onto the key segment of a key.
+--
+-- @
+-- Key bucketType bucket key
+--                       `—´
+-- @
+keyKeySegment :: Lens' Key ByteString
+keyKeySegment f (Key bucketType bucket key) =
+  (\key -> Key bucketType bucket key) <$>
+    f key
 
 -- | Use 'generatedKey' to ask Riak to generate a random key when writing a new
 -- object or data type.

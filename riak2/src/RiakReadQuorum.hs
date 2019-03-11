@@ -14,7 +14,7 @@ data ReadQuorum
   = ReadQuorum
   { nodes :: !Quorum
   , primary :: !Quorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 fromProto ::
      ( HasLens' a "pr" Word32

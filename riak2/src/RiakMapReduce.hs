@@ -8,7 +8,6 @@ module RiakMapReduce
 import RiakBucket (Bucket)
 import RiakHandle (Handle, HandleError)
 
-import Libriak.Response   (Response(..))
 import RiakErlangTerm     (ErlangTerm(..))
 import RiakError
 import RiakKey            (Key)
@@ -23,7 +22,6 @@ import qualified RiakMapReducePhase as MapReducePhase
 
 import Control.Foldl      (FoldM)
 import Control.Lens       ((.~))
-import Data.Profunctor    (lmap)
 import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto

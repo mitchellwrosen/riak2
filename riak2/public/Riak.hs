@@ -16,17 +16,17 @@ module Riak
     -- ** Delete object
   , delete
     -- * Convergent counter operations
-  , getConvergentCounter
-  , updateConvergentCounter
+  , getCounter
+  , updateCounter
     -- * Convergent HyperLogLog operations
-  , getConvergentHyperLogLog
-  , updateConvergentHyperLogLog
+  , getHyperLogLog
+  , updateHyperLogLog
     -- * Convergent map operations
-  , getConvergentMap
-  , putConvergentMap
+  , getMap
+  , putMap
     -- * Convergent set operations
-  , getConvergentSet
-  , putConvergentSet
+  , getSet
+  , putSet
     -- * Bucket type operations
     -- ** Bucket type properties
   , getBucketType
@@ -81,15 +81,15 @@ module Riak
   , ConvergentCounter(..)
   , ConvergentHyperLogLog(..)
   , ConvergentMap
-  , newConvergentMap
-  , convergentMapKey
-  , convergentMapValue
+  , newMap
+  , mapKey
+  , mapValue
   , ConvergentMapValue(..)
-  , emptyConvergentMapValue
+  , emptyMapValue
   , ConvergentSet
-  , newConvergentSet
-  , convergentSetKey
-  , convergentSetValue
+  , newSet
+  , setKey
+  , setValue
   , CounterBucketProperties(..)
   , ErlangTerm(..)
   , Error(..)
@@ -99,14 +99,14 @@ module Riak
   , DeleteOpts(..)
   , GetBucketError
   , GetBucketTypeError
-  , GetConvergentCounterError
-  , GetConvergentHyperLogLogError
-  , GetConvergentMapError
-  , GetConvergentSetError
+  , GetCounterError
   , GetError
+  , GetHyperLogLogError
   , GetIndexError
+  , GetMapError
   , GetOpts(..)
   , GetSchemaError
+  , GetSetError
   , Handle
   , HandleConfig(..)
   , HandleError(..)
@@ -117,7 +117,10 @@ module Riak
   , unsafeMakeIndexName
   , IntIndexQuery(..)
   , Key(..)
+  , keyBucketType
   , keyBucket
+  , keyBucketSegment
+  , keyKeySegment
   , generatedKey
   , ListBucketsError
   , ListKeysError
@@ -135,13 +138,13 @@ module Riak
   , newObject
   , ObjectBucketProperties(..)
   , Op(..)
-  , PutConvergentMapError
-  , PutConvergentSetError
   , PutError
   , PutIndexError
-  , PutSchemaError
   , PutIndexOpts(..)
+  , PutMapError
   , PutOpts(..)
+  , PutSchemaError
+  , PutSetError
   , QueryExactError
   , QueryRangeError
   , Quorum(..)
@@ -157,8 +160,8 @@ module Riak
   , SetBucketProperties(..)
   , SetBucketTypeIndexError
   , Sibling(..)
-  , UpdateConvergentCounterError
-  , UpdateConvergentHyperLogLogError
+  , UpdateCounterError
+  , UpdateHyperLogLogError
   , WriteQuorum(..)
     -- ** Re-exports
   , Endpoint(..)
@@ -170,6 +173,7 @@ module Riak
 
 -- TODO rename Config/Error export them
 import Libriak.Connection         (Endpoint(..))
+import Riak.Bucket
 import Riak.BucketProperties      (BucketProperties(..), ConflictResolution(..),
                                    CounterBucketProperties(..),
                                    HyperLogLogBucketProperties(..),
@@ -201,7 +205,6 @@ import Riak.SecondaryIndexQuery   (BinaryIndexQuery(..), IntIndexQuery(..),
 import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
 import Riak.Sibling
-import RiakBucket
 import RiakPing
 #ifdef DEBUG
 import RiakDebug (debug)

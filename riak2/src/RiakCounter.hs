@@ -1,7 +1,7 @@
-module RiakConvergentCounter
+module RiakCounter
   ( ConvergentCounter(..)
-  , getConvergentCounter
-  , updateConvergentCounter
+  , getCounter
+  , updateCounter
   ) where
 
 import RiakCrdt
@@ -35,22 +35,22 @@ data ConvergentCounter
   , value :: !Int64 -- ^
   } deriving stock (Generic, Show)
 
--- | Get a counter.
-getConvergentCounter ::
+-- | Get an eventually-convergent counter.
+getCounter ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
-  -> m (Either GetConvergentCounterError (Maybe ConvergentCounter))
-getConvergentCounter handle key opts =
-  liftIO (retrying 1000000 (getConvergentCounter_ handle key opts))
+  -> m (Either GetCounterError (Maybe ConvergentCounter))
+getCounter handle key opts =
+  liftIO (retrying 1000000 (getCounter_ handle key opts))
 
-getConvergentCounter_ ::
+getCounter_ ::
      Handle
   -> Key
   -> GetOpts
-  -> IO (Maybe (Either GetConvergentCounterError (Maybe ConvergentCounter)))
-getConvergentCounter_
+  -> IO (Maybe (Either GetCounterError (Maybe ConvergentCounter)))
+getCounter_
     handle
     key@(Key bucketType _ _)
     (GetOpts basicQuorum nodes notfoundOk quorum timeout) =
@@ -87,27 +87,27 @@ getConvergentCounter_
         , value = crdt ^. Proto.counterValue
         }
 
--- | Update a counter.
+-- | Update an eventually-convergent counter.
 --
--- /Note/: Counters, unlike other data types, represent their own update
--- operation.
+-- /Note/: Counters, unlike other convergent data types, represent their own
+-- update operation.
 --
 -- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
-updateConvergentCounter ::
+updateCounter ::
      MonadIO m
   => Handle -- ^
-  -> ConvergentCounter -- ^
+  -> ConvergentCounter -- ^ Counter update
   -> PutOpts -- ^
-  -> m (Either UpdateConvergentCounterError ConvergentCounter)
-updateConvergentCounter handle counter opts =
-  liftIO (retrying 1000000 (updateConvergentCounter_ handle counter opts))
+  -> m (Either UpdateCounterError ConvergentCounter)
+updateCounter handle counter opts =
+  liftIO (retrying 1000000 (updateCounter_ handle counter opts))
 
-updateConvergentCounter_ ::
+updateCounter_ ::
      Handle
   -> ConvergentCounter
   -> PutOpts
-  -> IO (Maybe (Either UpdateConvergentCounterError ConvergentCounter))
-updateConvergentCounter_
+  -> IO (Maybe (Either UpdateCounterError ConvergentCounter))
+updateCounter_
     handle
     (ConvergentCounter key@(Key bucketType _ _) value)
     (PutOpts nodes quorum timeout) =

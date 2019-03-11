@@ -7,27 +7,27 @@ module Riak.Error
   , DeleteIndexError
   , GetBucketError
   , GetBucketTypeError
-  , GetConvergentCounterError
-  , GetConvergentHyperLogLogError
-  , GetConvergentMapError
-  , GetConvergentSetError
-  , GetIndexError
+  , GetCounterError
   , GetError
+  , GetHyperLogLogError
+  , GetIndexError
+  , GetMapError
   , GetSchemaError
+  , GetSetError
   , ListBucketsError
   , ListKeysError
   , MapReduceBucketError
-  , PutConvergentMapError
-  , PutConvergentSetError
   , PutError
   , PutIndexError
+  , PutMapError
   , PutSchemaError
+  , PutSetError
   , QueryExactError
   , QueryRangeError
   , SearchError
   , SetBucketTypeIndexError
-  , UpdateConvergentCounterError
-  , UpdateConvergentHyperLogLogError
+  , UpdateCounterError
+  , UpdateHyperLogLogError
     -- * Internal type families
   , MayReturnBucketTypeDoesNotExist
   , MayReturnIndexDoesNotExist

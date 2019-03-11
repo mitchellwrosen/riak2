@@ -4,8 +4,8 @@ module Main where
 
 import Libriak.Connection      (Endpoint(..))
 import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
-import RiakBucket              (Bucket(..), queryBinaryIndex, queryIntIndex,
-                                setBucketIndex)
+import RiakBucket              (Bucket(..), getBucket, queryBinaryIndex,
+                                queryIntIndex, setBucketIndex)
 import RiakBucketType          (defaultBucketType)
 import RiakContent             (Content, newContent)
 import RiakContext             (newContext)
@@ -76,16 +76,55 @@ main = do
 
 integrationTests :: Handle -> [TestTree]
 integrationTests handle =
-  [ testGroup "RiakBucket" (riakBucketTests handle)
+  [ testGroup "RiakBinaryIndexQuery" []
+  , testGroup "RiakBucket" (riakBucketTests handle)
+  , testGroup "RiakBucketProperties" []
+  , testGroup "RiakBucketType" []
+  , testGroup "RiakBucketTypeInternal" []
+  , testGroup "RiakBusPool" []
+  , testGroup "RiakContent" []
+  , testGroup "RiakContext" []
+  , testGroup "RiakConvergentCounter" []
+  , testGroup "RiakConvergentHyperLogLog" []
+  , testGroup "RiakConvergentMap" []
+  , testGroup "RiakConvergentMapValue" []
+  , testGroup "RiakConvergentSet" []
+  , testGroup "RiakDebug" []
+  , testGroup "RiakDeleteOpts" []
+  , testGroup "RiakErlangTerm" []
+  , testGroup "RiakError" []
+  , testGroup "RiakGetOpts" []
+  , testGroup "RiakHandle" []
   , testGroup "RiakIndex" (riakIndexTests handle)
+  , testGroup "RiakIndexName" []
+  , testGroup "RiakIntIndexQuery" []
+  , testGroup "RiakKey" []
+  , testGroup "RiakManagedBus" []
+  , testGroup "RiakMapReduce" []
+  , testGroup "RiakMapReduceFunction" []
+  , testGroup "RiakMapReducePhase" []
   , testGroup "RiakObject" (riakObjectTests handle)
   , testGroup "RiakPing" (riakPingTests handle)
+  , testGroup "RiakPutOpts" []
+  , testGroup "RiakQuorum" []
+  , testGroup "RiakReadQuorum" []
+  , testGroup "RiakSTM" []
+  , testGroup "RiakSchema" []
+  , testGroup "RiakSearch" []
+  , testGroup "RiakSecondaryIndex" []
+  , testGroup "RiakSecondaryIndexValue" []
   , testGroup "RiakServerInfo" (riakServerInfoTests handle)
+  , testGroup "RiakSibling" []
+  , testGroup "RiakWriteQuorum" []
   ]
 
 riakBucketTests :: Handle -> [TestTree]
 riakBucketTests handle =
-  [ testGroup "getBucket" [ ]
+  [ testGroup "getBucket"
+    [ testCase "XXX success 1" $ do
+        bucket <- randomDefaultBucket
+        getBucket handle bucket `shouldReturnSatisfy` isRightJust
+    ]
   , testGroup "listKeys" [ ]
 
   , testGroup "queryBinaryIndex"
@@ -552,32 +591,6 @@ randomObjectKey =
 randomText :: Int -> IO Text
 randomText n =
   Text.pack <$> replicateM n (randomRIO ('a', 'z'))
-
--- randomObjectKeyIn :: ByteString -> IO RiakKey
--- randomObjectKeyIn bucket = do
---   key <- randomKeyName
---   pure (RiakKey (RiakBucket (RiakBucketType "objects") bucket) key)
-
--- randomObjectBucket :: IO RiakBucket
--- randomObjectBucket = do
---   bucket <- randomBucketName
---   pure (RiakBucket (RiakBucketType "objects") bucket)
-
--- randomCounterBucket :: IO RiakBucket
--- randomCounterBucket = do
---   RiakBucket (RiakBucketType "counters") <$> randomBucketName
-
--- randomCounterKey :: IO RiakKey
--- randomCounterKey =
---   RiakKey <$> randomCounterBucket <*> randomKeyName
-
--- randomSetBucket :: IO RiakBucket
--- randomSetBucket = do
---   RiakBucket (RiakBucketType "sets") <$> randomBucketName
-
--- randomSetKey :: IO RiakKey
--- randomSetKey =
---   RiakKey <$> randomSetBucket <*> randomKeyName
 
 isRightJust :: Either a (Maybe b) -> Bool
 isRightJust = \case

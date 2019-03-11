@@ -1,12 +1,12 @@
 module Riak.ConvergentSet
   ( -- * Convergent set operations
-    getConvergentSet
-  , putConvergentSet
+    getSet
+  , putSet
     -- * Convergent set
   , ConvergentSet
-  , newConvergentSet
-  , convergentSetKey
-  , convergentSetValue
+  , newSet
+  , setKey
+  , setValue
   ) where
 
-import RiakConvergentSet
+import RiakSet

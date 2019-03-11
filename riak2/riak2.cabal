@@ -14,7 +14,10 @@ description:
   For example, to /list the keys in a bucket/, the primary input type is the
   /bucket/, so this function is exported by the the "Riak.Bucket" module.
   .
-  However, every symbol is also re-exported by the top-level "Riak" module.
+  However, every symbol is also re-exported by the top-level "Riak" module, so
+  to import this library you only need:
+  .
+  > import qualified Riak
   .
   __Module guide__
   .
@@ -89,6 +92,7 @@ library
 
   exposed-modules:
     Riak
+    Riak.Bucket
     Riak.BucketProperties
     Riak.BucketType
     Riak.Content
@@ -115,9 +119,6 @@ library
 
   hs-source-dirs:
     public
-
-  reexported-modules:
-    RiakBucket as Riak.Bucket,
 
 library riak2-internal
   build-depends:
@@ -189,41 +190,42 @@ library riak2-internal
     RiakBucket
     RiakBucketProperties
     RiakBucketType
-    RiakBucketTypeInternal
     RiakBusPool
     RiakContent
     RiakContext
-    RiakConvergentCounter
-    RiakConvergentHyperLogLog
-    RiakConvergentMap
-    RiakConvergentMapValue
-    RiakConvergentSet
+    RiakCounter
+    RiakCounterBucketProps
     RiakDebug
     RiakDeleteOpts
     RiakErlangTerm
     RiakError
     RiakGetOpts
     RiakHandle
+    RiakHyperLogLog
     RiakIndex
     RiakIndexName
     RiakIntIndexQuery
     RiakKey
     RiakManagedBus
+    RiakMap
     RiakMapReduce
     RiakMapReduceFunction
     RiakMapReducePhase
+    RiakMapValue
+    RiakNotfoundBehavior
     RiakObject
     RiakPing
     RiakPutOpts
     RiakQuorum
     RiakReadQuorum
+    RiakSTM
     RiakSchema
     RiakSearch
     RiakSecondaryIndex
     RiakSecondaryIndexValue
     RiakServerInfo
+    RiakSet
     RiakSibling
-    RiakSTM
     RiakWriteQuorum
 
   ghc-options:
@@ -247,6 +249,7 @@ library riak2-internal
   other-modules:
     Prelude
     RiakBucketInternal
+    RiakBucketTypeInternal
     RiakCrdt
     RiakPanic
     RiakProtoContent

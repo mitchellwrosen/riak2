@@ -1,19 +1,19 @@
-module RiakConvergentSet
+module RiakSet
   ( ConvergentSet(..)
-  , newConvergentSet
-  , convergentSetKey
-  , convergentSetValue
-  , getConvergentSet
-  , putConvergentSet
+  , newSet
+  , setKey
+  , setValue
+  , getSet
+  , putSet
   , toProto
   ) where
 
-import RiakContext      (Context(..), newContext)
-import RiakCrdt         (parseGetCrdtError, parseUpdateCrdtError)
+import RiakContext (Context(..), newContext)
+import RiakCrdt    (parseGetCrdtError, parseUpdateCrdtError)
 import RiakError
-import RiakHandle       (Handle)
-import RiakKey          (Key(..), isGeneratedKey)
-import RiakUtils        (retrying)
+import RiakHandle  (Handle)
+import RiakKey     (Key(..), isGeneratedKey)
+import RiakUtils   (retrying)
 
 import qualified RiakHandle as Handle
 import qualified RiakKey    as Key
@@ -37,12 +37,12 @@ data ConvergentSet a
   , _oldValue :: !(HashSet a)
   } deriving stock (Generic, Show)
 
--- | Create a new convergent set.
-newConvergentSet ::
+-- | Create a new eventually-convergent set.
+newSet ::
      Key -- ^
   -> HashSet a -- ^
   -> ConvergentSet a
-newConvergentSet key contents =
+newSet key contents =
   ConvergentSet
     { _context = newContext
     , _key = key
@@ -50,30 +50,30 @@ newConvergentSet key contents =
     , _oldValue = HashSet.empty
     }
 
--- | A lens onto the key of a convergent set.
-convergentSetKey :: Lens' (ConvergentSet a) Key
-convergentSetKey =
+-- | A lens onto the key of an eventually-convergent set.
+setKey :: Lens' (ConvergentSet a) Key
+setKey =
   field @"_key"
 
--- | A lens onto the value of a convergent set.
-convergentSetValue :: Lens' (ConvergentSet a) (HashSet a)
-convergentSetValue =
+-- | A lens onto the value of an eventually-convergent set.
+setValue :: Lens' (ConvergentSet a) (HashSet a)
+setValue =
   field @"_newValue"
 
--- | Get a convergent set.
-getConvergentSet ::
+-- | Get an eventually-convergent set.
+getSet ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either GetConvergentSetError (Maybe (ConvergentSet ByteString)))
-getConvergentSet handle key =
-  liftIO (retrying 1000000 (getConvergentSet_ handle key))
+  -> m (Either GetSetError (Maybe (ConvergentSet ByteString)))
+getSet handle key =
+  liftIO (retrying 1000000 (getSet_ handle key))
 
-getConvergentSet_ ::
+getSet_ ::
      Handle
   -> Key
-  -> IO (Maybe (Either GetConvergentSetError (Maybe (ConvergentSet ByteString))))
-getConvergentSet_ handle key@(Key bucketType _ _) =
+  -> IO (Maybe (Either GetSetError (Maybe (ConvergentSet ByteString))))
+getSet_ handle key@(Key bucketType _ _) =
   Handle.getCrdt handle request >>= \case
     Left err ->
       pure (Just (Left (HandleError err)))
@@ -118,20 +118,20 @@ getConvergentSet_ handle key@(Key bucketType _ _) =
         , _oldValue = value
         }
 
--- | Put a convergent set.
-putConvergentSet ::
+-- | Put an eventually-convergent set.
+putSet ::
      MonadIO m
   => Handle -- ^
   -> ConvergentSet ByteString -- ^
-  -> m (Either PutConvergentSetError (ConvergentSet ByteString))
-putConvergentSet handle set =
-  liftIO (retrying 1000000 (putConvergentSet_ handle set))
+  -> m (Either PutSetError (ConvergentSet ByteString))
+putSet handle set =
+  liftIO (retrying 1000000 (putSet_ handle set))
 
-putConvergentSet_ ::
+putSet_ ::
      Handle
   -> ConvergentSet ByteString
-  -> IO (Maybe (Either PutConvergentSetError (ConvergentSet ByteString)))
-putConvergentSet_
+  -> IO (Maybe (Either PutSetError (ConvergentSet ByteString)))
+putSet_
     handle
     (ConvergentSet context key@(Key bucketType _ _) newValue oldValue) =
 

@@ -15,7 +15,7 @@ data WriteQuorum
   { durable :: !Quorum
   , nodes :: !Quorum
   , primary :: !Quorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 fromProto ::
      ( HasLens' a "dw" Word32

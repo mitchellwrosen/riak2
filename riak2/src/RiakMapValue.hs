@@ -1,11 +1,11 @@
-module RiakConvergentMapValue
+module RiakMapValue
   ( ConvergentMapValue(..)
-  , emptyConvergentMapValue
+  , emptyMapValue
   , fromProto
   , toProto
   ) where
 
-import qualified RiakConvergentSet as ConvergentSet
+import qualified RiakSet
 
 import Control.Lens          ((%~), (.~), (^.))
 import Data.Generics.Product (field)
@@ -30,9 +30,9 @@ data ConvergentMapValue
   , sets :: !(HashMap ByteString (HashSet ByteString)) -- ^ Sets
   } deriving stock (Generic, Show)
 
--- | An empty convergent map value.
-emptyConvergentMapValue :: ConvergentMapValue
-emptyConvergentMapValue =
+-- | An empty map value.
+emptyMapValue :: ConvergentMapValue
+emptyMapValue =
   ConvergentMapValue
     { counters = HashMap.empty
     , flags = HashMap.empty
@@ -43,7 +43,7 @@ emptyConvergentMapValue =
 
 fromProto :: [Proto.MapEntry] -> ConvergentMapValue
 fromProto =
-  foldl' step emptyConvergentMapValue
+  foldl' step emptyMapValue
 
   where
     step :: ConvergentMapValue -> Proto.MapEntry -> ConvergentMapValue
@@ -171,7 +171,7 @@ toProto newValue oldValue =
                   toProto
                     newValue
                     (fromMaybe
-                      emptyConvergentMapValue
+                      emptyMapValue
                       (HashMap.lookup key oldMaps))
               in do
                 guard (not (isEmptyMapOp op))
@@ -207,7 +207,7 @@ toProto newValue oldValue =
               let
                 op :: Proto.SetOp
                 op =
-                  ConvergentSet.toProto
+                  RiakSet.toProto
                     newValue
                     (fromMaybe HashSet.empty (HashMap.lookup key oldSets))
               in do

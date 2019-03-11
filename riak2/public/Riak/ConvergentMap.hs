@@ -1,16 +1,16 @@
 module Riak.ConvergentMap
   ( -- * Convergent map operations
-    getConvergentMap
-  , putConvergentMap
+    getMap
+  , putMap
     -- * Convergent map
   , ConvergentMap
-  , newConvergentMap
-  , convergentMapKey
-  , convergentMapValue
+  , newMap
+  , mapKey
+  , mapValue
     -- * Convergent map value
   , ConvergentMapValue(..)
-  , emptyConvergentMapValue
+  , emptyMapValue
   ) where
 
-import RiakConvergentMap
-import RiakConvergentMapValue
+import RiakMap
+import RiakMapValue

@@ -5,8 +5,8 @@
 
 module Riak.ConvergentHyperLogLog
   ( ConvergentHyperLogLog(..)
-  , getConvergentHyperLogLog
-  , updateConvergentHyperLogLog
+  , getHyperLogLog
+  , updateHyperLogLog
   ) where
 
-import RiakConvergentHyperLogLog
+import RiakHyperLogLog

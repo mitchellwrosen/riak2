@@ -1,24 +1,24 @@
-module RiakConvergentMap
-  ( getConvergentMap
-  , putConvergentMap
+module RiakMap
+  ( getMap
+  , putMap
     -- * Convergent map
   , ConvergentMap
-  , newConvergentMap
-  , convergentMapKey
-  , convergentMapValue
+  , newMap
+  , mapKey
+  , mapValue
   ) where
 
-import RiakContext            (Context(..), newContext)
-import RiakConvergentMapValue (ConvergentMapValue(..), emptyConvergentMapValue)
-import RiakCrdt               (parseGetCrdtError, parseUpdateCrdtError)
+import RiakContext  (Context(..), newContext)
+import RiakCrdt     (parseGetCrdtError, parseUpdateCrdtError)
 import RiakError
-import RiakHandle             (Handle)
-import RiakKey                (Key(..), isGeneratedKey)
-import RiakUtils              (retrying)
+import RiakHandle   (Handle)
+import RiakKey      (Key(..), isGeneratedKey)
+import RiakMapValue (ConvergentMapValue(..), emptyMapValue)
+import RiakUtils    (retrying)
 
-import qualified RiakConvergentMapValue as ConvergentMapValue
-import qualified RiakHandle             as Handle
-import qualified RiakKey                as Key
+import qualified RiakHandle   as Handle
+import qualified RiakKey      as Key
+import qualified RiakMapValue as MapValue
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
@@ -38,43 +38,43 @@ data ConvergentMap a
   , _oldValue :: !a
   } deriving stock (Functor, Generic, Show)
 
--- | Create a new convergent map.
-newConvergentMap ::
+-- | Create a new eventually-convergent map.
+newMap ::
      Key -- ^
   -> ConvergentMapValue -- ^
   -> ConvergentMap ConvergentMapValue
-newConvergentMap key value =
+newMap key value =
   ConvergentMap
     { _context = newContext
     , _key = key
     , _newValue = value
-    , _oldValue = emptyConvergentMapValue
+    , _oldValue = emptyMapValue
     }
 
--- | A lens onto the key of a convergent map.
-convergentMapKey :: Lens' (ConvergentMap a) Key
-convergentMapKey =
+-- | A lens onto the key of an eventually-convergent map.
+mapKey :: Lens' (ConvergentMap a) Key
+mapKey =
   field @"_key"
 
--- | A lens onto the value of a convergent map.
-convergentMapValue :: Lens' (ConvergentMap a) a
-convergentMapValue =
+-- | A lens onto the value of an eventually-convergent map.
+mapValue :: Lens' (ConvergentMap a) a
+mapValue =
   field @"_newValue"
 
--- | Get a convergent map.
-getConvergentMap ::
+-- | Get an eventually-convergent map.
+getMap ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either GetConvergentMapError (Maybe (ConvergentMap ConvergentMapValue)))
-getConvergentMap handle key =
-  liftIO (retrying 1000000 (getConvergentMap_ handle key))
+  -> m (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
+getMap handle key =
+  liftIO (retrying 1000000 (getMap_ handle key))
 
-getConvergentMap_ ::
+getMap_ ::
      Handle
   -> Key
-  -> IO (Maybe (Either GetConvergentMapError (Maybe (ConvergentMap ConvergentMapValue))))
-getConvergentMap_ handle key@(Key bucketType _ _) =
+  -> IO (Maybe (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue))))
+getMap_ handle key@(Key bucketType _ _) =
   Handle.getCrdt handle request >>= \case
     Left err ->
       pure (Just (Left (HandleError err)))
@@ -110,7 +110,7 @@ getConvergentMap_ handle key@(Key bucketType _ _) =
       let
         value :: ConvergentMapValue
         value =
-          ConvergentMapValue.fromProto (crdt ^. Proto.mapValue)
+          MapValue.fromProto (crdt ^. Proto.mapValue)
 
       pure ConvergentMap
         { _context = Context (response ^. Proto.context)
@@ -119,20 +119,20 @@ getConvergentMap_ handle key@(Key bucketType _ _) =
         , _oldValue = value
         }
 
--- | Put a convergent map.
-putConvergentMap ::
+-- | Put an eventually-convergent map.
+putMap ::
      MonadIO m
   => Handle -- ^
   -> ConvergentMap ConvergentMapValue -- ^
-  -> m (Either PutConvergentMapError (ConvergentMap ConvergentMapValue))
-putConvergentMap handle value =
-  liftIO (retrying 1000000 (putConvergentMap_ handle value))
+  -> m (Either PutMapError (ConvergentMap ConvergentMapValue))
+putMap handle value =
+  liftIO (retrying 1000000 (putMap_ handle value))
 
-putConvergentMap_ ::
+putMap_ ::
      Handle -- ^
   -> ConvergentMap ConvergentMapValue -- ^
-  -> IO (Maybe (Either PutConvergentMapError (ConvergentMap ConvergentMapValue)))
-putConvergentMap_
+  -> IO (Maybe (Either PutMapError (ConvergentMap ConvergentMapValue)))
+putMap_
     handle
     (ConvergentMap context key@(Key bucketType _ _) newValue oldValue) =
 
@@ -157,7 +157,7 @@ putConvergentMap_
               else Just (unContext context))
         & Proto.op .~
             (Proto.defMessage
-              & Proto.mapOp .~ ConvergentMapValue.toProto newValue oldValue)
+              & Proto.mapOp .~ MapValue.toProto newValue oldValue)
         & Proto.returnBody .~ True
 
 -- TODO map update opts
@@ -189,4 +189,4 @@ putConvergentMap_
       where
         value :: ConvergentMapValue
         value =
-          ConvergentMapValue.fromProto (response ^. Proto.mapValue)
+          MapValue.fromProto (response ^. Proto.mapValue)

@@ -10,3 +10,4 @@ module Riak.BucketProperties
   ) where
 
 import RiakBucketProperties
+import RiakNotfoundBehavior

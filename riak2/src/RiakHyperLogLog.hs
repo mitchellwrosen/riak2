@@ -3,10 +3,10 @@
 -- * <https://basho.com/posts/technical/what-in-the-hell-is-hyperloglog/>
 -- * <https://github.com/basho/riak_kv/blob/develop/docs/hll/hll.pdf>
 
-module RiakConvergentHyperLogLog
+module RiakHyperLogLog
   ( ConvergentHyperLogLog(..)
-  , getConvergentHyperLogLog
-  , updateConvergentHyperLogLog
+  , getHyperLogLog
+  , updateHyperLogLog
   ) where
 
 import RiakCrdt
@@ -41,20 +41,20 @@ data ConvergentHyperLogLog a
   , value :: !a -- ^
   } deriving stock (Functor, Generic, Show)
 
--- | Get a HyperLogLog.
-getConvergentHyperLogLog ::
+-- | Get an eventually-convergent HyperLogLog.
+getHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
-  -> m (Either GetConvergentHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
-getConvergentHyperLogLog handle key =
-  liftIO (retrying 1000000 (getConvergentHyperLogLog_ handle key))
+  -> m (Either GetHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
+getHyperLogLog handle key =
+  liftIO (retrying 1000000 (getHyperLogLog_ handle key))
 
-getConvergentHyperLogLog_ ::
+getHyperLogLog_ ::
      Handle -- ^
   -> Key -- ^
-  -> IO (Maybe (Either GetConvergentHyperLogLogError (Maybe (ConvergentHyperLogLog Word64))))
-getConvergentHyperLogLog_ handle key@(Key bucketType _ _) =
+  -> IO (Maybe (Either GetHyperLogLogError (Maybe (ConvergentHyperLogLog Word64))))
+getHyperLogLog_ handle key@(Key bucketType _ _) =
   Handle.getCrdt handle request >>= \case
     Left err ->
       pure (Just (Left (HandleError err)))
@@ -92,22 +92,22 @@ getConvergentHyperLogLog_ handle key@(Key bucketType _ _) =
         , value = crdt ^. Proto.hllValue
         }
 
--- | Update a HyperLogLog.
+-- | Update an eventually-convergent HyperLogLog.
 --
 -- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
-updateConvergentHyperLogLog ::
+updateHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
-  -> m (Either UpdateConvergentHyperLogLogError (ConvergentHyperLogLog Word64))
-updateConvergentHyperLogLog handle hll =
-  liftIO (retrying 1000000 (updateConvergentHyperLogLog_ handle hll))
+  -> m (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64))
+updateHyperLogLog handle hll =
+  liftIO (retrying 1000000 (updateHyperLogLog_ handle hll))
 
-updateConvergentHyperLogLog_ ::
+updateHyperLogLog_ ::
      Handle
   -> ConvergentHyperLogLog [ByteString]
-  -> IO (Maybe (Either UpdateConvergentHyperLogLogError (ConvergentHyperLogLog Word64)))
-updateConvergentHyperLogLog_
+  -> IO (Maybe (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64)))
+updateHyperLogLog_
     handle
     (ConvergentHyperLogLog key@(Key bucketType _ _) value) =
 

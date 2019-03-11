@@ -123,32 +123,32 @@ data Op
   | SetBucketTypeIndexOp
   | UpdateCrdtOp
 
-type DeleteError                      = Error 'DeleteOp
-type DeleteIndexError                 = Error 'DeleteIndexOp
-type GetBucketError                   = Error 'GetBucketOp
-type GetBucketTypeError               = Error 'GetBucketTypeOp
-type GetConvergentCounterError        = Error 'GetCrdtOp
-type GetConvergentHyperLogLogError    = Error 'GetCrdtOp
-type GetConvergentMapError            = Error 'GetCrdtOp
-type GetConvergentSetError            = Error 'GetCrdtOp
-type GetIndexError                    = Error 'GetIndexOp
-type GetError                         = Error 'GetOp
-type GetSchemaError                   = Error 'GetSchemaOp
-type ListBucketsError                 = Error 'ListBucketsOp
-type ListKeysError                    = Error 'ListKeysOp
-type MapReduceBucketError             = Error 'MapReduceBucketOp
-type PutConvergentMapError            = Error 'UpdateCrdtOp
-type PutConvergentSetError            = Error 'UpdateCrdtOp
-type PutError                         = Error 'PutOp
-type PutIndexError                    = Error 'PutIndexOp
-type PutSchemaError                   = Error 'PutSchemaOp
-type QueryExactError                  = Error 'SecondaryIndexQueryOp
-type QueryRangeError                  = Error 'SecondaryIndexQueryOp
-type SearchError                      = Error 'SearchOp
-type SetBucketIndexError              = Error 'SetBucketIndexOp
-type SetBucketTypeIndexError          = Error 'SetBucketTypeIndexOp
-type UpdateConvergentCounterError     = Error 'UpdateCrdtOp
-type UpdateConvergentHyperLogLogError = Error 'UpdateCrdtOp
+type DeleteError             = Error 'DeleteOp
+type DeleteIndexError        = Error 'DeleteIndexOp
+type GetBucketError          = Error 'GetBucketOp
+type GetBucketTypeError      = Error 'GetBucketTypeOp
+type GetCounterError         = Error 'GetCrdtOp
+type GetHyperLogLogError     = Error 'GetCrdtOp
+type GetMapError             = Error 'GetCrdtOp
+type GetSetError             = Error 'GetCrdtOp
+type GetIndexError           = Error 'GetIndexOp
+type GetError                = Error 'GetOp
+type GetSchemaError          = Error 'GetSchemaOp
+type ListBucketsError        = Error 'ListBucketsOp
+type ListKeysError           = Error 'ListKeysOp
+type MapReduceBucketError    = Error 'MapReduceBucketOp
+type PutMapError             = Error 'UpdateCrdtOp
+type PutSetError             = Error 'UpdateCrdtOp
+type PutError                = Error 'PutOp
+type PutIndexError           = Error 'PutIndexOp
+type PutSchemaError          = Error 'PutSchemaOp
+type QueryExactError         = Error 'SecondaryIndexQueryOp
+type QueryRangeError         = Error 'SecondaryIndexQueryOp
+type SearchError             = Error 'SearchOp
+type SetBucketIndexError     = Error 'SetBucketIndexOp
+type SetBucketTypeIndexError = Error 'SetBucketTypeIndexOp
+type UpdateCounterError      = Error 'UpdateCrdtOp
+type UpdateHyperLogLogError  = Error 'UpdateCrdtOp
 
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True

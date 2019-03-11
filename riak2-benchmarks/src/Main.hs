@@ -114,9 +114,9 @@ riak2PingParser =
             , Riak.healthCheckInterval =
                 1
             , Riak.idleTimeout =
-                5
+                10
             , Riak.requestTimeout =
-                1
+                5
             , Riak.retries =
                 3
             , Riak.handlers =

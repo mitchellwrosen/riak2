@@ -1,11 +1,13 @@
 module RiakBucketProperties where
 
-import RiakIndexName   (IndexName(..))
-import RiakReadQuorum  (ReadQuorum(..))
-import RiakWriteQuorum (WriteQuorum(..))
+import RiakIndexName        (IndexName(..))
+import RiakNotfoundBehavior (NotfoundBehavior)
+import RiakReadQuorum       (ReadQuorum(..))
+import RiakWriteQuorum      (WriteQuorum(..))
 
-import qualified RiakReadQuorum  as ReadQuorum
-import qualified RiakWriteQuorum as WriteQuorum
+import qualified RiakNotfoundBehavior as NotfoundBehavior
+import qualified RiakReadQuorum       as ReadQuorum
+import qualified RiakWriteQuorum      as WriteQuorum
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -19,7 +21,7 @@ data BucketProperties
   | BucketPropertiesMap MapBucketProperties
   | BucketPropertiesObject ObjectBucketProperties
   | BucketPropertiesSet SetBucketProperties
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 data CounterBucketProperties
   = CounterBucketProperties
@@ -30,7 +32,7 @@ data CounterBucketProperties
   , precommitHooks :: ![Proto.RpbCommitHook]
   , readQuorum :: !ReadQuorum
   , writeQuorum :: !WriteQuorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 -- TODO hll precision
 data HyperLogLogBucketProperties
@@ -42,7 +44,7 @@ data HyperLogLogBucketProperties
   , precommitHooks :: ![Proto.RpbCommitHook]
   , readQuorum :: !ReadQuorum
   , writeQuorum :: !WriteQuorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 data MapBucketProperties
   = MapBucketProperties
@@ -53,7 +55,7 @@ data MapBucketProperties
   , precommitHooks :: ![Proto.RpbCommitHook]
   , readQuorum :: !ReadQuorum
   , writeQuorum :: !WriteQuorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 data ObjectBucketProperties
   = ObjectBucketProperties
@@ -65,7 +67,7 @@ data ObjectBucketProperties
   , precommitHooks :: ![Proto.RpbCommitHook]
   , readQuorum :: !ReadQuorum
   , writeQuorum :: !WriteQuorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 data SetBucketProperties
   = SetBucketProperties
@@ -76,7 +78,7 @@ data SetBucketProperties
   , precommitHooks :: ![Proto.RpbCommitHook]
   , readQuorum :: !ReadQuorum
   , writeQuorum :: !WriteQuorum
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 -- | The conflict resolution strategy used by Riak, for normal KV (non-CRDT)
 -- objects.
@@ -86,14 +88,7 @@ data SetBucketProperties
 data ConflictResolution
   = UseTimestamps
   | LastWriteWins
-  deriving stock (Show)
-
--- | TODO better names for NotfoundBehavior constructors
-data NotfoundBehavior
-  = NotfoundCounts -- notfound counts towards r
-  | NotfoundSkipped -- all n vnodes are queried
-  | NotfoundSkippedBasic -- only a quorum of vnodes are queried
-  deriving stock (Show)
+  deriving stock (Eq, Show)
 
 fromProto :: Proto.RpbBucketProps -> BucketProperties
 fromProto props =
@@ -173,10 +168,7 @@ fromProto props =
 
     notfoundBehavior :: NotfoundBehavior
     notfoundBehavior =
-      case (fromMaybe True (props ^. Proto.maybe'notfoundOk), props ^. Proto.basicQuorum) of
-        (True, _)      -> NotfoundCounts
-        (False, False) -> NotfoundSkipped
-        (False, True)  -> NotfoundSkippedBasic
+      NotfoundBehavior.fromProto props
 
     postcommitHooks :: [Proto.RpbCommitHook]
     postcommitHooks =
