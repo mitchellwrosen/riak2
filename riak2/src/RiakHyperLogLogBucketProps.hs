@@ -13,7 +13,8 @@ import qualified RiakNotfoundBehavior as NotfoundBehavior
 import qualified RiakReadQuorum       as ReadQuorum
 import qualified RiakWriteQuorum      as WriteQuorum
 
-import Control.Lens ((^.))
+import Control.Lens       ((^.))
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto
 
@@ -21,7 +22,8 @@ import qualified Data.Riak.Proto as Proto
 -- TODO hll precision
 data HyperLogLogBucketProps
   = HyperLogLogBucketProps
-  { index :: Maybe IndexName -- ^ Search index
+  { backend :: Maybe Text
+  , index :: Maybe IndexName -- ^ Search index
   , nodes :: Natural
   , notfoundBehavior :: NotfoundBehavior
   , postcommitHooks :: [Proto.RpbCommitHook]
@@ -34,7 +36,8 @@ data HyperLogLogBucketProps
 fromProto :: Proto.RpbBucketProps -> HyperLogLogBucketProps
 fromProto props =
   HyperLogLogBucketProps
-    { index            = IndexName.fromBucketProps props
+    { backend          = decodeUtf8 <$> (props ^. Proto.maybe'backend)
+    , index            = IndexName.fromBucketProps props
     , nodes            = fromIntegral (props ^. Proto.nVal)
     , notfoundBehavior = NotfoundBehavior.fromProto props
     , postcommitHooks  = props ^. Proto.postcommit

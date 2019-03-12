@@ -12,8 +12,13 @@ import qualified Data.ByteString                  as ByteString
 
 
 -- TODO "Key cannot be zero-length" when putting with empty key
+--
 -- TODO retry on insufficient vnodes
 --        - list keys
+--
+-- TODO get "{insufficient_vnodes,0,need,2}"
+-- TODO get "{pr_val_unsatisfied,3,2}"
+-- TODO put/delete "{pw_val_unsatisfied,3,2}"
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.

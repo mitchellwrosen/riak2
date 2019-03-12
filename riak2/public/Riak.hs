@@ -147,6 +147,7 @@ module Riak
   , Object(..)
   , newObject
   , Op(..)
+  , PruneContextSettings(..)
   , PutError
   , PutIndexError
   , PutIndexOpts(..)
@@ -183,7 +184,8 @@ import Riak.BucketProps           (BucketProps(..), ConflictResolution(..),
                                    CounterBucketProps(..),
                                    HyperLogLogBucketProps(..),
                                    MapBucketProps(..), NotfoundBehavior(..),
-                                   SetBucketProps(..), SomeBucketProps(..))
+                                   PruneContextSettings(..), SetBucketProps(..),
+                                   SomeBucketProps(..))
 import Riak.BucketType
 import Riak.Content
 import Riak.Context

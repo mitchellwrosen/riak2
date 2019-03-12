@@ -13,14 +13,16 @@ import qualified RiakNotfoundBehavior as NotfoundBehavior
 import qualified RiakReadQuorum       as ReadQuorum
 import qualified RiakWriteQuorum      as WriteQuorum
 
-import Control.Lens ((^.))
+import Control.Lens       ((^.))
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto
 
 
 data MapBucketProps
   = MapBucketProps
-  { index :: Maybe IndexName -- ^ Search index
+  { backend :: Maybe Text
+  , index :: Maybe IndexName -- ^ Search index
   , nodes :: Natural
   , notfoundBehavior :: NotfoundBehavior
   , postcommitHooks :: [Proto.RpbCommitHook]
@@ -33,7 +35,8 @@ data MapBucketProps
 fromProto :: Proto.RpbBucketProps -> MapBucketProps
 fromProto props =
   MapBucketProps
-    { index            = IndexName.fromBucketProps props
+    { backend          = decodeUtf8 <$> (props ^. Proto.maybe'backend)
+    , index            = IndexName.fromBucketProps props
     , nodes            = fromIntegral (props ^. Proto.nVal)
     , notfoundBehavior = NotfoundBehavior.fromProto props
     , postcommitHooks  = props ^. Proto.postcommit

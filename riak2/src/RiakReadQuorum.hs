@@ -10,6 +10,8 @@ import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 import qualified Data.Riak.Proto as Proto
 
 
+-- TODO put NotfoundBehavior in here?
+
 data ReadQuorum
   = ReadQuorum
   { nodes :: Quorum
