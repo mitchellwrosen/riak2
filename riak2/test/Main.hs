@@ -8,7 +8,9 @@ import RiakBucket              (Bucket(..), getBucket, getCounterBucket,
                                 getSetBucket, queryBinaryIndex, queryIntIndex,
                                 setBucketIndex, unsetBucketIndex)
 import RiakBucketProps         (BucketProps(..))
-import RiakBucketType          (defaultBucketType)
+import RiakBucketType          (BucketType, defaultBucketType, getBucketType,
+                                getCounterBucketType, getHyperLogLogBucketType,
+                                getMapBucketType, getSetBucketType)
 import RiakContent             (Content, newContent)
 import RiakContext             (newContext)
 import RiakError               (Error(..))
@@ -82,7 +84,7 @@ integrationTests handle =
   [ testGroup "RiakBinaryIndexQuery" []
   , testGroup "RiakBucket" (riakBucketTests handle)
   , testGroup "RiakBucketProps" []
-  , testGroup "RiakBucketType" []
+  , testGroup "RiakBucketType" (riakBucketTypeTests handle)
   , testGroup "RiakBucketTypeInternal" []
   , testGroup "RiakBusPool" []
   , testGroup "RiakContent" []
@@ -336,6 +338,112 @@ riakBucketTests handle =
             Left (BucketTypeDoesNotExistError bucketType)
       ]
     ]
+  ]
+
+riakBucketTypeTests :: Handle -> [TestTree]
+riakBucketTypeTests handle =
+  [ testGroup "getBucketType"
+    [ testCase "object bucket type" $ do
+        getBucketType handle defaultBucketType >>= \case
+          Right SomeBucketProps{} -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "counter bucket type" $ do
+        getBucketType handle counterBucketType >>= \case
+          Right SomeCounterBucketProps{} -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "hll bucket type" $ do
+        getBucketType handle hyperLogLogBucketType >>= \case
+          Right SomeHyperLogLogBucketProps{} -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "map bucket type" $ do
+        getBucketType handle mapBucketType >>= \case
+          Right SomeMapBucketProps{} -> pure ()
+          result -> assertFailure (show result)
+
+    , testCase "set bucket type" $ do
+        getBucketType handle setBucketType >>= \case
+          Right SomeSetBucketProps{} -> pure ()
+          result -> assertFailure (show result)
+
+    , testGroup "failures"
+      [ testCase "bucket type not found" $ do
+          bucketType <- randomBucketType
+          getBucketType handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
+
+  , testGroup "getCounterBucketType"
+    [ testCase "success" $ do
+        getCounterBucketType handle counterBucketType `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
+      [ testCase "non-counter bucket type" $ do
+          getCounterBucketType handle defaultBucketType `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "bucket type not found" $ do
+          bucketType <- randomBucketType
+          getCounterBucketType handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
+
+  , testGroup "getHyperLogLogBucketType"
+    [ testCase "success" $ do
+        getHyperLogLogBucketType handle hyperLogLogBucketType `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
+      [ testCase "non-hll bucket type" $ do
+          getHyperLogLogBucketType handle defaultBucketType `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "bucket type not found" $ do
+          bucketType <- randomBucketType
+          getHyperLogLogBucketType handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
+
+  , testGroup "getMapBucketType"
+    [ testCase "success" $ do
+        getMapBucketType handle mapBucketType `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
+      [ testCase "non-map bucket type" $ do
+          getMapBucketType handle defaultBucketType `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "bucket type not found" $ do
+          bucketType <- randomBucketType
+          getMapBucketType handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
+
+  , testGroup "getSetBucketType"
+    [ testCase "success" $ do
+        getSetBucketType handle setBucketType `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
+      [ testCase "non-set bucket type" $ do
+          getSetBucketType handle defaultBucketType `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "bucket type not found" $ do
+          bucketType <- randomBucketType
+          getSetBucketType handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
+
+  , testGroup "setBucketTypeIndex" []
+  , testGroup "unsetBucketTypeIndex" []
+  , testGroup "listBuckets" []
+  , testGroup "streamBuckets" []
   ]
 
 riakIndexTests :: Handle -> [TestTree]
@@ -667,6 +775,22 @@ riakServerInfoTests handle =
 -- randomKeyNameString :: IO [Char]
 -- randomKeyNameString = randomBucketNameString
 
+counterBucketType :: BucketType
+counterBucketType =
+  "counters"
+
+hyperLogLogBucketType :: BucketType
+hyperLogLogBucketType =
+  "hlls"
+
+mapBucketType :: BucketType
+mapBucketType =
+  "maps"
+
+setBucketType :: BucketType
+setBucketType =
+  "sets"
+
 index1 :: IndexName
 index1 =
   unsafeMakeIndexName "default1"
@@ -680,6 +804,10 @@ randomBucket =
   Bucket
     <$> randomByteString 32
     <*> randomByteString 32
+
+randomBucketType :: IO BucketType
+randomBucketType =
+  randomByteString 32
 
 randomByteString :: Int -> IO ByteString
 randomByteString n =

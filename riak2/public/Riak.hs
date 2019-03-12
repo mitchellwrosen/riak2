@@ -30,6 +30,10 @@ module Riak
     -- * Bucket type operations
     -- ** Bucket type properties
   , getBucketType
+  , getCounterBucketType
+  , getHyperLogLogBucketType
+  , getMapBucketType
+  , getSetBucketType
   , setBucketTypeIndex
   , unsetBucketTypeIndex
     -- ** Full bucket traversals

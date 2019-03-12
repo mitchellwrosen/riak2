@@ -1,13 +1,18 @@
 module Riak.BucketType
-  ( BucketType
-  , defaultBucketType
-    -- ** Bucket type properties
-  , getBucketType
+  ( -- * Properties
+    getBucketType
+  , getCounterBucketType
+  , getHyperLogLogBucketType
+  , getMapBucketType
+  , getSetBucketType
   , setBucketTypeIndex
   , unsetBucketTypeIndex
-    -- ** Full traversals
+    -- * Full traversals
   , listBuckets
   , streamBuckets
+    -- * Bucket type
+  , BucketType
+  , defaultBucketType
   ) where
 
 import RiakBucketType

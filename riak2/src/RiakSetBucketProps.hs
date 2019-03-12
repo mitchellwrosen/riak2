@@ -1,7 +1,6 @@
 module RiakSetBucketProps
   ( SetBucketProps(..)
   , fromProto
-  , maybeFromProto
   ) where
 
 import RiakIndexName        (IndexName)
@@ -42,8 +41,3 @@ fromProto props =
     , readQuorum       = ReadQuorum.fromProto props
     , writeQuorum      = WriteQuorum.fromProto props
     }
-
-maybeFromProto :: Proto.RpbBucketProps -> Maybe SetBucketProps
-maybeFromProto props = do
-  "set" <- props ^. Proto.maybe'datatype
-  pure (fromProto props)

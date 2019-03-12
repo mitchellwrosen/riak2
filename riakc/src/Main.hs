@@ -363,10 +363,7 @@ getBucketParser =
               print err
               exitFailure
 
-            Right Nothing ->
-              putStrLn "Not found"
-
-            Right (Just props) ->
+            Right props ->
               print props
 
         Right bucket ->

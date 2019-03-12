@@ -20,7 +20,7 @@ module RiakBucket
 
 import RiakBinaryIndexQuery       (BinaryIndexQuery(..))
 import RiakBucketInternal         (Bucket(..))
-import RiakBucketTypeInternal     (BucketType)
+import RiakBucketType             (BucketType, coerceGetBucketError)
 import RiakCounterBucketProps     (CounterBucketProps)
 import RiakError
 import RiakHandle                 (Handle, HandleError)
@@ -30,16 +30,12 @@ import RiakIntIndexQuery          (IntIndexQuery(..))
 import RiakKey                    (Key(..))
 import RiakMapBucketProps         (MapBucketProps)
 import RiakSetBucketProps         (SetBucketProps)
-import RiakSomeBucketProps        (SomeBucketProps)
+import RiakSomeBucketProps        (SomeBucketProps(..))
 import RiakUtils                  (bs2int, int2bs, retrying)
 
-import qualified RiakBinaryIndexQuery       as BinaryIndexQuery
-import qualified RiakCounterBucketProps     as CounterBucketProps
-import qualified RiakHandle                 as Handle
-import qualified RiakHyperLogLogBucketProps as HyperLogLogBucketProps
-import qualified RiakMapBucketProps         as MapBucketProps
-import qualified RiakSetBucketProps         as SetBucketProps
-import qualified RiakSomeBucketProps        as SomeBucketProps
+import qualified RiakBinaryIndexQuery as BinaryIndexQuery
+import qualified RiakHandle           as Handle
+import qualified RiakSomeBucketProps  as SomeBucketProps
 
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       (Lens', folded, to, (.~), (^.))
@@ -77,6 +73,14 @@ bucketBucketSegment f (Bucket bucketType bucket) =
 --
 -- If you know the bucket's type ahead of time, prefer 'getCounterBucket',
 -- 'getHyperLogLogBucket', 'getMapBucket', or 'getSetBucket'.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 getBucket ::
      MonadIO m
   => Handle -- ^
@@ -125,31 +129,22 @@ getCounterBucket ::
   => Handle -- ^
   -> Bucket -- ^
   -> m (Either GetCounterBucketError CounterBucketProps)
-getCounterBucket handle bucket@(Bucket bucketType _) = liftIO $
-  fromResult <$> Handle.getBucket handle request
+getCounterBucket handle bucket@(Bucket bucketType _) =
+  fromResult <$> getBucket handle bucket
 
   where
-    request :: Proto.RpbGetBucketReq
-    request =
-      Proto.defMessage
-        & setProto bucket
-
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+         Either GetBucketError SomeBucketProps
       -> Either GetCounterBucketError CounterBucketProps
     fromResult = \case
       Left err ->
-        Left (HandleError err)
+        Left (coerceGetBucketError err)
 
-      Right (Left err) ->
-        Left (parseGetBucketError bucketType err)
+      Right (SomeCounterBucketProps props) ->
+        Right props
 
-      Right (Right response) ->
-        case CounterBucketProps.maybeFromProto (response ^. Proto.props) of
-          Nothing ->
-            Left (InvalidBucketTypeError bucketType)
-          Just props ->
-            Right props
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
 
 -- | Get a HyperLogLog bucket's properties.
 --
@@ -171,31 +166,22 @@ getHyperLogLogBucket ::
   => Handle -- ^
   -> Bucket -- ^
   -> m (Either GetHyperLogLogBucketError HyperLogLogBucketProps)
-getHyperLogLogBucket handle bucket@(Bucket bucketType _) = liftIO $
-  fromResult <$> Handle.getBucket handle request
+getHyperLogLogBucket handle bucket@(Bucket bucketType _) =
+  fromResult <$> getBucket handle bucket
 
   where
-    request :: Proto.RpbGetBucketReq
-    request =
-      Proto.defMessage
-        & setProto bucket
-
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+         Either GetBucketError SomeBucketProps
       -> Either GetHyperLogLogBucketError HyperLogLogBucketProps
     fromResult = \case
       Left err ->
-        Left (HandleError err)
+        Left (coerceGetBucketError err)
 
-      Right (Left err) ->
-        Left (parseGetBucketError bucketType err)
+      Right (SomeHyperLogLogBucketProps props) ->
+        Right props
 
-      Right (Right response) ->
-        case HyperLogLogBucketProps.maybeFromProto (response ^. Proto.props) of
-          Nothing ->
-            Left (InvalidBucketTypeError bucketType)
-          Just props ->
-            Right props
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
 
 -- | Get a map bucket's properties.
 --
@@ -217,31 +203,22 @@ getMapBucket ::
   => Handle -- ^
   -> Bucket -- ^
   -> m (Either GetMapBucketError MapBucketProps)
-getMapBucket handle bucket@(Bucket bucketType _) = liftIO $
-  fromResult <$> Handle.getBucket handle request
+getMapBucket handle bucket@(Bucket bucketType _) =
+  fromResult <$> getBucket handle bucket
 
   where
-    request :: Proto.RpbGetBucketReq
-    request =
-      Proto.defMessage
-        & setProto bucket
-
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+         Either GetBucketError SomeBucketProps
       -> Either GetMapBucketError MapBucketProps
     fromResult = \case
       Left err ->
-        Left (HandleError err)
+        Left (coerceGetBucketError err)
 
-      Right (Left err) ->
-        Left (parseGetBucketError bucketType err)
+      Right (SomeMapBucketProps props) ->
+        Right props
 
-      Right (Right response) ->
-        case MapBucketProps.maybeFromProto (response ^. Proto.props) of
-          Nothing ->
-            Left (InvalidBucketTypeError bucketType)
-          Just props ->
-            Right props
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
 
 -- | Get a set bucket's properties.
 --
@@ -263,31 +240,22 @@ getSetBucket ::
   => Handle -- ^
   -> Bucket -- ^
   -> m (Either GetSetBucketError SetBucketProps)
-getSetBucket handle bucket@(Bucket bucketType _) = liftIO $
-  fromResult <$> Handle.getBucket handle request
+getSetBucket handle bucket@(Bucket bucketType _) =
+  fromResult <$> getBucket handle bucket
 
   where
-    request :: Proto.RpbGetBucketReq
-    request =
-      Proto.defMessage
-        & setProto bucket
-
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+         Either GetBucketError SomeBucketProps
       -> Either GetSetBucketError SetBucketProps
     fromResult = \case
       Left err ->
-        Left (HandleError err)
+        Left (coerceGetBucketError err)
 
-      Right (Left err) ->
-        Left (parseGetBucketError bucketType err)
+      Right (SomeSetBucketProps props) ->
+        Right props
 
-      Right (Right response) ->
-        case SetBucketProps.maybeFromProto (response ^. Proto.props) of
-          Nothing ->
-            Left (InvalidBucketTypeError bucketType)
-          Just props ->
-            Right props
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
 
 parseGetBucketError ::
      MayReturnBucketTypeDoesNotExist op ~ 'True

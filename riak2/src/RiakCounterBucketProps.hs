@@ -1,7 +1,6 @@
 module RiakCounterBucketProps
   ( CounterBucketProps(..)
   , fromProto
-  , maybeFromProto
   ) where
 
 import RiakIndexName        (IndexName)
@@ -42,8 +41,3 @@ fromProto props =
     , readQuorum       = ReadQuorum.fromProto props
     , writeQuorum      = WriteQuorum.fromProto props
     }
-
-maybeFromProto :: Proto.RpbBucketProps -> Maybe CounterBucketProps
-maybeFromProto props = do
-  "counter" <- props ^. Proto.maybe'datatype
-  pure (fromProto props)

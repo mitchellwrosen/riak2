@@ -107,7 +107,6 @@ data Op
   = DeleteIndexOp
   | DeleteOp
   | GetBucketOp
-  | GetBucketTypeOp
   | GetCrdtOp
   | GetIndexOp
   | GetOp
@@ -126,96 +125,100 @@ data Op
   | UnsetBucketIndexOp
   | UpdateCrdtOp
 
-type DeleteError               = Error 'DeleteOp
-type DeleteIndexError          = Error 'DeleteIndexOp
-type GetBucketError            = Error 'GetSomeBucketOp
-type GetBucketTypeError        = Error 'GetBucketTypeOp
-type GetCounterBucketError     = Error 'GetBucketOp
-type GetCounterError           = Error 'GetCrdtOp
-type GetError                  = Error 'GetOp
-type GetHyperLogLogBucketError = Error 'GetBucketOp
-type GetHyperLogLogError       = Error 'GetCrdtOp
-type GetIndexError             = Error 'GetIndexOp
-type GetMapBucketError         = Error 'GetBucketOp
-type GetMapError               = Error 'GetCrdtOp
-type GetSchemaError            = Error 'GetSchemaOp
-type GetSetBucketError         = Error 'GetBucketOp
-type GetSetError               = Error 'GetCrdtOp
-type ListBucketsError          = Error 'ListBucketsOp
-type ListKeysError             = Error 'ListKeysOp
-type MapReduceBucketError      = Error 'MapReduceBucketOp
-type PutError                  = Error 'PutOp
-type PutIndexError             = Error 'PutIndexOp
-type PutMapError               = Error 'UpdateCrdtOp
-type PutSchemaError            = Error 'PutSchemaOp
-type PutSetError               = Error 'UpdateCrdtOp
-type QueryExactError           = Error 'SecondaryIndexQueryOp
-type QueryRangeError           = Error 'SecondaryIndexQueryOp
-type SearchError               = Error 'SearchOp
-type SetBucketIndexError       = Error 'SetBucketIndexOp
-type SetBucketTypeIndexError   = Error 'SetBucketTypeIndexOp
-type UnsetBucketIndexError     = Error 'UnsetBucketIndexOp
-type UpdateCounterError        = Error 'UpdateCrdtOp
-type UpdateHyperLogLogError    = Error 'UpdateCrdtOp
+type DeleteError                   = Error 'DeleteOp
+type DeleteIndexError              = Error 'DeleteIndexOp
+type GetBucketError                = Error 'GetSomeBucketOp
+type GetBucketTypeError            = Error 'GetSomeBucketOp
+type GetCounterBucketError         = Error 'GetBucketOp
+type GetCounterBucketTypeError     = Error 'GetBucketOp
+type GetCounterError               = Error 'GetCrdtOp
+type GetError                      = Error 'GetOp
+type GetHyperLogLogBucketError     = Error 'GetBucketOp
+type GetHyperLogLogBucketTypeError = Error 'GetBucketOp
+type GetHyperLogLogError           = Error 'GetCrdtOp
+type GetIndexError                 = Error 'GetIndexOp
+type GetMapBucketError             = Error 'GetBucketOp
+type GetMapBucketTypeError         = Error 'GetBucketOp
+type GetMapError                   = Error 'GetCrdtOp
+type GetSchemaError                = Error 'GetSchemaOp
+type GetSetBucketError             = Error 'GetBucketOp
+type GetSetBucketTypeError         = Error 'GetBucketOp
+type GetSetError                   = Error 'GetCrdtOp
+type ListBucketsError              = Error 'ListBucketsOp
+type ListKeysError                 = Error 'ListKeysOp
+type MapReduceBucketError          = Error 'MapReduceBucketOp
+type PutError                      = Error 'PutOp
+type PutIndexError                 = Error 'PutIndexOp
+type PutMapError                   = Error 'UpdateCrdtOp
+type PutSchemaError                = Error 'PutSchemaOp
+type PutSetError                   = Error 'UpdateCrdtOp
+type QueryExactError               = Error 'SecondaryIndexQueryOp
+type QueryRangeError               = Error 'SecondaryIndexQueryOp
+type SearchError                   = Error 'SearchOp
+type SetBucketIndexError           = Error 'SetBucketIndexOp
+type SetBucketTypeIndexError       = Error 'SetBucketTypeIndexOp
+type UnsetBucketIndexError         = Error 'UnsetBucketIndexOp
+type UpdateCounterError            = Error 'UpdateCrdtOp
+type UpdateHyperLogLogError        = Error 'UpdateCrdtOp
 
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
-  MayReturnBucketTypeDoesNotExist 'GetOp = 'True
-  MayReturnBucketTypeDoesNotExist 'GetBucketOp = 'True
-  MayReturnBucketTypeDoesNotExist 'GetCrdtOp = 'True
-  MayReturnBucketTypeDoesNotExist 'GetSomeBucketOp = 'True
-  MayReturnBucketTypeDoesNotExist 'ListBucketsOp = 'True
-  MayReturnBucketTypeDoesNotExist 'ListKeysOp = 'True
-  MayReturnBucketTypeDoesNotExist 'PutOp = 'True
-  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp = 'True
+  MayReturnBucketTypeDoesNotExist 'GetOp                = 'True
+  MayReturnBucketTypeDoesNotExist 'GetBucketOp          = 'True
+  MayReturnBucketTypeDoesNotExist 'GetCrdtOp            = 'True
+  MayReturnBucketTypeDoesNotExist 'GetSomeBucketOp      = 'True
+  MayReturnBucketTypeDoesNotExist 'ListBucketsOp        = 'True
+  MayReturnBucketTypeDoesNotExist 'ListKeysOp           = 'True
+  MayReturnBucketTypeDoesNotExist 'PutOp                = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp     = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
-  MayReturnBucketTypeDoesNotExist 'UnsetBucketIndexOp = 'True
-  MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp = 'True
-  MayReturnBucketTypeDoesNotExist _ = 'False
+  MayReturnBucketTypeDoesNotExist 'UnsetBucketIndexOp   = 'True
+  MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp         = 'True
+  MayReturnBucketTypeDoesNotExist _                     = 'False
 
 type family MayReturnIndexDoesNotExist (op :: Op) :: Bool where
-  MayReturnBucketTypeDoesNotExist 'SearchOp = 'True
-  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp = 'True
+  MayReturnBucketTypeDoesNotExist 'SearchOp             = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp     = 'True
   MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
-  MayReturnBucketTypeDoesNotExist _ = 'False
+  MayReturnBucketTypeDoesNotExist _                     = 'False
 
 type family MayReturnIndexHasAssociatedBuckets  (op :: Op) :: Bool where
   MayReturnIndexHasAssociatedBuckets 'DeleteIndexOp = 'True
-  MayReturnIndexHasAssociatedBuckets 'PutIndexOp = 'True
-  MayReturnIndexHasAssociatedBuckets _ = 'False
+  MayReturnIndexHasAssociatedBuckets 'PutIndexOp    = 'True
+  MayReturnIndexHasAssociatedBuckets _              = 'False
 
 type family MayReturnInsufficientNodes (op :: Op) :: Bool where
   MayReturnInsufficientNodes 'SecondaryIndexQueryOp = 'True
-  MayReturnInsufficientNodes _ = 'False
+  MayReturnInsufficientNodes _                      = 'False
 
 type family MayReturnInvalidBucketType (op :: Op) :: Bool where
-  MayReturnInvalidBucketType 'GetBucketOp = 'True
+  MayReturnInvalidBucketType 'GetBucketOp          = 'True
   MayReturnInvalidBucketType 'SetBucketTypeIndexOp = 'True
-  MayReturnInvalidBucketType _ = 'False
+  MayReturnInvalidBucketType _                     = 'False
 
 -- | @{n_val_violation,_}@
 type family MayReturnInvalidNodes (op :: Op) :: Bool where
-  MayReturnInvalidNodes 'GetOp = 'True
-  MayReturnInvalidNodes 'PutOp = 'True
-  MayReturnInvalidNodes 'PutIndexOp = 'True
-  MayReturnInvalidNodes 'SetBucketIndexOp = 'True
+  MayReturnInvalidNodes 'GetOp                = 'True
+  MayReturnInvalidNodes 'PutOp                = 'True
+  MayReturnInvalidNodes 'PutIndexOp           = 'True
+  MayReturnInvalidNodes 'SetBucketIndexOp     = 'True
   MayReturnInvalidNodes 'SetBucketTypeIndexOp = 'True
-  MayReturnInvalidNodes _ = 'False
+  MayReturnInvalidNodes _                     = 'False
 
 -- | @overload@
 type family MayReturnOverload (op :: Op) :: Bool where
   MayReturnOverload 'DeleteOp = 'True
-  MayReturnOverload 'GetOp = 'True
-  MayReturnOverload 'PutOp = 'True
-  MayReturnOverload _ = 'False
+  MayReturnOverload 'GetOp    = 'True
+  MayReturnOverload 'PutOp    = 'True
+  MayReturnOverload _         = 'False
 
 type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
   MayReturnSearchNotEnabled 'DeleteIndexOp = 'True
-  MayReturnSearchNotEnabled 'GetIndexOp = 'True
-  MayReturnSearchNotEnabled 'GetSchemaOp = 'True
-  MayReturnSearchNotEnabled 'PutIndexOp = 'True
-  MayReturnSearchNotEnabled 'PutSchemaOp = 'True
-  MayReturnSearchNotEnabled 'SearchOp = 'True
-  MayReturnSearchNotEnabled _ = 'False
+  MayReturnSearchNotEnabled 'GetIndexOp    = 'True
+  MayReturnSearchNotEnabled 'GetSchemaOp   = 'True
+  MayReturnSearchNotEnabled 'PutIndexOp    = 'True
+  MayReturnSearchNotEnabled 'PutSchemaOp   = 'True
+  MayReturnSearchNotEnabled 'SearchOp      = 'True
+  MayReturnSearchNotEnabled _              = 'False
 
 -- no_type
 isBucketTypeDoesNotExistError0 :: ByteString -> Bool

@@ -2,19 +2,30 @@ module RiakBucketType
   ( BucketType
   , defaultBucketType
   , getBucketType
+  , getCounterBucketType
+  , getHyperLogLogBucketType
+  , getMapBucketType
+  , getSetBucketType
   , setBucketTypeIndex
   , unsetBucketTypeIndex
   , listBuckets
   , streamBuckets
+
+  , coerceGetBucketError
   ) where
 
-import RiakBucket             (Bucket(..))
-import RiakBucketTypeInternal (BucketType, defaultBucketType)
+import RiakBucketInternal         (Bucket(..))
+import RiakBucketTypeInternal     (BucketType, defaultBucketType)
+import RiakCounterBucketProps     (CounterBucketProps)
 import RiakError
-import RiakHandle             (Handle)
-import RiakIndexName          (IndexName(..))
-import RiakSomeBucketProps    (SomeBucketProps)
-import RiakUtils              (retrying)
+import RiakHandle                 (Handle, HandleError)
+import RiakHyperLogLogBucketProps (HyperLogLogBucketProps)
+import RiakIndexName              (IndexName(..))
+import RiakMapBucketProps         (MapBucketProps)
+import RiakSetBucketProps         (SetBucketProps)
+import RiakSomeBucketProps        (SomeBucketProps)
+import RiakSomeBucketProps        (SomeBucketProps(..))
+import RiakUtils                  (retrying)
 
 import qualified RiakHandle          as Handle
 import qualified RiakSomeBucketProps as SomeBucketProps
@@ -22,38 +33,217 @@ import qualified RiakSomeBucketProps as SomeBucketProps
 import Control.Foldl      (FoldM(..))
 import Control.Lens       (folded, to, (.~), (^.))
 import Data.Text.Encoding (decodeUtf8, encodeUtf8)
+import Unsafe.Coerce      (unsafeCoerce)
 
 import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
 
--- | Get bucket type properties.
+-- | Get a bucket type's properties.
+--
+-- If you know the bucket type's type ahead of time, prefer
+-- 'getCounterBucketType', 'getHyperLogLogBucketType', 'getMapBucketType', or
+-- 'getSetBucketType'.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 getBucketType ::
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
-  -> m (Either GetBucketTypeError (Maybe SomeBucketProps))
+  -> m (Either GetBucketTypeError SomeBucketProps)
 getBucketType handle bucketType = liftIO $
-  Handle.getBucketType handle bucketType >>= \case
-    Left err ->
-      pure (Left (HandleError err))
+  fromResult <$> Handle.getBucketType handle bucketType
 
-    Right (Left err) ->
-      pure (parseGetBucketTypeError err)
+  where
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+      -> Either GetBucketTypeError SomeBucketProps
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Right response) ->
-      pure (Right (Just (SomeBucketProps.fromProto (response ^. Proto.props))))
+      Right (Left err) ->
+        Left (parseGetBucketTypeError bucketType err)
+
+      Right (Right response) ->
+        Right (SomeBucketProps.fromProto (response ^. Proto.props))
+
+-- | Get a counter bucket type's properties.
+--
+-- Prefer this to 'getBucketType' if you are certain the given bucket type
+-- contains counters.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
+-- | 'InvalidBucketTypeError'      | The bucket does not contain counters      |
+-- |                               | (@datatype = counter@).                   |
+-- +-------------------------------+-------------------------------------------+
+getCounterBucketType ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> m (Either GetCounterBucketError CounterBucketProps)
+getCounterBucketType handle bucketType =
+  fromResult <$> getBucketType handle bucketType
+
+  where
+    fromResult ::
+         Either GetBucketTypeError SomeBucketProps
+      -> Either GetCounterBucketTypeError CounterBucketProps
+    fromResult = \case
+      Left err ->
+        Left (coerceGetBucketError err)
+
+      Right (SomeCounterBucketProps props) ->
+        Right props
+
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
+
+-- | Get a HyperLogLog bucket type's properties.
+--
+-- Prefer this to 'getBucketType' if you are certain the given bucket type
+-- contains HyperLogLogs.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
+-- | 'InvalidBucketTypeError'      | The bucket does not contain HyperLogLogs  |
+-- |                               | (@datatype = hll@).                       |
+-- +-------------------------------+-------------------------------------------+
+getHyperLogLogBucketType ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> m (Either GetHyperLogLogBucketError HyperLogLogBucketProps)
+getHyperLogLogBucketType handle bucketType =
+  fromResult <$> getBucketType handle bucketType
+
+  where
+    fromResult ::
+         Either GetBucketTypeError SomeBucketProps
+      -> Either GetHyperLogLogBucketTypeError HyperLogLogBucketProps
+    fromResult = \case
+      Left err ->
+        Left (coerceGetBucketError err)
+
+      Right (SomeHyperLogLogBucketProps props) ->
+        Right props
+
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
+
+-- | Get a map bucket type's properties.
+--
+-- Prefer this to 'getBucketType' if you are certain the given bucket type
+-- contains maps.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
+-- | 'InvalidBucketTypeError'      | The bucket does not contain maps          |
+-- |                               | (@datatype = map@).                       |
+-- +-------------------------------+-------------------------------------------+
+getMapBucketType ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> m (Either GetMapBucketError MapBucketProps)
+getMapBucketType handle bucketType =
+  fromResult <$> getBucketType handle bucketType
+
+  where
+    fromResult ::
+         Either GetBucketTypeError SomeBucketProps
+      -> Either GetMapBucketTypeError MapBucketProps
+    fromResult = \case
+      Left err ->
+        Left (coerceGetBucketError err)
+
+      Right (SomeMapBucketProps props) ->
+        Right props
+
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
+
+-- | Get a set bucket type's properties.
+--
+-- Prefer this to 'getBucketType' if you are certain the given bucket type
+-- contains sets.
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
+-- | 'InvalidBucketTypeError'      | The bucket does not contain sets          |
+-- |                               | (@datatype = set@).                       |
+-- +-------------------------------+-------------------------------------------+
+getSetBucketType ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> m (Either GetSetBucketError SetBucketProps)
+getSetBucketType handle bucketType =
+  fromResult <$> getBucketType handle bucketType
+
+  where
+    fromResult ::
+         Either GetBucketTypeError SomeBucketProps
+      -> Either GetSetBucketTypeError SetBucketProps
+    fromResult = \case
+      Left err ->
+        Left (coerceGetBucketError err)
+
+      Right (SomeSetBucketProps props) ->
+        Right props
+
+      Right _ ->
+        Left (InvalidBucketTypeError bucketType)
 
 parseGetBucketTypeError ::
-     ByteString
-  -> Either GetBucketTypeError (Maybe a)
-parseGetBucketTypeError err
+     BucketType
+  -> ByteString
+  -> GetBucketTypeError
+parseGetBucketTypeError bucketType err
   | isBucketTypeDoesNotExistError3 err =
-      Right Nothing
+      BucketTypeDoesNotExistError bucketType
   | otherwise =
-      Left (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
--- TODO getCounterBucketType, getHyperLogLogBucketType, getMapBucketType, getSetBucketType
+coerceGetBucketError ::
+     MayReturnBucketTypeDoesNotExist op ~ 'True
+  => GetBucketError
+  -> Error op
+coerceGetBucketError =
+  {-
+  \case
+    BucketTypeDoesNotExistError x -> BucketTypeDoesNotExistError x
+    HandleError                 x -> HandleError                 x
+    UnknownError                x -> UnknownError                x
+  -}
+  unsafeCoerce
 
 -- | Set the index of a bucket type.
 --
