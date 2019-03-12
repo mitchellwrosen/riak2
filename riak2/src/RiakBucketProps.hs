@@ -18,7 +18,7 @@ import qualified Data.Riak.Proto as Proto
 
 data BucketProps
   = BucketProps
-  { conflictResolution :: Maybe ConflictResolution
+  { conflictResolution :: ConflictResolution
   , index :: Maybe IndexName -- ^ Search index
   , nodes :: Natural
   , notfoundBehavior :: NotfoundBehavior
@@ -31,22 +31,30 @@ data BucketProps
 -- | The conflict resolution strategy used by Riak, for normal KV (non-CRDT)
 -- objects.
 --
--- Allowing Riak to create siblings is highly recommended, but there are two
--- built-in strategies to resolve conflicts in Riak itself.
+-- * 'ClientSideConflictResolution' means, in the presence of concurrent updates
+--   (or updates lacking a causal context), Riak will create siblings that will
+--   have to be collapsed into one value outside of Riak. This strategy is
+--   highly recommended for most mutable data.
+--
+-- * 'TimestampBasedConflictResolution' uses objects' internal timestamps to
+--    resolve conflicts. Timestamps are inherently unreliable; this strategy is
+--    legacy and, in the author's opinion, less useful than
+--    'LastWriteWinsConflictResolution' in all cases. Do not use it.
+--
+-- * 'LastWriteWinsConflictResolution', means Riak will always overwrite any
+--   existing data, no matter what its internal timestamp is. This strategy is
+--   useful for immutable data.
 data ConflictResolution
-  = UseTimestamps
-  | LastWriteWins
+  = ClientSideConflictResolution
+  | TimestampBasedConflictResolution
+  | LastWriteWinsConflictResolution
   deriving stock (Eq, Show)
 
 -- | Parse from bucket props. Does not check that datatype is nothing.
 fromProto :: Proto.RpbBucketProps -> BucketProps
 fromProto props =
   BucketProps
-    { conflictResolution = do
-        guard (not (props ^. Proto.allowMult))
-        if props ^. Proto.lastWriteWins
-          then Just LastWriteWins
-          else Just UseTimestamps
+    { conflictResolution = conflictResolution
     , index              = IndexName.fromBucketProps props
     , nodes              = fromIntegral (props ^. Proto.nVal)
     , notfoundBehavior   = NotfoundBehavior.fromProto props
@@ -55,3 +63,13 @@ fromProto props =
     , readQuorum         = ReadQuorum.fromProto props
     , writeQuorum        = WriteQuorum.fromProto props
     }
+
+  where
+    conflictResolution :: ConflictResolution
+    conflictResolution =
+      if props ^. Proto.allowMult then
+        ClientSideConflictResolution
+      else if props ^. Proto.lastWriteWins then
+        LastWriteWinsConflictResolution
+      else
+        TimestampBasedConflictResolution
