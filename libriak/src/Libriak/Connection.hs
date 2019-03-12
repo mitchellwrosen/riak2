@@ -26,8 +26,7 @@ import GHC.ByteOrder            (ByteOrder(..), targetByteOrder)
 import GHC.Conc                 (TVar, registerDelay)
 import Socket.Stream.IPv4       (CloseException(..), ConnectException(..),
                                  Endpoint(..), Interruptibility(..),
-                                 ReceiveException(..), SendException(..),
-                                 SocketException(..))
+                                 ReceiveException(..), SendException(..))
 
 import qualified Socket.Stream.IPv4 as Socket
 

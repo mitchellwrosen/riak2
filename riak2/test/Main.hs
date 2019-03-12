@@ -127,106 +127,110 @@ riakBucketTests handle =
     [ testCase "object bucket" $ do
         bucket <- randomDefaultBucket
         getBucket handle bucket >>= \case
-          Right (Just SomeBucketProps{}) -> pure ()
+          Right SomeBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "counter bucket" $ do
         bucket <- randomCounterBucket
         getBucket handle bucket >>= \case
-          Right (Just SomeCounterBucketProps{}) -> pure ()
+          Right SomeCounterBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "hll bucket" $ do
         bucket <- randomHyperLogLogBucket
         getBucket handle bucket >>= \case
-          Right (Just SomeHyperLogLogBucketProps{}) -> pure ()
+          Right SomeHyperLogLogBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "map bucket" $ do
         bucket <- randomMapBucket
         getBucket handle bucket >>= \case
-          Right (Just SomeMapBucketProps{}) -> pure ()
+          Right SomeMapBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "set bucket" $ do
         bucket <- randomSetBucket
         getBucket handle bucket >>= \case
-          Right (Just SomeSetBucketProps{}) -> pure ()
+          Right SomeSetBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
-    , testCase "bucket type not found" $ do
-        bucket <- randomBucket
-        getBucket handle bucket `shouldReturnSatisfy` isRightNothing
-
     , testGroup "failures"
-      [ ]
+      [ testCase "bucket type not found" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          getBucket handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
     ]
 
   , testGroup "getCounterBucket"
     [ testCase "success" $ do
         bucket <- randomCounterBucket
-        getCounterBucket handle bucket `shouldReturnSatisfy` isRightJust
-
-    , testCase "bucket type not found" $ do
-        bucket <- randomBucket
-        getCounterBucket handle bucket `shouldReturnSatisfy` isRightNothing
+        getCounterBucket handle bucket `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-counter bucket" $ do
           bucket@(Bucket bucketType _) <- randomDefaultBucket
           getCounterBucket handle bucket `shouldReturn`
             Left (InvalidBucketTypeError bucketType)
+
+      , testCase "bucket type not found" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          getCounterBucket handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
       ]
     ]
 
   , testGroup "getHyperLogLogBucket"
     [ testCase "success" $ do
         bucket <- randomHyperLogLogBucket
-        getHyperLogLogBucket handle bucket `shouldReturnSatisfy` isRightJust
-
-    , testCase "bucket type not found" $ do
-        bucket <- randomBucket
-        getHyperLogLogBucket handle bucket `shouldReturnSatisfy` isRightNothing
+        getHyperLogLogBucket handle bucket `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-hll bucket" $ do
           bucket@(Bucket bucketType _) <- randomDefaultBucket
           getHyperLogLogBucket handle bucket `shouldReturn`
             Left (InvalidBucketTypeError bucketType)
+
+      , testCase "bucket type not found" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          getHyperLogLogBucket handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
       ]
     ]
 
   , testGroup "getMapBucket"
     [ testCase "success" $ do
         bucket <- randomMapBucket
-        getMapBucket handle bucket `shouldReturnSatisfy` isRightJust
-
-    , testCase "bucket type not found" $ do
-        bucket <- randomBucket
-        getMapBucket handle bucket `shouldReturnSatisfy` isRightNothing
+        getMapBucket handle bucket `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-map bucket" $ do
           bucket@(Bucket bucketType _) <- randomDefaultBucket
           getMapBucket handle bucket `shouldReturn`
             Left (InvalidBucketTypeError bucketType)
+
+      , testCase "bucket type not found" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          getMapBucket handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
       ]
     ]
 
   , testGroup "getSetBucket"
     [ testCase "success" $ do
         bucket <- randomSetBucket
-        getSetBucket handle bucket `shouldReturnSatisfy` isRightJust
-
-    , testCase "bucket type not found" $ do
-        bucket <- randomBucket
-        getSetBucket handle bucket `shouldReturnSatisfy` isRightNothing
+        getSetBucket handle bucket `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-set bucket" $ do
           bucket@(Bucket bucketType _) <- randomDefaultBucket
           getSetBucket handle bucket `shouldReturn`
             Left (InvalidBucketTypeError bucketType)
+
+      , testCase "bucket type not found" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          getSetBucket handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
       ]
     ]
 

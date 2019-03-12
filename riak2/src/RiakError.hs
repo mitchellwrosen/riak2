@@ -160,7 +160,9 @@ type UpdateHyperLogLogError    = Error 'UpdateCrdtOp
 
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'GetOp = 'True
+  MayReturnBucketTypeDoesNotExist 'GetBucketOp = 'True
   MayReturnBucketTypeDoesNotExist 'GetCrdtOp = 'True
+  MayReturnBucketTypeDoesNotExist 'GetSomeBucketOp = 'True
   MayReturnBucketTypeDoesNotExist 'ListBucketsOp = 'True
   MayReturnBucketTypeDoesNotExist 'ListKeysOp = 'True
   MayReturnBucketTypeDoesNotExist 'PutOp = 'True
