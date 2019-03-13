@@ -19,7 +19,6 @@ import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Riak.Proto as Proto
 
 
--- TODO hll precision
 data HyperLogLogBucketProps
   = HyperLogLogBucketProps
   { backend :: Maybe Text
@@ -27,6 +26,7 @@ data HyperLogLogBucketProps
   , nodes :: Natural
   , notfoundBehavior :: NotfoundBehavior
   , postcommitHooks :: [Proto.RpbCommitHook]
+  , precision :: Natural -- ^ @4-16@, inclusive
   , precommitHooks :: [Proto.RpbCommitHook]
   , readQuorum :: ReadQuorum
   , writeQuorum :: WriteQuorum
@@ -41,6 +41,7 @@ fromProto props =
     , nodes            = fromIntegral (props ^. Proto.nVal)
     , notfoundBehavior = NotfoundBehavior.fromProto props
     , postcommitHooks  = props ^. Proto.postcommit
+    , precision        = fromIntegral (props ^. Proto.hllPrecision)
     , precommitHooks   = props ^. Proto.precommit
     , readQuorum       = ReadQuorum.fromProto props
     , writeQuorum      = WriteQuorum.fromProto props
