@@ -1007,18 +1007,19 @@ queryParser :: Parser (Handle -> IO ())
 queryParser =
   doQuery
     <$> bucketArgument
-    <*> strArgument (help "Key" <> metavar "KEY")
-    <*> secondaryIndexValueArgument
-    -- <*> optional secondaryIndexValueArgument
+    <*> strArgument (help "Index" <> metavar "INDEX")
+    <*> secondaryIndexValueArgument (help "Value" <> metavar "VALUE")
+    <*> optional (secondaryIndexValueArgument (metavar "VALUE"))
 
   where
     doQuery ::
          Bucket
       -> ByteString
       -> Either ByteString Int64
+      -> Maybe (Either ByteString Int64)
       -> Handle
       -> IO ()
-    doQuery bucket index val1 handle =
+    doQuery bucket index val1 val2 handle =
       doQuery_ >>= \case
         Left (UnknownError err) -> do
           Text.putStrLn err
@@ -1033,9 +1034,9 @@ queryParser =
 
       where
         doQuery_ :: IO (Either QueryRangeError ())
-        doQuery_ =
-          case val1 of
-            Left s ->
+        doQuery_ = do
+          case (val1, val2) of
+            (Left s, Nothing) ->
               queryBinaryIndexTerms
                 handle
                 (BinaryIndexQuery
@@ -1048,7 +1049,20 @@ queryParser =
                   (\(val, Key _ _ key) ->
                     Text.putStrLn (decodeUtf8 val <> " " <> decodeUtf8 key)))
 
-            Right n ->
+            (Left s1, Just (Left s2)) ->
+              queryBinaryIndexTerms
+                handle
+                (BinaryIndexQuery
+                  { bucket = bucket
+                  , index = index
+                  , minValue = s1
+                  , maxValue = s2
+                  })
+                (Foldl.mapM_
+                  (\(val, Key _ _ key) ->
+                    Text.putStrLn (decodeUtf8 val <> " " <> decodeUtf8 key)))
+
+            (Right n, Nothing) ->
               queryIntIndexTerms
                 handle
                 (IntIndexQuery
@@ -1060,6 +1074,23 @@ queryParser =
                 (Foldl.mapM_
                   (\(val, Key _ _ key) ->
                     Text.putStrLn (Text.pack (show val) <> " " <> decodeUtf8 key)))
+
+            (Right n1, Just (Right n2)) ->
+              queryIntIndexTerms
+                handle
+                (IntIndexQuery
+                  { bucket = bucket
+                  , index = index
+                  , minValue = n1
+                  , maxValue = n2
+                  })
+                (Foldl.mapM_
+                  (\(val, Key _ _ key) ->
+                    Text.putStrLn (Text.pack (show val) <> " " <> decodeUtf8 key)))
+
+            _ -> do
+              putStrLn "Invalid query"
+              exitFailure
 
 
 searchParser :: Parser (Handle -> IO ())
@@ -1293,7 +1324,7 @@ secondaryIndexOption :: Parser SecondaryIndex
 secondaryIndexOption =
   option
     (eitherReader parseSecondaryIndex)
-    (help "Secondary index" <> long "index" <> metavar "KEY/VALUE")
+    (help "Secondary index" <> long "index" <> metavar "INDEX/VALUE")
   where
     parseSecondaryIndex :: String -> Either String SecondaryIndex
     parseSecondaryIndex string =
@@ -1306,13 +1337,14 @@ secondaryIndexOption =
               Right (SecondaryIndex name (Integer n))
 
         _ ->
-          Left "Expected: key/value'"
+          Left "Expected: index/value'"
 
-secondaryIndexValueArgument :: Parser (Either ByteString Int64)
+secondaryIndexValueArgument ::
+     Mod ArgumentFields (Either ByteString Int64)
+  -> Parser (Either ByteString Int64)
 secondaryIndexValueArgument =
   argument
     (eitherReader parseSecondaryIndexValue)
-    (help "Value" <> metavar "VALUE")
   where
     parseSecondaryIndexValue :: String -> Either String (Either ByteString Int64)
     parseSecondaryIndexValue string =

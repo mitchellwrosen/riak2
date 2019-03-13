@@ -18,7 +18,7 @@ module RiakBucket
   , streamKeys
   ) where
 
-import RiakBinaryIndexQuery       (BinaryIndexQuery(..))
+import RiakBinaryIndexQuery       (BinaryIndexQuery(..), builtinBucketIndex, builtinKeyIndex)
 import RiakBucketInternal         (Bucket(..))
 import RiakBucketType             (BucketType, coerceGetBucketError)
 import RiakCounterBucketProps     (CounterBucketProps)
@@ -400,20 +400,38 @@ queryBinaryIndex ::
   -> BinaryIndexQuery -- ^
   -> FoldM IO Key r -- ^
   -> m (Either QueryRangeError r)
-queryBinaryIndex handle query@(BinaryIndexQuery { bucket, minValue, maxValue }) keyFold = liftIO $
-  doIndex handle request (Foldl.handlesM handler keyFold)
+queryBinaryIndex
+    handle
+    query@(BinaryIndexQuery { bucket, minValue, maxValue })
+    keyFold = liftIO $
+
+  doIndex
+    handle
+    bucket
+    request
+    (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
     request =
-      Proto.defMessage
-        & setProto bucket
-        & Proto.index .~ BinaryIndexQuery.indexName query
-        & Proto.maxResults .~ 50 -- TODO configure page size
-        & Proto.rangeMax .~ maxValue
-        & Proto.rangeMin .~ minValue
-        & Proto.qtype .~ Proto.RpbIndexReq'range -- TODO perform exact query if min == max
-        & Proto.stream .~ True
+      if minValue == maxValue
+        then
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ BinaryIndexQuery.indexName query
+            & Proto.key .~ minValue
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.qtype .~ Proto.RpbIndexReq'eq
+            & Proto.stream .~ True
+        else
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ BinaryIndexQuery.indexName query
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.rangeMax .~ maxValue
+            & Proto.rangeMin .~ minValue
+            & Proto.qtype .~ Proto.RpbIndexReq'range
+            & Proto.stream .~ True
 
     handler :: Foldl.HandlerM IO Proto.RpbIndexResp Key
     handler =
@@ -428,43 +446,71 @@ queryBinaryIndex handle query@(BinaryIndexQuery { bucket, minValue, maxValue }) 
 -- | Perform a query on a binary secondary index.
 --
 -- Fetches results in batches of 50.
---
--- TODO make this work for '$bucket' queries
 queryBinaryIndexTerms ::
      MonadIO m
   => Handle -- ^
   -> BinaryIndexQuery -- ^
   -> FoldM IO (ByteString, Key) r -- ^
   -> m (Either QueryRangeError r)
-queryBinaryIndexTerms handle query@(BinaryIndexQuery { bucket, minValue, maxValue }) keyFold = liftIO $
-  doIndex handle request (Foldl.handlesM handler keyFold)
+queryBinaryIndexTerms
+    handle
+    BinaryIndexQuery { bucket, index, minValue, maxValue }
+    keyFold = liftIO $
+
+  doIndex
+    handle
+    bucket
+    request
+    (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
     request =
-      Proto.defMessage
-        & setProto bucket
-        & Proto.index .~ BinaryIndexQuery.indexName query
-        & Proto.maxResults .~ 50 -- TODO configure page size
-        & Proto.rangeMax .~ maxValue
-        & Proto.rangeMin .~ minValue
-        & Proto.returnTerms .~ True
-        & Proto.qtype .~ Proto.RpbIndexReq'range
-        & Proto.stream .~ True
+      if index == builtinBucketIndex
+        then
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ index
+            & Proto.key .~ minValue
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.qtype .~ Proto.RpbIndexReq'eq
+            & Proto.stream .~ True
+      else if index == builtinKeyIndex
+        then
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ builtinKeyIndex
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.qtype .~ Proto.RpbIndexReq'range
+            & Proto.rangeMin .~ minValue
+            & Proto.rangeMax .~ maxValue
+            & Proto.returnTerms .~ True
+            & Proto.stream .~ True
+      else
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ (index <> "_bin")
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.qtype .~ Proto.RpbIndexReq'range
+            & Proto.rangeMin .~ minValue
+            & Proto.rangeMax .~ maxValue
+            & Proto.returnTerms .~ True
+            & Proto.stream .~ True
 
     handler :: Foldl.HandlerM IO Proto.RpbIndexResp (ByteString, Key)
     handler =
-     Proto.results . folded . to fromResult
+      if index == builtinBucketIndex
+        then
+          Proto.keys .
+          folded .
+          to (\key -> (b, Key bucketType b key))
+        else
+          Proto.results .
+          folded .
+          to (\pair -> (pair ^. Proto.key, Key bucketType b (pair ^. Proto.value)))
 
-    fromResult :: Proto.RpbPair -> (ByteString, Key)
-    fromResult pair =
-      (pair ^. Proto.key, mkKey (pair ^. Proto.value))
-
-    mkKey :: ByteString -> Key
-    mkKey =
-      case bucket of
-        Bucket bucketType bucket ->
-          Key bucketType bucket
+    Bucket bucketType b =
+      bucket
 
 -- | Perform a query on an integer secondary index.
 --
@@ -476,19 +522,33 @@ queryIntIndex ::
   -> FoldM IO Key r -- ^
   -> m (Either QueryRangeError r)
 queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
-  doIndex handle request (Foldl.handlesM handler keyFold)
+  doIndex
+    handle
+    bucket
+    request
+    (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
     request =
-      Proto.defMessage
-        & setProto bucket
-        & Proto.index .~ (index <> "_int")
-        & Proto.maxResults .~ 50 -- TODO configure page size
-        & Proto.rangeMax .~ int2bs maxValue
-        & Proto.rangeMin .~ int2bs minValue
-        & Proto.qtype .~ Proto.RpbIndexReq'range
-        & Proto.stream .~ True
+      if minValue == maxValue
+        then
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ (index <> "_int")
+            & Proto.key .~ int2bs minValue
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.qtype .~ Proto.RpbIndexReq'eq
+            & Proto.stream .~ True
+        else
+          Proto.defMessage
+            & setProto bucket
+            & Proto.index .~ (index <> "_int")
+            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.qtype .~ Proto.RpbIndexReq'range
+            & Proto.rangeMax .~ int2bs maxValue
+            & Proto.rangeMin .~ int2bs minValue
+            & Proto.stream .~ True
 
     handler :: Foldl.HandlerM IO Proto.RpbIndexResp Key
     handler =
@@ -510,7 +570,11 @@ queryIntIndexTerms ::
   -> FoldM IO (Int64, Key) r -- ^
   -> m (Either QueryRangeError r)
 queryIntIndexTerms handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
-  doIndex handle request (Foldl.handlesM handler keyFold)
+  doIndex
+    handle
+    bucket
+    request
+    (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
@@ -542,19 +606,21 @@ queryIntIndexTerms handle IntIndexQuery { bucket, index, minValue, maxValue } ke
 doIndex ::
      forall r.
      Handle
+  -> Bucket
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either (Error 'SecondaryIndexQueryOp) r)
-doIndex handle request responseFold =
-  retrying 1000000 (doIndex_ handle request responseFold)
+doIndex handle bucket request responseFold =
+  retrying 1000000 (doIndex_ handle bucket request responseFold)
 
 doIndex_ ::
      forall r.
      Handle
+  -> Bucket
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
-doIndex_ handle =
+doIndex_ handle bucket =
   loop
 
   where
@@ -585,11 +651,6 @@ doIndex_ handle =
               loop
                 (request & Proto.continuation .~ continuation)
                 nextResponseFold
-
-      where
-        bucket :: Bucket
-        bucket =
-          Bucket (request ^. Proto.type') (request ^. Proto.bucket)
 
 parseSecondaryIndexQueryError ::
      Bucket
