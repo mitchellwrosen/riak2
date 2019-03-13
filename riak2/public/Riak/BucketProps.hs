@@ -6,7 +6,6 @@ module Riak.BucketProps
   , MapBucketProps(..)
   , SetBucketProps(..)
   , ConflictResolution(..)
-  , NotfoundBehavior(..)
   , PruneContextSettings(..)
   ) where
 
@@ -15,6 +14,5 @@ import RiakBucketProps            (BucketProps(..), ConflictResolution(..),
 import RiakCounterBucketProps     (CounterBucketProps(..))
 import RiakHyperLogLogBucketProps (HyperLogLogBucketProps(..))
 import RiakMapBucketProps         (MapBucketProps(..))
-import RiakNotfoundBehavior       (NotfoundBehavior(..))
 import RiakSetBucketProps         (SetBucketProps(..))
 import RiakSomeBucketProps        (SomeBucketProps(..))

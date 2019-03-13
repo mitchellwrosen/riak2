@@ -216,7 +216,6 @@ library riak2-internal
     RiakMapReduceFunction
     RiakMapReducePhase
     RiakMapValue
-    RiakNotfoundBehavior
     RiakObject
     RiakPing
     RiakPutOpts

@@ -53,7 +53,7 @@ getCounter_ ::
 getCounter_
     handle
     key@(Key bucketType _ _)
-    (GetOpts basicQuorum nodes notfoundOk quorum timeout) =
+    (GetOpts nodes quorum timeout) =
 
   Handle.getCrdt handle request >>= \case
     Left err ->
@@ -71,8 +71,6 @@ getCounter_
       Proto.defMessage
         & Key.setProto key
         & ReadQuorum.setProto quorum
-        & Proto.maybe'basicQuorum .~ basicQuorum
-        & Proto.maybe'notfoundOk .~ notfoundOk
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
         & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 

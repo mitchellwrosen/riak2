@@ -213,14 +213,12 @@ parseGetError request err
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest
     key
-    GetOpts { basicQuorum, nodes, notfoundOk, quorum, timeout } =
+    GetOpts { nodes, quorum, timeout } =
 
   Proto.defMessage
     & Key.setProto key
     & ReadQuorum.setProto quorum
     & Proto.deletedvclock .~ True
-    & Proto.maybe'basicQuorum .~ basicQuorum
-    & Proto.maybe'notfoundOk .~ notfoundOk
     & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
     & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
@@ -379,7 +377,7 @@ delete_ ::
 delete_
     handle
     Object { context, key }
-    DeleteOpts { nodes, readQuorum, timeout, writeQuorum } =
+    DeleteOpts { nodes, timeout, writeQuorum } =
 
   Handle.delete handle request >>= \case
     Left err ->
@@ -396,7 +394,6 @@ delete_
     request =
       Proto.defMessage
         & Key.setProto key
-        & ReadQuorum.setProto readQuorum
         & WriteQuorum.setProto writeQuorum
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
         & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)

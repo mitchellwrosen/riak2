@@ -1,9 +1,10 @@
 module Riak.Quorum
   ( Quorum(..)
   , ReadQuorum(..)
+  , NotfoundOk(..)
   , WriteQuorum(..)
   ) where
 
 import RiakQuorum      (Quorum(..))
-import RiakReadQuorum  (ReadQuorum(..))
+import RiakReadQuorum  (NotfoundOk(..), ReadQuorum(..))
 import RiakWriteQuorum (WriteQuorum(..))

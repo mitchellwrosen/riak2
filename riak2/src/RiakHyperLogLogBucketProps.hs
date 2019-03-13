@@ -3,15 +3,13 @@ module RiakHyperLogLogBucketProps
   , fromProto
   ) where
 
-import RiakIndexName        (IndexName)
-import RiakNotfoundBehavior (NotfoundBehavior)
-import RiakReadQuorum       (ReadQuorum)
-import RiakWriteQuorum      (WriteQuorum)
+import RiakIndexName   (IndexName)
+import RiakReadQuorum  (ReadQuorum)
+import RiakWriteQuorum (WriteQuorum)
 
-import qualified RiakIndexName        as IndexName
-import qualified RiakNotfoundBehavior as NotfoundBehavior
-import qualified RiakReadQuorum       as ReadQuorum
-import qualified RiakWriteQuorum      as WriteQuorum
+import qualified RiakIndexName   as IndexName
+import qualified RiakReadQuorum  as ReadQuorum
+import qualified RiakWriteQuorum as WriteQuorum
 
 import Control.Lens       ((^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -24,7 +22,6 @@ data HyperLogLogBucketProps
   { backend :: Maybe Text
   , index :: Maybe IndexName -- ^ Search index
   , nodes :: Natural
-  , notfoundBehavior :: NotfoundBehavior
   , postcommitHooks :: [Proto.RpbCommitHook]
   , precision :: Natural -- ^ @4-16@, inclusive
   , precommitHooks :: [Proto.RpbCommitHook]
@@ -39,7 +36,6 @@ fromProto props =
     { backend          = decodeUtf8 <$> (props ^. Proto.maybe'backend)
     , index            = IndexName.fromBucketProps props
     , nodes            = fromIntegral (props ^. Proto.nVal)
-    , notfoundBehavior = NotfoundBehavior.fromProto props
     , postcommitHooks  = props ^. Proto.postcommit
     , precision        = fromIntegral (props ^. Proto.hllPrecision)
     , precommitHooks   = props ^. Proto.precommit

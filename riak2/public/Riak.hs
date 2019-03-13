@@ -143,7 +143,7 @@ module Riak
   , MayReturnInvalidNodes
   , MayReturnOverload
   , MayReturnSearchNotEnabled
-  , NotfoundBehavior(..)
+  , NotfoundOk(..)
   , Object(..)
   , newObject
   , Op(..)
@@ -183,9 +183,8 @@ import Riak.Bucket
 import Riak.BucketProps           (BucketProps(..), ConflictResolution(..),
                                    CounterBucketProps(..),
                                    HyperLogLogBucketProps(..),
-                                   MapBucketProps(..), NotfoundBehavior(..),
-                                   PruneContextSettings(..), SetBucketProps(..),
-                                   SomeBucketProps(..))
+                                   MapBucketProps(..), PruneContextSettings(..),
+                                   SetBucketProps(..), SomeBucketProps(..))
 import Riak.BucketType
 import Riak.Content
 import Riak.Context
@@ -201,7 +200,8 @@ import Riak.Index
 import Riak.Key
 import Riak.MapReduce
 import Riak.Object
-import Riak.Quorum                (Quorum(..), ReadQuorum(..), WriteQuorum(..))
+import Riak.Quorum                (NotfoundOk(..), Quorum(..), ReadQuorum(..),
+                                   WriteQuorum(..))
 import Riak.Schema
 import Riak.Search
 import Riak.SecondaryIndex        (SecondaryIndex(..))

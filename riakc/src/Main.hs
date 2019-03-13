@@ -300,9 +300,7 @@ getParser =
         opts :: GetOpts
         opts =
           GetOpts
-            { basicQuorum = Nothing
-            , nodes = nodes
-            , notfoundOk = Nothing
+            { nodes = nodes
             , quorum = quorum
             , timeout = timeout
             }
@@ -399,9 +397,7 @@ getCounterParser =
         opts :: GetOpts
         opts =
           GetOpts
-            { basicQuorum = Nothing
-            , nodes = nodes
-            , notfoundOk = Nothing
+            { nodes = nodes
             , quorum = quorum
             , timeout = Nothing
             }
@@ -1301,6 +1297,7 @@ readQuorumOption =
         _ ->
           Just ReadQuorum
             { nodes = fromMaybe QuorumDefault r
+            , notfoundOk = NotfoundOk -- TODO riakc parse notfoundOk
             , primary = fromMaybe QuorumDefault pr
             }
 
