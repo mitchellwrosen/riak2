@@ -3,7 +3,6 @@ module Riak.Error
     Error(..)
   , Op(..)
     -- * Error type aliases
-  , DeleteError
   , DeleteIndexError
   , GetBucketError
   , GetBucketTypeError

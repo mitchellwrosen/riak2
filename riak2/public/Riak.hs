@@ -104,9 +104,7 @@ module Riak
   , ErlangTerm(..)
   , Error(..)
   , EventHandlers(..)
-  , DeleteError
   , DeleteIndexError
-  , DeleteOpts(..)
   , GetBucketError
   , GetBucketTypeError
   , GetCounterError

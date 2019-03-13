@@ -5,7 +5,6 @@ module RiakObject where
 
 import RiakContent    (Content(..))
 import RiakContext    (Context(..), newContext)
-import RiakDeleteOpts (DeleteOpts(..))
 import RiakError
 import RiakGetOpts    (GetOpts(..))
 import RiakHandle     (Handle)
@@ -364,46 +363,23 @@ delete ::
      MonadIO m
   => Handle -- ^
   -> Object a -- ^
-  -> DeleteOpts -- ^
-  -> m (Either DeleteError ())
-delete handle object opts =
-  liftIO (retrying 1000000 (delete_ handle object opts))
-
-delete_ ::
-     Handle
-  -> Object a
-  -> DeleteOpts
-  -> IO (Maybe (Either DeleteError ()))
-delete_
-    handle
-    Object { context, key }
-    DeleteOpts { nodes, timeout, writeQuorum } =
-
-  Handle.delete handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseDeleteError err)
-
-    Right (Right _) ->
-      pure (Just (Right ()))
+  -> PutOpts -- ^
+  -> m (Either PutError ())
+delete handle Object { context, key } PutOpts { nodes, quorum, timeout } = liftIO $
+  (() <$) <$> doPut handle request
 
   where
-    request :: Proto.RpbDelReq
+    request :: Proto.RpbPutReq
     request =
       Proto.defMessage
-        & Key.setProto key
-        & WriteQuorum.setProto writeQuorum
+        & Key.setMaybeProto key
+        & WriteQuorum.setProto quorum
+        & Proto.content .~
+            (Proto.defMessage
+              & Proto.deleted .~ True)
         & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
         & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
-        & Proto.vclock .~ unContext context
-
-parseDeleteError :: ByteString -> Maybe DeleteError
-parseDeleteError err
-  | isOverloadError err =
-      Just OverloadError
-  | isUnknownMessageCode err =
-      Nothing
-  | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+        & Proto.maybe'vclock .~
+            (if ByteString.null (unContext context)
+              then Nothing
+              else Just (unContext context))

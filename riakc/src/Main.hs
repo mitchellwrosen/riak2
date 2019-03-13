@@ -204,7 +204,6 @@ deleteParser =
     <$> keyArgument
     <*> optional contextOption
     <*> optional nodesOption
-    <*> readQuorumOption
     <*> writeQuorumOption
     <*> optional timeoutOption
   where
@@ -212,12 +211,11 @@ deleteParser =
          Key
       -> Maybe Context
       -> Maybe Natural
-      -> Maybe ReadQuorum
       -> Maybe WriteQuorum
       -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doDelete key context nodes readQuorum writeQuorum timeout handle =
+    doDelete key context nodes quorum timeout handle =
       delete handle object opts >>= \case
         Left err -> do
           print err
@@ -235,13 +233,12 @@ deleteParser =
             , key = key
             }
 
-        opts :: DeleteOpts
+        opts :: PutOpts
         opts =
-          DeleteOpts
+          PutOpts
             { nodes = nodes
-            , readQuorum = readQuorum
+            , quorum = quorum
             , timeout = timeout
-            , writeQuorum = writeQuorum
             }
 
 deleteIndexParser :: Parser (Handle -> IO ())

@@ -110,7 +110,6 @@ deriving stock instance Show (Error op)
 -- | Operations used to index the 'Error' type.
 data Op
   = DeleteIndexOp
-  | DeleteOp
   | GetBucketOp
   | GetCrdtOp
   | GetIndexOp
@@ -130,7 +129,6 @@ data Op
   | UnsetBucketIndexOp
   | UpdateCrdtOp
 
-type DeleteError                   = Error 'DeleteOp
 type DeleteIndexError              = Error 'DeleteIndexOp
 type GetBucketError                = Error 'GetSomeBucketOp
 type GetBucketTypeError            = Error 'GetSomeBucketOp
@@ -211,7 +209,6 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
 
 -- | @overload@
 type family MayReturnOverload (op :: Op) :: Bool where
-  MayReturnOverload 'DeleteOp = 'True
   MayReturnOverload 'GetOp    = 'True
   MayReturnOverload 'PutOp    = 'True
   MayReturnOverload _         = 'False

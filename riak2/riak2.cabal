@@ -198,7 +198,6 @@ library riak2-internal
     RiakCounter
     RiakCounterBucketProps
     RiakDebug
-    RiakDeleteOpts
     RiakErlangTerm
     RiakError
     RiakGetOpts

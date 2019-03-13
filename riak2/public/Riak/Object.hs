@@ -16,10 +16,8 @@ module Riak.Object
     -- * Options
   , GetOpts(..)
   , PutOpts(..)
-  , DeleteOpts(..)
   ) where
 
-import RiakDeleteOpts (DeleteOpts(..))
-import RiakGetOpts    (GetOpts(..))
+import RiakGetOpts (GetOpts(..))
 import RiakObject
-import RiakPutOpts    (PutOpts(..))
+import RiakPutOpts (PutOpts(..))
