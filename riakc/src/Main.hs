@@ -327,8 +327,6 @@ getParser =
           traverse_ printMetadata (HashMap.toList (content ^. field @"metadata"))
           for_ (content ^. field @"type'") $ \type' ->
             Text.putStrLn ("content type = " <> decodeUtf8 type')
-          for_ (content ^. field @"ttl") $ \ttl ->
-            printf "ttl = %s\n" (show ttl)
           Text.putStrLn ("value = " <> displayByteString (content ^. field @"value"))
 
         printMetadata :: (ByteString, ByteString) -> IO ()

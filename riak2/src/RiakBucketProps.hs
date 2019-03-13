@@ -16,8 +16,6 @@ import Data.Time          (NominalDiffTime, secondsToNominalDiffTime)
 
 import qualified Data.Riak.Proto as Proto
 
--- TODO bucket props writeOnce, ttl
-
 data BucketProps
   = BucketProps
   { backend :: Maybe Text
@@ -29,7 +27,6 @@ data BucketProps
   , precommitHooks :: [Proto.RpbCommitHook]
   , pruneContextSettings :: PruneContextSettings
   , readQuorum :: ReadQuorum
-  , ttl :: Maybe Word32
   , writeOnce :: Bool
   , writeQuorum :: WriteQuorum
   } deriving stock (Eq, Generic, Show)
@@ -84,7 +81,6 @@ fromProto props =
     , precommitHooks       = props ^. Proto.precommit
     , pruneContextSettings = pruneContextSettings
     , readQuorum           = ReadQuorum.fromProto props
-    , ttl                  = props ^. Proto.maybe'ttl
     , writeOnce            = props ^. Proto.writeOnce
     , writeQuorum          = WriteQuorum.fromProto props
     }

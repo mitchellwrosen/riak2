@@ -29,7 +29,6 @@ fromProtoContent content =
         , indexes = map SecondaryIndex.fromPair (content ^. Proto.indexes)
         , lastModified = Proto.Content.lastModified content
         , metadata = Proto.Content.metadata content
-        , ttl = content ^. Proto.maybe'ttl
         , type' = content ^. Proto.maybe'contentType
         , value = content ^. Proto.value
         }

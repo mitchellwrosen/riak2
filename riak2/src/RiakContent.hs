@@ -20,7 +20,6 @@ data Content a
   , lastModified :: UTCTime -- ^ Last modified.
   , metadata :: HashMap ByteString ByteString -- ^ User metadata
   , type' :: Maybe ByteString -- ^ Content type
-  , ttl :: Maybe Word32 -- ^ Time to live. Unused on write. TODO NominalDiffTime
   , value :: a -- ^ Value
   } deriving stock (Eq, Functor, Generic, Show)
 
@@ -40,7 +39,6 @@ newContent value =
     , indexes = []
     , lastModified = UTCTime (ModifiedJulianDay 0) 0
     , metadata = HashMap.empty
-    , ttl = Nothing
     , type' = Nothing
     , value = value
     }
