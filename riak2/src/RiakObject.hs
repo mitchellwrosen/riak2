@@ -1,12 +1,14 @@
 -- TODO timeout variants since Riak will only return {error, timeout} if one was
 -- requested?
+--
+-- TODO add *With variants
 
 module RiakObject where
 
 import RiakContent (Content(..))
 import RiakContext (Context(..), newContext)
 import RiakError
-import RiakGetOpts (GetOpts(..))
+import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
 import RiakKey     (Key(..))
 import RiakPutOpts (PutOpts(..))
@@ -14,10 +16,10 @@ import RiakSibling (Sibling(..))
 import RiakUtils   (difftimeToMillis, retrying)
 
 import qualified RiakBucket         as Bucket
+import qualified RiakGetOpts        as GetOpts
 import qualified RiakHandle         as Handle
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
-import qualified RiakReadQuorum     as ReadQuorum
 import qualified RiakSecondaryIndex as SecondaryIndex
 import qualified RiakSibling        as Sibling
 import qualified RiakWriteQuorum    as WriteQuorum
@@ -213,16 +215,11 @@ parseGetError request err
       Just (UnknownError (decodeUtf8 err))
 
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
-makeGetRequest
-    key
-    GetOpts { nodes, quorum, timeout } =
-
+makeGetRequest key opts =
   Proto.defMessage
+    & GetOpts.setProto opts
     & Key.setProto key
-    & ReadQuorum.setProto quorum
     & Proto.deletedvclock .~ True
-    & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-    & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
 
 -- | Put an object and return its key.

@@ -11,11 +11,13 @@ module RiakMap
 import RiakContext  (Context(..), newContext)
 import RiakCrdt     (parseGetCrdtError, parseUpdateCrdtError)
 import RiakError
-import RiakHandle   (Handle)
+import RiakGetOpts  (GetOpts)
+import RiakHandle   (Handle, HandleError)
 import RiakKey      (Key(..), isGeneratedKey)
 import RiakMapValue (ConvergentMapValue(..), emptyMapValue)
 import RiakUtils    (retrying)
 
+import qualified RiakGetOpts  as GetOpts
 import qualified RiakHandle   as Handle
 import qualified RiakKey      as Key
 import qualified RiakMapValue as MapValue
@@ -66,39 +68,38 @@ getMap ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> GetOpts -- ^
   -> m (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
-getMap handle key =
-  liftIO (retrying 1000000 (getMap_ handle key))
+getMap handle key opts =
+  liftIO (retrying 1000000 (getMap_ handle key opts))
 
 getMap_ ::
      Handle
   -> Key
+  -> GetOpts
   -> IO (Maybe (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue))))
-getMap_ handle key@(Key bucketType _ _) =
-  Handle.getCrdt handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseGetCrdtError bucketType err)
-
-    Right (Right response) ->
-      pure (Just (Right (fromResponse response)))
+getMap_ handle key@(Key bucketType _ _) opts =
+  fromResult <$> Handle.getCrdt handle request
 
   where
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
+        & GetOpts.setProto opts
         & Key.setProto key
 
-        -- TODO get map opts
-        -- & Proto.maybe'basicQuorum .~ undefined
-        -- & Proto.maybe'nVal .~ undefined
-        -- & Proto.maybe'notfoundOk .~ undefined
-        -- & Proto.maybe'pr .~ undefined
-        -- & Proto.maybe'r .~ undefined
-        -- & Proto.maybe'sloppyQuorum .~ undefined
-        -- & Proto.maybe'timeout .~ undefined
+    fromResult ::
+         Either HandleError (Either ByteString Proto.DtFetchResp)
+      -> Maybe (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
+    fromResult = \case
+      Left err ->
+        Just (Left (HandleError err))
+
+      Right (Left err) ->
+        Left <$> parseGetCrdtError bucketType err
+
+      Right (Right response) ->
+        Just (Right (fromResponse response))
 
     fromResponse ::
          Proto.DtFetchResp

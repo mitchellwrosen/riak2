@@ -11,12 +11,14 @@ module RiakHyperLogLog
 
 import RiakCrdt
 import RiakError
-import RiakHandle (Handle)
-import RiakKey    (Key(..), isGeneratedKey)
-import RiakUtils  (retrying)
+import RiakGetOpts (GetOpts)
+import RiakHandle  (Handle)
+import RiakKey     (Key(..), isGeneratedKey)
+import RiakUtils   (retrying)
 
-import qualified RiakHandle as Handle
-import qualified RiakKey    as Key
+import qualified RiakGetOpts as GetOpts
+import qualified RiakHandle  as Handle
+import qualified RiakKey     as Key
 
 import Control.Lens ((.~), (^.))
 
@@ -46,15 +48,17 @@ getHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> GetOpts -- ^
   -> m (Either GetHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
-getHyperLogLog handle key =
-  liftIO (retrying 1000000 (getHyperLogLog_ handle key))
+getHyperLogLog handle key opts =
+  liftIO (retrying 1000000 (getHyperLogLog_ handle key opts))
 
 getHyperLogLog_ ::
-     Handle -- ^
-  -> Key -- ^
+     Handle
+  -> Key
+  -> GetOpts
   -> IO (Maybe (Either GetHyperLogLogError (Maybe (ConvergentHyperLogLog Word64))))
-getHyperLogLog_ handle key@(Key bucketType _ _) =
+getHyperLogLog_ handle key@(Key bucketType _ _) opts =
   Handle.getCrdt handle request >>= \case
     Left err ->
       pure (Just (Left (HandleError err)))
@@ -69,16 +73,8 @@ getHyperLogLog_ handle key@(Key bucketType _ _) =
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
+        & GetOpts.setProto opts
         & Key.setProto key
-
-        -- TODO get hll opts
-        -- & Proto.maybe'basicQuorum .~ undefined
-        -- & Proto.maybe'nVal .~ undefined
-        -- & Proto.maybe'notfoundOk .~ undefined
-        -- & Proto.maybe'pr .~ undefined
-        -- & Proto.maybe'r .~ undefined
-        -- & Proto.maybe'sloppyQuorum .~ undefined
-        -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
          Proto.DtFetchResp

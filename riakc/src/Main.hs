@@ -1,5 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
+-- TODO riakc get-hll
+
 module Main where
 
 import Riak
@@ -265,18 +267,14 @@ getParser :: Parser (Handle -> IO ())
 getParser =
   doGet
     <$> keyArgument
-    <*> optional nodesOption
-    <*> readQuorumOption
-    <*> optional timeoutOption
+    <*> getOptsOption
   where
     doGet ::
          Key
-      -> Maybe Natural
-      -> Maybe ReadQuorum
-      -> Maybe NominalDiffTime
+      -> GetOpts
       -> Handle
       -> IO ()
-    doGet key nodes quorum timeout handle =
+    doGet key opts handle =
       get handle key opts >>= \case
         Left err -> do
           print err
@@ -293,14 +291,6 @@ getParser =
                 printSibling sibling
 
       where
-        opts :: GetOpts
-        opts =
-          GetOpts
-            { nodes = nodes
-            , quorum = quorum
-            , timeout = timeout
-            }
-
         printSibling :: Sibling ByteString -> IO ()
         printSibling = \case
           Sibling content ->
@@ -370,16 +360,14 @@ getCounterParser :: Parser (Handle -> IO ())
 getCounterParser =
   doGetCounter
     <$> keyArgument
-    <*> optional nodesOption
-    <*> readQuorumOption
+    <*> getOptsOption
   where
     doGetCounter ::
          Key
-      -> Maybe Natural
-      -> Maybe ReadQuorum
+      -> GetOpts
       -> Handle
       -> IO ()
-    doGetCounter key nodes quorum handle =
+    doGetCounter key opts handle =
       getCounter handle key opts >>= \case
         Left err -> do
           print err
@@ -387,15 +375,6 @@ getCounterParser =
 
         Right val ->
           print val
-
-      where
-        opts :: GetOpts
-        opts =
-          GetOpts
-            { nodes = nodes
-            , quorum = quorum
-            , timeout = Nothing
-            }
 
 getIndexParser :: Parser (Handle -> IO ())
 getIndexParser =
@@ -430,13 +409,15 @@ getMapParser :: Parser (Handle -> IO ())
 getMapParser =
   doGetMap
     <$> keyArgument
+    <*> getOptsOption
   where
     doGetMap ::
          Key
+      -> GetOpts
       -> Handle
       -> IO ()
-    doGetMap key handle =
-      getMap handle key >>= \case
+    doGetMap key opts handle =
+      getMap handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -512,13 +493,15 @@ getSetParser :: Parser (Handle -> IO ())
 getSetParser =
   doGetSet
     <$> keyArgument
+    <*> getOptsOption
   where
     doGetSet ::
          Key
+      -> GetOpts
       -> Handle
       -> IO ()
-    doGetSet key handle =
-      getSet handle key >>= \case
+    doGetSet key opts handle =
+      getSet handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -698,20 +681,22 @@ putSetParser =
   doPutSet
     <$> bucketOrKeyArgument
     <*> many (strArgument (help "Set element" <> metavar "VALUE"))
+    <*> getOptsOption
 
   where
     doPutSet ::
          Either Bucket Key
       -> [ByteString]
+      -> GetOpts
       -> Handle
       -> IO ()
-    doPutSet bucketOrKey value handle =
+    doPutSet bucketOrKey value getOpts handle =
       case bucketOrKey of
         Left bucket ->
           go (newSet (generatedKey bucket) HashSet.empty)
 
         Right key ->
-          getSet handle key >>= \case
+          getSet handle key getOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -742,20 +727,22 @@ putMapParser =
   doPutMap
     <$> bucketOrKeyArgument
     <*> (combineValues <$> many mapValueOption)
+    <*> getOptsOption
 
   where
     doPutMap ::
          Either Bucket Key
       -> ConvergentMapValue
+      -> GetOpts
       -> Handle
       -> IO ()
-    doPutMap bucketOrKey value handle =
+    doPutMap bucketOrKey value getOpts handle =
       case bucketOrKey of
         Left bucket ->
           go (newMap (generatedKey bucket) emptyMapValue)
 
         Right key ->
-          getMap handle key >>= \case
+          getMap handle key getOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -1311,6 +1298,13 @@ contextOption =
 encodingOption :: Parser ByteString
 encodingOption =
   encodeUtf8 <$> strOption (long "encoding" <> help "Character encoding")
+
+getOptsOption :: Parser GetOpts
+getOptsOption =
+  GetOpts
+    <$> optional nodesOption
+    <*> readQuorumOption
+    <*> optional timeoutOption
 
 indexNameArgument :: Parser IndexName
 indexNameArgument =

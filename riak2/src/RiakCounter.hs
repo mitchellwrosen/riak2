@@ -12,9 +12,9 @@ import RiakKey     (Key(..))
 import RiakPutOpts (PutOpts(..))
 import RiakUtils   (difftimeToMillis, retrying)
 
+import qualified RiakGetOpts     as GetOpts
 import qualified RiakHandle      as Handle
 import qualified RiakKey         as Key
-import qualified RiakReadQuorum  as ReadQuorum
 import qualified RiakWriteQuorum as WriteQuorum
 
 import Control.Lens ((.~), (^.))
@@ -50,10 +50,7 @@ getCounter_ ::
   -> Key
   -> GetOpts
   -> IO (Maybe (Either GetCounterError (Maybe ConvergentCounter)))
-getCounter_
-    handle
-    key@(Key bucketType _ _)
-    (GetOpts nodes quorum timeout) =
+getCounter_ handle key@(Key bucketType _ _) opts =
 
   Handle.getCrdt handle request >>= \case
     Left err ->
@@ -69,10 +66,8 @@ getCounter_
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
+        & GetOpts.setProto opts
         & Key.setProto key
-        & ReadQuorum.setProto quorum
-        & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
     fromResponse ::
          Proto.DtFetchResp

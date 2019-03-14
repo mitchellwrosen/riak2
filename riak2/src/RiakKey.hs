@@ -19,7 +19,6 @@ import RiakKeyInternal        (Key(..))
 import qualified RiakBucketType as BucketType
 
 import Control.Lens                       (Lens', (.~), (^.))
-import Data.Hashable                      (Hashable)
 import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 
 import qualified Data.ByteString as ByteString

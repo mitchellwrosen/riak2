@@ -11,12 +11,14 @@ module RiakSet
 import RiakContext (Context(..), newContext)
 import RiakCrdt    (parseGetCrdtError, parseUpdateCrdtError)
 import RiakError
+import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
 import RiakKey     (Key(..), isGeneratedKey)
 import RiakUtils   (retrying)
 
-import qualified RiakHandle as Handle
-import qualified RiakKey    as Key
+import qualified RiakGetOpts as GetOpts
+import qualified RiakHandle  as Handle
+import qualified RiakKey     as Key
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
@@ -65,15 +67,17 @@ getSet ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> GetOpts -- ^
   -> m (Either GetSetError (Maybe (ConvergentSet ByteString)))
-getSet handle key =
-  liftIO (retrying 1000000 (getSet_ handle key))
+getSet handle key opts =
+  liftIO (retrying 1000000 (getSet_ handle key opts))
 
 getSet_ ::
      Handle
   -> Key
+  -> GetOpts
   -> IO (Maybe (Either GetSetError (Maybe (ConvergentSet ByteString))))
-getSet_ handle key@(Key bucketType _ _) =
+getSet_ handle key@(Key bucketType _ _) opts =
   Handle.getCrdt handle request >>= \case
     Left err ->
       pure (Just (Left (HandleError err)))
@@ -88,16 +92,8 @@ getSet_ handle key@(Key bucketType _ _) =
     request :: Proto.DtFetchReq
     request =
       Proto.defMessage
+        & GetOpts.setProto opts
         & Key.setProto key
-
-        -- TODO get set opts
-        -- & Proto.maybe'basicQuorum .~ undefined
-        -- & Proto.maybe'nVal .~ undefined
-        -- & Proto.maybe'notfoundOk .~ undefined
-        -- & Proto.maybe'pr .~ undefined
-        -- & Proto.maybe'r .~ undefined
-        -- & Proto.maybe'sloppyQuorum .~ undefined
-        -- & Proto.maybe'timeout .~ undefined
 
     fromResponse ::
          Proto.DtFetchResp
