@@ -5,12 +5,12 @@ module Main where
 import RiakBinaryIndexQuery (BinaryIndexQuery(..), inBucket)
 import RiakBucket           (Bucket(..), getBucket, getCounterBucket,
                              getHyperLogLogBucket, getMapBucket, getSetBucket,
-                             queryBinaryIndex, queryIntIndex, setBucketIndex,
-                             unsetBucketIndex)
+                             listKeys, queryBinaryIndex, queryIntIndex,
+                             setBucketIndex, unsetBucketIndex)
 import RiakBucketProps      (BucketProps(..))
 import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
                              getCounterBucketType, getHyperLogLogBucketType,
-                             getMapBucketType, getSetBucketType)
+                             getMapBucketType, getSetBucketType, listBuckets)
 import RiakContent          (Content, newContent)
 import RiakContext          (newContext)
 import RiakError            (Error(..))
@@ -241,7 +241,18 @@ riakBucketTests handle =
       ]
     ]
 
-  , testGroup "listKeys" [ ]
+  , testGroup "listKeys"
+    [ testCase "empty bucket works for some reason" $
+        listKeys handle (Bucket defaultBucketType "") `shouldReturn`
+          Right []
+
+    , testGroup "failures"
+      [ testCase "bucket type not found" $ do
+          bucket@(Bucket bucketType _) <- randomBucket
+          listKeys handle bucket `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
 
   , testGroup "queryBinaryIndex"
     [ testCase "one-elem index" $ do
@@ -295,7 +306,14 @@ riakBucketTests handle =
           `shouldReturn` Right 1
 
     , testGroup "failures"
-      [ ]
+      [ testCase "bucket type does not exist" $ do
+          bucket <- Bucket <$> randomBucketType <*> pure "a"
+          queryIntIndex
+            handle
+            (IntIndexQuery { bucket = bucket, index = "a", minValue = 1, maxValue = 1 })
+            (Foldl.generalize Foldl.length)
+            `shouldReturn` Right 0
+      ]
     ]
 
   , testGroup "queryIntIndexTerms" [ ]
@@ -326,8 +344,6 @@ riakBucketTests handle =
             Left InvalidNodesError
       ]
     ]
-
-  , testGroup "streamKeys" [ ]
 
   , testGroup "unsetBucketIndex"
     [ testCase "success" $ do
@@ -446,8 +462,15 @@ riakBucketTypeTests handle =
 
   , testGroup "setBucketTypeIndex" []
   , testGroup "unsetBucketTypeIndex" []
-  , testGroup "listBuckets" []
-  , testGroup "streamBuckets" []
+
+  , testGroup "listBuckets"
+    [ testGroup "failures"
+      [ testCase "bucket type not found" $ do
+          bucketType <- randomBucketType
+          listBuckets handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
   ]
 
 riakIndexTests :: Handle -> [TestTree]
