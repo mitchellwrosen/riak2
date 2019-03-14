@@ -27,7 +27,6 @@ import RiakPing                (ping)
 import RiakPutOpts             (PutOpts(..))
 import RiakSchema              (defaultSchema)
 import RiakSecondaryIndex      (SecondaryIndex(..))
-import RiakSecondaryIndexValue (SecondaryIndexValue(..))
 import RiakServerInfo          (ServerInfo(..), getServerInfo)
 import RiakSibling             (Sibling(..))
 import RiakSomeBucketProps     (SomeBucketProps(..))
@@ -243,7 +242,7 @@ riakBucketTests handle =
         object <- randomObject
         let bucket = object ^. field @"key" . keyBucket
         idx <- randomByteString 32
-        let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Binary "x")]
+        let object' = object & field @"content" . field @"indexes" .~ [BinaryIndex idx "x"]
         put handle object' def `shouldReturnSatisfy` isRight
         queryBinaryIndex
           handle
@@ -282,7 +281,7 @@ riakBucketTests handle =
         object <- randomObject
         let bucket = object ^. field @"key" . keyBucket
         idx <- randomByteString 32
-        let object' = object & field @"content" . field @"indexes" .~ [SecondaryIndex idx (Integer 1)]
+        let object' = object & field @"content" . field @"indexes" .~ [IntIndex idx 1]
         put handle object' def `shouldReturnSatisfy` isRight
         queryIntIndex
           handle
