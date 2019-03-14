@@ -9,7 +9,6 @@ executable riakc
     base,
     base64-bytestring,
     bytestring,
-    data-default-class,
     foldl,
     generic-lens,
     ip,

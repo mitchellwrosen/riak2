@@ -7,7 +7,6 @@ import Riak
 import Control.Arrow         ((***))
 import Control.Lens          (view, (.~), (^.))
 import Data.ByteString       (ByteString)
-import Data.Default.Class    (def)
 import Data.Fixed            (Fixed(..))
 import Data.Foldable         (asum, for_, traverse_)
 import Data.Function         ((&))
@@ -1091,16 +1090,28 @@ searchParser =
   doSearch
     <$> indexNameArgument
     <*> queryArgument
+    <*> many fieldOption
+    <*> optional filterOption
+    <*> optional presortOption
+    <*> optional rowsOption
+    <*> optional sortOption
+    <*> optional startOption
 
   where
     doSearch ::
          IndexName
       -> Text
+      -> [ByteString]
+      -> Maybe ByteString
+      -> Maybe ByteString
+      -> Maybe Word32
+      -> Maybe ByteString
+      -> Maybe Word32
       -> Handle
       -> IO ()
-    doSearch index query handle =
+    doSearch index query fields filter presort rows sort start handle =
       -- TODO search options
-      search handle index (encodeUtf8 query) def >>= \case
+      search handle index (encodeUtf8 query) opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -1110,9 +1121,49 @@ searchParser =
           putStrLn ("Num found: " ++ show numFound)
           for_ documents printDocument
 
+      where
+        opts :: SearchOpts
+        opts =
+          SearchOpts
+            { fieldList = fields
+            , filter = filter
+            , presort = presort
+            , rows = rows
+            , sort = sort
+            , start = start
+            }
+
     queryArgument :: Parser Text
     queryArgument =
       strArgument (help "Query" <> metavar "QUERY")
+
+    fieldOption :: Parser ByteString
+    fieldOption =
+      encodeUtf8 <$>
+        strOption (help "Field" <> long "field" <> metavar "FIELD")
+
+    filterOption :: Parser ByteString
+    filterOption =
+      encodeUtf8 <$>
+        strOption (help "Filter query" <> long "filter" <> metavar "QUERY")
+
+    presortOption :: Parser ByteString
+    presortOption =
+      encodeUtf8 <$>
+        strOption (help "Presort" <> long "presort" <> metavar "PRESORT")
+
+    rowsOption :: Parser Word32
+    rowsOption =
+      option auto (help "Rows" <> long "rows" <> metavar "N")
+
+    sortOption :: Parser ByteString
+    sortOption =
+      encodeUtf8 <$>
+        strOption (help "Sort" <> long "sort" <> metavar "asc|desc")
+
+    startOption :: Parser Word32
+    startOption =
+      option auto (help "Start" <> long "start" <> metavar "N")
 
     -- Assume the keys and values are UTF-8 encoded
     printDocument :: [(ByteString, ByteString)] -> IO ()
