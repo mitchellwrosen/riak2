@@ -329,14 +329,13 @@ getParser =
             ("metadata " <> decodeUtf8 key <> " = " <> displayByteString val)
 
         printSecondaryIndex :: SecondaryIndex -> IO ()
-        printSecondaryIndex (SecondaryIndex name val) =
-          Text.putStrLn ("index " <> decodeUtf8 name <> " = " <> valstr)
+        printSecondaryIndex = \case
+          BinaryIndex name val -> go name (displayByteString val)
+          IntIndex name val -> go name (Text.pack (show val))
           where
-            valstr :: Text
-            valstr =
-              case val of
-                Binary blob -> displayByteString blob
-                Integer n -> Text.pack (show n)
+            go :: ByteString -> Text -> IO ()
+            go name val =
+              Text.putStrLn ("index " <> decodeUtf8 name <> " = " <> val)
 
 getBucketParser :: Parser (Handle -> IO ())
 getBucketParser =
@@ -1377,9 +1376,9 @@ secondaryIndexOption =
         [ stringToByteString -> name, val ] ->
           case readMaybe val of
             Nothing ->
-              Right (SecondaryIndex name (Binary (stringToByteString val)))
+              Right (BinaryIndex name (stringToByteString val))
             Just n ->
-              Right (SecondaryIndex name (Integer n))
+              Right (IntIndex name n)
 
         _ ->
           Left "Expected: index/value'"

@@ -1,72 +1,46 @@
 module RiakSecondaryIndex where
 
 import RiakPanic
-import RiakSecondaryIndexValue (SecondaryIndexValue)
 import RiakUtils
 
+import qualified RiakProtoPair as Pair
+
+import Control.Lens    ((.~))
 import Data.Riak.Proto (RpbPair)
 
-import qualified RiakProtoPair           as Pair
-import qualified RiakSecondaryIndexValue as SecondaryIndexValue
-
 import qualified Data.ByteString as ByteString
+import qualified Data.Riak.Proto as Proto
 
 
 -- | A secondary index.
-data SecondaryIndex
-  = forall a.
-    SecondaryIndex ByteString (SecondaryIndexValue a)
-
-deriving stock instance Show SecondaryIndex
-
-instance Eq SecondaryIndex where
-  SecondaryIndex x1 y1 == SecondaryIndex x2 y2 =
-    x1 == x2 &&
-      case y1 of
-        SecondaryIndexValue.Binary v1 ->
-          case y2 of
-            SecondaryIndexValue.Binary v2 -> v1 == v2
-            SecondaryIndexValue.Integer{} -> False
-        SecondaryIndexValue.Integer v1 ->
-          case y2 of
-            SecondaryIndexValue.Integer v2 -> v1 == v2
-            SecondaryIndexValue.Binary{} -> False
-
--- | Binary index smart constructor.
-binary ::
-     ByteString -- ^ Index name
-  -> ByteString -- ^ Value
-  -> SecondaryIndex
-binary index value =
-  SecondaryIndex index (SecondaryIndexValue.Binary value)
-
--- | Integer index smart constructor.
-integer ::
-     ByteString -- ^ Index name
-  -> Int64 -- ^ Value
-  -> SecondaryIndex
-integer index value =
-  SecondaryIndex index (SecondaryIndexValue.Integer value)
+data SecondaryIndex :: Type where
+  BinaryIndex :: ByteString -> ByteString -> SecondaryIndex
+  IntIndex :: ByteString -> Int64 -> SecondaryIndex
+  deriving stock (Eq, Show)
 
 fromPair :: RpbPair -> SecondaryIndex
 fromPair =
   Pair.toTuple >>> \case
-    (ByteString.stripSuffix "_bin" -> Just k, v) ->
-      SecondaryIndex k (SecondaryIndexValue.Binary v)
+    (ByteString.stripSuffix "_bin" -> Just key, value) ->
+      BinaryIndex key value
 
-    (ByteString.stripSuffix "_int" -> Just k, v) ->
-      SecondaryIndex k (SecondaryIndexValue.Integer (bs2int v))
+    (ByteString.stripSuffix "_int" -> Just key, value) ->
+      IntIndex key (bs2int value)
 
     (k, v) ->
-      impurePanic "Riak.Internal.SecondaryIndex.fromPair"
+      impurePanic "RiakSecondaryIndex.fromPair"
         ( ("key",   k)
         , ("value", v)
         )
 
 toPair :: SecondaryIndex -> RpbPair
 toPair = \case
-  SecondaryIndex k (SecondaryIndexValue.Binary v) ->
-    Pair.fromTuple (k <> "_bin", v)
+  BinaryIndex key value ->
+    Proto.defMessage
+      & Proto.key .~ (key <> "_bin")
+      & Proto.value .~ value
 
-  SecondaryIndex k (SecondaryIndexValue.Integer v) ->
-    Pair.fromTuple (k <> "_int", int2bs v)
+  IntIndex key value ->
+    Proto.defMessage
+      & Proto.key .~ (key <> "_int")
+      & Proto.value .~ int2bs value

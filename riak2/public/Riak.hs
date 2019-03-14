@@ -165,7 +165,6 @@ module Riak
   , SearchOpts(..)
   , SearchResults(..)
   , SecondaryIndex(..)
-  , SecondaryIndexValue(..)
   , ServerInfo(..)
   , SetBucketProps(..)
   , SetBucketTypeIndexError
@@ -207,7 +206,6 @@ import Riak.Search
 import Riak.SecondaryIndex        (SecondaryIndex(..))
 import Riak.SecondaryIndexQuery   (BinaryIndexQuery(..), IntIndexQuery(..),
                                    inBucket)
-import Riak.SecondaryIndexValue   (SecondaryIndexValue(..))
 import Riak.ServerInfo
 import Riak.Sibling
 import RiakPing

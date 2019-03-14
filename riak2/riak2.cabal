@@ -48,7 +48,6 @@ description:
   Secondary index types:
   .
   * "Riak.SecondaryIndex"
-  * "Riak.SecondaryIndexValue"
   * "Riak.SecondaryIndexQuery"
   .
   Search types and operations:
@@ -113,7 +112,6 @@ library
     Riak.Schema
     Riak.Search
     Riak.SecondaryIndex
-    Riak.SecondaryIndexValue
     Riak.ServerInfo
     Riak.Sibling
 
@@ -224,7 +222,6 @@ library riak2-internal
     RiakSchema
     RiakSearch
     RiakSecondaryIndex
-    RiakSecondaryIndexValue
     RiakServerInfo
     RiakSet
     RiakSetBucketProps
