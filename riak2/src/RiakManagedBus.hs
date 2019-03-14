@@ -96,7 +96,7 @@ import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
-                           readTCounter, registerOneShotEvent)
+                           readTCounter)
 
 import qualified Libriak.Handle as Handle
 import qualified RiakDebug      as Debug
@@ -106,13 +106,10 @@ import Control.Exception.Safe (throwIO, tryAny, tryAsync, uninterruptibleMask)
 import Control.Foldl          (FoldM)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
+import GHC.Conc               (registerDelay)
 import Socket.Stream.IPv4     (ConnectException, Endpoint, Interruptibility(..))
 
 import qualified Data.Riak.Proto as Proto
-
--- TODO configure connecting wait time
-waitTimeout :: Int
-waitTimeout = 5*1000*1000
 
 data ManagedBus
   = ManagedBus
@@ -120,7 +117,7 @@ data ManagedBus
   , endpoint :: Endpoint
   , healthCheckInterval :: Int
   , idleTimeout :: Int
-  , receiveTimeout :: Int
+  , requestTimeout :: Int
   , handlers :: EventHandlers
 
   , generationVar :: TVar Word64
@@ -148,7 +145,7 @@ data ManagedBusConfig
   , endpoint :: Endpoint
   , healthCheckInterval :: Int -- Microseconds
   , idleTimeout :: Int -- Microseconds
-  , receiveTimeout :: Int -- Microseconds
+  , requestTimeout :: Int -- Microseconds
   , handlers :: EventHandlers
   } deriving stock (Show)
 
@@ -192,7 +189,7 @@ createManagedBus ::
   -> IO ManagedBus
 createManagedBus
     ManagedBusConfig { endpoint, handlers, healthCheckInterval, idleTimeout,
-                       receiveTimeout, uuid
+                       requestTimeout, uuid
                      } = do
 
   generationVar :: TVar Word64 <-
@@ -212,7 +209,7 @@ createManagedBus
     , endpoint = endpoint
     , healthCheckInterval = healthCheckInterval
     , idleTimeout = idleTimeout
-    , receiveTimeout = receiveTimeout
+    , requestTimeout = requestTimeout
     , generationVar = generationVar
     , stateVar = stateVar
     , inFlightVar = inFlightVar
@@ -222,10 +219,12 @@ createManagedBus
 
 withHandle ::
      forall a.
-     ManagedBus
-  -> (Handle.Handle -> IO (Either Handle.HandleError a))
+     TVar Bool
+  -> ManagedBus
+  -> (TVar Bool -> Handle.Handle -> IO (Either Handle.HandleError a))
   -> IO (Either ManagedBusError a)
 withHandle
+    timeoutVar
     managedBus@(ManagedBus { generationVar, inFlightVar, lastUsedRef, stateVar,
                              uuid })
     callback =
@@ -263,7 +262,7 @@ withHandle
         getMonotonicTimeNSec
 
       result :: Either SomeException (Either Handle.HandleError a) <-
-        tryAsync (unmask (callback handle))
+        tryAsync (unmask (callback timeoutVar handle))
 
       atomically (decrTCounter inFlightVar)
 
@@ -342,18 +341,17 @@ withHandle
           pure (Right result)
 
     wait :: IO (Either ManagedBusError a)
-    wait = do
-      timedOut :: STM () <-
-        registerOneShotEvent waitTimeout
-
+    wait =
       atomicallyIO $
-        (pure (Left ManagedBusTimeoutError) <$ timedOut)
+        (readTVar timeoutVar >>= \case
+          False -> retry
+          True -> pure (pure (Left ManagedBusTimeoutError)))
         <|>
         (readTVar stateVar >>= \case
           Connected _ Healthy ->
-            pure (withHandle managedBus callback)
+            pure (withHandle timeoutVar managedBus callback)
           Disconnected ->
-            pure (withHandle managedBus callback)
+            pure (withHandle timeoutVar managedBus callback)
 
           Connecting -> retry
           Connected _ Unhealthy -> retry
@@ -371,8 +369,7 @@ connect ::
   -> IO ()
 connect
     managedBus@(ManagedBus { endpoint, generationVar, handlers,
-                             healthCheckInterval, idleTimeout, receiveTimeout,
-                             stateVar, uuid })
+                             healthCheckInterval, idleTimeout, stateVar, uuid })
     = do
 
   generation <- readTVarIO generationVar
@@ -386,7 +383,7 @@ connect
       -> NominalDiffTime
       -> IO ()
     connectLoop generation seconds =
-      Handle.connect endpoint receiveTimeout handleHandlers >>= \case
+      Handle.connect endpoint handleHandlers >>= \case
         Left err -> do
           void (tryAny (onConnectError handlers err))
           debug uuid generation (show err ++ ", reconnecting in " ++ show seconds)
@@ -399,7 +396,10 @@ connect
 
     pingLoop :: Handle.Handle -> Word64 -> NominalDiffTime -> IO ()
     pingLoop handle generation seconds = do
-      Handle.ping handle >>= \case
+      timeoutVar :: TVar Bool <-
+        registerDelay pingTimeout
+
+      Handle.ping timeoutVar handle >>= \case
         Left err -> do
           debug uuid generation $
             show err ++ ", reconnecting in " ++ show seconds
@@ -453,8 +453,11 @@ monitorHealth
               incrTCounter inFlightVar
 
               pure $ do
+                timeoutVar :: TVar Bool <-
+                  registerDelay pingTimeout
+
                 result :: Either Handle.HandleError (Either ByteString ()) <-
-                  Handle.ping handle
+                  Handle.ping timeoutVar handle
 
                 atomically (decrTCounter inFlightVar)
 
@@ -523,8 +526,11 @@ monitorHealth
               incrTCounter inFlightVar
 
               pure $ do
+                timeoutVar :: TVar Bool <-
+                  registerDelay pingTimeout
+
                 result :: Either Handle.HandleError (Either ByteString ()) <-
-                  Handle.ping handle
+                  Handle.ping timeoutVar handle
 
                 atomically (decrTCounter inFlightVar)
 
@@ -599,11 +605,13 @@ monitorUsage
   where
     loop :: IO ()
     loop = do
-      timer :: STM () <-
-        registerOneShotEvent (idleTimeout `div` 2)
+      timeoutVar :: TVar Bool <-
+        registerDelay (idleTimeout `div` 2)
 
       atomicallyIO $
-        (timer $> handleTimer)
+        (readTVar timeoutVar >>= \case
+          False -> retry
+          True -> pure handleTimer)
         <|>
         (whenGen generation generationVar $
           readTVar stateVar >>= \case
@@ -693,6 +701,9 @@ atomicallyIO :: STM (IO a) -> IO a
 atomicallyIO =
   join . atomically
 
+pingTimeout :: Int
+pingTimeout =
+  5*1000*1000
 
 --------------------------------------------------------------------------------
 -- Libriak.Handle wrappers
@@ -702,174 +713,242 @@ delete ::
      ManagedBus -- ^
   -> Proto.RpbDelReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-delete bus request =
-  withHandle bus $ \handle ->
-    Handle.delete handle request
+delete bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.delete timeoutVar handle request
 
 deleteIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexDeleteReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-deleteIndex bus request =
-  withHandle bus $ \handle ->
-    Handle.deleteIndex handle request
+deleteIndex bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.deleteIndex timeoutVar handle request
 
 get ::
      ManagedBus
   -> Proto.RpbGetReq
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetResp))
-get bus request =
-  withHandle bus $ \handle ->
-    Handle.get handle request
+get bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.get timeoutVar handle request
 
 getBucket ::
      ManagedBus -- ^
   -> Proto.RpbGetBucketReq -- ^
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetBucketResp))
-getBucket bus request =
-  withHandle bus $ \handle ->
-    Handle.getBucket handle request
+getBucket bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.getBucket timeoutVar handle request
 
 getBucketType ::
      ManagedBus -- ^
   -> Proto.RpbGetBucketTypeReq -- ^
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetBucketResp))
-getBucketType bus request =
-  withHandle bus $ \handle ->
-    Handle.getBucketType handle request
+getBucketType bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.getBucketType timeoutVar handle request
 
 getCrdt ::
      ManagedBus
   -> Proto.DtFetchReq
   -> IO (Either ManagedBusError (Either ByteString Proto.DtFetchResp))
-getCrdt bus request =
-  withHandle bus $ \handle ->
-    Handle.getCrdt handle request
+getCrdt bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.getCrdt timeoutVar handle request
 
 getIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexGetReq
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbYokozunaIndexGetResp))
-getIndex bus request =
-  withHandle bus $ \handle ->
-    Handle.getIndex handle request
+getIndex bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.getIndex timeoutVar handle request
 
 getSchema ::
      ManagedBus
   -> Proto.RpbYokozunaSchemaGetReq
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbYokozunaSchemaGetResp))
-getSchema bus request =
-  withHandle bus $ \handle ->
-    Handle.getSchema handle request
+getSchema bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.getSchema timeoutVar handle request
 
 getServerInfo ::
      ManagedBus
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetServerInfoResp))
-getServerInfo bus =
-  withHandle bus Handle.getServerInfo
+getServerInfo bus@(ManagedBus { requestTimeout }) = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.getServerInfo timeoutVar handle
 
 listBuckets ::
      ManagedBus
   -> Proto.RpbListBucketsReq
   -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either ManagedBusError (Either ByteString r))
-listBuckets bus request responseFold =
-  withHandle bus $ \handle ->
-    Handle.listBuckets handle request responseFold
+listBuckets bus@(ManagedBus { requestTimeout }) request responseFold = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.listBuckets timeoutVar handle request responseFold
 
 listKeys ::
      ManagedBus
   -> Proto.RpbListKeysReq
   -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either ManagedBusError (Either ByteString r))
-listKeys bus request responseFold =
-  withHandle bus $ \handle ->
-    Handle.listKeys handle request responseFold
+listKeys bus@(ManagedBus { requestTimeout }) request responseFold = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.listKeys timeoutVar handle request responseFold
 
 mapReduce ::
      ManagedBus
   -> Proto.RpbMapRedReq
   -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either ManagedBusError (Either ByteString r))
-mapReduce bus request responseFold =
-  withHandle bus $ \handle ->
-    Handle.mapReduce handle request responseFold
+mapReduce bus@(ManagedBus { requestTimeout }) request responseFold = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.mapReduce timeoutVar handle request responseFold
 
 ping ::
      ManagedBus
   -> IO (Either ManagedBusError (Either ByteString ()))
-ping bus =
-  withHandle bus Handle.ping
+ping bus@(ManagedBus { requestTimeout }) = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.ping timeoutVar handle
 
 put ::
      ManagedBus
   -> Proto.RpbPutReq
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbPutResp))
-put bus request =
-  withHandle bus $ \handle ->
-    Handle.put handle request
+put bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.put timeoutVar handle request
 
 putIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexPutReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-putIndex bus request =
-  withHandle bus $ \handle ->
-    Handle.putIndex handle request
+putIndex bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.putIndex timeoutVar handle request
 
 putSchema ::
      ManagedBus
   -> Proto.RpbYokozunaSchemaPutReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-putSchema bus request =
-  withHandle bus $ \handle ->
-    Handle.putSchema handle request
+putSchema bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.putSchema timeoutVar handle request
 
 resetBucket ::
      ManagedBus
   -> Proto.RpbResetBucketReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-resetBucket bus request =
-  withHandle bus $ \handle ->
-    Handle.resetBucket handle request
+resetBucket bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.resetBucket timeoutVar handle request
 
 setBucket ::
      ManagedBus
   -> Proto.RpbSetBucketReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-setBucket bus request =
-  withHandle bus $ \handle ->
-    Handle.setBucket handle request
+setBucket bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.setBucket timeoutVar handle request
 
 setBucketType ::
      ManagedBus
   -> Proto.RpbSetBucketTypeReq
   -> IO (Either ManagedBusError (Either ByteString ()))
-setBucketType bus request =
-  withHandle bus $ \handle ->
-    Handle.setBucketType handle request
+setBucketType bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.setBucketType timeoutVar handle request
 
 search ::
      ManagedBus
   -> Proto.RpbSearchQueryReq
   -> IO (Either ManagedBusError (Either ByteString Proto.RpbSearchQueryResp))
-search bus request =
-  withHandle bus $ \handle ->
-    Handle.search handle request
+search bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.search timeoutVar handle request
 
 secondaryIndex ::
      ManagedBus
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either ManagedBusError (Either ByteString r))
-secondaryIndex bus request responseFold =
-  withHandle bus $ \handle ->
-    Handle.secondaryIndex handle request responseFold
+secondaryIndex bus@(ManagedBus { requestTimeout }) request responseFold = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.secondaryIndex timeoutVar handle request responseFold
 
 updateCrdt ::
      ManagedBus -- ^
   -> Proto.DtUpdateReq -- ^
   -> IO (Either ManagedBusError (Either ByteString Proto.DtUpdateResp))
-updateCrdt bus request =
-  withHandle bus $ \handle ->
-    Handle.updateCrdt handle request
+updateCrdt bus@(ManagedBus { requestTimeout }) request = do
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  withHandle timeoutVar bus $ \timeoutVar handle ->
+    Handle.updateCrdt timeoutVar handle request

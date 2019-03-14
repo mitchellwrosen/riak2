@@ -29,11 +29,11 @@ createBusPool ::
      Endpoint
   -> Int -- ^ Health check interval (microseconds)
   -> Int -- ^ Idle timeout (microseconds)
-  -> Int -- ^ Receive timeout (microseconds)
+  -> Int -- ^ Request timeout (microseconds)
   -> EventHandlers
   -> IO BusPool
 createBusPool
-    endpoint healthCheckInterval idleTimeout receiveTimeout handlers = do
+    endpoint healthCheckInterval idleTimeout requestTimeout handlers = do
 
   pool :: Vector ManagedBus <-
     Vector.generateM
@@ -51,7 +51,7 @@ createBusPool
         , endpoint = endpoint
         , healthCheckInterval = healthCheckInterval
         , idleTimeout = idleTimeout
-        , receiveTimeout = receiveTimeout
+        , requestTimeout = requestTimeout
         , handlers = handlers
         }
 

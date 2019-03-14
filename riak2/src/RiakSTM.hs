@@ -6,8 +6,6 @@ module RiakSTM
   , readTCounter
   , incrTCounter
   , decrTCounter
-
-  , registerOneShotEvent
   ) where
 
 import Control.Concurrent.STM
@@ -31,13 +29,3 @@ incrTCounter (TCounter var) =
 decrTCounter :: TCounter -> STM ()
 decrTCounter (TCounter var) =
   modifyTVar' var (subtract 1)
-
-registerOneShotEvent :: Int -> IO (STM ())
-registerOneShotEvent micros = do
-  var :: TVar Bool <-
-    registerDelay micros
-
-  pure
-    (readTVar var >>= \case
-      False -> retry
-      True -> pure ())

@@ -57,7 +57,10 @@ data HandleConfig
     -- @0@ to disable.
   , healthCheckInterval :: NominalDiffTime
   , idleTimeout :: NominalDiffTime
-    -- | How long to wait for a response from Riak before timing out.
+    -- | How long to wait for a successful response from Riak before timing out.
+    -- This includes the time spent waiting for a successful connection to be
+    -- established, time spent waiting for Riak to become healthy, and time
+    -- spent waiting for Riak to respond.
   , requestTimeout :: NominalDiffTime
     -- | The additional number of times to attempt a request if it results in a
     -- non-Riak error.

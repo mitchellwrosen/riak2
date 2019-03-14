@@ -23,7 +23,7 @@ import Data.Kind                (Type)
 import Data.Primitive.ByteArray
 import Data.Word                (Word32, byteSwap32)
 import GHC.ByteOrder            (ByteOrder(..), targetByteOrder)
-import GHC.Conc                 (TVar, registerDelay)
+import GHC.Conc                 (TVar)
 import Socket.Stream.IPv4       (CloseException(..), ConnectException(..),
                                  Endpoint(..), Interruptibility(..),
                                  ReceiveException(..), SendException(..))
@@ -231,21 +231,18 @@ sendall Connection { sendBuffer, connection } =
 --
 -- TODO benchmark receive
 receive ::
-     Connection
-  -> Int -- ^ Timeout (microseconds)
+     TVar Bool
+  -> Connection
   -> IO (Either ConnectionError EncodedResponse)
-receive connection timeout =
+receive timeoutVar connection =
   bimap fromReceiveException coerce <$>
-    receive_ connection timeout
+    receive_ timeoutVar connection
 
 receive_ ::
-     Connection
-  -> Int
+     TVar Bool
+  -> Connection
   -> IO (Either (ReceiveException 'Interruptible) ByteArray)
-receive_ Connection { connection } receiveTimeout = do
-  timeoutVar :: TVar Bool <-
-    registerDelay receiveTimeout
-
+receive_ timeoutVar Connection { connection } =
   receiveBigEndianWord32 connection timeoutVar >>= \case
     Left err ->
       pure (Left err)
