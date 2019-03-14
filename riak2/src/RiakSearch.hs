@@ -101,7 +101,5 @@ parseSearchError index err
       IndexDoesNotExistError index
   | isSearchFailedError err =
       SearchFailedError
-  | isUnknownMessageCode err =
-      SearchNotEnabledError
   | otherwise =
       UnknownError (decodeUtf8 err)

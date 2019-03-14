@@ -14,7 +14,6 @@ import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString                  as ByteString
 
 
--- TODO get "{insufficient_vnodes,0,need,2}"
 -- TODO get "{pr_val_unsatisfied,3,2}"
 -- TODO put/delete "{pw_val_unsatisfied,3,2}"
 
@@ -82,12 +81,6 @@ data Error :: Op -> Type where
   -- TODO retry on overload
   OverloadError ::
        MayReturnOverload op ~ 'True
-    => Error op
-
-  -- | A search-related operation was attempted, but either search is disabled
-  -- in @riak.conf@, or the search service is not yet up.
-  SearchNotEnabledError ::
-       MayReturnSearchNotEnabled op ~ 'True
     => Error op
 
   -- | The search failed. Typically, this means the query was malformed. Check
@@ -225,14 +218,9 @@ type family MayReturnOverload (op :: Op) :: Bool where
   MayReturnOverload 'PutOp    = 'True
   MayReturnOverload _         = 'False
 
-type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
-  MayReturnSearchNotEnabled 'DeleteIndexOp = 'True
-  MayReturnSearchNotEnabled 'GetIndexOp    = 'True
-  MayReturnSearchNotEnabled 'GetSchemaOp   = 'True
-  MayReturnSearchNotEnabled 'PutIndexOp    = 'True
-  MayReturnSearchNotEnabled 'PutSchemaOp   = 'True
-  MayReturnSearchNotEnabled 'SearchOp      = 'True
-  MayReturnSearchNotEnabled _              = 'False
+isAllNodesDownError :: ByteString -> Bool
+isAllNodesDownError =
+  (== "all_nodes_down")
 
 isBucketCannotBeZeroLengthError :: ByteString -> Bool
 isBucketCannotBeZeroLengthError =
@@ -331,9 +319,13 @@ isIndexDoesNotExistError1 msg =
   ByteString.isPrefixOf "No index <<\"" msg &&
     ByteString.isSuffixOf "\">> found." msg
 
-isInsufficientNodesError :: ByteString -> Bool
-isInsufficientNodesError =
+isInsufficientVnodesError0 :: ByteString -> Bool
+isInsufficientVnodesError0 =
   (== "{error,insufficient_vnodes_available}")
+
+isInsufficientVnodesError1 :: ByteString -> Bool
+isInsufficientVnodesError1 =
+  ByteString.isPrefixOf "{insufficient_vnodes"
 
 isInvalidNodesError0 :: ByteString -> Bool
 isInvalidNodesError0 =
@@ -351,13 +343,17 @@ isKeyCannotBeZeroLengthError :: ByteString -> Bool
 isKeyCannotBeZeroLengthError =
   (== "Key cannot be zero-length")
 
-isNotfound :: ByteString -> Bool
-isNotfound =
+isNotfoundError :: ByteString -> Bool
+isNotfoundError =
   (== "notfound")
 
 isOverloadError :: ByteString -> Bool
 isOverloadError =
   (== "overload")
+
+-- isPrValUnsatisfied :: ByteString -> Bool
+-- isPrValUnsatisfied =
+  -- TODO get "{pr_val_unsatisfied,3,2}"
 
 isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =
@@ -371,6 +367,6 @@ isSecondaryIndexesNotSupportedError :: ByteString -> Bool
 isSecondaryIndexesNotSupportedError =
   ByteString.isPrefixOf "{error,{indexes_not_supported,"
 
-isUnknownMessageCode :: ByteString -> Bool
-isUnknownMessageCode =
+isUnknownMessageCodeError :: ByteString -> Bool
+isUnknownMessageCodeError =
   ByteString.isPrefixOf "Unknown message code:"

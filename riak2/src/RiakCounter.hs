@@ -20,6 +20,8 @@ import Control.Lens ((.~), (^.))
 
 import qualified Data.Riak.Proto as Proto
 
+-- TODO UnknownError "\"Counters require bucket property 'allow_mult=true'\""
+
 
 -- | An eventually-convergent counter.
 --

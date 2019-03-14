@@ -143,7 +143,6 @@ module Riak
   , MayReturnIndexDoesNotExist
   , MayReturnInvalidNodes
   , MayReturnOverload
-  , MayReturnSearchNotEnabled
   , NotfoundOk(..)
   , Object(..)
   , newObject

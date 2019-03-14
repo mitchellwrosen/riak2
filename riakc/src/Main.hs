@@ -69,11 +69,11 @@ main = do
         , retries =
             3
         , healthCheckInterval =
-            1
-        , idleTimeout =
-            10
-        , requestTimeout =
             5
+        , idleTimeout =
+            60
+        , requestTimeout =
+            30
         , handlers =
             EventHandlers
               { onSend =

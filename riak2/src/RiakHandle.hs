@@ -3,7 +3,6 @@ module RiakHandle
   , HandleConfig(..)
   , EventHandlers(..)
   , createHandle
-  , delete
   , deleteIndex
   , get
   , getBucket
@@ -145,13 +144,6 @@ withManagedBus Handle { pool, retries } action =
 
                 Right response ->
                   pure (Right response)
-
-delete ::
-     Handle -- ^
-  -> Proto.RpbDelReq
-  -> IO (Either HandleError (Either ByteString ()))
-delete handle request =
-  withManagedBus handle (\bus -> ManagedBus.delete bus request)
 
 deleteIndex ::
      Handle

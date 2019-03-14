@@ -8,9 +8,10 @@ module RiakIndex
   ) where
 
 import RiakError
-import RiakHandle       (Handle)
+import RiakHandle      (Handle)
+import RiakHandleError (HandleError)
 import RiakIndexName
-import RiakSchema       (defaultSchema)
+import RiakSchema      (defaultSchema)
 
 import qualified RiakHandle as Handle
 
@@ -52,14 +53,6 @@ instance Default PutIndexOpts where
 
 
 -- | Get a Solr index.
---
--- +----------------------------------+----------------------------------------+
--- | Error                            | Meaning                                |
--- +==================================+========================================+
--- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
--- |                                  | or the search service is temporarily   |
--- |                                  | unavailable.                           |
--- +----------------------------------+----------------------------------------+
 getIndex ::
      MonadIO m
   => Handle -- ^
@@ -80,43 +73,36 @@ parseGetIndexError ::
      ByteString
   -> Either GetIndexError (Maybe Index)
 parseGetIndexError err
-  | isNotfound err =
+  | isNotfoundError err =
       Right Nothing
-  | isUnknownMessageCode err =
-      Left SearchNotEnabledError
   | otherwise =
       Left (UnknownError (decodeUtf8 err))
 
 -- | Get all Solr indexes.
---
--- +----------------------------------+----------------------------------------+
--- | Error                            | Meaning                                |
--- +==================================+========================================+
--- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
--- |                                  | or the search service is temporarily   |
--- |                                  | unavailable.                           |
--- +----------------------------------+----------------------------------------+
 getIndexes ::
      MonadIO m
   => Handle -- ^
   -> m (Either GetIndexError [Index])
 getIndexes handle = liftIO $
-  Handle.getIndex handle Nothing >>= \case
-    Left err ->
-      pure (Left (HandleError err))
+  fromResult <$> Handle.getIndex handle Nothing
 
-    Right (Left err) ->
-      pure (Left (parseGetIndexesError err))
+  where
+    fromResult ::
+         Either HandleError (Either ByteString Proto.RpbYokozunaIndexGetResp)
+      -> Either GetIndexError [Index]
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Right response) ->
-      pure (Right (map fromProto (response ^. Proto.index)))
+      Right (Left err) ->
+        Left (parseGetIndexesError err)
+
+      Right (Right response) ->
+        Right (map fromProto (response ^. Proto.index))
 
 parseGetIndexesError :: ByteString -> GetIndexError
-parseGetIndexesError err
-  | isUnknownMessageCode err =
-      SearchNotEnabledError
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+parseGetIndexesError err =
+  UnknownError (decodeUtf8 err)
 
 -- | Put a Solr index.
 --
@@ -138,10 +124,6 @@ parseGetIndexesError err
 -- |                                  | first create it with                   |
 -- |                                  | 'Riak.Schema.putSchema', or use the    |
 -- |                                  | 'Riak.Schema.defaultSchema'.           |
--- +----------------------------------+----------------------------------------+
--- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
--- |                                  | or the search service is temporarily   |
--- |                                  | unavailable.                           |
 -- +----------------------------------+----------------------------------------+
 putIndex ::
      MonadIO m
@@ -168,7 +150,6 @@ putIndex_ handle index schema nodes timeout = do
   getIndex handle index >>= \case
     Left err ->
       case err of
-        SearchNotEnabledError -> pure (Left SearchNotEnabledError)
         HandleError err' -> pure (Left (HandleError err'))
         UnknownError err' -> pure (Left (UnknownError err'))
 
@@ -221,8 +202,6 @@ putIndex_ handle index schema nodes timeout = do
         HandleError err
       IndexHasAssociatedBucketsError name buckets ->
         IndexHasAssociatedBucketsError name buckets
-      SearchNotEnabledError ->
-        SearchNotEnabledError
       UnknownError err ->
         UnknownError err
 
@@ -230,8 +209,6 @@ parsePutIndexError :: ByteString -> PutIndexError
 parsePutIndexError err
   | isSchemaDoesNotExistError err =
       SchemaDoesNotExistError
-  | isUnknownMessageCode err =
-      SearchNotEnabledError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -245,25 +222,27 @@ parsePutIndexError err
 -- |                                  | must first each be unassociated using  |
 -- |                                  | 'Riak.Bucket.unsetBucketIndex'.        |
 -- +----------------------------------+----------------------------------------+
--- | 'SearchNotEnabledError'          | Either @search = off@ in @riak.conf@,  |
--- |                                  | or the search service is temporarily   |
--- |                                  | unavailable.                           |
--- +----------------------------------+----------------------------------------+
 deleteIndex ::
      MonadIO m
   => Handle -- ^
   -> IndexName -- ^
   -> m (Either DeleteIndexError Bool)
 deleteIndex handle name = liftIO $
-  Handle.deleteIndex handle (encodeUtf8 (unIndexName name)) >>= \case
-    Left err ->
-      pure (Left (HandleError err))
+  fromResult <$> Handle.deleteIndex handle (encodeUtf8 (unIndexName name))
 
-    Right (Left err) ->
-      pure (parseDeleteIndexError name err)
+  where
+    fromResult ::
+         Either HandleError (Either ByteString ())
+      -> Either DeleteIndexError Bool
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Right _) ->
-      pure (Right True)
+      Right (Left err) ->
+        parseDeleteIndexError name err
+
+      Right (Right _) ->
+        Right True
 
 parseDeleteIndexError ::
      IndexName
@@ -272,10 +251,8 @@ parseDeleteIndexError ::
 parseDeleteIndexError name err
   | Just buckets <- isHasAssociatedBucketsError err =
       Left (IndexHasAssociatedBucketsError name buckets)
-  | isNotfound err =
+  | isNotfoundError err =
       Right False
-  | isUnknownMessageCode err =
-      Left SearchNotEnabledError
   | otherwise =
       Left (UnknownError (decodeUtf8 err))
 

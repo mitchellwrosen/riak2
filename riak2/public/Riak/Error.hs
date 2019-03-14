@@ -32,7 +32,6 @@ module Riak.Error
   , MayReturnIndexDoesNotExist
   , MayReturnInvalidNodes
   , MayReturnOverload
-  , MayReturnSearchNotEnabled
   ) where
 
 import RiakError

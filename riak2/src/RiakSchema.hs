@@ -6,7 +6,8 @@ module RiakSchema
   ) where
 
 import RiakError
-import RiakHandle       (Handle)
+import RiakHandle      (Handle)
+import RiakHandleError (HandleError)
 
 import qualified RiakHandle as Handle
 
@@ -49,10 +50,8 @@ parseGetSchemaError ::
      ByteString
   -> Either GetSchemaError (Maybe Schema)
 parseGetSchemaError err
-  | isNotfound err =
+  | isNotfoundError err =
       Right Nothing
-  | isUnknownMessageCode err =
-      Left SearchNotEnabledError
   | otherwise =
       Left (UnknownError (decodeUtf8 err))
 
@@ -63,15 +62,21 @@ putSchema ::
   -> Schema -- ^
   -> m (Either PutSchemaError ())
 putSchema handle schema = liftIO $
-  Handle.putSchema handle (toProto schema) >>= \case
-    Left err ->
-      pure (Left (HandleError err))
+  fromResult <$> Handle.putSchema handle (toProto schema)
 
-    Right (Left err) ->
-      pure (Left (parsePutSchemaError err))
+  where
+    fromResult ::
+         Either HandleError (Either ByteString ())
+      -> Either PutSchemaError ()
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Right _) ->
-      pure (Right ())
+      Right (Left err) ->
+        Left (parsePutSchemaError err)
+
+      Right (Right _) ->
+        Right ()
 
 parsePutSchemaError ::
      ByteString
@@ -79,8 +84,6 @@ parsePutSchemaError ::
 parsePutSchemaError err
   | isInvalidSchemaError err =
       InvalidSchemaError (decodeUtf8 err)
-  | isUnknownMessageCode err =
-      SearchNotEnabledError
   | otherwise =
       UnknownError (decodeUtf8 err)
 

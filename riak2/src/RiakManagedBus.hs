@@ -68,7 +68,6 @@ module RiakManagedBus
   , ManagedBusError(..)
   , createManagedBus
     -- * API
-  , delete
   , deleteIndex
   , get
   , getBucket
@@ -95,7 +94,9 @@ module RiakManagedBus
 import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
-import RiakError          (isInsufficientNodesError, isUnknownMessageCode)
+import RiakError          (isAllNodesDownError, isInsufficientVnodesError0,
+                           isInsufficientVnodesError1,
+                           isUnknownMessageCodeError)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -710,17 +711,6 @@ pingTimeout =
 -- Libriak.Handle wrappers
 --------------------------------------------------------------------------------
 
-delete ::
-     ManagedBus -- ^
-  -> Proto.RpbDelReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
-delete bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.delete timeoutVar handle request
-
 deleteIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexDeleteReq
@@ -729,8 +719,11 @@ deleteIndex bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.deleteIndex timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.deleteIndex timeoutVar handle request)
 
 get ::
      ManagedBus
@@ -742,7 +735,9 @@ get bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    (\err ->
+      isInsufficientVnodesError1 err ||
+      isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.get timeoutVar handle request)
 
@@ -778,7 +773,9 @@ getCrdt bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    (\err ->
+      isInsufficientVnodesError1 err ||
+      isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.getCrdt timeoutVar handle request)
 
@@ -790,8 +787,11 @@ getIndex bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.getIndex timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.getIndex timeoutVar handle request)
 
 getSchema ::
      ManagedBus
@@ -801,8 +801,11 @@ getSchema bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.getSchema timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.getSchema timeoutVar handle request)
 
 getServerInfo ::
      ManagedBus
@@ -825,7 +828,7 @@ listBuckets bus@(ManagedBus { requestTimeout }) request responseFold = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    isUnknownMessageCodeError
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.listBuckets timeoutVar handle request responseFold)
 
@@ -840,7 +843,7 @@ listKeys bus@(ManagedBus { requestTimeout }) request responseFold = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    isUnknownMessageCodeError
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.listKeys timeoutVar handle request responseFold)
 
@@ -855,7 +858,7 @@ mapReduce bus@(ManagedBus { requestTimeout }) request responseFold = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    isUnknownMessageCodeError
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.mapReduce timeoutVar handle request responseFold)
 
@@ -879,7 +882,9 @@ put bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    (\err ->
+      isAllNodesDownError err ||
+      isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.put timeoutVar handle request)
 
@@ -891,8 +896,11 @@ putIndex bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.putIndex timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.putIndex timeoutVar handle request)
 
 putSchema ::
      ManagedBus
@@ -902,8 +910,11 @@ putSchema bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.putSchema timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.putSchema timeoutVar handle request)
 
 resetBucket ::
      ManagedBus
@@ -946,8 +957,11 @@ search bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.search timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.search timeoutVar handle request)
 
 secondaryIndex ::
      ManagedBus
@@ -961,8 +975,8 @@ secondaryIndex bus@(ManagedBus { requestTimeout }) request responseFold = do
   retrying
     timeoutVar
     (\err ->
-      isInsufficientNodesError err ||
-      isUnknownMessageCode err)
+      isInsufficientVnodesError0 err ||
+      isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.secondaryIndex timeoutVar handle request responseFold)
 
@@ -976,7 +990,9 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    isUnknownMessageCode
+    (\err ->
+      isAllNodesDownError err ||
+      isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.updateCrdt timeoutVar handle request)
 
