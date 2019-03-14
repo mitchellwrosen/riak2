@@ -95,6 +95,7 @@ module RiakManagedBus
 import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
+import RiakError          (isInsufficientNodesError, isUnknownMessageCode)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -828,8 +829,11 @@ listKeys bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.listKeys timeoutVar handle request responseFold
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.listKeys timeoutVar handle request responseFold)
 
 mapReduce ::
      ManagedBus
@@ -939,8 +943,13 @@ secondaryIndex bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.secondaryIndex timeoutVar handle request responseFold
+  retrying
+    timeoutVar
+    (\err ->
+      isInsufficientNodesError err ||
+      isUnknownMessageCode err)
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.secondaryIndex timeoutVar handle request responseFold)
 
 updateCrdt ::
      ManagedBus -- ^
@@ -952,3 +961,42 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
 
   withHandle timeoutVar bus $ \timeoutVar handle ->
     Handle.updateCrdt timeoutVar handle request
+
+retrying ::
+     forall r.
+     TVar Bool
+  -> (ByteString -> Bool)
+  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either ByteString r))
+retrying timeoutVar shouldRetry action =
+  retrying_ timeoutVar shouldRetry action (1*1000*1000)
+
+retrying_ ::
+     forall r.
+     TVar Bool
+  -> (ByteString -> Bool)
+  -> IO (Either ManagedBusError (Either ByteString r))
+  -> Int
+  -> IO (Either ManagedBusError (Either ByteString r))
+retrying_ timeoutVar shouldRetry action =
+  loop
+
+  where
+    loop :: Int -> IO (Either ManagedBusError (Either ByteString r))
+    loop sleepMicros =
+      action >>= \case
+        Right (Left err) | shouldRetry err -> do
+          sleepVar :: TVar Bool <-
+            registerDelay sleepMicros
+
+          atomicallyIO $
+            (readTVar sleepVar >>= \case
+              False -> retry
+              True -> pure (loop (sleepMicros * 2)))
+            <|>
+            (readTVar timeoutVar >>= \case
+              False -> retry
+              True -> pure (pure (Left ManagedBusTimeoutError)))
+
+        result ->
+          pure result

@@ -2,7 +2,6 @@ module RiakHandle
   ( Handle(..)
   , HandleConfig(..)
   , EventHandlers(..)
-  , HandleError(..)
   , createHandle
   , delete
   , deleteIndex
@@ -28,9 +27,10 @@ module RiakHandle
   , updateCrdt
   ) where
 
-import RiakBusPool    (BusPool, createBusPool)
-import RiakManagedBus (EventHandlers(..), ManagedBus, ManagedBusError(..))
-import RiakUtils      (difftimeToMicros)
+import RiakBusPool     (BusPool, createBusPool)
+import RiakHandleError (HandleError(..))
+import RiakManagedBus  (EventHandlers(..), ManagedBus, ManagedBusError(..))
+import RiakUtils       (difftimeToMicros)
 
 import qualified RiakBusPool    as BusPool
 import qualified RiakManagedBus as ManagedBus
@@ -81,14 +81,6 @@ data HandleConfig
   , retries :: Natural
   , handlers :: EventHandlers
   }
-
-data HandleError :: Type where
-  -- | A request timed out waiting for a handle to become connected.
-  HandleTimeoutError :: HandleError
-  -- | A request was attempted the maximum number of times.
-  HandleRetryError :: HandleError
-  deriving stock (Eq, Show)
-
 
 -- | Create a handle.
 --

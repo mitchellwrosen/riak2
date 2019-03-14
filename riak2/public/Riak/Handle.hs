@@ -7,3 +7,4 @@ module Riak.Handle
   ) where
 
 import RiakHandle
+import RiakHandleError (HandleError(..))

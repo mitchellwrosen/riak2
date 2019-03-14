@@ -200,6 +200,7 @@ library riak2-internal
     RiakError
     RiakGetOpts
     RiakHandle
+    RiakHandleError
     RiakHyperLogLog
     RiakHyperLogLogBucketProps
     RiakIndex

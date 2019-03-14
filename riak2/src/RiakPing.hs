@@ -2,7 +2,8 @@ module RiakPing
   ( ping
   ) where
 
-import RiakHandle (Handle, HandleError)
+import RiakHandle      (Handle)
+import RiakHandleError (HandleError)
 
 import qualified RiakHandle as Handle
 

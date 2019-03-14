@@ -9,8 +9,9 @@ module RiakMapReduce
   , mapReduceSearch
   ) where
 
-import RiakBucket (Bucket)
-import RiakHandle (Handle, HandleError)
+import RiakBucket      (Bucket)
+import RiakHandle      (Handle)
+import RiakHandleError (HandleError)
 
 import RiakBinaryIndexQuery (BinaryIndexQuery)
 import RiakErlangTerm       (ErlangTerm(..))

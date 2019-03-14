@@ -8,15 +8,16 @@ module RiakMap
   , mapValue
   ) where
 
-import RiakContext  (Context(..), newContext)
-import RiakCrdt     (parseGetCrdtError, parseUpdateCrdtError)
+import RiakContext     (Context(..), newContext)
+import RiakCrdt        (parseGetCrdtError, parseUpdateCrdtError)
 import RiakError
-import RiakGetOpts  (GetOpts)
-import RiakHandle   (Handle, HandleError)
-import RiakKey      (Key(..), isGeneratedKey)
-import RiakMapValue (ConvergentMapValue(..), emptyMapValue)
-import RiakPutOpts  (PutOpts)
-import RiakUtils    (retrying)
+import RiakGetOpts     (GetOpts)
+import RiakHandle      (Handle)
+import RiakHandleError (HandleError)
+import RiakKey         (Key(..), isGeneratedKey)
+import RiakMapValue    (ConvergentMapValue(..), emptyMapValue)
+import RiakPutOpts     (PutOpts)
+import RiakUtils       (retrying)
 
 import qualified RiakGetOpts  as GetOpts
 import qualified RiakHandle   as Handle

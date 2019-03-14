@@ -7,16 +7,13 @@ import RiakBucketTypeInternal (BucketType, defaultBucketType)
 import RiakIndexName          (IndexName)
 import RiakKeyInternal        (Key)
 
-import qualified RiakHandle as Handle (HandleError)
+import qualified RiakHandleError as HandleError (HandleError)
 
 import qualified Data.Attoparsec.ByteString       as Atto (Parser)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString                  as ByteString
 
 
--- TODO retry on insufficient vnodes
---        - list keys
---
 -- TODO get "{insufficient_vnodes,0,need,2}"
 -- TODO get "{pr_val_unsatisfied,3,2}"
 -- TODO put/delete "{pw_val_unsatisfied,3,2}"
@@ -55,11 +52,6 @@ data Error :: Op -> Type where
     -> [Bucket]
     -> Error op
 
-  -- | Insufficient nodes are available to service the request.
-  InsufficientNodesError ::
-       MayReturnInsufficientNodes op ~ 'True
-    => Error op
-
   InvalidBucketError ::
        MayReturnInvalidBucket op ~ 'True
     => Bucket
@@ -86,6 +78,8 @@ data Error :: Op -> Type where
     -> Error 'PutSchemaOp
 
   -- | Riak is overloaded.
+  --
+  -- TODO retry on overload
   OverloadError ::
        MayReturnOverload op ~ 'True
     => Error op
@@ -104,9 +98,9 @@ data Error :: Op -> Type where
   SchemaDoesNotExistError ::
        Error 'PutIndexOp
 
-  -- | An error was returned by the underlying handle, not Riak itself.
+  -- | An error was returned by the underlying handle.
   HandleError ::
-       Handle.HandleError
+       HandleError.HandleError
     -> Error op
 
   -- | An error was returned by Riak, but this library couldn't parse it. Please
@@ -202,10 +196,6 @@ type family MayReturnIndexHasAssociatedBuckets  (op :: Op) :: Bool where
   MayReturnIndexHasAssociatedBuckets 'DeleteIndexOp = 'True
   MayReturnIndexHasAssociatedBuckets 'PutIndexOp    = 'True
   MayReturnIndexHasAssociatedBuckets _              = 'False
-
-type family MayReturnInsufficientNodes (op :: Op) :: Bool where
-  MayReturnInsufficientNodes 'SecondaryIndexQueryOp = 'True
-  MayReturnInsufficientNodes _                      = 'False
 
 type family MayReturnInvalidBucket (op :: Op) :: Bool where
   MayReturnInvalidBucket 'PutOp = 'True

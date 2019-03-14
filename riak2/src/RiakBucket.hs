@@ -26,7 +26,8 @@ import RiakBucketInternal         (Bucket(..))
 import RiakBucketType             (BucketType, coerceGetBucketError)
 import RiakCounterBucketProps     (CounterBucketProps)
 import RiakError
-import RiakHandle                 (Handle, HandleError)
+import RiakHandle                 (Handle)
+import RiakHandleError            (HandleError)
 import RiakHyperLogLogBucketProps (HyperLogLogBucketProps)
 import RiakIndexName              (IndexName(..))
 import RiakIntIndexQuery          (IntIndexQuery(..))
@@ -34,7 +35,7 @@ import RiakKey                    (Key(..))
 import RiakMapBucketProps         (MapBucketProps)
 import RiakSetBucketProps         (SetBucketProps)
 import RiakSomeBucketProps        (SomeBucketProps(..))
-import RiakUtils                  (bs2int, int2bs, retrying)
+import RiakUtils                  (bs2int, int2bs)
 
 import qualified RiakBinaryIndexQuery as BinaryIndexQuery
 import qualified RiakBucketType       as BucketType
@@ -565,7 +566,11 @@ queryIntIndexTerms ::
   -> IntIndexQuery -- ^
   -> FoldM IO (Int64, Key) r -- ^
   -> m (Either QueryRangeError r)
-queryIntIndexTerms handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
+queryIntIndexTerms
+    handle
+    IntIndexQuery { bucket, index, minValue, maxValue }
+    keyFold = liftIO $
+
   doIndex
     handle
     bucket
@@ -606,24 +611,14 @@ doIndex ::
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either (Error 'SecondaryIndexQueryOp) r)
-doIndex handle bucket request responseFold =
-  retrying 1000000 (doIndex_ handle bucket request responseFold)
-
-doIndex_ ::
-     forall r.
-     Handle
-  -> Bucket
-  -> Proto.RpbIndexReq
-  -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
-doIndex_ handle bucket =
+doIndex handle bucket =
   loop
 
   where
     loop ::
          Proto.RpbIndexReq
       -> FoldM IO Proto.RpbIndexResp r
-      -> IO (Maybe (Either (Error 'SecondaryIndexQueryOp) r))
+      -> IO (Either (Error 'SecondaryIndexQueryOp) r)
     loop request responseFold = do
       result :: Either HandleError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
@@ -633,15 +628,15 @@ doIndex_ handle bucket =
 
       case result of
         Left err ->
-          pure (Just (Left (HandleError err)))
+          pure (Left (HandleError err))
 
         Right (Left err) ->
-          pure (Left <$> parseSecondaryIndexQueryError bucket err)
+          pure (Left (parseSecondaryIndexQueryError bucket err))
 
         Right (Right (nextResponseFold, continuation)) ->
           case continuation of
             Nothing ->
-              Just . Right <$> extractM nextResponseFold
+              Right <$> extractM nextResponseFold
 
             Just continuation -> do
               loop
@@ -651,16 +646,12 @@ doIndex_ handle bucket =
 parseSecondaryIndexQueryError ::
      Bucket
   -> ByteString
-  -> Maybe (Error 'SecondaryIndexQueryOp)
+  -> Error 'SecondaryIndexQueryOp
 parseSecondaryIndexQueryError bucket err
-  | isInsufficientNodesError err =
-      Just InsufficientNodesError
   | isSecondaryIndexesNotSupportedError err =
-      Just (SecondaryIndexesNotSupportedError bucket)
-  | isUnknownMessageCode err =
-      Nothing
+      SecondaryIndexesNotSupportedError bucket
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
 
 doIndexPage ::
@@ -714,31 +705,17 @@ listKeys handle bucket =
 --
 -- /See also/: 'listKeys'
 streamKeys ::
+     forall m r.
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> m (Either ListKeysError r)
-streamKeys handle bucket keyFold =
-  liftIO (retrying 1000000 (streamKeys_ handle bucket keyFold))
-
-streamKeys_ ::
-     Handle
-  -> Bucket
-  -> FoldM IO Key r
-  -> IO (Maybe (Either ListKeysError r))
-streamKeys_ handle b@(Bucket bucketType bucket) keyFold =
-  doRequest >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseListKeysError bucketType err)
-
-    Right (Right response) ->
-      pure (Just (Right response))
+streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
+  fromResult <$> doRequest
 
   where
+    doRequest :: IO (Either HandleError (Either ByteString r))
     doRequest =
       Handle.listKeys
         handle
@@ -747,20 +724,31 @@ streamKeys_ handle b@(Bucket bucketType bucket) keyFold =
           (Proto.keys . folded . to (Key bucketType bucket))
           keyFold)
 
+    fromResult ::
+         Either HandleError (Either ByteString r)
+      -> Either ListKeysError r
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseListKeysError bucketType err)
+
+      Right (Right response) ->
+        Right response
+
     request :: Proto.RpbListKeysReq
     request =
       Proto.defMessage
         & setProto b
         -- TODO stream keys timeout
 
-parseListKeysError :: ByteString -> ByteString -> Maybe ListKeysError
+parseListKeysError :: ByteString -> ByteString -> ListKeysError
 parseListKeysError bucketType err
   | isBucketTypeDoesNotExistError4 err =
-      Just (BucketTypeDoesNotExistError bucketType)
-  | isUnknownMessageCode err =
-      Nothing
+      BucketTypeDoesNotExistError bucketType
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
 fromProto ::
      ( HasLens' a "bucket" ByteString
