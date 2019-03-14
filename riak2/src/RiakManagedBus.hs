@@ -391,7 +391,7 @@ connect
           void (tryAny (onConnectError handlers err))
           debug uuid generation (show err ++ ", reconnecting in " ++ show seconds)
           sleep seconds
-          connectLoop generation (seconds * 1.5)
+          connectLoop generation (seconds * 2)
 
         Right handle -> do
           debug uuid generation "connected, pinging until healthy"
@@ -405,12 +405,12 @@ connect
             show err ++ ", reconnecting in " ++ show seconds
           void (Handle.disconnect handle)
           sleep seconds
-          connectLoop generation (seconds * 1.5)
+          connectLoop generation (seconds * 2)
 
         Right (Left err) -> do
           debug uuid generation (show err ++ ", pinging in " ++ show seconds)
           sleep seconds
-          pingLoop handle generation (seconds * 1.5)
+          pingLoop handle generation (seconds * 2)
 
         Right (Right _) -> do
           atomically (writeTVar stateVar (Connected handle Healthy))
@@ -555,7 +555,7 @@ monitorHealth
                   Right (Left err) -> do
                     debug uuid generation $
                       "ping failed: " ++ show err ++ ", retrying in " ++ show seconds
-                    pingLoop (seconds * 1.5)
+                    pingLoop (seconds * 2)
 
                   Right (Right _) ->
                     maybeMonitorLoop
