@@ -14,9 +14,6 @@ import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString                  as ByteString
 
 
--- TODO get "{pr_val_unsatisfied,3,2}"
--- TODO put/delete "{pw_val_unsatisfied,3,2}"
-
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.
 --
@@ -351,9 +348,13 @@ isOverloadError :: ByteString -> Bool
 isOverloadError =
   (== "overload")
 
--- isPrValUnsatisfied :: ByteString -> Bool
--- isPrValUnsatisfied =
-  -- TODO get "{pr_val_unsatisfied,3,2}"
+isPrValUnsatisfied :: ByteString -> Bool
+isPrValUnsatisfied =
+  ByteString.isPrefixOf "{pr_val_unsatisfied"
+
+isPwValUnsatisfied :: ByteString -> Bool
+isPwValUnsatisfied =
+  ByteString.isPrefixOf "{pw_val_unsatisfied"
 
 isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =

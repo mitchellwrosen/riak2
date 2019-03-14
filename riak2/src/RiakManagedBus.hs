@@ -95,8 +95,8 @@ import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakError          (isAllNodesDownError, isInsufficientVnodesError0,
-                           isInsufficientVnodesError1,
-                           isUnknownMessageCodeError)
+                           isInsufficientVnodesError1, isPrValUnsatisfied,
+                           isPwValUnsatisfied, isUnknownMessageCodeError)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -737,6 +737,7 @@ get bus@(ManagedBus { requestTimeout }) request = do
     timeoutVar
     (\err ->
       isInsufficientVnodesError1 err ||
+      isPrValUnsatisfied err ||
       isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.get timeoutVar handle request)
@@ -775,6 +776,7 @@ getCrdt bus@(ManagedBus { requestTimeout }) request = do
     timeoutVar
     (\err ->
       isInsufficientVnodesError1 err ||
+      isPrValUnsatisfied err ||
       isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.getCrdt timeoutVar handle request)
@@ -884,6 +886,7 @@ put bus@(ManagedBus { requestTimeout }) request = do
     timeoutVar
     (\err ->
       isAllNodesDownError err ||
+      isPwValUnsatisfied err ||
       isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.put timeoutVar handle request)
@@ -992,6 +995,7 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
     timeoutVar
     (\err ->
       isAllNodesDownError err ||
+      isPwValUnsatisfied err ||
       isUnknownMessageCodeError err)
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.updateCrdt timeoutVar handle request)
