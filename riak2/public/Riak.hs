@@ -58,10 +58,11 @@ module Riak
   , listKeys
   , streamKeys
     -- * MapReduce operations
+  , mapReduceKeys
   , mapReduceBucket
   , mapReduceBinaryIndex
   , mapReduceIntIndex
-  , mapReduceKeys
+  , mapReduceSearch
     -- * Search operations
   , search
     -- ** Search schema

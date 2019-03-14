@@ -2,10 +2,11 @@
 -- TODO better map reduce fold types
 
 module RiakMapReduce
-  ( mapReduceBucket
+  ( mapReduceKeys
+  , mapReduceBucket
   , mapReduceBinaryIndex
   , mapReduceIntIndex
-  , mapReduceKeys
+  , mapReduceSearch
   ) where
 
 import RiakBucket (Bucket)
@@ -14,6 +15,7 @@ import RiakHandle (Handle, HandleError)
 import RiakBinaryIndexQuery (BinaryIndexQuery)
 import RiakErlangTerm       (ErlangTerm(..))
 import RiakError
+import RiakIndexName        (IndexName)
 import RiakIntIndexQuery    (IntIndexQuery)
 import RiakKey              (Key)
 import RiakMapReduceInput   (MapReduceInput(..))
@@ -33,6 +35,20 @@ import qualified Data.Riak.Proto as Proto
 import qualified Data.Vector     as Vector
 
 
+-- | Perform a MapReduce job over a list of keys.
+--
+-- TODO test mapReduceKeys
+-- TODO MapReduceKeysError
+mapReduceKeys ::
+     MonadIO m
+  => Handle -- ^
+  -> [Key] -- ^
+  -> [MapReducePhase] -- ^
+  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> m (Either HandleError (Either ByteString r))
+mapReduceKeys handle keys phases responseFold = liftIO $
+  doMapReduce handle (MapReduceInputKeys keys) phases responseFold
+
 -- | Perform a MapReduce job over all keys in a bucket.
 --
 -- /Note/: This is an extremely expensive operation, and should not be used on a
@@ -47,7 +63,7 @@ mapReduceBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> [MapReducePhase]
+  -> [MapReducePhase] -- ^
   -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either MapReduceBucketError r)
 mapReduceBucket handle bucket phases responseFold = liftIO $
@@ -80,7 +96,7 @@ mapReduceBinaryIndex ::
      MonadIO m
   => Handle -- ^
   -> BinaryIndexQuery -- ^
-  -> [MapReducePhase]
+  -> [MapReducePhase] -- ^
   -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either MapReduceBinaryIndexError r)
 mapReduceBinaryIndex handle query phases responseFold = liftIO $
@@ -114,7 +130,7 @@ mapReduceIntIndex ::
      MonadIO m
   => Handle -- ^
   -> IntIndexQuery -- ^
-  -> [MapReducePhase]
+  -> [MapReducePhase] -- ^
   -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either MapReduceIntIndexError r)
 mapReduceIntIndex handle query phases responseFold = liftIO $
@@ -139,19 +155,21 @@ parseMapReduceIntIndexError :: ByteString -> MapReduceIntIndexError
 parseMapReduceIntIndexError err =
   UnknownError (decodeUtf8 err)
 
--- | Perform a MapReduce job over a list of keys.
+-- | Perform a MapReduce job over the results of a search query.
 --
--- TODO test mapReduceKeys
--- TODO MapReduceKeysError
-mapReduceKeys ::
+-- -- TODO test mapReduceSearch
+-- -- TODO MapReduceSearchError
+-- -- TODO oops, for mapReduceSearch UnknownMessageCode might refer to yokozuna
+mapReduceSearch ::
      MonadIO m
   => Handle -- ^
-  -> [Key] -- ^
-  -> [MapReducePhase]
+  -> IndexName -- ^
+  -> ByteString -- ^ Search query
+  -> [MapReducePhase] -- ^
   -> FoldM IO Proto.RpbMapRedResp r -- ^
   -> m (Either HandleError (Either ByteString r))
-mapReduceKeys handle keys phases responseFold = liftIO $
-  doMapReduce handle (MapReduceInputKeys keys) phases responseFold
+mapReduceSearch handle index query phases responseFold = liftIO $
+  doMapReduce handle (MapReduceInputSearch index query) phases responseFold
 
 doMapReduce ::
      Handle

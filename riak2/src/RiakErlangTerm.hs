@@ -7,8 +7,6 @@ module RiakErlangTerm
   , build
   , decode
     -- ** Smart constructors
-  , atomModfun
-  , atomNone
   , bool
   , tuple2
   , tuple3
@@ -198,14 +196,6 @@ bytes32 :: ByteString -> Builder
 bytes32 bytes =
   Builder.int32BE (fromIntegral (ByteString.length bytes)) <>
     Builder.byteString bytes
-
-atomModfun :: ErlangTerm
-atomModfun =
-  ErlAtomUtf8 "modfun"
-
-atomNone :: ErlangTerm
-atomNone =
-  ErlAtomUtf8 "none"
 
 bool :: Bool -> ErlangTerm
 bool = \case

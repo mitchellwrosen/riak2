@@ -4,10 +4,11 @@
 -- * <https://docs.basho.com/riak/kv/2.2.3/developing/api/protocol-buffers/mapreduce/>
 
 module Riak.MapReduce
-  ( mapReduceBucket
+  ( mapReduceKeys
+  , mapReduceBucket
   , mapReduceBinaryIndex
   , mapReduceIntIndex
-  , mapReduceKeys
+  , mapReduceSearch
   , MapReducePhase(..)
   , MapReduceFunction(..)
   ) where

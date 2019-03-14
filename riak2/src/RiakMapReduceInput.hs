@@ -6,12 +6,15 @@ module RiakMapReduceInput
 import RiakBinaryIndexQuery (BinaryIndexQuery(..))
 import RiakBucket           (Bucket(..))
 import RiakErlangTerm       (ErlangTerm(..))
+import RiakIndexName        (IndexName(..))
 import RiakIntIndexQuery    (IntIndexQuery(..))
 import RiakKey              (Key(..))
 import RiakUtils            (int2bs)
 
-import qualified RiakBinaryIndexQuery    as BinaryIndexQuery
-import qualified RiakErlangTerm          as Erlang
+import qualified RiakBinaryIndexQuery as BinaryIndexQuery
+import qualified RiakErlangTerm       as Erlang
+
+import Data.Text.Encoding (encodeUtf8)
 
 import qualified Data.Vector as Vector
 
@@ -22,8 +25,10 @@ data MapReduceInput
   | MapReduceInputFunction Text Text
   | MapReduceInputIntIndexQuery IntIndexQuery
   | MapReduceInputBinaryIndexQuery BinaryIndexQuery
-  -- TODO MapReduceInputSearch
-  -- see riak_kv_mapred_term.erl
+  | MapReduceInputSearch IndexName ByteString
+  -- TODO search input can take a list of "key filters"
+
+  -- TODO "bucket name and keyfilter spec"??? riak_kv_mrc_pipe.erl
 
 toErlangTerm :: MapReduceInput -> ErlangTerm
 toErlangTerm = \case
@@ -39,7 +44,7 @@ toErlangTerm = \case
           (Erlang.tuple2
             (Erlang.tuple2 (ErlBinary bucketType) (ErlBinary bucket))
             (ErlBinary key))
-          Erlang.atomNone
+          atomNone
 
     in
       Erlang.list (Vector.fromList (map keyToTerm keys))
@@ -47,7 +52,7 @@ toErlangTerm = \case
   -- {modfun, Module, Function, _Options}
   MapReduceInputFunction m f ->
     Erlang.tuple4
-      Erlang.atomModfun
+      atomModfun
       (ErlAtomUtf8 m)
       (ErlAtomUtf8 f)
       (Erlang.list Vector.empty)
@@ -57,6 +62,12 @@ toErlangTerm = \case
 
   MapReduceInputBinaryIndexQuery query ->
     binaryIndexQueryToErlangTerm query
+
+  MapReduceInputSearch index query ->
+    Erlang.tuple3
+      atomSearch
+      (ErlBinary (encodeUtf8 (unIndexName index)))
+      (ErlBinary query)
 
 intIndexQueryToErlangTerm :: IntIndexQuery -> ErlangTerm
 intIndexQueryToErlangTerm IntIndexQuery { bucket, index, minValue, maxValue } =
@@ -106,3 +117,15 @@ rangeQueryToErlangTerm bucket index minValue maxValue =
 atomIndex :: ErlangTerm
 atomIndex =
   ErlAtomUtf8 "index"
+
+atomModfun :: ErlangTerm
+atomModfun =
+  ErlAtomUtf8 "modfun"
+
+atomNone :: ErlangTerm
+atomNone =
+  ErlAtomUtf8 "none"
+
+atomSearch :: ErlangTerm
+atomSearch =
+  ErlAtomUtf8 "search"

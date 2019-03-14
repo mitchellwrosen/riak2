@@ -396,8 +396,6 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
         & Proto.type' .~ bucketType
 
 -- | Perform a query on a binary secondary index.
---
--- Fetches results in batches of 50.
 queryBinaryIndex ::
      MonadIO m
   => Handle -- ^
@@ -424,14 +422,14 @@ queryBinaryIndex
             & setProto bucket
             & Proto.index .~ BinaryIndexQuery.indexName query
             & Proto.key .~ minValue
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.qtype .~ Proto.RpbIndexReq'eq
             & Proto.stream .~ True
         else
           Proto.defMessage
             & setProto bucket
             & Proto.index .~ BinaryIndexQuery.indexName query
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.rangeMax .~ maxValue
             & Proto.rangeMin .~ minValue
             & Proto.qtype .~ Proto.RpbIndexReq'range
@@ -448,8 +446,6 @@ queryBinaryIndex
           Key bucketType bucket
 
 -- | Perform a query on a binary secondary index.
---
--- Fetches results in batches of 50.
 queryBinaryIndexTerms ::
      MonadIO m
   => Handle -- ^
@@ -476,7 +472,7 @@ queryBinaryIndexTerms
             & setProto bucket
             & Proto.index .~ index
             & Proto.key .~ minValue
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.qtype .~ Proto.RpbIndexReq'eq
             & Proto.stream .~ True
       else if index == builtinKeyIndex
@@ -484,7 +480,7 @@ queryBinaryIndexTerms
           Proto.defMessage
             & setProto bucket
             & Proto.index .~ builtinKeyIndex
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.qtype .~ Proto.RpbIndexReq'range
             & Proto.rangeMin .~ minValue
             & Proto.rangeMax .~ maxValue
@@ -494,7 +490,7 @@ queryBinaryIndexTerms
           Proto.defMessage
             & setProto bucket
             & Proto.index .~ (index <> "_bin")
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.qtype .~ Proto.RpbIndexReq'range
             & Proto.rangeMin .~ minValue
             & Proto.rangeMax .~ maxValue
@@ -517,8 +513,6 @@ queryBinaryIndexTerms
       bucket
 
 -- | Perform a query on an integer secondary index.
---
--- Fetches results in batches of 50.
 queryIntIndex ::
      MonadIO m
   => Handle -- ^
@@ -541,14 +535,14 @@ queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold
             & setProto bucket
             & Proto.index .~ (index <> "_int")
             & Proto.key .~ int2bs minValue
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.qtype .~ Proto.RpbIndexReq'eq
             & Proto.stream .~ True
         else
           Proto.defMessage
             & setProto bucket
             & Proto.index .~ (index <> "_int")
-            & Proto.maxResults .~ 50 -- TODO configure page size
+            & Proto.maxResults .~ 100
             & Proto.qtype .~ Proto.RpbIndexReq'range
             & Proto.rangeMax .~ int2bs maxValue
             & Proto.rangeMin .~ int2bs minValue
@@ -565,8 +559,6 @@ queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold
           Key bucketType bucket
 
 -- | Perform a query on an integer secondary index.
---
--- Fetches results in batches of 50.
 queryIntIndexTerms ::
      MonadIO m
   => Handle -- ^
@@ -586,7 +578,7 @@ queryIntIndexTerms handle IntIndexQuery { bucket, index, minValue, maxValue } ke
       Proto.defMessage
         & setProto bucket
         & Proto.index .~ (index <> "_int")
-        & Proto.maxResults .~ 50 -- TODO configure page size
+        & Proto.maxResults .~ 100
         & Proto.rangeMax .~ int2bs maxValue
         & Proto.rangeMin .~ int2bs minValue
         & Proto.returnTerms .~ True
