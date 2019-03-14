@@ -6,16 +6,16 @@ module RiakCounter
 
 import RiakCrdt
 import RiakError
-import RiakGetOpts (GetOpts(..))
+import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
 import RiakKey     (Key(..))
-import RiakPutOpts (PutOpts(..))
-import RiakUtils   (difftimeToMillis, retrying)
+import RiakPutOpts (PutOpts)
+import RiakUtils   (retrying)
 
-import qualified RiakGetOpts     as GetOpts
-import qualified RiakHandle      as Handle
-import qualified RiakKey         as Key
-import qualified RiakWriteQuorum as WriteQuorum
+import qualified RiakGetOpts as GetOpts
+import qualified RiakHandle  as Handle
+import qualified RiakKey     as Key
+import qualified RiakPutOpts as PutOpts
 
 import Control.Lens ((.~), (^.))
 
@@ -103,7 +103,7 @@ updateCounter_ ::
 updateCounter_
     handle
     (ConvergentCounter key@(Key bucketType _ _) value)
-    (PutOpts nodes quorum timeout) =
+    opts =
 
   Handle.updateCrdt handle request >>= \case
     Left err ->
@@ -120,15 +120,13 @@ updateCounter_
     request =
       Proto.defMessage
         & Key.setMaybeProto key
-        & WriteQuorum.setProto quorum
-        & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
         & Proto.op .~
             (Proto.defMessage
               & Proto.counterOp .~
                   (Proto.defMessage
                     & Proto.increment .~ value))
         & Proto.returnBody .~ True
+        & PutOpts.setProto opts
 
     fromResponse ::
          Proto.DtUpdateResp

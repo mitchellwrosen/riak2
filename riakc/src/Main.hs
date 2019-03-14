@@ -591,9 +591,7 @@ putParser =
     <*> optional encodingOption
     <*> many secondaryIndexOption
     <*> optional contextOption
-    <*> optional nodesOption
-    <*> writeQuorumOption
-    <*> optional timeoutOption
+    <*> putOptsOption
   where
     doPut ::
          Either Bucket Key
@@ -603,12 +601,10 @@ putParser =
       -> Maybe ByteString
       -> [SecondaryIndex]
       -> Maybe Context
-      -> Maybe Natural
-      -> Maybe WriteQuorum
-      -> Maybe NominalDiffTime
+      -> PutOpts
       -> Handle
       -> IO ()
-    doPut bucketOrKey val type' charset encoding indexes context nodes quorum timeout handle =
+    doPut bucketOrKey val type' charset encoding indexes context opts handle =
       put handle object opts >>= \case
         Left err -> do
           print err
@@ -636,14 +632,6 @@ putParser =
                 case bucketOrKey of
                   Left bucket -> generatedKey bucket
                   Right key -> key
-            }
-
-        opts :: PutOpts
-        opts =
-          PutOpts
-            { nodes = nodes
-            , quorum = quorum
-            , timeout = timeout
             }
 
 putIndexParser :: Parser (Handle -> IO ())
@@ -682,15 +670,17 @@ putSetParser =
     <$> bucketOrKeyArgument
     <*> many (strArgument (help "Set element" <> metavar "VALUE"))
     <*> getOptsOption
+    <*> putOptsOption
 
   where
     doPutSet ::
          Either Bucket Key
       -> [ByteString]
       -> GetOpts
+      -> PutOpts
       -> Handle
       -> IO ()
-    doPutSet bucketOrKey value getOpts handle =
+    doPutSet bucketOrKey value getOpts putOpts handle =
       case bucketOrKey of
         Left bucket ->
           go (newSet (generatedKey bucket) HashSet.empty)
@@ -709,7 +699,7 @@ putSetParser =
       where
         go :: ConvergentSet ByteString -> IO ()
         go set =
-          putSet handle  set' >>= \case
+          putSet handle set' putOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -728,15 +718,17 @@ putMapParser =
     <$> bucketOrKeyArgument
     <*> (combineValues <$> many mapValueOption)
     <*> getOptsOption
+    <*> putOptsOption
 
   where
     doPutMap ::
          Either Bucket Key
       -> ConvergentMapValue
       -> GetOpts
+      -> PutOpts
       -> Handle
       -> IO ()
-    doPutMap bucketOrKey value getOpts handle =
+    doPutMap bucketOrKey value getOpts putOpts handle =
       case bucketOrKey of
         Left bucket ->
           go (newMap (generatedKey bucket) emptyMapValue)
@@ -756,7 +748,7 @@ putMapParser =
       where
         go :: ConvergentMap ConvergentMapValue -> IO ()
         go oldMap =
-          putMap handle (oldMap & mapValue .~ value) >>= \case
+          putMap handle (oldMap & mapValue .~ value) putOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -1324,6 +1316,13 @@ keyArgument =
 nodesOption :: Parser Natural
 nodesOption =
   option auto (help "Number of nodes" <> long "nodes" <> metavar "NODES")
+
+putOptsOption :: Parser PutOpts
+putOptsOption =
+  PutOpts
+    <$> optional nodesOption
+    <*> writeQuorumOption
+    <*> optional timeoutOption
 
 readQuorumOption :: Parser (Maybe ReadQuorum)
 readQuorumOption =

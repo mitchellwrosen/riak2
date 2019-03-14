@@ -15,12 +15,14 @@ import RiakGetOpts  (GetOpts)
 import RiakHandle   (Handle, HandleError)
 import RiakKey      (Key(..), isGeneratedKey)
 import RiakMapValue (ConvergentMapValue(..), emptyMapValue)
+import RiakPutOpts  (PutOpts)
 import RiakUtils    (retrying)
 
 import qualified RiakGetOpts  as GetOpts
 import qualified RiakHandle   as Handle
 import qualified RiakKey      as Key
 import qualified RiakMapValue as MapValue
+import qualified RiakPutOpts  as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
@@ -125,17 +127,20 @@ putMap ::
      MonadIO m
   => Handle -- ^
   -> ConvergentMap ConvergentMapValue -- ^
+  -> PutOpts
   -> m (Either PutMapError (ConvergentMap ConvergentMapValue))
-putMap handle value =
-  liftIO (retrying 1000000 (putMap_ handle value))
+putMap handle value opts =
+  liftIO (retrying 1000000 (putMap_ handle value opts))
 
 putMap_ ::
-     Handle -- ^
-  -> ConvergentMap ConvergentMapValue -- ^
+     Handle
+  -> ConvergentMap ConvergentMapValue
+  -> PutOpts
   -> IO (Maybe (Either PutMapError (ConvergentMap ConvergentMapValue)))
 putMap_
     handle
-    (ConvergentMap context key@(Key bucketType _ _) newValue oldValue) =
+    (ConvergentMap context key@(Key bucketType _ _) newValue oldValue)
+    opts =
 
   Handle.updateCrdt handle request >>= \case
     Left err ->
@@ -160,14 +165,7 @@ putMap_
             (Proto.defMessage
               & Proto.mapOp .~ MapValue.toProto newValue oldValue)
         & Proto.returnBody .~ True
-
--- TODO map update opts
--- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'dw :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'pw :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'timeout :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
--- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
+        & PutOpts.setProto opts
 
     fromResponse ::
          Proto.DtUpdateResp

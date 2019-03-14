@@ -1,9 +1,16 @@
 module RiakPutOpts where
 
+import RiakUtils       (difftimeToMillis)
 import RiakWriteQuorum (WriteQuorum)
 
-import Data.Default.Class (Default(..))
-import Data.Time          (NominalDiffTime)
+import qualified RiakWriteQuorum as WriteQuorum
+
+import Control.Lens                       ((.~))
+import Data.Default.Class                 (Default(..))
+import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
+import Data.Time                          (NominalDiffTime)
+
+import qualified Data.Riak.Proto as Proto
 
 
 data PutOpts
@@ -22,3 +29,17 @@ instance Default PutOpts where
       , timeout = Nothing
       }
 
+setProto ::
+     ( HasLens' a "dw" Word32
+     , HasLens' a "maybe'nVal" (Maybe Word32)
+     , HasLens' a "maybe'timeout" (Maybe Word32)
+     , HasLens' a "pw" Word32
+     , HasLens' a "w" Word32
+     )
+  => PutOpts
+  -> a
+  -> a
+setProto PutOpts { nodes, quorum, timeout } =
+  WriteQuorum.setProto quorum .
+  (Proto.maybe'nVal .~ (fromIntegral <$> nodes)) .
+  (Proto.maybe'timeout .~ (difftimeToMillis <$> timeout))

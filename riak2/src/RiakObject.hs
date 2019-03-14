@@ -11,18 +11,18 @@ import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
 import RiakKey     (Key(..))
-import RiakPutOpts (PutOpts(..))
+import RiakPutOpts (PutOpts)
 import RiakSibling (Sibling(..))
-import RiakUtils   (difftimeToMillis, retrying)
+import RiakUtils   (retrying)
 
 import qualified RiakBucket         as Bucket
 import qualified RiakGetOpts        as GetOpts
 import qualified RiakHandle         as Handle
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
+import qualified RiakPutOpts        as PutOpts
 import qualified RiakSecondaryIndex as SecondaryIndex
 import qualified RiakSibling        as Sibling
-import qualified RiakWriteQuorum    as WriteQuorum
 
 import Control.Lens          ((.~), (^.))
 import Data.Generics.Product (field)
@@ -340,10 +340,9 @@ makePutRequest ::
   -> Proto.RpbPutReq
 makePutRequest
      Object { content = Content { charset, encoding, indexes, metadata, type', value }, context, key }
-     PutOpts { nodes, quorum, timeout } =
+     opts =
   Proto.defMessage
     & Key.setMaybeProto key
-    & WriteQuorum.setProto quorum
     & Proto.content .~
         (Proto.defMessage
           & Proto.Content.setMetadata metadata
@@ -353,12 +352,11 @@ makePutRequest
           & Proto.maybe'contentType .~ type'
           & Proto.value .~ value
         )
-    & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-    & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
     & Proto.maybe'vclock .~
         (if ByteString.null (unContext context)
           then Nothing
           else Just (unContext context))
+    & PutOpts.setProto opts
 
 -- | Delete an object.
 delete ::
@@ -367,7 +365,7 @@ delete ::
   -> Object a -- ^
   -> PutOpts -- ^
   -> m (Either PutError ())
-delete handle Object { context, key } PutOpts { nodes, quorum, timeout } = liftIO $
+delete handle Object { context, key } opts = liftIO $
   (() <$) <$> doPut handle request
 
   where
@@ -375,13 +373,11 @@ delete handle Object { context, key } PutOpts { nodes, quorum, timeout } = liftI
     request =
       Proto.defMessage
         & Key.setMaybeProto key
-        & WriteQuorum.setProto quorum
         & Proto.content .~
             (Proto.defMessage
               & Proto.deleted .~ True)
-        & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
-        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
         & Proto.maybe'vclock .~
             (if ByteString.null (unContext context)
               then Nothing
               else Just (unContext context))
+        & PutOpts.setProto opts

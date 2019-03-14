@@ -14,11 +14,13 @@ import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
 import RiakKey     (Key(..), isGeneratedKey)
+import RiakPutOpts (PutOpts)
 import RiakUtils   (retrying)
 
 import qualified RiakGetOpts as GetOpts
 import qualified RiakHandle  as Handle
 import qualified RiakKey     as Key
+import qualified RiakPutOpts as PutOpts
 
 import Control.Lens ((.~), (^.))
 
@@ -95,17 +97,20 @@ updateHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
+  -> PutOpts -- ^
   -> m (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64))
-updateHyperLogLog handle hll =
-  liftIO (retrying 1000000 (updateHyperLogLog_ handle hll))
+updateHyperLogLog handle hll opts =
+  liftIO (retrying 1000000 (updateHyperLogLog_ handle hll opts))
 
 updateHyperLogLog_ ::
      Handle
   -> ConvergentHyperLogLog [ByteString]
+  -> PutOpts
   -> IO (Maybe (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64)))
 updateHyperLogLog_
     handle
-    (ConvergentHyperLogLog key@(Key bucketType _ _) value) =
+    (ConvergentHyperLogLog key@(Key bucketType _ _) value)
+    opts =
 
   Handle.updateCrdt handle request >>= \case
     Left err ->
@@ -128,14 +133,7 @@ updateHyperLogLog_
                   (Proto.defMessage
                     & Proto.adds .~ value))
         & Proto.returnBody .~ True
-
--- TODO map update opts
--- _DtUpdateReq'w :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'dw :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'pw :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'timeout :: !(Prelude.Maybe Data.Word.Word32),
--- _DtUpdateReq'sloppyQuorum :: !(Prelude.Maybe Prelude.Bool),
--- _DtUpdateReq'nVal :: !(Prelude.Maybe Data.Word.Word32),
+        & PutOpts.setProto opts
 
     fromResponse :: Proto.DtUpdateResp -> ConvergentHyperLogLog Word64
     fromResponse response =
