@@ -59,6 +59,8 @@ module Riak
   , streamKeys
     -- * MapReduce operations
   , mapReduceBucket
+  , mapReduceBinaryIndex
+  , mapReduceIntIndex
   , mapReduceKeys
     -- * Search operations
   , search

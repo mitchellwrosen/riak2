@@ -5,8 +5,9 @@
 
 module Riak.MapReduce
   ( mapReduceBucket
+  , mapReduceBinaryIndex
+  , mapReduceIntIndex
   , mapReduceKeys
-    -- TODO map reduce functions for other input types
   , MapReducePhase(..)
   , MapReduceFunction(..)
   ) where

@@ -59,6 +59,8 @@
 --   After disconnecting,
 --     ==> [Connecting]
 
+-- TODO move 'retrying' logic into managed bus
+
 module RiakManagedBus
   ( ManagedBus
   , ManagedBusConfig(..)

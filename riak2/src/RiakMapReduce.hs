@@ -1,19 +1,24 @@
--- TODO map reduce functions for other input types
+-- TODO add modfun mapreduce
+-- TODO better map reduce fold types
 
 module RiakMapReduce
   ( mapReduceBucket
+  , mapReduceBinaryIndex
+  , mapReduceIntIndex
   , mapReduceKeys
   ) where
 
 import RiakBucket (Bucket)
 import RiakHandle (Handle, HandleError)
 
-import RiakErlangTerm     (ErlangTerm(..))
+import RiakBinaryIndexQuery (BinaryIndexQuery)
+import RiakErlangTerm       (ErlangTerm(..))
 import RiakError
-import RiakKey            (Key)
-import RiakMapReduceInput (MapReduceInput(..))
-import RiakMapReducePhase (MapReducePhase(..))
-import RiakUtils          (retrying)
+import RiakIntIndexQuery    (IntIndexQuery)
+import RiakKey              (Key)
+import RiakMapReduceInput   (MapReduceInput(..))
+import RiakMapReducePhase   (MapReducePhase(..))
+import RiakUtils            (retrying)
 
 import qualified RiakErlangTerm     as ErlangTerm
 import qualified RiakHandle         as Handle
@@ -34,7 +39,9 @@ import qualified Data.Vector     as Vector
 -- production cluster.
 --
 -- /Note/: If your backend supports secondary indexes, it is faster to use
--- 'mapReduceQueryExact' with the 'Riak.ExactQuery.inBucket' query.
+-- 'mapReduceBinaryIndex' with the 'Riak.SecondaryIndexQuery.inBucket' query.
+--
+-- TODO test mapReduceBucket
 mapReduceBucket ::
      forall m r.
      MonadIO m
@@ -65,7 +72,77 @@ parseMapReduceBucketError :: ByteString -> MapReduceBucketError
 parseMapReduceBucketError err =
   UnknownError (decodeUtf8 err)
 
+-- | Perform a MapReduce job over the results of a binary secondary index query.
+--
+-- TODO test mapReduceBinaryIndex
+mapReduceBinaryIndex ::
+     forall m r.
+     MonadIO m
+  => Handle -- ^
+  -> BinaryIndexQuery -- ^
+  -> [MapReducePhase]
+  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> m (Either MapReduceBinaryIndexError r)
+mapReduceBinaryIndex handle query phases responseFold = liftIO $
+  fromResponse <$>
+    doMapReduce handle (MapReduceInputBinaryIndexQuery query) phases responseFold
+
+  where
+    fromResponse ::
+         Either HandleError (Either ByteString r)
+      -> Either MapReduceBinaryIndexError r
+    fromResponse = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseMapReduceBinaryIndexError err)
+
+      Right (Right result) ->
+        Right result
+
+parseMapReduceBinaryIndexError :: ByteString -> MapReduceBinaryIndexError
+parseMapReduceBinaryIndexError err =
+  UnknownError (decodeUtf8 err)
+
+-- | Perform a MapReduce job over the results of a integer secondary index
+-- query.
+--
+-- TODO test mapReduceIntIndex
+mapReduceIntIndex ::
+     forall m r.
+     MonadIO m
+  => Handle -- ^
+  -> IntIndexQuery -- ^
+  -> [MapReducePhase]
+  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> m (Either MapReduceIntIndexError r)
+mapReduceIntIndex handle query phases responseFold = liftIO $
+  fromResponse <$>
+    doMapReduce handle (MapReduceInputIntIndexQuery query) phases responseFold
+
+  where
+    fromResponse ::
+         Either HandleError (Either ByteString r)
+      -> Either MapReduceIntIndexError r
+    fromResponse = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseMapReduceIntIndexError err)
+
+      Right (Right result) ->
+        Right result
+
+parseMapReduceIntIndexError :: ByteString -> MapReduceIntIndexError
+parseMapReduceIntIndexError err =
+  UnknownError (decodeUtf8 err)
+
 -- | Perform a MapReduce job over a list of keys.
+--
+-- TODO test mapReduceKeys
+-- TODO MapReduceKeysError
 mapReduceKeys ::
      MonadIO m
   => Handle -- ^

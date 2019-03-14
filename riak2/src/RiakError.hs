@@ -119,6 +119,7 @@ data Op
   | ListBucketsOp
   | ListKeysOp
   | MapReduceBucketOp
+  | MapReduceSecondaryIndexOp
   | PutIndexOp
   | PutOp
   | PutSchemaOp
@@ -149,7 +150,9 @@ type GetSetBucketTypeError         = Error 'GetBucketOp
 type GetSetError                   = Error 'GetCrdtOp
 type ListBucketsError              = Error 'ListBucketsOp
 type ListKeysError                 = Error 'ListKeysOp
+type MapReduceBinaryIndexError     = Error 'MapReduceSecondaryIndexOp
 type MapReduceBucketError          = Error 'MapReduceBucketOp
+type MapReduceIntIndexError        = Error 'MapReduceSecondaryIndexOp
 type PutError                      = Error 'PutOp
 type PutIndexError                 = Error 'PutIndexOp
 type PutMapError                   = Error 'UpdateCrdtOp
