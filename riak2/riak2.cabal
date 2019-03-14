@@ -252,6 +252,7 @@ library riak2-internal
     RiakBucketInternal
     RiakBucketTypeInternal
     RiakCrdt
+    RiakKeyInternal
     RiakPanic
     RiakProtoContent
     RiakProtoPair

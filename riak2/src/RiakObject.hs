@@ -3,16 +3,17 @@
 
 module RiakObject where
 
-import RiakContent    (Content(..))
-import RiakContext    (Context(..), newContext)
+import RiakContent (Content(..))
+import RiakContext (Context(..), newContext)
 import RiakError
-import RiakGetOpts    (GetOpts(..))
-import RiakHandle     (Handle)
-import RiakKey        (Key(..))
-import RiakPutOpts    (PutOpts(..))
-import RiakSibling    (Sibling(..))
-import RiakUtils      (difftimeToMillis, retrying)
+import RiakGetOpts (GetOpts(..))
+import RiakHandle  (Handle)
+import RiakKey     (Key(..))
+import RiakPutOpts (PutOpts(..))
+import RiakSibling (Sibling(..))
+import RiakUtils   (difftimeToMillis, retrying)
 
+import qualified RiakBucket         as Bucket
 import qualified RiakHandle         as Handle
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
@@ -202,6 +203,8 @@ parseGetError request err
       Just (BucketTypeDoesNotExistError (request ^. Proto.type'))
   | isInvalidNodesError0 err =
       Just InvalidNodesError
+  | isKeyCannotBeZeroLengthError err =
+      Just (InvalidKeyError (Key.fromProto request))
   | isOverloadError err =
       Just OverloadError
   | isUnknownMessageCode err =
@@ -321,6 +324,8 @@ doPut_ handle request = do
 
 parsePutError :: Proto.RpbPutReq -> ByteString -> Maybe PutError
 parsePutError request err
+  | isBucketCannotBeZeroLengthError err =
+      Just (InvalidBucketError (Bucket.fromProto request))
   | isBucketTypeDoesNotExistError0 err =
       Just (BucketTypeDoesNotExistError (request ^. Proto.type'))
   | isInvalidNodesError0 err =

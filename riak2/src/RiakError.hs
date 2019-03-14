@@ -1,8 +1,11 @@
+-- TODO more exhausive zero-length bucket/key coverage
+
 module RiakError where
 
 import RiakBucketInternal     (Bucket(..))
-import RiakBucketTypeInternal (defaultBucketType)
+import RiakBucketTypeInternal (BucketType, defaultBucketType)
 import RiakIndexName          (IndexName)
+import RiakKeyInternal        (Key)
 
 import qualified RiakHandle as Handle (HandleError)
 
@@ -11,8 +14,6 @@ import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString                  as ByteString
 
 
--- TODO "Key cannot be zero-length" when putting with empty key
---
 -- TODO retry on insufficient vnodes
 --        - list keys
 --
@@ -59,10 +60,20 @@ data Error :: Op -> Type where
        MayReturnInsufficientNodes op ~ 'True
     => Error op
 
+  InvalidBucketError ::
+       MayReturnInvalidBucket op ~ 'True
+    => Bucket
+    -> Error op
+
   -- | The bucket type was "invalid" for some reason (operation-specific).
   InvalidBucketTypeError ::
        MayReturnInvalidBucketType op ~ 'True
-    => ByteString
+    => BucketType
+    -> Error op
+
+  InvalidKeyError ::
+       MayReturnInvalidKey op ~ 'True
+    => Key
     -> Error op
 
   InvalidNodesError ::
@@ -196,10 +207,18 @@ type family MayReturnInsufficientNodes (op :: Op) :: Bool where
   MayReturnInsufficientNodes 'SecondaryIndexQueryOp = 'True
   MayReturnInsufficientNodes _                      = 'False
 
+type family MayReturnInvalidBucket (op :: Op) :: Bool where
+  MayReturnInvalidBucket 'PutOp = 'True
+  MayReturnInvalidBucket _      = 'False
+
 type family MayReturnInvalidBucketType (op :: Op) :: Bool where
   MayReturnInvalidBucketType 'GetBucketOp          = 'True
   MayReturnInvalidBucketType 'SetBucketTypeIndexOp = 'True
   MayReturnInvalidBucketType _                     = 'False
+
+type family MayReturnInvalidKey (op :: Op) :: Bool where
+  MayReturnInvalidKey 'GetOp = 'True
+  MayReturnInvalidKey _      = 'False
 
 -- | @{n_val_violation,_}@
 type family MayReturnInvalidNodes (op :: Op) :: Bool where
@@ -224,6 +243,10 @@ type family MayReturnSearchNotEnabled (op :: Op) :: Bool where
   MayReturnSearchNotEnabled 'PutSchemaOp   = 'True
   MayReturnSearchNotEnabled 'SearchOp      = 'True
   MayReturnSearchNotEnabled _              = 'False
+
+isBucketCannotBeZeroLengthError :: ByteString -> Bool
+isBucketCannotBeZeroLengthError =
+  (== "Bucket cannot be zero-length")
 
 -- no_type
 isBucketTypeDoesNotExistError0 :: ByteString -> Bool
@@ -333,6 +356,10 @@ isInvalidNodesError1 =
 isInvalidSchemaError :: ByteString -> Bool
 isInvalidSchemaError =
   ByteString.isPrefixOf "Error storing schema"
+
+isKeyCannotBeZeroLengthError :: ByteString -> Bool
+isKeyCannotBeZeroLengthError =
+  (== "Key cannot be zero-length")
 
 isNotfound :: ByteString -> Bool
 isNotfound =

@@ -2,34 +2,35 @@
 
 module Main where
 
-import RiakBinaryIndexQuery    (BinaryIndexQuery(..), inBucket)
-import RiakBucket              (Bucket(..), getBucket, getCounterBucket,
-                                getHyperLogLogBucket, getMapBucket,
-                                getSetBucket, queryBinaryIndex, queryIntIndex,
-                                setBucketIndex, unsetBucketIndex)
-import RiakBucketProps         (BucketProps(..))
-import RiakBucketType          (BucketType, defaultBucketType, getBucketType,
-                                getCounterBucketType, getHyperLogLogBucketType,
-                                getMapBucketType, getSetBucketType)
-import RiakContent             (Content, newContent)
-import RiakContext             (newContext)
-import RiakError               (Error(..))
-import RiakGetOpts             (GetOpts(..))
-import RiakHandle              (EventHandlers(..), Handle, HandleConfig(..),
-                                HandleError, createHandle)
-import RiakIndex               (Index, deleteIndex, putIndex)
-import RiakIndexName           (IndexName, unsafeMakeIndexName)
-import RiakIntIndexQuery       (IntIndexQuery(..))
-import RiakKey                 (Key(..), generatedKey, keyBucket)
-import RiakObject              (Object(..), delete, get, getHead, getIfModified,
-                                newObject, put, putGet, putGetHead)
-import RiakPing                (ping)
-import RiakPutOpts             (PutOpts(..))
-import RiakSchema              (defaultSchema)
-import RiakSecondaryIndex      (SecondaryIndex(..))
-import RiakServerInfo          (ServerInfo(..), getServerInfo)
-import RiakSibling             (Sibling(..))
-import RiakSomeBucketProps     (SomeBucketProps(..))
+import RiakBinaryIndexQuery (BinaryIndexQuery(..), inBucket)
+import RiakBucket           (Bucket(..), getBucket, getCounterBucket,
+                             getHyperLogLogBucket, getMapBucket, getSetBucket,
+                             queryBinaryIndex, queryIntIndex, setBucketIndex,
+                             unsetBucketIndex)
+import RiakBucketProps      (BucketProps(..))
+import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
+                             getCounterBucketType, getHyperLogLogBucketType,
+                             getMapBucketType, getSetBucketType)
+import RiakContent          (Content, newContent)
+import RiakContext          (newContext)
+import RiakError            (Error(..))
+import RiakGetOpts          (GetOpts(..))
+import RiakHandle           (EventHandlers(..), Handle, HandleConfig(..),
+                             HandleError, createHandle)
+import RiakIndex            (Index, deleteIndex, putIndex)
+import RiakIndexName        (IndexName, unsafeMakeIndexName)
+import RiakIntIndexQuery    (IntIndexQuery(..))
+import RiakKey              (Key(..), generatedKey, keyBucket, keyBucketSegment,
+                             keyKeySegment)
+import RiakObject           (Object(..), delete, get, getHead, getIfModified,
+                             newObject, put, putGet, putGetHead)
+import RiakPing             (ping)
+import RiakPutOpts          (PutOpts(..))
+import RiakSchema           (defaultSchema)
+import RiakSecondaryIndex   (SecondaryIndex(..))
+import RiakServerInfo       (ServerInfo(..), getServerInfo)
+import RiakSibling          (Sibling(..))
+import RiakSomeBucketProps  (SomeBucketProps(..))
 
 import Control.Lens
 import Control.Monad
@@ -155,6 +156,10 @@ riakBucketTests handle =
           Right SomeSetBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
+    , testCase "empty bucket works for some reason" $
+        getBucket handle (Bucket defaultBucketType "") `shouldReturnSatisfy`
+          isRight
+
     , testGroup "failures"
       [ testCase "bucket type not found" $ do
           bucket@(Bucket bucketType _) <- randomBucket
@@ -253,9 +258,8 @@ riakBucketTests handle =
     , testCase "in bucket" $ do
         let n = 10
         bucket <- randomObjectBucket
-        let object = newObject (generatedKey bucket) (newContent "")
         replicateM_ n $
-          put handle object def `shouldReturnSatisfy` isRight
+          put handle (emptyObject (generatedKey bucket)) def `shouldReturnSatisfy` isRight
         queryBinaryIndex
           handle
           (inBucket bucket)
@@ -505,6 +509,11 @@ riakObjectTests handle =
           key <- randomObjectKey
           get handle key (def { nodes = Just 4 }) `shouldReturn`
             Left InvalidNodesError
+
+      , testCase "empty key" $ do
+          Bucket bucketType bucket <- randomObjectBucket
+          let key = Key bucketType bucket ""
+          get handle key def `shouldReturn` Left (InvalidKeyError key)
       ]
 
     , testGroup "getHead"
@@ -544,22 +553,24 @@ riakObjectTests handle =
   , testGroup "put"
     [ testCase "generated key" $ do
         bucket <- randomObjectBucket
-        let object = newObject (generatedKey bucket) (newContent "")
-        put handle object def `shouldReturnSatisfy` isRight
+        put handle (emptyObject (generatedKey bucket)) def `shouldReturnSatisfy` isRight
 
-    , testCase "bucket type not found" $ do
-        bucketType <- randomByteString 32
-        bucket <- randomByteString 32
-        key <- randomByteString 32
-        let object = newObject (Key bucketType bucket key) (newContent "")
-        put handle object def `shouldReturn`
-          Left (BucketTypeDoesNotExistError bucketType)
+    , testGroup "failures"
+      [ testCase "bucket type not found" $ do
+          key@(Key bucketType _ _) <- randomKey
+          put handle (emptyObject key) def `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
 
-    , testCase "invalid nval" $ do
-        key <- randomObjectKey
-        let object = newObject key (newContent "")
-        put handle object (def { nodes = Just 4 }) `shouldReturn`
-          Left InvalidNodesError
+      , testCase "empty bucket" $ do
+          key <- Key defaultBucketType "" <$> randomByteString 32
+          put handle (emptyObject key) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+
+      , testCase "invalid nval" $ do
+          key <- randomObjectKey
+          put handle (emptyObject key) (def { nodes = Just 4 }) `shouldReturn`
+            Left InvalidNodesError
+      ]
     ]
 
   , testGroup "putGet"
@@ -593,7 +604,11 @@ riakObjectTests handle =
     ]
 
   , testGroup "delete"
-    [ testCase "tombstone" $ do
+    [ testCase "non-existent object" $ do
+        object <- randomObject
+        delete handle object def `shouldReturn` Right ()
+
+    , testCase "tombstone" $ do
         object <- randomObject
         put handle object def `shouldReturnSatisfy` isRight
         delete handle object { context = newContext } def `shouldReturn` Right ()
@@ -610,6 +625,18 @@ riakObjectTests handle =
               Right Object { content = [] } -> pure ()
               result -> assertFailure (show result)
           result -> assertFailure (show result)
+
+    , testCase "empty key" $ do
+        object <- randomObject
+        let object' = object & field @"key" . keyKeySegment .~ ""
+        delete handle object' def `shouldReturn` Right ()
+
+    , testGroup "failures"
+      [ testCase "empty bucket" $ do
+          key <- Key defaultBucketType "" <$> randomByteString 32
+          delete handle (emptyObject key) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+      ]
     ]
   ]
 
@@ -797,6 +824,14 @@ index1 =
 index3 :: IndexName
 index3 =
   unsafeMakeIndexName "default3"
+
+emptyObject :: Key -> Object (Content ByteString)
+emptyObject key =
+  newObject key emptyContent
+
+emptyContent :: Content ByteString
+emptyContent =
+  newContent mempty
 
 randomBucket :: IO Bucket
 randomBucket =

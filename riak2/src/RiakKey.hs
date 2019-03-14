@@ -1,23 +1,30 @@
-module RiakKey where
+module RiakKey
+  ( Key(..)
+  , keyBucketType
+  , keyBucket
+  , keyBucketSegment
+  , keyKeySegment
+  , generatedKey
+
+  , isGeneratedKey
+  , fromProto
+  , setProto
+  , setMaybeProto
+  ) where
 
 import RiakBucketInternal     (Bucket(..))
 import RiakBucketTypeInternal (BucketType)
+import RiakKeyInternal        (Key(..))
 
-import Control.Lens                       (Lens', (.~))
+import qualified RiakBucketType as BucketType
+
+import Control.Lens                       (Lens', (.~), (^.))
 import Data.Hashable                      (Hashable)
 import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 
 import qualified Data.ByteString as ByteString
 import qualified Data.Riak.Proto as Proto
 
-
--- | A bucket type, bucket, and key.
---
--- /Note/: The bucket type must be UTF-8 encoded.
-data Key
-  = Key ByteString ByteString ByteString
-  deriving stock (Eq, Generic, Show)
-  deriving anyclass (Hashable)
 
 -- | A lens onto the bucket type of a key.
 --
@@ -74,6 +81,19 @@ generatedKey (Bucket bucketType bucket) =
 isGeneratedKey :: Key -> Bool
 isGeneratedKey (Key _ _ key) =
   ByteString.null key
+
+fromProto ::
+     ( HasLens' a "bucket" ByteString
+     , HasLens' a "key" ByteString
+     , HasLens' a "type'" ByteString
+     )
+  => a
+  -> Key
+fromProto proto =
+  Key
+    (BucketType.fromProto proto)
+    (proto ^. Proto.bucket)
+    (proto ^. Proto.key)
 
 setProto ::
      ( HasLens' a "bucket" ByteString

@@ -12,6 +12,7 @@ module RiakBucketType
   , streamBuckets
 
   , coerceGetBucketError
+  , fromProto
   ) where
 
 import RiakBucketInternal         (Bucket(..))
@@ -30,12 +31,14 @@ import RiakUtils                  (retrying)
 import qualified RiakHandle          as Handle
 import qualified RiakSomeBucketProps as SomeBucketProps
 
-import Control.Foldl      (FoldM(..))
-import Control.Lens       (folded, to, (.~), (^.))
-import Data.Text.Encoding (decodeUtf8, encodeUtf8)
-import Unsafe.Coerce      (unsafeCoerce)
+import Control.Foldl                      (FoldM(..))
+import Control.Lens                       (folded, to, (.~), (^.))
+import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
+import Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
+import Unsafe.Coerce                      (unsafeCoerce)
 
 import qualified Control.Foldl   as Foldl
+import qualified Data.ByteString as ByteString
 import qualified Data.Riak.Proto as Proto
 
 
@@ -399,3 +402,12 @@ makeResponseFold bucketType =
     handler :: Foldl.HandlerM m Proto.RpbListBucketsResp Bucket
     handler =
       Proto.buckets . folded . to (Bucket bucketType)
+
+fromProto :: HasLens' a "type'" ByteString => a -> BucketType
+fromProto proto =
+  if ByteString.null type'
+    then defaultBucketType
+    else type'
+  where
+    type' :: ByteString
+    type' = proto ^. Proto.type'

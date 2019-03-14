@@ -16,9 +16,12 @@ module RiakBucket
   , queryBinaryIndexTerms
   , listKeys
   , streamKeys
+
+  , fromProto
   ) where
 
-import RiakBinaryIndexQuery       (BinaryIndexQuery(..), builtinBucketIndex, builtinKeyIndex)
+import RiakBinaryIndexQuery       (BinaryIndexQuery(..), builtinBucketIndex,
+                                   builtinKeyIndex)
 import RiakBucketInternal         (Bucket(..))
 import RiakBucketType             (BucketType, coerceGetBucketError)
 import RiakCounterBucketProps     (CounterBucketProps)
@@ -34,6 +37,7 @@ import RiakSomeBucketProps        (SomeBucketProps(..))
 import RiakUtils                  (bs2int, int2bs, retrying)
 
 import qualified RiakBinaryIndexQuery as BinaryIndexQuery
+import qualified RiakBucketType       as BucketType
 import qualified RiakHandle           as Handle
 import qualified RiakSomeBucketProps  as SomeBucketProps
 
@@ -765,6 +769,17 @@ parseListKeysError bucketType err
       Nothing
   | otherwise =
       Just (UnknownError (decodeUtf8 err))
+
+fromProto ::
+     ( HasLens' a "bucket" ByteString
+     , HasLens' a "type'" ByteString
+     )
+  => a
+  -> Bucket
+fromProto proto =
+  Bucket
+    (BucketType.fromProto proto)
+    (proto ^. Proto.bucket)
 
 setProto ::
      ( HasLens' a "bucket" ByteString
