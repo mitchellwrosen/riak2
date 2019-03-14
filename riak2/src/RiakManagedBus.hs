@@ -750,8 +750,11 @@ getBucket bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.getBucket timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.getBucket timeoutVar handle request)
 
 getBucketType ::
      ManagedBus -- ^
@@ -761,8 +764,11 @@ getBucketType bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.getBucketType timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.getBucketType timeoutVar handle request)
 
 getCrdt ::
      ManagedBus
@@ -816,8 +822,11 @@ getServerInfo bus@(ManagedBus { requestTimeout }) = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.getServerInfo timeoutVar handle
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.getServerInfo timeoutVar handle)
 
 listBuckets ::
      ManagedBus
@@ -871,8 +880,11 @@ ping bus@(ManagedBus { requestTimeout }) = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.ping timeoutVar handle
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.ping timeoutVar handle)
 
 put ::
      ManagedBus
@@ -927,8 +939,11 @@ resetBucket bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.resetBucket timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCodeError
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.resetBucket timeoutVar handle request)
 
 setBucket ::
      ManagedBus
