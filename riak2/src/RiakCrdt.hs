@@ -10,23 +10,19 @@ import Data.Text.Encoding (decodeUtf8)
 parseGetCrdtError ::
      ByteString -- ^ Bucket type
   -> ByteString -- ^ Error
-  -> Maybe (Error 'GetCrdtOp)
+  -> Error 'GetCrdtOp
 parseGetCrdtError bucketType err
   | isBucketTypeDoesNotExistError1 err =
-      Just (BucketTypeDoesNotExistError bucketType)
-  | isUnknownMessageCode err =
-      Nothing
+      BucketTypeDoesNotExistError bucketType
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
 parseUpdateCrdtError ::
      ByteString -- ^ Bucket type
   -> ByteString -- ^ Error
-  -> Maybe (Error 'UpdateCrdtOp)
+  -> Error 'UpdateCrdtOp
 parseUpdateCrdtError bucketType err
   | isBucketTypeDoesNotExistError1 err =
-      Just (BucketTypeDoesNotExistError bucketType)
-  | isUnknownMessageCode err =
-      Nothing
+      BucketTypeDoesNotExistError bucketType
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)

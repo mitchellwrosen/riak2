@@ -740,8 +740,11 @@ get bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.get timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.get timeoutVar handle request)
 
 getBucket ::
      ManagedBus -- ^
@@ -773,8 +776,11 @@ getCrdt bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.getCrdt timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.getCrdt timeoutVar handle request)
 
 getIndex ::
      ManagedBus
@@ -817,8 +823,11 @@ listBuckets bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.listBuckets timeoutVar handle request responseFold
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.listBuckets timeoutVar handle request responseFold)
 
 listKeys ::
      ManagedBus
@@ -844,8 +853,11 @@ mapReduce bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.mapReduce timeoutVar handle request responseFold
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.mapReduce timeoutVar handle request responseFold)
 
 ping ::
      ManagedBus
@@ -865,8 +877,11 @@ put bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.put timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.put timeoutVar handle request)
 
 putIndex ::
      ManagedBus
@@ -959,8 +974,11 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.updateCrdt timeoutVar handle request
+  retrying
+    timeoutVar
+    isUnknownMessageCode
+    (withHandle timeoutVar bus $ \timeoutVar handle ->
+      Handle.updateCrdt timeoutVar handle request)
 
 retrying ::
      forall r.

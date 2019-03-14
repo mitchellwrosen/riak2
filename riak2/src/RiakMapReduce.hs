@@ -21,7 +21,6 @@ import RiakIntIndexQuery    (IntIndexQuery)
 import RiakKey              (Key)
 import RiakMapReduceInput   (MapReduceInput(..))
 import RiakMapReducePhase   (MapReducePhase(..))
-import RiakUtils            (retrying)
 
 import qualified RiakErlangTerm     as ErlangTerm
 import qualified RiakHandle         as Handle
@@ -179,21 +178,10 @@ doMapReduce ::
   -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either HandleError (Either ByteString r))
 doMapReduce handle input phases responseFold =
-  retrying 1000000 (doMapReduce_ handle input phases responseFold)
-
-doMapReduce_ ::
-     forall r.
-     Handle
-  -> MapReduceInput
-  -> [MapReducePhase]
-  -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Maybe (Either HandleError (Either ByteString r)))
-doMapReduce_ handle input phases responseFold =
-  fromResponse <$>
-    Handle.mapReduce
-      handle
-      request
-      responseFold
+  Handle.mapReduce
+    handle
+    request
+    responseFold
 
   where
     request :: Proto.RpbMapRedReq
@@ -201,22 +189,6 @@ doMapReduce_ handle input phases responseFold =
       Proto.defMessage
         & Proto.contentType .~ "application/x-erlang-binary"
         & Proto.request .~ ErlangTerm.build (makeMapReduceErlangTerm input phases)
-
-    fromResponse ::
-         Either HandleError (Either ByteString r)
-      -> Maybe (Either HandleError (Either ByteString r))
-    fromResponse = \case
-      Left err ->
-        Just (Left err)
-
-      Right (Left err)
-        | isUnknownMessageCode err ->
-            Nothing
-        | otherwise ->
-            Just (Right (Left err))
-
-      Right (Right result) ->
-        Just (Right (Right result))
 
 -- [{inputs, Inputs}, {query, Query}, {timeout, Timeout}]
 --

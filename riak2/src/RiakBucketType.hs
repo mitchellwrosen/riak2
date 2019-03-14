@@ -27,7 +27,6 @@ import RiakMapBucketProps         (MapBucketProps)
 import RiakSetBucketProps         (SetBucketProps)
 import RiakSomeBucketProps        (SomeBucketProps)
 import RiakSomeBucketProps        (SomeBucketProps(..))
-import RiakUtils                  (retrying)
 
 import qualified RiakHandle          as Handle
 import qualified RiakSomeBucketProps as SomeBucketProps
@@ -355,26 +354,21 @@ streamBuckets ::
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> m (Either ListBucketsError r)
-streamBuckets handle bucketType bucketFold =
-  liftIO (retrying 1000000 (streamBuckets_ handle bucketType bucketFold))
-
-streamBuckets_ ::
-     Handle
-  -> BucketType
-  -> FoldM IO Bucket r
-  -> IO (Maybe (Either ListBucketsError r))
-streamBuckets_ handle bucketType bucketFold =
-  Handle.listBuckets handle request (makeResponseFold bucketType bucketFold) >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseListBucketsError bucketType err)
-
-    Right (Right response) ->
-      pure (Just (Right response))
+streamBuckets handle bucketType bucketFold = liftIO $
+  fromResult <$>
+    Handle.listBuckets handle request (makeResponseFold bucketType bucketFold)
 
   where
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseListBucketsError bucketType err)
+
+      Right (Right response) ->
+        Right response
+
     request :: Proto.RpbListBucketsReq
     request =
       Proto.defMessage
@@ -382,14 +376,12 @@ streamBuckets_ handle bucketType bucketFold =
         & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
 
-parseListBucketsError :: ByteString -> ByteString -> Maybe ListBucketsError
+parseListBucketsError :: ByteString -> ByteString -> ListBucketsError
 parseListBucketsError bucketType err
   | isBucketTypeDoesNotExistError4 err =
-      Just (BucketTypeDoesNotExistError bucketType)
-  | isUnknownMessageCode err =
-      Nothing
+      BucketTypeDoesNotExistError bucketType
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
 makeResponseFold ::
      forall m r. Monad m

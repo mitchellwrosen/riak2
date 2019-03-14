@@ -10,7 +10,6 @@ import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
 import RiakKey     (Key(..))
 import RiakPutOpts (PutOpts)
-import RiakUtils   (retrying)
 
 import qualified RiakGetOpts as GetOpts
 import qualified RiakHandle  as Handle
@@ -42,25 +41,8 @@ getCounter ::
   -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetCounterError (Maybe ConvergentCounter))
-getCounter handle key opts =
-  liftIO (retrying 1000000 (getCounter_ handle key opts))
-
-getCounter_ ::
-     Handle
-  -> Key
-  -> GetOpts
-  -> IO (Maybe (Either GetCounterError (Maybe ConvergentCounter)))
-getCounter_ handle key@(Key bucketType _ _) opts =
-
-  Handle.getCrdt handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseGetCrdtError bucketType err)
-
-    Right (Right response) ->
-      pure (Just (Right (fromResponse response)))
+getCounter handle key@(Key bucketType _ _) opts = liftIO $
+  fromResult <$> Handle.getCrdt handle request
 
   where
     request :: Proto.DtFetchReq
@@ -68,6 +50,16 @@ getCounter_ handle key@(Key bucketType _ _) opts =
       Proto.defMessage
         & GetOpts.setProto opts
         & Key.setProto key
+
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseGetCrdtError bucketType err)
+
+      Right (Right response) ->
+        Right (fromResponse response)
 
     fromResponse ::
          Proto.DtFetchResp
@@ -92,28 +84,13 @@ updateCounter ::
   -> ConvergentCounter -- ^ Counter update
   -> PutOpts -- ^
   -> m (Either UpdateCounterError ConvergentCounter)
-updateCounter handle counter opts =
-  liftIO (retrying 1000000 (updateCounter_ handle counter opts))
-
-updateCounter_ ::
-     Handle
-  -> ConvergentCounter
-  -> PutOpts
-  -> IO (Maybe (Either UpdateCounterError ConvergentCounter))
-updateCounter_
+updateCounter
     handle
     (ConvergentCounter key@(Key bucketType _ _) value)
-    opts =
+    opts = liftIO $
 
-  Handle.updateCrdt handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseUpdateCrdtError bucketType err)
-
-    Right (Right response) ->
-      pure (Just (Right (fromResponse response)))
+  fromResult <$>
+    Handle.updateCrdt handle request
 
   where
     request :: Proto.DtUpdateReq
@@ -127,6 +104,16 @@ updateCounter_
                     & Proto.increment .~ value))
         & Proto.returnBody .~ True
         & PutOpts.setProto opts
+
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseUpdateCrdtError bucketType err)
+
+      Right (Right response) ->
+        Right (fromResponse response)
 
     fromResponse ::
          Proto.DtUpdateResp

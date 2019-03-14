@@ -13,7 +13,6 @@ import RiakHandle  (Handle)
 import RiakKey     (Key(..))
 import RiakPutOpts (PutOpts)
 import RiakSibling (Sibling(..))
-import RiakUtils   (retrying)
 
 import qualified RiakBucket         as Bucket
 import qualified RiakGetOpts        as GetOpts
@@ -182,37 +181,31 @@ doGet ::
   -> Proto.RpbGetReq
   -> IO (Either GetError Proto.RpbGetResp)
 doGet handle request =
-  retrying 1000000 (doGet_ handle request)
+  fromResult <$> Handle.get handle request
 
-doGet_ ::
-     Handle
-  -> Proto.RpbGetReq
-  -> IO (Maybe (Either GetError Proto.RpbGetResp))
-doGet_ handle request =
-  Handle.get handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
+  where
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Left err) ->
-      pure (Left <$> parseGetError request err)
+      Right (Left err) ->
+        Left (parseGetError request err)
 
-    Right (Right response) ->
-      pure (Just (Right response))
+      Right (Right response) ->
+        Right response
 
-parseGetError :: Proto.RpbGetReq -> ByteString -> Maybe GetError
+parseGetError :: Proto.RpbGetReq -> ByteString -> GetError
 parseGetError request err
   | isBucketTypeDoesNotExistError0 err =
-      Just (BucketTypeDoesNotExistError (request ^. Proto.type'))
+      BucketTypeDoesNotExistError (request ^. Proto.type')
   | isInvalidNodesError0 err =
-      Just InvalidNodesError
+      InvalidNodesError
   | isKeyCannotBeZeroLengthError err =
-      Just (InvalidKeyError (Key.fromProto request))
+      InvalidKeyError (Key.fromProto request)
   | isOverloadError err =
-      Just OverloadError
-  | isUnknownMessageCode err =
-      Nothing
+      OverloadError
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest key opts =
@@ -302,37 +295,31 @@ doPut ::
   -> Proto.RpbPutReq
   -> IO (Either PutError Proto.RpbPutResp)
 doPut handle request =
-  retrying 1000000 (doPut_ handle request)
+  fromResult <$> Handle.put handle request
 
-doPut_ ::
-     Handle
-  -> Proto.RpbPutReq
-  -> IO (Maybe (Either PutError Proto.RpbPutResp))
-doPut_ handle request = do
-  Handle.put handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
+  where
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
 
-    Right (Left err) ->
-      pure (Left <$> parsePutError request err)
+      Right (Left err) ->
+        Left (parsePutError request err)
 
-    Right (Right response) ->
-      pure (Just (Right response))
+      Right (Right response) ->
+        Right response
 
-parsePutError :: Proto.RpbPutReq -> ByteString -> Maybe PutError
+parsePutError :: Proto.RpbPutReq -> ByteString -> PutError
 parsePutError request err
   | isBucketCannotBeZeroLengthError err =
-      Just (InvalidBucketError (Bucket.fromProto request))
+      InvalidBucketError (Bucket.fromProto request)
   | isBucketTypeDoesNotExistError0 err =
-      Just (BucketTypeDoesNotExistError (request ^. Proto.type'))
+      BucketTypeDoesNotExistError (request ^. Proto.type')
   | isInvalidNodesError0 err =
-      Just InvalidNodesError
+      InvalidNodesError
   | isOverloadError err =
-      Just OverloadError
-  | isUnknownMessageCode err =
-      Nothing
+      OverloadError
   | otherwise =
-      Just (UnknownError (decodeUtf8 err))
+      UnknownError (decodeUtf8 err)
 
 makePutRequest ::
      Object (Content ByteString)

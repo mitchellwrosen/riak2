@@ -17,7 +17,6 @@ import RiakHandleError (HandleError)
 import RiakKey         (Key(..), isGeneratedKey)
 import RiakMapValue    (ConvergentMapValue(..), emptyMapValue)
 import RiakPutOpts     (PutOpts)
-import RiakUtils       (retrying)
 
 import qualified RiakGetOpts  as GetOpts
 import qualified RiakHandle   as Handle
@@ -73,15 +72,7 @@ getMap ::
   -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
-getMap handle key opts =
-  liftIO (retrying 1000000 (getMap_ handle key opts))
-
-getMap_ ::
-     Handle
-  -> Key
-  -> GetOpts
-  -> IO (Maybe (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue))))
-getMap_ handle key@(Key bucketType _ _) opts =
+getMap handle key@(Key bucketType _ _) opts = liftIO $
   fromResult <$> Handle.getCrdt handle request
 
   where
@@ -93,16 +84,16 @@ getMap_ handle key@(Key bucketType _ _) opts =
 
     fromResult ::
          Either HandleError (Either ByteString Proto.DtFetchResp)
-      -> Maybe (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
+      -> Either GetMapError (Maybe (ConvergentMap ConvergentMapValue))
     fromResult = \case
       Left err ->
-        Just (Left (HandleError err))
+        Left (HandleError err)
 
       Right (Left err) ->
-        Left <$> parseGetCrdtError bucketType err
+        Left (parseGetCrdtError bucketType err)
 
       Right (Right response) ->
-        Just (Right (fromResponse response))
+        Right (fromResponse response)
 
     fromResponse ::
          Proto.DtFetchResp
@@ -130,28 +121,12 @@ putMap ::
   -> ConvergentMap ConvergentMapValue -- ^
   -> PutOpts
   -> m (Either PutMapError (ConvergentMap ConvergentMapValue))
-putMap handle value opts =
-  liftIO (retrying 1000000 (putMap_ handle value opts))
-
-putMap_ ::
-     Handle
-  -> ConvergentMap ConvergentMapValue
-  -> PutOpts
-  -> IO (Maybe (Either PutMapError (ConvergentMap ConvergentMapValue)))
-putMap_
+putMap
     handle
     (ConvergentMap context key@(Key bucketType _ _) newValue oldValue)
-    opts =
+    opts = liftIO $
 
-  Handle.updateCrdt handle request >>= \case
-    Left err ->
-      pure (Just (Left (HandleError err)))
-
-    Right (Left err) ->
-      pure (Left <$> parseUpdateCrdtError bucketType err)
-
-    Right (Right response) ->
-      pure (Just (Right (fromResponse response)))
+  fromResult <$> Handle.updateCrdt handle request
 
   where
     request :: Proto.DtUpdateReq
@@ -167,6 +142,16 @@ putMap_
               & Proto.mapOp .~ MapValue.toProto newValue oldValue)
         & Proto.returnBody .~ True
         & PutOpts.setProto opts
+
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseUpdateCrdtError bucketType err)
+
+      Right (Right response) ->
+        Right (fromResponse response)
 
     fromResponse ::
          Proto.DtUpdateResp
