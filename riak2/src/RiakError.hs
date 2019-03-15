@@ -276,6 +276,10 @@ isBucketTypeDoesNotExistError5 =
       Atto.string "{error," *> Atto.skipSpace
       Atto.string "no_type}" $> ()
 
+isDwValUnsatisfied :: ByteString -> Bool
+isDwValUnsatisfied =
+  ByteString.isPrefixOf "{dw_val_unsatisfied"
+
 -- Can't delete index with associate buckets [{<<\"objects\">>,<<\"foo\">>},\n    {<<\"objects\">>,<<\"bar\">>}]
 isHasAssociatedBucketsError :: ByteString -> Maybe [Bucket]
 isHasAssociatedBucketsError err = do

@@ -94,10 +94,12 @@ module RiakManagedBus
 import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
-import RiakError          (isAllNodesDownError, isInsufficientVnodesError0,
+import RiakError          (isAllNodesDownError, isDwValUnsatisfied,
+                           isInsufficientVnodesError0,
                            isInsufficientVnodesError1, isPrValUnsatisfied,
-                           isWValUnsatisfied, isPwValUnsatisfied, isRValUnsatisfied,
-                           isTimeoutError, isUnknownMessageCodeError)
+                           isPwValUnsatisfied, isRValUnsatisfied,
+                           isTimeoutError, isUnknownMessageCodeError,
+                           isWValUnsatisfied)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -1017,6 +1019,7 @@ getReqShouldRetry err =
 putReqShouldRetry :: ByteString -> Bool
 putReqShouldRetry err =
   isAllNodesDownError err ||
+  isDwValUnsatisfied err ||
   isPwValUnsatisfied err ||
   isUnknownMessageCodeError err ||
   isWValUnsatisfied err
