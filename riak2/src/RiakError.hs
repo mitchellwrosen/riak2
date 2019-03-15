@@ -188,12 +188,14 @@ type family MayReturnIndexHasAssociatedBuckets  (op :: Op) :: Bool where
   MayReturnIndexHasAssociatedBuckets _              = 'False
 
 type family MayReturnInvalidBucket (op :: Op) :: Bool where
-  MayReturnInvalidBucket 'PutOp = 'True
-  MayReturnInvalidBucket _      = 'False
+  MayReturnInvalidBucket 'PutOp        = 'True
+  MayReturnInvalidBucket 'UpdateCrdtOp = 'True
+  MayReturnInvalidBucket _             = 'False
 
 type family MayReturnInvalidBucketType (op :: Op) :: Bool where
   MayReturnInvalidBucketType 'GetBucketOp          = 'True
   MayReturnInvalidBucketType 'SetBucketTypeIndexOp = 'True
+  MayReturnInvalidBucketType 'UpdateCrdtOp         = 'True
   MayReturnInvalidBucketType _                     = 'False
 
 type family MayReturnInvalidKey (op :: Op) :: Bool where
@@ -222,6 +224,10 @@ isAllNodesDownError =
 isBucketCannotBeZeroLengthError :: ByteString -> Bool
 isBucketCannotBeZeroLengthError =
   (== "Bucket cannot be zero-length")
+
+isBucketMustBeAllowMultError :: ByteString -> Bool
+isBucketMustBeAllowMultError =
+  (== "\"Bucket must be allow_mult=true\"")
 
 -- no_type
 isBucketTypeDoesNotExistError0 :: ByteString -> Bool
@@ -324,6 +330,10 @@ isInsufficientVnodesError1 :: ByteString -> Bool
 isInsufficientVnodesError1 =
   ByteString.isPrefixOf "{insufficient_vnodes"
 
+isInvalidCounterBucketError :: ByteString -> Bool
+isInvalidCounterBucketError =
+  ByteString.isPrefixOf "\"Counters require bucket property"
+
 isInvalidNodesError0 :: ByteString -> Bool
 isInvalidNodesError0 =
   ByteString.isPrefixOf "{n_val_violation"
@@ -340,9 +350,29 @@ isKeyCannotBeZeroLengthError :: ByteString -> Bool
 isKeyCannotBeZeroLengthError =
   (== "Key cannot be zero-length")
 
+isNonCounterOperationOnDefaultBucketError :: ByteString -> Bool
+isNonCounterOperationOnDefaultBucketError =
+  (== "\"non-counter operation on default bucket\"")
+
 isNotfoundError :: ByteString -> Bool
 isNotfoundError =
   (== "notfound")
+
+isOperationTypeIsCounterButBucketTypeIsError :: ByteString -> Bool
+isOperationTypeIsCounterButBucketTypeIsError =
+  ByteString.isPrefixOf "Operation type is `counter` but  bucket type is"
+
+isOperationTypeIsHllButBucketTypeIsError :: ByteString -> Bool
+isOperationTypeIsHllButBucketTypeIsError =
+  ByteString.isPrefixOf "Operation type is `hll` but  bucket type is"
+
+isOperationTypeIsMapButBucketTypeIsError :: ByteString -> Bool
+isOperationTypeIsMapButBucketTypeIsError =
+  ByteString.isPrefixOf "Operation type is `map` but  bucket type is"
+
+isOperationTypeIsSetButBucketTypeIsError :: ByteString -> Bool
+isOperationTypeIsSetButBucketTypeIsError =
+  ByteString.isPrefixOf "Operation type is `set` but  bucket type is"
 
 isOverloadError :: ByteString -> Bool
 isOverloadError =

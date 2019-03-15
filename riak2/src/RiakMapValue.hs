@@ -28,7 +28,7 @@ data ConvergentMapValue
   , maps :: HashMap ByteString ConvergentMapValue -- ^ Maps
   , registers :: HashMap ByteString ByteString -- ^ Registers
   , sets :: HashMap ByteString (HashSet ByteString) -- ^ Sets
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 -- | An empty map value.
 emptyMapValue :: ConvergentMapValue

@@ -9,10 +9,12 @@ module RiakHyperLogLog
   , updateHyperLogLog
   ) where
 
+import RiakBucket  (Bucket(..))
 import RiakCrdt
 import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
+import RiakKey     (keyBucket)
 import RiakKey     (Key(..), isGeneratedKey)
 import RiakPutOpts (PutOpts)
 
@@ -21,7 +23,8 @@ import qualified RiakHandle  as Handle
 import qualified RiakKey     as Key
 import qualified RiakPutOpts as PutOpts
 
-import Control.Lens ((.~), (^.))
+import Control.Lens       ((.~), (^.))
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto
 
@@ -42,7 +45,7 @@ data ConvergentHyperLogLog a
   = ConvergentHyperLogLog
   { key :: Key -- ^
   , value :: a -- ^
-  } deriving stock (Functor, Generic, Show)
+  } deriving stock (Eq, Functor, Generic, Show)
 
 -- | Get an eventually-convergent HyperLogLog.
 getHyperLogLog ::
@@ -92,10 +95,7 @@ updateHyperLogLog ::
   -> ConvergentHyperLogLog [ByteString] -- ^
   -> PutOpts -- ^
   -> m (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64))
-updateHyperLogLog
-    handle
-    (ConvergentHyperLogLog key@(Key bucketType _ _) value)
-    opts = liftIO $
+updateHyperLogLog handle (ConvergentHyperLogLog key value) opts = liftIO $
 
   fromResult <$> Handle.updateCrdt handle request
 
@@ -117,7 +117,7 @@ updateHyperLogLog
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseUpdateCrdtError bucketType err)
+        Left (parseUpdateHyperLogLogError (key ^. keyBucket) err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -136,3 +136,19 @@ updateHyperLogLog
         , value =
             response ^. Proto.hllValue
         }
+
+parseUpdateHyperLogLogError ::
+     Bucket
+  -> ByteString
+  -> Error 'UpdateCrdtOp
+parseUpdateHyperLogLogError bucket@(Bucket bucketType _) err
+  | isBucketMustBeAllowMultError err =
+      InvalidBucketError bucket
+  | isBucketTypeDoesNotExistError1 err =
+      BucketTypeDoesNotExistError bucketType
+  | isOperationTypeIsHllButBucketTypeIsError err =
+      InvalidBucketTypeError bucketType
+  | isNonCounterOperationOnDefaultBucketError err =
+      InvalidBucketTypeError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)

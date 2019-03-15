@@ -8,12 +8,13 @@ module RiakSet
   , toProto
   ) where
 
+import RiakBucket  (Bucket(..))
 import RiakContext (Context(..), newContext)
-import RiakCrdt    (parseGetCrdtError, parseUpdateCrdtError)
+import RiakCrdt    (parseGetCrdtError)
 import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
-import RiakKey     (Key(..), isGeneratedKey)
+import RiakKey     (Key(..), isGeneratedKey, keyBucket)
 import RiakPutOpts (PutOpts)
 
 import qualified RiakGetOpts as GetOpts
@@ -23,6 +24,7 @@ import qualified RiakPutOpts as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
+import Data.Text.Encoding    (decodeUtf8)
 
 import qualified Data.ByteString as ByteString
 import qualified Data.HashSet    as HashSet
@@ -38,7 +40,7 @@ data ConvergentSet a
   , _key :: Key
   , _newValue :: HashSet a
   , _oldValue :: HashSet a
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 -- | Create a new eventually-convergent set.
 newSet ::
@@ -118,7 +120,7 @@ putSet ::
   -> m (Either PutSetError (ConvergentSet ByteString))
 putSet
     handle
-    (ConvergentSet context key@(Key bucketType _ _) newValue oldValue)
+    (ConvergentSet context key newValue oldValue)
     opts = liftIO $
 
   fromResult <$> Handle.updateCrdt handle request
@@ -143,7 +145,7 @@ putSet
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseUpdateCrdtError bucketType err)
+        Left (parsePutSetError (key ^. keyBucket) err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -188,3 +190,20 @@ toProto newValue oldValue =
     removes :: [ByteString]
     removes =
       HashSet.toList (HashSet.difference oldValue newValue)
+
+
+parsePutSetError ::
+     Bucket
+  -> ByteString
+  -> Error 'UpdateCrdtOp
+parsePutSetError bucket@(Bucket bucketType _) err
+  | isBucketMustBeAllowMultError err =
+      InvalidBucketError bucket
+  | isBucketTypeDoesNotExistError1 err =
+      BucketTypeDoesNotExistError bucketType
+  | isOperationTypeIsSetButBucketTypeIsError err =
+      InvalidBucketTypeError bucketType
+  | isNonCounterOperationOnDefaultBucketError err =
+      InvalidBucketTypeError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)

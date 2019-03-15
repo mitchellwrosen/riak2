@@ -8,13 +8,14 @@ module RiakMap
   , mapValue
   ) where
 
+import RiakBucket      (Bucket(..))
 import RiakContext     (Context(..), newContext)
-import RiakCrdt        (parseGetCrdtError, parseUpdateCrdtError)
+import RiakCrdt        (parseGetCrdtError)
 import RiakError
 import RiakGetOpts     (GetOpts)
 import RiakHandle      (Handle)
 import RiakHandleError (HandleError)
-import RiakKey         (Key(..), isGeneratedKey)
+import RiakKey         (Key(..), isGeneratedKey, keyBucket)
 import RiakMapValue    (ConvergentMapValue(..), emptyMapValue)
 import RiakPutOpts     (PutOpts)
 
@@ -26,6 +27,7 @@ import qualified RiakPutOpts  as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
+import Data.Text.Encoding    (decodeUtf8)
 
 import qualified Data.ByteString as ByteString
 import qualified Data.Riak.Proto as Proto
@@ -40,7 +42,7 @@ data ConvergentMap a
   , _key :: Key
   , _newValue :: a
   , _oldValue :: a
-  } deriving stock (Functor, Generic, Show)
+  } deriving stock (Eq, Functor, Generic, Show)
 
 -- | Create a new eventually-convergent map.
 newMap ::
@@ -123,7 +125,7 @@ putMap ::
   -> m (Either PutMapError (ConvergentMap ConvergentMapValue))
 putMap
     handle
-    (ConvergentMap context key@(Key bucketType _ _) newValue oldValue)
+    (ConvergentMap context key newValue oldValue)
     opts = liftIO $
 
   fromResult <$> Handle.updateCrdt handle request
@@ -148,7 +150,7 @@ putMap
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseUpdateCrdtError bucketType err)
+        Left (parsePutMapError (key ^. keyBucket) err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -175,3 +177,19 @@ putMap
         value :: ConvergentMapValue
         value =
           MapValue.fromProto (response ^. Proto.mapValue)
+
+parsePutMapError ::
+     Bucket
+  -> ByteString
+  -> Error 'UpdateCrdtOp
+parsePutMapError bucket@(Bucket bucketType _) err
+  | isBucketMustBeAllowMultError err =
+      InvalidBucketError bucket
+  | isBucketTypeDoesNotExistError1 err =
+      BucketTypeDoesNotExistError bucketType
+  | isNonCounterOperationOnDefaultBucketError err =
+      InvalidBucketTypeError bucketType
+  | isOperationTypeIsMapButBucketTypeIsError err =
+      InvalidBucketTypeError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)

@@ -16,13 +16,3 @@ parseGetCrdtError bucketType err
       BucketTypeDoesNotExistError bucketType
   | otherwise =
       UnknownError (decodeUtf8 err)
-
-parseUpdateCrdtError ::
-     ByteString -- ^ Bucket type
-  -> ByteString -- ^ Error
-  -> Error 'UpdateCrdtOp
-parseUpdateCrdtError bucketType err
-  | isBucketTypeDoesNotExistError1 err =
-      BucketTypeDoesNotExistError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)

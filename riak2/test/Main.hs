@@ -13,16 +13,21 @@ import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
                              getMapBucketType, getSetBucketType, listBuckets)
 import RiakContent          (Content, newContent)
 import RiakContext          (newContext)
+import RiakCounter          (ConvergentCounter(..), getCounter, updateCounter)
 import RiakError            (Error(..))
 import RiakGetOpts          (GetOpts(..))
 import RiakHandle           (EventHandlers(..), Handle, HandleConfig(..),
                              createHandle)
 import RiakHandleError      (HandleError)
+import RiakHyperLogLog      (ConvergentHyperLogLog(..), getHyperLogLog,
+                             updateHyperLogLog)
 import RiakIndex            (Index, deleteIndex, putIndex)
 import RiakIndexName        (IndexName, unsafeMakeIndexName)
 import RiakIntIndexQuery    (IntIndexQuery(..))
 import RiakKey              (Key(..), generatedKey, keyBucket, keyBucketSegment,
-                             keyKeySegment)
+                             keyBucketType, keyKeySegment)
+import RiakMap              (ConvergentMap, getMap, newMap, putMap)
+import RiakMapValue         (ConvergentMapValue, emptyMapValue)
 import RiakObject           (Object(..), delete, get, getHead, getIfModified,
                              newObject, put, putGet, putGetHead)
 import RiakPing             (ping)
@@ -30,6 +35,7 @@ import RiakPutOpts          (PutOpts(..))
 import RiakSchema           (defaultSchema)
 import RiakSecondaryIndex   (SecondaryIndex(..))
 import RiakServerInfo       (ServerInfo(..), getServerInfo)
+import RiakSet              (ConvergentSet, getSet, newSet, putSet)
 import RiakSibling          (Sibling(..))
 import RiakSomeBucketProps  (SomeBucketProps(..))
 
@@ -82,46 +88,16 @@ main = do
 
 integrationTests :: Handle -> [TestTree]
 integrationTests handle =
-  [ testGroup "RiakBinaryIndexQuery" []
-  , testGroup "RiakBucket" (riakBucketTests handle)
-  , testGroup "RiakBucketProps" []
+  [ testGroup "RiakBucket" (riakBucketTests handle)
   , testGroup "RiakBucketType" (riakBucketTypeTests handle)
-  , testGroup "RiakBucketTypeInternal" []
-  , testGroup "RiakBusPool" []
-  , testGroup "RiakContent" []
-  , testGroup "RiakContext" []
-  , testGroup "RiakConvergentCounter" []
-  , testGroup "RiakConvergentHyperLogLog" []
-  , testGroup "RiakConvergentMap" []
-  , testGroup "RiakConvergentMapValue" []
-  , testGroup "RiakConvergentSet" []
-  , testGroup "RiakDebug" []
-  , testGroup "RiakDeleteOpts" []
-  , testGroup "RiakErlangTerm" []
-  , testGroup "RiakError" []
-  , testGroup "RiakGetOpts" []
-  , testGroup "RiakHandle" []
+  , testGroup "RiakCounter" (riakCounterTests handle)
+  , testGroup "RiakHyperLogLog" (riakHyperLogLogTests handle)
   , testGroup "RiakIndex" (riakIndexTests handle)
-  , testGroup "RiakIndexName" []
-  , testGroup "RiakIntIndexQuery" []
-  , testGroup "RiakKey" []
-  , testGroup "RiakManagedBus" []
-  , testGroup "RiakMapReduce" []
-  , testGroup "RiakMapReduceFunction" []
-  , testGroup "RiakMapReducePhase" []
+  , testGroup "RiakMap" (riakMapTests handle)
   , testGroup "RiakObject" (riakObjectTests handle)
   , testGroup "RiakPing" (riakPingTests handle)
-  , testGroup "RiakPutOpts" []
-  , testGroup "RiakQuorum" []
-  , testGroup "RiakReadQuorum" []
-  , testGroup "RiakSTM" []
-  , testGroup "RiakSchema" []
-  , testGroup "RiakSearch" []
-  , testGroup "RiakSecondaryIndex" []
-  , testGroup "RiakSecondaryIndexValue" []
   , testGroup "RiakServerInfo" (riakServerInfoTests handle)
-  , testGroup "RiakSibling" []
-  , testGroup "RiakWriteQuorum" []
+  , testGroup "RiakSet" (riakSetTests handle)
   ]
 
 riakBucketTests :: Handle -> [TestTree]
@@ -306,14 +282,15 @@ riakBucketTests handle =
           `shouldReturn` Right 1
 
     , testGroup "failures"
-      [ testCase "bucket type does not exist" $ do
-          bucket <- Bucket <$> randomBucketType <*> pure "a"
-          queryIntIndex
-            handle
-            (IntIndexQuery { bucket = bucket, index = "a", minValue = 1, maxValue = 1 })
-            (Foldl.generalize Foldl.length)
-            `shouldReturn` Right 0
-      ]
+      [ ]
+      -- [ testCase "bucket type does not exist" $ do
+      --     bucket <- Bucket <$> randomBucketType <*> pure "a"
+      --     queryIntIndex
+      --       handle
+      --       (IntIndexQuery { bucket = bucket, index = "a", minValue = 1, maxValue = 1 })
+      --       (Foldl.generalize Foldl.length)
+      --       `shouldReturn` Right 0
+      -- ]
     ]
 
   , testGroup "queryIntIndexTerms" [ ]
@@ -473,6 +450,84 @@ riakBucketTypeTests handle =
     ]
   ]
 
+riakCounterTests :: Handle -> [TestTree]
+riakCounterTests handle =
+  [ testGroup "getCounter"
+    [ testCase "default bucket succeeds for some reason" $ do
+        key <- randomDefaultKey
+        put handle (emptyObject key) def `shouldReturn` Right key
+        getCounter handle key def `shouldReturnSatisfy` isRightJust
+    ]
+
+  , testGroup "updateCounter"
+    [ testGroup "failures"
+      [ testCase "default bucket" $ do
+          key <- randomDefaultKey
+          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+
+      , testCase "allow_mult=false (non-default)" $ do
+          key <- randomNoSiblingsKey
+          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+
+      , testCase "hll bucket" $ do
+          key <- randomHyperLogLogKey
+          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "map bucket" $ do
+          key <- randomMapKey
+          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "set bucket" $ do
+          key <- randomSetKey
+          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+      ]
+    ]
+  ]
+
+riakHyperLogLogTests :: Handle -> [TestTree]
+riakHyperLogLogTests handle =
+  [ testGroup "getHyperLogLog"
+    [ testCase "non-hll bucket succeeds for some reason" $ do
+        key <- randomDefaultKey
+        put handle (emptyObject key) def `shouldReturn` Right key
+        getHyperLogLog handle key def `shouldReturnSatisfy` isRightJust
+    ]
+
+  , testGroup "updateHyperLogLog"
+    [ testGroup "failures"
+      [ testCase "default bucket" $ do
+          key <- randomDefaultKey
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "allow_mult=false (non-default)" $ do
+          key <- randomNoSiblingsKey
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+
+      , testCase "counter bucket" $ do
+          key <- randomCounterKey
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "map bucket" $ do
+          key <- randomMapKey
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "set bucket" $ do
+          key <- randomSetKey
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+      ]
+    ]
+  ]
+
 riakIndexTests :: Handle -> [TestTree]
 riakIndexTests handle =
   [ testGroup "getIndex" []
@@ -501,6 +556,45 @@ riakIndexTests handle =
           setBucketIndex handle bucket2 index `shouldReturn` Right ()
           deleteIndex handle index `shouldReturn`
             Left (IndexHasAssociatedBucketsError index [bucket1, bucket2])
+      ]
+    ]
+  ]
+
+riakMapTests :: Handle -> [TestTree]
+riakMapTests handle =
+  [ testGroup "getMap"
+    [ testCase "non-map bucket succeeds for some reason" $ do
+        key <- randomDefaultKey
+        put handle (emptyObject key) def `shouldReturn` Right key
+        getMap handle key def `shouldReturnSatisfy` isRightJust
+    ]
+
+  , testGroup "putMap"
+    [ testGroup "failures"
+      [ testCase "default bucket" $ do
+          key <- randomDefaultKey
+          putMap handle (emptyMap key) def `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "allow_mult=false (non-default)" $ do
+          key <- randomNoSiblingsKey
+          putMap handle (emptyMap key) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+
+      , testCase "counter bucket" $ do
+          key <- randomCounterKey
+          putMap handle (emptyMap key) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "hll bucket" $ do
+          key <- randomHyperLogLogKey
+          putMap handle (emptyMap key) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "set bucket" $ do
+          key <- randomSetKey
+          putMap handle (emptyMap key) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
     ]
   ]
@@ -678,6 +772,45 @@ riakServerInfoTests handle =
     ]
   ]
 
+riakSetTests :: Handle -> [TestTree]
+riakSetTests handle =
+  [ testGroup "getSet"
+    [ testCase "non-set bucket succeeds for some reason" $ do
+        key <- randomDefaultKey
+        put handle (emptyObject key) def `shouldReturn` Right key
+        getSet handle key def `shouldReturnSatisfy` isRightJust
+    ]
+
+  , testGroup "putSet"
+    [ testGroup "failures"
+      [ testCase "default bucket" $ do
+          key <- randomDefaultKey
+          putSet handle (emptySet key) def `shouldReturn`
+            Left (InvalidBucketTypeError defaultBucketType)
+
+      , testCase "allow_mult=false (non-default)" $ do
+          key <- randomNoSiblingsKey
+          putSet handle (emptySet key) def `shouldReturn`
+            Left (InvalidBucketError (key ^. keyBucket))
+
+      , testCase "counter bucket" $ do
+          key <- randomCounterKey
+          putSet handle (emptySet key) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "hll bucket" $ do
+          key <- randomHyperLogLogKey
+          putSet handle (emptySet key) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+
+      , testCase "map bucket" $ do
+          key <- randomMapKey
+          putSet handle (emptySet key) def `shouldReturn`
+            Left (InvalidBucketTypeError (key ^. keyBucketType))
+      ]
+    ]
+  ]
+
 --   , testCase "exact int query" $ do
 --       let ixname = RiakIndexName "foo"
 --       ns <- replicateM 100 (randomRIO (-2, 2))
@@ -849,9 +982,17 @@ index3 :: IndexName
 index3 =
   unsafeMakeIndexName "default3"
 
+emptyMap :: Key -> ConvergentMap ConvergentMapValue
+emptyMap key =
+  newMap key emptyMapValue
+
 emptyObject :: Key -> Object (Content ByteString)
 emptyObject key =
   newObject key emptyContent
+
+emptySet :: Key -> ConvergentSet ByteString
+emptySet key =
+  newSet key mempty
 
 emptyContent :: Content ByteString
 emptyContent =
@@ -876,10 +1017,28 @@ randomCounterBucket =
   Bucket "counters"
     <$> randomByteString 32
 
+randomCounterKey :: IO Key
+randomCounterKey =
+  Key "counters"
+    <$> randomByteString 32
+    <*> randomByteString 32
+
 randomDefaultBucket :: IO Bucket
 randomDefaultBucket =
   Bucket defaultBucketType
     <$> randomByteString 32
+
+randomDefaultKey :: IO Key
+randomDefaultKey =
+  Key defaultBucketType
+    <$> randomByteString 32
+    <*> randomByteString 32
+
+randomHyperLogLogKey :: IO Key
+randomHyperLogLogKey =
+  Key "hlls"
+    <$> randomByteString 32
+    <*> randomByteString 32
 
 randomHyperLogLogBucket :: IO Bucket
 randomHyperLogLogBucket =
@@ -902,6 +1061,18 @@ randomMapBucket =
   Bucket "maps"
     <$> randomByteString 32
 
+randomMapKey :: IO Key
+randomMapKey =
+  Key "maps"
+    <$> randomByteString 32
+    <*> randomByteString 32
+
+randomNoSiblingsKey :: IO Key
+randomNoSiblingsKey =
+  Key "nosiblings"
+    <$> randomByteString 32
+    <*> randomByteString 32
+
 randomObject :: IO (Object (Content ByteString))
 randomObject = do
   bucket <- randomByteString 32
@@ -917,6 +1088,12 @@ randomObjectBucket =
 randomObjectKey :: IO Key
 randomObjectKey =
   Key "objects"
+    <$> randomByteString 32
+    <*> randomByteString 32
+
+randomSetKey :: IO Key
+randomSetKey =
+  Key "sets"
     <$> randomByteString 32
     <*> randomByteString 32
 

@@ -4,10 +4,12 @@ module RiakCounter
   , updateCounter
   ) where
 
+import RiakBucket  (Bucket(..))
 import RiakCrdt
 import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
+import RiakKey     (keyBucket)
 import RiakKey     (Key(..))
 import RiakPutOpts (PutOpts)
 
@@ -16,12 +18,10 @@ import qualified RiakHandle  as Handle
 import qualified RiakKey     as Key
 import qualified RiakPutOpts as PutOpts
 
-import Control.Lens ((.~), (^.))
+import Control.Lens       ((.~), (^.))
+import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto
-
--- TODO UnknownError "\"Counters require bucket property 'allow_mult=true'\""
-
 
 -- | An eventually-convergent counter.
 --
@@ -34,7 +34,7 @@ data ConvergentCounter
   = ConvergentCounter
   { key :: Key -- ^
   , value :: Int64 -- ^
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)
 
 -- | Get an eventually-convergent counter.
 getCounter ::
@@ -86,11 +86,7 @@ updateCounter ::
   -> ConvergentCounter -- ^ Counter update
   -> PutOpts -- ^
   -> m (Either UpdateCounterError ConvergentCounter)
-updateCounter
-    handle
-    (ConvergentCounter key@(Key bucketType _ _) value)
-    opts = liftIO $
-
+updateCounter handle (ConvergentCounter key value) opts = liftIO $
   fromResult <$>
     Handle.updateCrdt handle request
 
@@ -112,7 +108,7 @@ updateCounter
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseUpdateCrdtError bucketType err)
+        Left (parseUpdateCounterError (key ^. keyBucket) err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -133,3 +129,19 @@ updateCounter
         , value =
             response ^. Proto.counterValue
         }
+
+parseUpdateCounterError ::
+     Bucket
+  -> ByteString
+  -> Error 'UpdateCrdtOp
+parseUpdateCounterError bucket@(Bucket bucketType _) err
+  | isBucketTypeDoesNotExistError1 err =
+      BucketTypeDoesNotExistError bucketType
+  | isBucketMustBeAllowMultError err =
+      InvalidBucketError bucket
+  | isInvalidCounterBucketError err =
+      InvalidBucketError bucket
+  | isOperationTypeIsCounterButBucketTypeIsError err =
+      InvalidBucketTypeError bucketType
+  | otherwise =
+      UnknownError (decodeUtf8 err)
