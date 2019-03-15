@@ -92,8 +92,7 @@ module RiakManagedBus
   ) where
 
 import Libriak.Connection (ConnectionError)
-import Libriak.Request    (Request(..))
-import Libriak.Response   (DecodeError, Response)
+import Libriak.Response   (DecodeError)
 import RiakError          (isAllNodesDownError, isDwValUnsatisfiedError,
                            isInsufficientVnodesError0,
                            isInsufficientVnodesError1, isOverloadError,
@@ -166,21 +165,21 @@ data ManagedBusError :: Type where
 
 data EventHandlers
   = EventHandlers
-  { onSend :: forall code. Request code -> IO ()
+  { -- onSend :: forall code. Request code -> IO ()
     -- ^ Called just prior to sending a request.
-  , onReceive :: forall code. Response code -> IO ()
+  -- , onReceive :: forall code. Response code -> IO ()
     -- ^ Called just after receiving a response.
-  , onConnectError :: ConnectException 'Uninterruptible -> IO ()
+    onConnectError :: ConnectException 'Uninterruptible -> IO ()
   , onConnectionError :: ConnectionError -> IO ()
   }
 
 instance Monoid EventHandlers where
-  mempty = EventHandlers mempty mempty mempty mempty
+  mempty = EventHandlers mempty mempty
   mappend = (<>)
 
 instance Semigroup EventHandlers where
-  EventHandlers a1 b1 c1 d1 <> EventHandlers a2 b2 c2 d2 =
-    EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2)
+  EventHandlers a1 b1 <> EventHandlers a2 b2 =
+    EventHandlers (a1 <> a2) (b1 <> b2)
 
 instance Show EventHandlers where
   show _ =
@@ -429,10 +428,10 @@ connect
     handleHandlers :: Handle.EventHandlers
     handleHandlers =
       Handle.EventHandlers
-        { Handle.onSend = onSend handlers
-        , Handle.onReceive = onReceive handlers
-        , Handle.onError = mempty -- FIXME
-        }
+        -- { Handle.onSend = onSend handlers
+        -- , Handle.onReceive = onReceive handlers
+        -- , Handle.onError = mempty -- FIXME
+        -- }
 
 monitorHealth ::
      ManagedBus

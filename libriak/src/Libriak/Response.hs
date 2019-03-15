@@ -1,5 +1,3 @@
-{-# LANGUAGE MagicHash #-}
-
 module Libriak.Response
   ( EncodedResponse(..)
   , DecodeError(..)
@@ -23,19 +21,15 @@ module Libriak.Response
   ) where
 
 import Control.Exception        (Exception)
-import Control.Lens             ((^.))
 import Control.Monad.ST
 import Control.Monad.ST.Unsafe
-import Data.Bifunctor           (first, second)
+import Data.Bifunctor           (first)
 import Data.ByteString          (ByteString)
 import Data.Kind                (Type)
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Word                (Word8)
-import GHC.Exts                 (Proxy#, proxy#)
 import GHC.Ptr                  (Ptr(..))
-import GHC.TypeLits             (KnownNat, Nat, natVal')
-import Unsafe.Coerce
 
 import qualified Data.ByteString.Internal as ByteString
 import qualified Data.Riak.Proto          as Proto

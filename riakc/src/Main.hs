@@ -78,15 +78,17 @@ main = do
             5
         , handlers =
             EventHandlers
-              { onSend =
-                  if verbose
-                    then \msg -> putStrLn (">>> " ++ show msg)
-                    else mempty
-              , onReceive =
-                  if verbose
-                    then \msg -> putStrLn ("<<< " ++ show msg)
-                    else mempty
-              , onConnectError =
+              {
+                -- onSend =
+                --   if verbose
+                --     then \msg -> putStrLn (">>> " ++ show msg)
+                --     else mempty
+              -- , onReceive =
+                --   if verbose
+                --     then \msg -> putStrLn ("<<< " ++ show msg)
+                --     else mempty
+              -- ,
+                onConnectError =
                   if verbose
                     then \ex -> putStrLn ("*** " ++ show ex)
                     else mempty

@@ -30,9 +30,9 @@ main = do
         , retries = 0
         , handlers =
             EventHandlers
-              { onSend = \msg -> putStrLn (">>> " ++ show msg)
-              , onReceive = \msg -> putStrLn ("<<< " ++ show msg)
-              , onConnectError = \ex -> putStrLn ("*** " ++ show ex)
+              { -- onSend = \msg -> putStrLn (">>> " ++ show msg)
+              --, onReceive = \msg -> putStrLn ("<<< " ++ show msg)
+                onConnectError = \ex -> putStrLn ("*** " ++ show ex)
               , onConnectionError = \ex -> putStrLn ("*** " ++ show ex)
               }
         }

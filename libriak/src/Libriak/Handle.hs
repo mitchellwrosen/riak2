@@ -40,24 +40,16 @@ import qualified Libriak.Connection as Connection
 import Control.Applicative                ((<|>))
 import Control.Concurrent
 import Control.Concurrent.Async
-import Control.Concurrent.MVar            (MVar, newMVar, withMVar)
 import Control.Concurrent.STM
-import Control.Exception.Safe             (SomeException, catchAsync, throwIO)
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       ((^.))
+import Control.Monad                      (void)
 import Control.Monad                      (join)
 import Data.ByteString                    (ByteString)
-import Data.Function                      (on)
-import Data.IORef                         (IORef, newIORef, readIORef,
-                                           writeIORef)
 import Data.Kind                          (Type)
 import Data.NF                            (NF, getNF, makeNF)
-import Data.Profunctor                    (lmap)
 import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
-import Data.Proxy
-import GHC.TypeLits                       (KnownNat, sameNat)
-import Socket.Stream.IPv4                 (CloseException(..),
-                                           ConnectException(..), Endpoint(..),
+import Socket.Stream.IPv4                 (ConnectException(..), Endpoint(..),
                                            Interruptibility(..))
 
 import qualified Data.Riak.Proto as Proto
@@ -69,8 +61,6 @@ data Handle
   = Handle
   { stateVar :: TVar State
   , queue :: TBQueue Item
-  , sendAsync :: Async ()
-  , receiveAsync :: Async ()
   , handlers :: EventHandlers
   }
 
@@ -83,24 +73,30 @@ data State
 
 data Item :: Type where
   Exchange ::
-       NF EncodedRequest
+       TVar Bool
+    -> NF EncodedRequest
     -> TMVar (Either HandleError EncodedResponse)
     -> Item
 
   Stream ::
-       NF EncodedRequest
+       HasLens' response "done" Bool
+    => TVar Bool
+    -> NF EncodedRequest
     -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
-    -> TQueue (Either HandleError response)
+    -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
     -> Item
 
 data SentItem :: Type where
   Exchange' ::
-       TMVar (Either HandleError EncodedResponse)
+       TVar Bool
+    -> TMVar (Either HandleError EncodedResponse)
     -> SentItem
 
   Stream' ::
-       (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
-    -> TQueue (Either HandleError response)
+       HasLens' response "done" Bool
+    => TVar Bool
+    -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+    -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
     -> SentItem
 
 data HandleError :: Type where
@@ -131,6 +127,9 @@ data EventHandlers
 
 -- | Acquire a handle.
 --
+-- This function must be called with asynchronous exceptions masked, and the
+-- caller must eventually call 'disconnect'.
+--
 -- /Throws/: This function will never throw an exception.
 connect ::
      Endpoint
@@ -154,27 +153,25 @@ connect endpoint handlers =
       sentItemQueue :: TQueue SentItem <-
         newTQueueIO
 
-      sendAsync <-
-        async
+      void . forkIO $ do
+        concurrently_
           (sendThread
             stateVar
             streamingVar
             itemQueue
             sentItemQueue
             connection)
+          (receiveThread
+            stateVar
+            streamingVar
+            sentItemQueue
+            connection)
 
-      receiveAsync <-
-        async
-          undefined
-
-      -- Close connection!
-      -- Fork recv thread!
+        () <$ Connection.disconnect connection
 
       pure (Right Handle
         { stateVar = stateVar
         , queue = itemQueue
-        , sendAsync = sendAsync
-        , receiveAsync = receiveAsync
         , handlers = handlers
         })
 
@@ -191,7 +188,7 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
   where
     loop :: IO ()
     loop =
-      join (atomically (processItem <|> stopIfDisconnected))
+      join (atomically (processItem <|> stopIfDisconnected stateVar))
 
     processItem :: STM (IO ())
     processItem =
@@ -200,30 +197,31 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
 
     sendItem :: Item -> IO ()
     sendItem = \case
-      Exchange request responseVar ->
+      Exchange timeoutVar request responseVar ->
         Connection.send connection (getNF request) >>= \case
-          Left err -> do
-            atomically (writeTVar stateVar Disconnected)
-
-            atomically
-              (putTMVar
+          Left err ->
+            atomically $ do
+              putTMVar
                 responseVar
-                (Left (HandleConnectionError err)))
+                (Left (HandleConnectionError err))
+
+              writeTVar stateVar Disconnected
 
           Right () -> do
-            atomically (writeTQueue sentItemQueue (Exchange' responseVar))
+            atomically
+              (writeTQueue sentItemQueue (Exchange' timeoutVar responseVar))
 
             loop
 
-      Stream request parseResponse responseQueue ->
+      Stream timeoutVar request decodeResponse responseQueue ->
         Connection.send connection (getNF request) >>= \case
-          Left err -> do
-            atomically (writeTVar stateVar Disconnected)
-
-            atomically
-              (writeTQueue
+          Left err ->
+            atomically $ do
+              writeTQueue
                 responseQueue
-                (Left (HandleConnectionError err)))
+                (Left (HandleConnectionError err))
+
+              writeTVar stateVar Disconnected
 
           Right () -> do
             atomically $ do
@@ -232,7 +230,8 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
               writeTQueue
                 sentItemQueue
                 (Stream'
-                  parseResponse
+                  timeoutVar
+                  decodeResponse
                   responseQueue)
 
             join . atomically $
@@ -240,25 +239,99 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
                 True -> retry
                 False -> pure loop)
               <|>
-              stopIfDisconnected
+              (stopIfDisconnected stateVar)
 
-    stopIfDisconnected :: STM (IO ())
-    stopIfDisconnected =
-      readTVar stateVar >>= \case
-        Connected -> retry
-        Disconnected -> pure (pure ())
+receiveThread ::
+     TVar State
+  -> TVar Bool
+  -> TQueue SentItem
+  -> Connection
+  -> IO ()
+receiveThread stateVar streamingVar sentItemQueue connection =
+  loop
+
+  where
+    loop :: IO ()
+    loop =
+      join . atomically $
+        (handleItem <$> readTQueue sentItemQueue)
+        <|>
+        stopIfDisconnected stateVar
+
+    handleItem :: SentItem -> IO ()
+    handleItem = \case
+      Exchange' timeoutVar responseVar ->
+        Connection.receive timeoutVar connection >>= \case
+          Left err ->
+            atomically $ do
+              putTMVar responseVar (Left (HandleConnectionError err))
+              writeTVar stateVar Disconnected
+
+          Right response -> do
+            atomically (putTMVar responseVar (Right response))
+            loop
+
+      Stream' timeoutVar decodeResponse responseQueue -> do
+        streamResponse timeoutVar decodeResponse responseQueue
+
+    streamResponse ::
+         forall response.
+         HasLens' response "done" Bool
+      => TVar Bool
+      -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+      -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+      -> IO ()
+    streamResponse timeoutVar decodeResponse responseQueue =
+      receiveLoop
+
+      where
+        receiveLoop :: IO ()
+        receiveLoop =
+          Connection.receive timeoutVar connection >>= \case
+            Left err ->
+              atomically $ do
+                writeTQueue responseQueue (Left (HandleConnectionError err))
+                writeTVar stateVar Disconnected
+
+            Right response ->
+              case decodeResponse response of
+                Left err ->
+                  -- Hrm, thread that called 'stream' might see 'Disconnected'
+                  -- before its own decode error... ;(
+                  atomically $ do
+                    writeTQueue responseQueue (Left (HandleDecodeError err))
+                    writeTVar stateVar Disconnected
+
+                Right (Left response) -> do
+                  atomically $ do
+                    writeTQueue responseQueue (Right (Left response))
+                    writeTVar streamingVar False
+                  loop
+
+                Right (Right response) -> do
+                  atomically (writeTQueue responseQueue (Right (Right response)))
+
+                  if response ^. Proto.done
+                    then do
+                      atomically (writeTVar streamingVar False)
+                      loop
+                    else
+                      receiveLoop
+
+stopIfDisconnected :: TVar State -> STM (IO ())
+stopIfDisconnected stateVar =
+  readTVar stateVar >>= \case
+    Connected -> retry
+    Disconnected -> pure (pure ())
 
 -- | Disconnect a handle if it's not already disconnected.
 --
 -- /Throws/: This function will never throw an exception.
 disconnect ::
      Handle
-  -> IO (Either CloseException ())
-disconnect Handle { stateVar } =
-  join . atomically $
-    readTVar stateVar >>= \case
-
-    writeTVar stateVar Disconnected)
+  -> IO ()
+disconnect Handle { stateVar } = do
+  atomically (writeTVar stateVar Disconnected)
 
 -- | Send a request and receive the response (a single message).
 exchange ::
@@ -285,7 +358,7 @@ exchange
       atomically
         (writeTBQueue
           queue
-          (Exchange (makeNF request) responseVar))
+          (Exchange timeoutVar (makeNF request) responseVar))
 
       join . atomically $
         (do
@@ -329,9 +402,9 @@ stream ::
   -> IO (Either HandleError (Either ByteString r))
 stream
     timeoutVar
-    handle@(Handle { handlers, queue, stateVar })
+    (Handle { queue, stateVar })
     request
-    parseResponse
+    decodeResponse
     (FoldM step (initial :: IO x) extract) =
 
   readTVarIO stateVar >>= \case
@@ -339,22 +412,23 @@ stream
       pure (Left HandleClosedError)
 
     Connected -> do
-      responseQueue :: TQueue (Either HandleError response) <-
+      responseQueue :: TQueue (Either HandleError (Either Proto.RpbErrorResp response)) <-
         newTQueueIO
 
       atomically
         (writeTBQueue
           queue
           (Stream
+            timeoutVar
             (makeNF request)
-            parseResponse
+            decodeResponse
             responseQueue))
 
       processResponse responseQueue
 
   where
     processResponse ::
-         TQueue (Either HandleError response)
+         TQueue (Either HandleError (Either Proto.RpbErrorResp response))
       -> IO (Either HandleError (Either ByteString r))
     processResponse responseQueue =
       initial >>= loop
@@ -364,7 +438,7 @@ stream
         loop acc =
           join . atomically $
             (do
-              response :: Either HandleError response <-
+              response :: Either HandleError (Either Proto.RpbErrorResp response) <-
                 readTQueue responseQueue
 
               pure $
@@ -372,7 +446,10 @@ stream
                   Left err ->
                     pure (Left err)
 
-                  Right response -> do
+                  Right (Left response) ->
+                    pure (Right (Left (response ^. Proto.errmsg)))
+
+                  Right (Right response) -> do
                     acc' :: x <-
                       step acc response
 

@@ -27,13 +27,11 @@ module Libriak.Request
 import Control.DeepSeq          (NFData(..))
 import Control.Monad.ST
 import Data.ByteString.Internal (ByteString(..))
-import Data.Kind                (Type)
 import Data.List                (foldl')
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Word                (Word8)
 import GHC.ForeignPtr           (ForeignPtr(..))
-import GHC.TypeLits             (KnownNat, Nat)
 
 import qualified Data.ProtoLens  as Proto
 import qualified Data.Riak.Proto as Proto
