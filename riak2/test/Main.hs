@@ -6,11 +6,12 @@ import RiakBinaryIndexQuery (BinaryIndexQuery(..), inBucket)
 import RiakBucket           (Bucket(..), getBucket, getCounterBucket,
                              getHyperLogLogBucket, getMapBucket, getSetBucket,
                              listKeys, queryBinaryIndex, queryIntIndex,
-                             setBucketIndex, unsetBucketIndex)
+                             resetBucket, setBucketIndex, unsetBucketIndex)
 import RiakBucketProps      (BucketProps(..))
 import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
                              getCounterBucketType, getHyperLogLogBucketType,
-                             getMapBucketType, getSetBucketType, listBuckets)
+                             getMapBucketType, getSetBucketType, listBuckets,
+                             setBucketTypeIndex, unsetBucketTypeIndex)
 import RiakContent          (Content, newContent)
 import RiakContext          (newContext)
 import RiakCounter          (ConvergentCounter(..), getCounter, updateCounter)
@@ -282,26 +283,38 @@ riakBucketTests handle =
           `shouldReturn` Right 1
 
     , testGroup "failures"
-      [ ]
-      -- [ testCase "bucket type does not exist" $ do
-      --     bucket <- Bucket <$> randomBucketType <*> pure "a"
-      --     queryIntIndex
-      --       handle
-      --       (IntIndexQuery { bucket = bucket, index = "a", minValue = 1, maxValue = 1 })
-      --       (Foldl.generalize Foldl.length)
-      --       `shouldReturn` Right 0
-      -- ]
+      [ testCase "bucket type does not exist" $ do
+          bucketType <- randomBucketType
+          let bucket = Bucket bucketType "a"
+          queryIntIndex
+            handle
+            (IntIndexQuery { bucket = bucket, index = "a", minValue = 1, maxValue = 1 })
+            (Foldl.generalize Foldl.length)
+            `shouldReturn` Left (BucketTypeDoesNotExistError bucketType)
+      ]
     ]
 
   , testGroup "queryIntIndexTerms" [ ]
 
-  , testGroup "resetBucket" [ ]
+  , testGroup "resetBucket"
+    [ testCase "non-existent bucket type works for some reason" $ do
+        bucketType <- randomBucketType
+        resetBucket handle (Bucket bucketType "a") `shouldReturn` Right ()
+
+    , testCase "empty bucket works for some reason" $ do
+        bucketType <- randomBucketType
+        let bucket = Bucket bucketType ""
+        resetBucket handle bucket `shouldReturn` Right ()
+    ]
 
   , testGroup "setBucketIndex"
     [ testCase "success" $ do
         bucket <- randomDefaultBucket
         setBucketIndex handle bucket index3 `shouldReturn`
           Right ()
+
+      , testCase "empty bucket works for some reason" $ do
+          setBucketIndex handle (Bucket defaultBucketType "") index3 >>= print
 
     , testGroup "failures"
       [ testCase "bucket type does not exist" $ do
@@ -314,6 +327,12 @@ riakBucketTests handle =
           index <- unsafeMakeIndexName <$> randomText 32
           setBucketIndex handle bucket index `shouldReturn`
             Left (IndexDoesNotExistError index)
+
+      , testCase "invalid index name" $ do
+          bucket <- randomDefaultBucket
+          setBucketIndex handle bucket (unsafeMakeIndexName "∙") >>= \case
+            Left (UnknownError _) -> pure ()
+            _ -> assertFailure ""
 
       , testCase "invalid n_val" $ do
           bucket <- randomDefaultBucket
@@ -346,22 +365,22 @@ riakBucketTypeTests handle =
           result -> assertFailure (show result)
 
     , testCase "counter bucket type" $ do
-        getBucketType handle counterBucketType >>= \case
+        getBucketType handle countersBucketType >>= \case
           Right SomeCounterBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "hll bucket type" $ do
-        getBucketType handle hyperLogLogBucketType >>= \case
+        getBucketType handle hllsBucketType >>= \case
           Right SomeHyperLogLogBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "map bucket type" $ do
-        getBucketType handle mapBucketType >>= \case
+        getBucketType handle mapsBucketType >>= \case
           Right SomeMapBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
     , testCase "set bucket type" $ do
-        getBucketType handle setBucketType >>= \case
+        getBucketType handle setsBucketType >>= \case
           Right SomeSetBucketProps{} -> pure ()
           result -> assertFailure (show result)
 
@@ -375,7 +394,7 @@ riakBucketTypeTests handle =
 
   , testGroup "getCounterBucketType"
     [ testCase "success" $ do
-        getCounterBucketType handle counterBucketType `shouldReturnSatisfy` isRight
+        getCounterBucketType handle countersBucketType `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-counter bucket type" $ do
@@ -391,7 +410,7 @@ riakBucketTypeTests handle =
 
   , testGroup "getHyperLogLogBucketType"
     [ testCase "success" $ do
-        getHyperLogLogBucketType handle hyperLogLogBucketType `shouldReturnSatisfy` isRight
+        getHyperLogLogBucketType handle hllsBucketType `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-hll bucket type" $ do
@@ -407,7 +426,7 @@ riakBucketTypeTests handle =
 
   , testGroup "getMapBucketType"
     [ testCase "success" $ do
-        getMapBucketType handle mapBucketType `shouldReturnSatisfy` isRight
+        getMapBucketType handle mapsBucketType `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-map bucket type" $ do
@@ -423,7 +442,7 @@ riakBucketTypeTests handle =
 
   , testGroup "getSetBucketType"
     [ testCase "success" $ do
-        getSetBucketType handle setBucketType `shouldReturnSatisfy` isRight
+        getSetBucketType handle setsBucketType `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "non-set bucket type" $ do
@@ -437,8 +456,37 @@ riakBucketTypeTests handle =
       ]
     ]
 
-  , testGroup "setBucketTypeIndex" []
-  , testGroup "unsetBucketTypeIndex" []
+  , testGroup "setBucketTypeIndex"
+    [ testGroup "failures"
+      [ testCase "bucket type does not exist" $ do
+          bucketType <- randomBucketType
+          setBucketTypeIndex handle bucketType index3 `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+
+      , testCase "index does not exist" $ do
+          index <- unsafeMakeIndexName <$> randomText 32
+          setBucketTypeIndex handle countersBucketType index `shouldReturn`
+            Left (IndexDoesNotExistError index)
+
+      , testCase "invalid index name" $ do
+          setBucketTypeIndex handle countersBucketType (unsafeMakeIndexName "∙") >>= \case
+            Left (UnknownError _) -> pure ()
+            _ -> assertFailure ""
+
+      , testCase "invalid n_val" $ do
+          setBucketTypeIndex handle countersBucketType index1 `shouldReturn`
+            Left InvalidNodesError
+      ]
+    ]
+
+  , testGroup "unsetBucketTypeIndex"
+    [ testGroup "failures"
+      [ testCase "bucket type does not exist" $ do
+          bucketType <- randomBucketType
+          unsetBucketTypeIndex handle bucketType `shouldReturn`
+            Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
 
   , testGroup "listBuckets"
     [ testGroup "failures"
@@ -446,6 +494,10 @@ riakBucketTypeTests handle =
           bucketType <- randomBucketType
           listBuckets handle bucketType `shouldReturn`
             Left (BucketTypeDoesNotExistError bucketType)
+
+      , testCase "empty bucket type" $ do
+          listBuckets handle "" `shouldReturn`
+            Left (BucketTypeDoesNotExistError "")
       ]
     ]
   ]
@@ -460,7 +512,11 @@ riakCounterTests handle =
     ]
 
   , testGroup "updateCounter"
-    [ testGroup "failures"
+    [ testCase "empty bucket works for some reason" $ do
+        key <- (keyBucketSegment .~ "") <$> randomCounterKey
+        updateCounter handle (ConvergentCounter key 1) def `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
           updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
@@ -499,7 +555,11 @@ riakHyperLogLogTests handle =
     ]
 
   , testGroup "updateHyperLogLog"
-    [ testGroup "failures"
+    [ testCase "empty bucket works for some reason" $ do
+        key <- (keyBucketSegment .~ "") <$> randomHyperLogLogKey
+        updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
           updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
@@ -570,7 +630,11 @@ riakMapTests handle =
     ]
 
   , testGroup "putMap"
-    [ testGroup "failures"
+    [ testCase "empty bucket works for some reason" $ do
+        key <- (keyBucketSegment .~ "") <$> randomMapKey
+        putMap handle (emptyMap key) def `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
           putMap handle (emptyMap key) def `shouldReturn`
@@ -782,7 +846,11 @@ riakSetTests handle =
     ]
 
   , testGroup "putSet"
-    [ testGroup "failures"
+    [ testCase "empty bucket works for some reason" $ do
+        key <- (keyBucketSegment .~ "") <$> randomSetKey
+        putSet handle (emptySet key) def `shouldReturnSatisfy` isRight
+
+    , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
           putSet handle (emptySet key) def `shouldReturn`
@@ -958,20 +1026,20 @@ riakSetTests handle =
 -- randomKeyNameString :: IO [Char]
 -- randomKeyNameString = randomBucketNameString
 
-counterBucketType :: BucketType
-counterBucketType =
+countersBucketType :: BucketType
+countersBucketType =
   "counters"
 
-hyperLogLogBucketType :: BucketType
-hyperLogLogBucketType =
+hllsBucketType :: BucketType
+hllsBucketType =
   "hlls"
 
-mapBucketType :: BucketType
-mapBucketType =
+mapsBucketType :: BucketType
+mapsBucketType =
   "maps"
 
-setBucketType :: BucketType
-setBucketType =
+setsBucketType :: BucketType
+setsBucketType =
   "sets"
 
 index1 :: IndexName

@@ -155,8 +155,7 @@ module Riak
   , PutOpts(..)
   , PutSchemaError
   , PutSetError
-  , QueryExactError
-  , QueryRangeError
+  , QueryIndexError
   , Quorum(..)
   , ReadQuorum(..)
   , Schema(..)

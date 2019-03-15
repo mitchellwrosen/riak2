@@ -384,10 +384,9 @@ resetBucket ::
      MonadIO m
   => Handle -- ^
   -> Bucket -- ^
-  -> m (Either HandleError (Either ByteString ()))
+  -> m (Either ResetBucketError ())
 resetBucket handle (Bucket bucketType bucket) = liftIO $
-  (fmap.fmap) (() <$)
-    (Handle.resetBucket handle request)
+  fromResult <$> Handle.resetBucket handle request
 
   where
     request :: Proto.RpbResetBucketReq
@@ -396,13 +395,31 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
         & Proto.bucket .~ bucket
         & Proto.type' .~ bucketType
 
+    fromResult ::
+         Either HandleError (Either ByteString ())
+      -> Either ResetBucketError ()
+    fromResult = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseResetBucketError err)
+
+      Right (Right _) ->
+        Right ()
+
+parseResetBucketError :: ByteString -> ResetBucketError
+parseResetBucketError err
+  | otherwise =
+      UnknownError (decodeUtf8 err)
+
 -- | Perform a query on a binary secondary index.
 queryBinaryIndex ::
      MonadIO m
   => Handle -- ^
   -> BinaryIndexQuery -- ^
   -> FoldM IO Key r -- ^
-  -> m (Either QueryRangeError r)
+  -> m (Either QueryIndexError r)
 queryBinaryIndex
     handle
     query@(BinaryIndexQuery { bucket, minValue, maxValue })
@@ -452,7 +469,7 @@ queryBinaryIndexTerms ::
   => Handle -- ^
   -> BinaryIndexQuery -- ^
   -> FoldM IO (ByteString, Key) r -- ^
-  -> m (Either QueryRangeError r)
+  -> m (Either QueryIndexError r)
 queryBinaryIndexTerms
     handle
     BinaryIndexQuery { bucket, index, minValue, maxValue }
@@ -519,7 +536,7 @@ queryIntIndex ::
   => Handle -- ^
   -> IntIndexQuery -- ^
   -> FoldM IO Key r -- ^
-  -> m (Either QueryRangeError r)
+  -> m (Either QueryIndexError r)
 queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
   doIndex
     handle
@@ -565,7 +582,7 @@ queryIntIndexTerms ::
   => Handle -- ^
   -> IntIndexQuery -- ^
   -> FoldM IO (Int64, Key) r -- ^
-  -> m (Either QueryRangeError r)
+  -> m (Either QueryIndexError r)
 queryIntIndexTerms
     handle
     IntIndexQuery { bucket, index, minValue, maxValue }
@@ -647,7 +664,9 @@ parseSecondaryIndexQueryError ::
      Bucket
   -> ByteString
   -> Error 'SecondaryIndexQueryOp
-parseSecondaryIndexQueryError bucket err
+parseSecondaryIndexQueryError bucket@(Bucket bucketType _) err
+  | isBucketTypeDoesNotExistError5 err =
+      BucketTypeDoesNotExistError bucketType
   | isSecondaryIndexesNotSupportedError err =
       SecondaryIndexesNotSupportedError bucket
   | otherwise =

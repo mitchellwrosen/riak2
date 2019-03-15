@@ -118,6 +118,7 @@ data Op
   | PutIndexOp
   | PutOp
   | PutSchemaOp
+  | ResetBucketOp
   | SearchOp
   | SecondaryIndexQueryOp
   | SetBucketIndexOp
@@ -153,8 +154,8 @@ type PutIndexError                 = Error 'PutIndexOp
 type PutMapError                   = Error 'UpdateCrdtOp
 type PutSchemaError                = Error 'PutSchemaOp
 type PutSetError                   = Error 'UpdateCrdtOp
-type QueryExactError               = Error 'SecondaryIndexQueryOp
-type QueryRangeError               = Error 'SecondaryIndexQueryOp
+type QueryIndexError               = Error 'SecondaryIndexQueryOp
+type ResetBucketError              = Error 'ResetBucketOp
 type SearchError                   = Error 'SearchOp
 type SetBucketIndexError           = Error 'SetBucketIndexOp
 type SetBucketTypeIndexError       = Error 'SetBucketTypeIndexOp
@@ -163,18 +164,19 @@ type UpdateCounterError            = Error 'UpdateCrdtOp
 type UpdateHyperLogLogError        = Error 'UpdateCrdtOp
 
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where
-  MayReturnBucketTypeDoesNotExist 'GetOp                = 'True
-  MayReturnBucketTypeDoesNotExist 'GetBucketOp          = 'True
-  MayReturnBucketTypeDoesNotExist 'GetCrdtOp            = 'True
-  MayReturnBucketTypeDoesNotExist 'GetSomeBucketOp      = 'True
-  MayReturnBucketTypeDoesNotExist 'ListBucketsOp        = 'True
-  MayReturnBucketTypeDoesNotExist 'ListKeysOp           = 'True
-  MayReturnBucketTypeDoesNotExist 'PutOp                = 'True
-  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp     = 'True
-  MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp = 'True
-  MayReturnBucketTypeDoesNotExist 'UnsetBucketIndexOp   = 'True
-  MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp         = 'True
-  MayReturnBucketTypeDoesNotExist _                     = 'False
+  MayReturnBucketTypeDoesNotExist 'GetOp                 = 'True
+  MayReturnBucketTypeDoesNotExist 'GetBucketOp           = 'True
+  MayReturnBucketTypeDoesNotExist 'GetCrdtOp             = 'True
+  MayReturnBucketTypeDoesNotExist 'GetSomeBucketOp       = 'True
+  MayReturnBucketTypeDoesNotExist 'ListBucketsOp         = 'True
+  MayReturnBucketTypeDoesNotExist 'ListKeysOp            = 'True
+  MayReturnBucketTypeDoesNotExist 'PutOp                 = 'True
+  MayReturnBucketTypeDoesNotExist 'SecondaryIndexQueryOp = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketIndexOp      = 'True
+  MayReturnBucketTypeDoesNotExist 'SetBucketTypeIndexOp  = 'True
+  MayReturnBucketTypeDoesNotExist 'UnsetBucketIndexOp    = 'True
+  MayReturnBucketTypeDoesNotExist 'UpdateCrdtOp          = 'True
+  MayReturnBucketTypeDoesNotExist _                      = 'False
 
 type family MayReturnIndexDoesNotExist (op :: Op) :: Bool where
   MayReturnBucketTypeDoesNotExist 'SearchOp             = 'True
@@ -253,6 +255,22 @@ isBucketTypeDoesNotExistError3 =
 isBucketTypeDoesNotExistError4 :: ByteString -> Bool
 isBucketTypeDoesNotExistError4 =
   ByteString.isPrefixOf "No bucket-type named '"
+
+isBucketTypeDoesNotExistError5 :: ByteString -> Bool
+isBucketTypeDoesNotExistError5 =
+  isRight . Atto.parseOnly parser
+
+  where
+    parser :: Atto.Parser ()
+    parser = do
+      Atto.string "Error processing incoming message: error:{badmatch," *> Atto.skipSpace
+      Atto.string "{error," *> Atto.skipSpace
+      Atto.string "{function_clause," *> Atto.skipSpace
+      Atto.string "[{proplists," *> Atto.skipSpace
+      Atto.string "get_value," *> Atto.skipSpace
+      Atto.string "[n_val," *> Atto.skipSpace
+      Atto.string "{error," *> Atto.skipSpace
+      Atto.string "no_type}" $> ()
 
 -- Can't delete index with associate buckets [{<<\"objects\">>,<<\"foo\">>},\n    {<<\"objects\">>,<<\"bar\">>}]
 isHasAssociatedBucketsError :: ByteString -> Maybe [Bucket]

@@ -1003,7 +1003,7 @@ queryParser =
           pure ()
 
       where
-        doQuery_ :: IO (Either QueryRangeError ())
+        doQuery_ :: IO (Either QueryIndexError ())
         doQuery_ = do
           case (val1, val2) of
             (Left s, Nothing) ->
