@@ -96,8 +96,8 @@ import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakError          (isAllNodesDownError, isInsufficientVnodesError0,
                            isInsufficientVnodesError1, isPrValUnsatisfied,
-                           isPwValUnsatisfied, isTimeoutError,
-                           isUnknownMessageCodeError)
+                           isWValUnsatisfied, isPwValUnsatisfied, isRValUnsatisfied,
+                           isTimeoutError, isUnknownMessageCodeError)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -736,10 +736,7 @@ get bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    (\err ->
-      isInsufficientVnodesError1 err ||
-      isPrValUnsatisfied err ||
-      isUnknownMessageCodeError err)
+    getReqShouldRetry
     (translateTimeout <$>
       (withHandle timeoutVar bus $ \timeoutVar handle ->
         Handle.get timeoutVar handle request))
@@ -782,10 +779,7 @@ getCrdt bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    (\err ->
-      isInsufficientVnodesError1 err ||
-      isPrValUnsatisfied err ||
-      isUnknownMessageCodeError err)
+    getReqShouldRetry
     (withHandle timeoutVar bus $ \timeoutVar handle ->
       Handle.getCrdt timeoutVar handle request)
 
@@ -898,10 +892,7 @@ put bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    (\err ->
-      isAllNodesDownError err ||
-      isPwValUnsatisfied err ||
-      isUnknownMessageCodeError err)
+    putReqShouldRetry
     (translateTimeout <$>
       (withHandle timeoutVar bus $ \timeoutVar handle ->
         Handle.put timeoutVar handle request))
@@ -1011,13 +1002,24 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
 
   retrying
     timeoutVar
-    (\err ->
-      isAllNodesDownError err ||
-      isPwValUnsatisfied err ||
-      isUnknownMessageCodeError err)
+    putReqShouldRetry
     (translateTimeout <$>
       (withHandle timeoutVar bus $ \timeoutVar handle ->
         Handle.updateCrdt timeoutVar handle request))
+
+getReqShouldRetry :: ByteString -> Bool
+getReqShouldRetry err =
+  isInsufficientVnodesError1 err ||
+  isPrValUnsatisfied err ||
+  isRValUnsatisfied err ||
+  isUnknownMessageCodeError err
+
+putReqShouldRetry :: ByteString -> Bool
+putReqShouldRetry err =
+  isAllNodesDownError err ||
+  isPwValUnsatisfied err ||
+  isUnknownMessageCodeError err ||
+  isWValUnsatisfied err
 
 retrying ::
      forall r.

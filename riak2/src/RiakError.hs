@@ -408,6 +408,10 @@ isPwValUnsatisfied :: ByteString -> Bool
 isPwValUnsatisfied =
   ByteString.isPrefixOf "{pw_val_unsatisfied"
 
+isRValUnsatisfied :: ByteString -> Bool
+isRValUnsatisfied =
+  ByteString.isPrefixOf "{r_val_unsatisfied"
+
 isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =
   (== "Schema not found")
@@ -427,3 +431,7 @@ isTimeoutError =
 isUnknownMessageCodeError :: ByteString -> Bool
 isUnknownMessageCodeError =
   ByteString.isPrefixOf "Unknown message code:"
+
+isWValUnsatisfied :: ByteString -> Bool
+isWValUnsatisfied =
+  ByteString.isPrefixOf "{w_val_unsatisfied"
