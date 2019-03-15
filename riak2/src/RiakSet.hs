@@ -208,7 +208,5 @@ parsePutSetError bucket@(Bucket bucketType _) err
       InvalidBucketTypeError bucketType
   | isOperationTypeIsSetButBucketTypeIsError err =
       InvalidBucketTypeError bucketType
-  | isTimeoutError err =
-      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)

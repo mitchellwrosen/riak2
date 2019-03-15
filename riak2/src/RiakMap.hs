@@ -19,12 +19,11 @@ import RiakKey         (Key(..), isGeneratedKey, keyBucket)
 import RiakMapValue    (ConvergentMapValue(..), emptyMapValue)
 import RiakPutOpts     (PutOpts)
 
-import qualified RiakGetOpts     as GetOpts
-import qualified RiakHandle      as Handle
-import qualified RiakHandleError as HandleError
-import qualified RiakKey         as Key
-import qualified RiakMapValue    as MapValue
-import qualified RiakPutOpts     as PutOpts
+import qualified RiakGetOpts  as GetOpts
+import qualified RiakHandle   as Handle
+import qualified RiakKey      as Key
+import qualified RiakMapValue as MapValue
+import qualified RiakPutOpts  as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)
@@ -86,7 +85,7 @@ getMap handle key@(Key bucketType _ _) opts = liftIO $
         & Key.setProto key
 
     fromResult ::
-         Either HandleError (Either ByteString Proto.DtFetchResp)
+         Either [HandleError] (Either ByteString Proto.DtFetchResp)
       -> Either GetMapError (Maybe (ConvergentMap ConvergentMapValue))
     fromResult = \case
       Left err ->
@@ -194,7 +193,5 @@ parsePutMapError bucket@(Bucket bucketType _) err
       InvalidBucketTypeError bucketType
   | isOperationTypeIsMapButBucketTypeIsError err =
       InvalidBucketTypeError bucketType
-  | isTimeoutError err =
-      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)

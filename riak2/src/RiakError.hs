@@ -90,8 +90,9 @@ data Error :: Op -> Type where
        Error 'PutIndexOp
 
   -- | An error was returned by the underlying handle.
+  -- TODO name HandleErrors differently
   HandleError ::
-       HandleError.HandleError
+       [HandleError.HandleError]
     -> Error op
 
   -- | An error was returned by Riak, but this library couldn't parse it. Please

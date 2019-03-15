@@ -15,7 +15,7 @@ import Data.ByteString        (ByteString)
 ping ::
      MonadIO m
   => Handle -- ^
-  -> m (Either HandleError (Either ByteString ()))
+  -> m (Either [HandleError] (Either ByteString ()))
 ping handle = liftIO $
   (fmap.fmap) (() <$)
     (Handle.ping handle)

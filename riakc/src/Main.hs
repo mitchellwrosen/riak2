@@ -69,13 +69,13 @@ main = do
               , port = port
               }
         , retries =
-            3
+            0
         , healthCheckInterval =
-            5
+            0
         , idleTimeout =
-            60
+            0
         , requestTimeout =
-            30
+            5
         , handlers =
             EventHandlers
               { onSend =
@@ -87,9 +87,13 @@ main = do
                     then \msg -> putStrLn ("<<< " ++ show msg)
                     else mempty
               , onConnectError =
-                  print
+                  if verbose
+                    then \ex -> putStrLn ("*** " ++ show ex)
+                    else mempty
               , onConnectionError =
-                  print
+                  if verbose
+                    then \ex -> putStrLn ("*** " ++ show ex)
+                    else mempty
               }
         }
 
@@ -1187,7 +1191,6 @@ searchParser =
       -> Handle
       -> IO ()
     doSearch index query fields filter presort rows sort start handle =
-      -- TODO search options
       search handle index (encodeUtf8 query) opts >>= \case
         Left err -> do
           print err

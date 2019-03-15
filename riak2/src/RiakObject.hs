@@ -1,6 +1,3 @@
--- TODO timeout variants since Riak will only return {error, timeout} if one was
--- requested?
---
 -- TODO add *With variants
 
 module RiakObject where
@@ -205,8 +202,6 @@ parseGetError request err
       InvalidKeyError (Key.fromProto request)
   | isOverloadError err =
       OverloadError
-  | isTimeoutError err =
-      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -321,8 +316,6 @@ parsePutError request err
       InvalidNodesError
   | isOverloadError err =
       OverloadError
-  | isTimeoutError err =
-      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)
 

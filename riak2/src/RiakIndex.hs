@@ -88,7 +88,7 @@ getIndexes handle = liftIO $
 
   where
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbYokozunaIndexGetResp)
+         Either [HandleError] (Either ByteString Proto.RpbYokozunaIndexGetResp)
       -> Either GetIndexError [Index]
     fromResult = \case
       Left err ->
@@ -232,7 +232,7 @@ deleteIndex handle name = liftIO $
 
   where
     fromResult ::
-         Either HandleError (Either ByteString ())
+         Either [HandleError] (Either ByteString ())
       -> Either DeleteIndexError Bool
     fromResult = \case
       Left err ->

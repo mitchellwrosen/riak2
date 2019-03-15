@@ -33,6 +33,16 @@ data DecodeError :: Type where
   UnexpectedMessageCode :: Word8 -> Word8 -> DecodeError
   deriving anyclass (Exception)
 
+instance Eq DecodeError where
+  ProtobufDecodeError a1 b1   == ProtobufDecodeError a2 b2   = a1 == a2 && b1 == b2
+  ProtobufDecodeError{}       == _                           = False
+
+  UnexpectedResponse a1 b1    == UnexpectedResponse a2 b2    = a1 == a2 && responseEq b1 b2
+  UnexpectedResponse{}        == _                           = False
+
+  UnexpectedMessageCode a1 b1 == UnexpectedMessageCode a2 b2 = a1 == a2 && b1 == b2
+  UnexpectedMessageCode{}     == _                           = False
+
 deriving instance Show DecodeError
 
 data Response :: Nat -> Type where
@@ -56,6 +66,44 @@ data Response :: Nat -> Type where
   RespDtUpdate             :: Proto.DtUpdateResp             -> Response 83
 
 deriving stock instance Show (Response code)
+
+responseEq :: Response code1 -> Response code2 -> Bool
+responseEq (RespRpbError x)             (RespRpbError y)             = x == y
+responseEq  RespRpbError{}              _                            = False
+responseEq (RespRpbPing x)              (RespRpbPing y)              = x == y
+responseEq  RespRpbPing{}               _                            = False
+responseEq (RespRpbGetServerInfo x)     (RespRpbGetServerInfo y)     = x == y
+responseEq  RespRpbGetServerInfo{}      _                            = False
+responseEq (RespRpbGet x)               (RespRpbGet y)               = x == y
+responseEq  RespRpbGet{}                _                            = False
+responseEq (RespRpbPut x)               (RespRpbPut y)               = x == y
+responseEq  RespRpbPut{}                _                            = False
+responseEq (RespRpbDel x)               (RespRpbDel y)               = x == y
+responseEq  RespRpbDel{}                _                            = False
+responseEq (RespRpbListBuckets x)       (RespRpbListBuckets y)       = x == y
+responseEq  RespRpbListBuckets{}        _                            = False
+responseEq (RespRpbListKeys x)          (RespRpbListKeys y)          = x == y
+responseEq  RespRpbListKeys{}           _                            = False
+responseEq (RespRpbGetBucket x)         (RespRpbGetBucket y)         = x == y
+responseEq  RespRpbGetBucket{}          _                            = False
+responseEq (RespRpbSetBucket x)         (RespRpbSetBucket y)         = x == y
+responseEq  RespRpbSetBucket{}          _                            = False
+responseEq (RespRpbMapRed x)            (RespRpbMapRed y)            = x == y
+responseEq  RespRpbMapRed{}             _                            = False
+responseEq (RespRpbIndex x)             (RespRpbIndex y)             = x == y
+responseEq  RespRpbIndex{}              _                            = False
+responseEq (RespRpbSearchQuery x)       (RespRpbSearchQuery y)       = x == y
+responseEq  RespRpbSearchQuery{}        _                            = False
+responseEq (RespRpbResetBucket x)       (RespRpbResetBucket y)       = x == y
+responseEq  RespRpbResetBucket{}        _                            = False
+responseEq (RespRpbYokozunaIndexGet x)  (RespRpbYokozunaIndexGet y)  = x == y
+responseEq  RespRpbYokozunaIndexGet{}   _                            = False
+responseEq (RespRpbYokozunaSchemaGet x) (RespRpbYokozunaSchemaGet y) = x == y
+responseEq  RespRpbYokozunaSchemaGet{}  _                            = False
+responseEq (RespDtFetch x)              (RespDtFetch y)              = x == y
+responseEq  RespDtFetch{}               _                            = False
+responseEq (RespDtUpdate x)             (RespDtUpdate y)             = x == y
+responseEq  RespDtUpdate{}              _                            = False
 
 -- | An encoded response, which consists of a 1-byte message code and a protobuf
 -- payload. The 4-byte big-endian length prefix has already been stripped.

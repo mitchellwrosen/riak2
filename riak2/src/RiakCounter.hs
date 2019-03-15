@@ -13,11 +13,10 @@ import RiakKey     (keyBucket)
 import RiakKey     (Key(..))
 import RiakPutOpts (PutOpts)
 
-import qualified RiakGetOpts     as GetOpts
-import qualified RiakHandle      as Handle
-import qualified RiakHandleError as HandleError
-import qualified RiakKey         as Key
-import qualified RiakPutOpts     as PutOpts
+import qualified RiakGetOpts as GetOpts
+import qualified RiakHandle  as Handle
+import qualified RiakKey     as Key
+import qualified RiakPutOpts as PutOpts
 
 import Control.Lens       ((.~), (^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -146,7 +145,5 @@ parseUpdateCounterError bucket@(Bucket bucketType _) err
       InvalidNodesError
   | isOperationTypeIsCounterButBucketTypeIsError err =
       InvalidBucketTypeError bucketType
-  | isTimeoutError err =
-      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)

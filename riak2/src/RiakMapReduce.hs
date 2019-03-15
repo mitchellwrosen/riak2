@@ -45,7 +45,7 @@ mapReduceKeys ::
   -> [Key] -- ^
   -> [MapReducePhase] -- ^
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either HandleError (Either ByteString r))
+  -> m (Either [HandleError] (Either ByteString r))
 mapReduceKeys handle keys phases responseFold = liftIO $
   doMapReduce handle (MapReduceInputKeys keys) phases responseFold
 
@@ -72,7 +72,7 @@ mapReduceBucket handle bucket phases responseFold = liftIO $
 
   where
     fromResponse ::
-         Either HandleError (Either ByteString r)
+         Either [HandleError] (Either ByteString r)
       -> Either MapReduceBucketError r
     fromResponse = \case
       Left err ->
@@ -105,7 +105,7 @@ mapReduceBinaryIndex handle query phases responseFold = liftIO $
 
   where
     fromResponse ::
-         Either HandleError (Either ByteString r)
+         Either [HandleError] (Either ByteString r)
       -> Either MapReduceBinaryIndexError r
     fromResponse = \case
       Left err ->
@@ -139,7 +139,7 @@ mapReduceIntIndex handle query phases responseFold = liftIO $
 
   where
     fromResponse ::
-         Either HandleError (Either ByteString r)
+         Either [HandleError] (Either ByteString r)
       -> Either MapReduceIntIndexError r
     fromResponse = \case
       Left err ->
@@ -167,7 +167,7 @@ mapReduceSearch ::
   -> ByteString -- ^ Search query
   -> [MapReducePhase] -- ^
   -> FoldM IO Proto.RpbMapRedResp r -- ^
-  -> m (Either HandleError (Either ByteString r))
+  -> m (Either [HandleError] (Either ByteString r))
 mapReduceSearch handle index query phases responseFold = liftIO $
   doMapReduce handle (MapReduceInputSearch index query) phases responseFold
 
@@ -176,7 +176,7 @@ doMapReduce ::
   -> MapReduceInput
   -> [MapReducePhase]
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either HandleError (Either ByteString r))
+  -> IO (Either [HandleError] (Either ByteString r))
 doMapReduce handle input phases responseFold =
   Handle.mapReduce
     handle

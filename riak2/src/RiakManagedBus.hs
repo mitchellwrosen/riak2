@@ -96,7 +96,8 @@ import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
 import RiakError          (isAllNodesDownError, isInsufficientVnodesError0,
                            isInsufficientVnodesError1, isPrValUnsatisfied,
-                           isPwValUnsatisfied, isUnknownMessageCodeError)
+                           isPwValUnsatisfied, isTimeoutError,
+                           isUnknownMessageCodeError)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -739,8 +740,9 @@ get bus@(ManagedBus { requestTimeout }) request = do
       isInsufficientVnodesError1 err ||
       isPrValUnsatisfied err ||
       isUnknownMessageCodeError err)
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.get timeoutVar handle request)
+    (translateTimeout <$>
+      (withHandle timeoutVar bus $ \timeoutVar handle ->
+        Handle.get timeoutVar handle request))
 
 getBucket ::
      ManagedBus -- ^
@@ -900,8 +902,9 @@ put bus@(ManagedBus { requestTimeout }) request = do
       isAllNodesDownError err ||
       isPwValUnsatisfied err ||
       isUnknownMessageCodeError err)
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.put timeoutVar handle request)
+    (translateTimeout <$>
+      (withHandle timeoutVar bus $ \timeoutVar handle ->
+        Handle.put timeoutVar handle request))
 
 putIndex ::
      ManagedBus
@@ -1012,8 +1015,9 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
       isAllNodesDownError err ||
       isPwValUnsatisfied err ||
       isUnknownMessageCodeError err)
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.updateCrdt timeoutVar handle request)
+    (translateTimeout <$>
+      (withHandle timeoutVar bus $ \timeoutVar handle ->
+        Handle.updateCrdt timeoutVar handle request))
 
 retrying ::
      forall r.
@@ -1053,3 +1057,14 @@ retrying_ timeoutVar shouldRetry action =
 
         result ->
           pure result
+
+-- Translate "timeout" error to a managed bus timeout.
+translateTimeout ::
+     Either ManagedBusError (Either ByteString r)
+  -> Either ManagedBusError (Either ByteString r)
+translateTimeout = \case
+  Right (Left err) | isTimeoutError err ->
+    Left ManagedBusTimeoutError
+
+  result ->
+    result

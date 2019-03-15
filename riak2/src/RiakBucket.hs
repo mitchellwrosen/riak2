@@ -101,7 +101,7 @@ getBucket handle bucket@(Bucket bucketType _) = liftIO $
         & setProto bucket
 
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+         Either [HandleError] (Either ByteString Proto.RpbGetBucketResp)
       -> Either GetBucketError SomeBucketProps
     fromResult = \case
       Left err ->
@@ -367,7 +367,7 @@ setBucketIndex_ handle bucket index parseError = liftIO $
               & Proto.searchIndex .~ encodeUtf8 (_unIndexName index))
 
     fromResult ::
-         Either HandleError (Either ByteString ())
+         Either [HandleError] (Either ByteString ())
       -> Either (Error op) ()
     fromResult = \case
       Left err ->
@@ -396,7 +396,7 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
         & Proto.type' .~ bucketType
 
     fromResult ::
-         Either HandleError (Either ByteString ())
+         Either [HandleError] (Either ByteString ())
       -> Either ResetBucketError ()
     fromResult = \case
       Left err ->
@@ -637,7 +637,7 @@ doIndex handle bucket =
       -> FoldM IO Proto.RpbIndexResp r
       -> IO (Either (Error 'SecondaryIndexQueryOp) r)
     loop request responseFold = do
-      result :: Either HandleError (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
+      result :: Either [HandleError] (Either ByteString (FoldM IO Proto.RpbIndexResp r, Maybe ByteString)) <-
         doIndexPage
           handle
           request
@@ -677,7 +677,7 @@ doIndexPage ::
      Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either HandleError (Either ByteString (r, Maybe ByteString)))
+  -> IO (Either [HandleError] (Either ByteString (r, Maybe ByteString)))
 doIndexPage handle request fold =
   Handle.secondaryIndex
     handle
@@ -734,7 +734,7 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
   fromResult <$> doRequest
 
   where
-    doRequest :: IO (Either HandleError (Either ByteString r))
+    doRequest :: IO (Either [HandleError] (Either ByteString r))
     doRequest =
       Handle.listKeys
         handle
@@ -744,7 +744,7 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
           keyFold)
 
     fromResult ::
-         Either HandleError (Either ByteString r)
+         Either [HandleError] (Either ByteString r)
       -> Either ListKeysError r
     fromResult = \case
       Left err ->

@@ -65,7 +65,7 @@ getBucketType handle bucketType = liftIO $
 
   where
     fromResult ::
-         Either HandleError (Either ByteString Proto.RpbGetBucketResp)
+         Either [HandleError] (Either ByteString Proto.RpbGetBucketResp)
       -> Either GetBucketTypeError SomeBucketProps
     fromResult = \case
       Left err ->

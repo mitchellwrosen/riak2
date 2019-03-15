@@ -66,7 +66,7 @@ putSchema handle schema = liftIO $
 
   where
     fromResult ::
-         Either HandleError (Either ByteString ())
+         Either [HandleError] (Either ByteString ())
       -> Either PutSchemaError ()
     fromResult = \case
       Left err ->
