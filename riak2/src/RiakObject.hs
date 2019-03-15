@@ -17,6 +17,7 @@ import RiakSibling (Sibling(..))
 import qualified RiakBucket         as Bucket
 import qualified RiakGetOpts        as GetOpts
 import qualified RiakHandle         as Handle
+import qualified RiakHandleError    as HandleError
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
 import qualified RiakPutOpts        as PutOpts
@@ -204,6 +205,8 @@ parseGetError request err
       InvalidKeyError (Key.fromProto request)
   | isOverloadError err =
       OverloadError
+  | isTimeoutError err =
+      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -318,6 +321,8 @@ parsePutError request err
       InvalidNodesError
   | isOverloadError err =
       OverloadError
+  | isTimeoutError err =
+      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)
 

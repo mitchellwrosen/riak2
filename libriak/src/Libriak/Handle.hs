@@ -580,4 +580,3 @@ receive timeoutVar connection handlers = do
         Right (Right response) -> do
           onReceive handlers response
           pure (Right (Right response))
-

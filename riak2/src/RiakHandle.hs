@@ -105,6 +105,7 @@ createHandle
     , handlers = handlers
     }
 
+-- TODO retry on timeout?
 withManagedBus ::
      forall a.
      Handle

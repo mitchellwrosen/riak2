@@ -13,6 +13,7 @@ import qualified Data.Attoparsec.ByteString       as Atto (Parser)
 import qualified Data.Attoparsec.ByteString.Char8 as Atto
 import qualified Data.ByteString                  as ByteString
 
+-- TODO does dt fetch time out...?
 
 -- | Error responses that Riak may return, plus a generic "handle error" that
 -- occurs when something goes wrong with the underlying connection.
@@ -207,10 +208,12 @@ type family MayReturnInvalidKey (op :: Op) :: Bool where
 -- | @{n_val_violation,_}@
 type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'GetOp                = 'True
+  MayReturnInvalidNodes 'GetCrdtOp            = 'True
   MayReturnInvalidNodes 'PutOp                = 'True
   MayReturnInvalidNodes 'PutIndexOp           = 'True
   MayReturnInvalidNodes 'SetBucketIndexOp     = 'True
   MayReturnInvalidNodes 'SetBucketTypeIndexOp = 'True
+  MayReturnInvalidNodes 'UpdateCrdtOp         = 'True
   MayReturnInvalidNodes _                     = 'False
 
 -- | @overload@
@@ -415,6 +418,10 @@ isSearchFailedError =
 isSecondaryIndexesNotSupportedError :: ByteString -> Bool
 isSecondaryIndexesNotSupportedError =
   ByteString.isPrefixOf "{error,{indexes_not_supported,"
+
+isTimeoutError :: ByteString -> Bool
+isTimeoutError =
+  (== "timeout")
 
 isUnknownMessageCodeError :: ByteString -> Bool
 isUnknownMessageCodeError =

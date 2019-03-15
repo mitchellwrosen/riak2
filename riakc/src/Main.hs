@@ -1,6 +1,7 @@
 {-# OPTIONS_GHC -fno-warn-name-shadowing #-}
 
 -- TODO riakc get-hll
+-- TODO fix riakc put crdt (--nodes, --timeout overlap)
 
 module Main where
 
@@ -759,18 +760,18 @@ putSetParser =
   doPutSet
     <$> bucketOrKeyArgument
     <*> many (strArgument (help "Set element" <> metavar "VALUE"))
-    <*> getOptsOption
+    -- <*> getOptsOption
     <*> putOptsOption
 
   where
     doPutSet ::
          Either Bucket Key
       -> [ByteString]
-      -> GetOpts
+      -- -> GetOpts
       -> PutOpts
       -> Handle
       -> IO ()
-    doPutSet bucketOrKey value getOpts putOpts handle =
+    doPutSet bucketOrKey value putOpts handle =
       case bucketOrKey of
         Left bucket ->
           go (newSet (generatedKey bucket) HashSet.empty)
@@ -787,6 +788,14 @@ putSetParser =
             Right (Just set) ->
               go set
       where
+        getOpts :: GetOpts
+        getOpts =
+          GetOpts
+            { nodes = Nothing
+            , quorum = Nothing
+            , timeout = Nothing
+            }
+
         go :: ConvergentSet ByteString -> IO ()
         go set =
           putSet handle set' putOpts >>= \case

@@ -18,10 +18,11 @@ import RiakKey     (keyBucket)
 import RiakKey     (Key(..), isGeneratedKey)
 import RiakPutOpts (PutOpts)
 
-import qualified RiakGetOpts as GetOpts
-import qualified RiakHandle  as Handle
-import qualified RiakKey     as Key
-import qualified RiakPutOpts as PutOpts
+import qualified RiakGetOpts     as GetOpts
+import qualified RiakHandle      as Handle
+import qualified RiakHandleError as HandleError
+import qualified RiakKey         as Key
+import qualified RiakPutOpts     as PutOpts
 
 import Control.Lens       ((.~), (^.))
 import Data.Text.Encoding (decodeUtf8)
@@ -146,9 +147,13 @@ parseUpdateHyperLogLogError bucket@(Bucket bucketType _) err
       InvalidBucketError bucket
   | isBucketTypeDoesNotExistError1 err =
       BucketTypeDoesNotExistError bucketType
-  | isOperationTypeIsHllButBucketTypeIsError err =
-      InvalidBucketTypeError bucketType
+  | isInvalidNodesError0 err =
+      InvalidNodesError
   | isNonCounterOperationOnDefaultBucketError err =
       InvalidBucketTypeError bucketType
+  | isOperationTypeIsHllButBucketTypeIsError err =
+      InvalidBucketTypeError bucketType
+  | isTimeoutError err =
+      HandleError HandleError.HandleTimeoutError
   | otherwise =
       UnknownError (decodeUtf8 err)
