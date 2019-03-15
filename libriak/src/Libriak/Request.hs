@@ -1,17 +1,39 @@
 module Libriak.Request
-  ( Request(..)
-  , EncodedRequest(..)
-  , encodeRequest
+  ( EncodedRequest(..)
+  , encodeDtFetch
+  , encodeDtUpdate
+  , encodeRpbDel
+  , encodeRpbGet
+  , encodeRpbGetBucket
+  , encodeRpbGetBucketType
+  , encodeRpbGetServerInfo
+  , encodeRpbIndex
+  , encodeRpbListBuckets
+  , encodeRpbListKeys
+  , encodeRpbMapRed
+  , encodeRpbPing
+  , encodeRpbPut
+  , encodeRpbResetBucket
+  , encodeRpbSearchQuery
+  , encodeRpbSetBucket
+  , encodeRpbSetBucketType
+  , encodeRpbYokozunaIndexDelete
+  , encodeRpbYokozunaIndexGet
+  , encodeRpbYokozunaIndexPut
+  , encodeRpbYokozunaSchemaGet
+  , encodeRpbYokozunaSchemaPut
   ) where
 
+import Control.DeepSeq          (NFData(..))
 import Control.Monad.ST
 import Data.ByteString.Internal (ByteString(..))
 import Data.Kind                (Type)
+import Data.List                (foldl')
 import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Word                (Word8)
 import GHC.ForeignPtr           (ForeignPtr(..))
-import GHC.TypeLits             (Nat)
+import GHC.TypeLits             (KnownNat, Nat)
 
 import qualified Data.ProtoLens  as Proto
 import qualified Data.Riak.Proto as Proto
@@ -19,77 +41,116 @@ import qualified Data.Riak.Proto as Proto
 
 -- TODO request 33 is of riak_kv so handle unknown message code by retrying
 
--- | Request indexed by message code of the expected response.
-data Request :: Nat -> Type where
-  ReqDtFetch                :: Proto.DtFetchReq                -> Request 81
-  ReqDtUpdate               :: Proto.DtUpdateReq               -> Request 83
-  ReqRpbDel                 :: Proto.RpbDelReq                 -> Request 14
-  ReqRpbGet                 :: Proto.RpbGetReq                 -> Request 10
-  ReqRpbGetBucket           :: Proto.RpbGetBucketReq           -> Request 20
-  ReqRpbGetBucketType       :: Proto.RpbGetBucketTypeReq       -> Request 20
-  ReqRpbGetServerInfo       :: Proto.RpbGetServerInfoReq       -> Request 8
-  ReqRpbIndex               :: Proto.RpbIndexReq               -> Request 26
-  ReqRpbListBuckets         :: Proto.RpbListBucketsReq         -> Request 16
-  ReqRpbListKeys            :: Proto.RpbListKeysReq            -> Request 18
-  ReqRpbMapRed              :: Proto.RpbMapRedReq              -> Request 24
-  ReqRpbPing                :: Proto.RpbPingReq                -> Request 2
-  ReqRpbPut                 :: Proto.RpbPutReq                 -> Request 12
-  ReqRpbResetBucket         :: Proto.RpbResetBucketReq         -> Request 30
-  ReqRpbSearchQuery         :: Proto.RpbSearchQueryReq         -> Request 28
-  ReqRpbSetBucket           :: Proto.RpbSetBucketReq           -> Request 22
-  ReqRpbSetBucketType       :: Proto.RpbSetBucketTypeReq       -> Request 22
-  ReqRpbYokozunaIndexDelete :: Proto.RpbYokozunaIndexDeleteReq -> Request 14
-  ReqRpbYokozunaIndexGet    :: Proto.RpbYokozunaIndexGetReq    -> Request 55
-  ReqRpbYokozunaIndexPut    :: Proto.RpbYokozunaIndexPutReq    -> Request 12
-  ReqRpbYokozunaSchemaGet   :: Proto.RpbYokozunaSchemaGetReq   -> Request 59
-  ReqRpbYokozunaSchemaPut   :: Proto.RpbYokozunaSchemaPutReq   -> Request 12
-
-deriving stock instance Show (Request code)
-
 newtype EncodedRequest
   = EncodedRequest { unEncodedRequest :: [ByteArray] }
 
-encodeRequest :: Request code -> EncodedRequest
-encodeRequest = \case
-  ReqDtFetch                request -> go 80 request
-  ReqDtUpdate               request -> go 82 request
-  ReqRpbDel                 request -> go 13 request
-  ReqRpbGet                 request -> go  9 request
-  ReqRpbGetBucket           request -> go 19 request
-  ReqRpbGetBucketType       request -> go 31 request
-  ReqRpbGetServerInfo       request -> go  7 request
-  ReqRpbIndex               request -> go 25 request
-  ReqRpbListBuckets         request -> go 15 request
-  ReqRpbListKeys            request -> go 17 request
-  ReqRpbMapRed              request -> go 23 request
-  ReqRpbPing                request -> go  1 request
-  ReqRpbPut                 request -> go 11 request
-  ReqRpbResetBucket         request -> go 29 request
-  ReqRpbSearchQuery         request -> go 27 request
-  ReqRpbSetBucket           request -> go 21 request
-  ReqRpbSetBucketType       request -> go 32 request
-  ReqRpbYokozunaIndexDelete request -> go 57 request
-  ReqRpbYokozunaIndexGet    request -> go 54 request
-  ReqRpbYokozunaIndexPut    request -> go 56 request
-  ReqRpbYokozunaSchemaGet   request -> go 58 request
-  ReqRpbYokozunaSchemaPut   request -> go 60 request
+instance NFData EncodedRequest where
+  rnf (EncodedRequest xs) =
+    foldl' (\acc x -> x `seq` acc) () xs
 
+encodeDtFetch :: Proto.DtFetchReq -> EncodedRequest
+encodeDtFetch =
+  encode 80
+
+encodeDtUpdate :: Proto.DtUpdateReq -> EncodedRequest
+encodeDtUpdate =
+  encode 82
+
+encodeRpbDel :: Proto.RpbDelReq -> EncodedRequest
+encodeRpbDel =
+  encode 13
+
+encodeRpbGet :: Proto.RpbGetReq -> EncodedRequest
+encodeRpbGet =
+  encode 9
+
+encodeRpbGetBucket :: Proto.RpbGetBucketReq -> EncodedRequest
+encodeRpbGetBucket =
+  encode 19
+
+encodeRpbGetBucketType :: Proto.RpbGetBucketTypeReq -> EncodedRequest
+encodeRpbGetBucketType =
+  encode 31
+
+encodeRpbGetServerInfo :: Proto.RpbGetServerInfoReq -> EncodedRequest
+encodeRpbGetServerInfo =
+  encode 7
+
+encodeRpbIndex :: Proto.RpbIndexReq -> EncodedRequest
+encodeRpbIndex =
+  encode 25
+
+encodeRpbListBuckets :: Proto.RpbListBucketsReq -> EncodedRequest
+encodeRpbListBuckets =
+  encode 15
+
+encodeRpbListKeys :: Proto.RpbListKeysReq -> EncodedRequest
+encodeRpbListKeys =
+  encode 17
+
+encodeRpbMapRed :: Proto.RpbMapRedReq -> EncodedRequest
+encodeRpbMapRed =
+  encode 23
+
+encodeRpbPing :: Proto.RpbPingReq -> EncodedRequest
+encodeRpbPing =
+  encode 1
+
+encodeRpbPut :: Proto.RpbPutReq -> EncodedRequest
+encodeRpbPut =
+  encode 11
+
+encodeRpbResetBucket :: Proto.RpbResetBucketReq -> EncodedRequest
+encodeRpbResetBucket =
+  encode 29
+
+encodeRpbSearchQuery :: Proto.RpbSearchQueryReq -> EncodedRequest
+encodeRpbSearchQuery =
+  encode 27
+
+encodeRpbSetBucket :: Proto.RpbSetBucketReq -> EncodedRequest
+encodeRpbSetBucket =
+  encode 21
+
+encodeRpbSetBucketType :: Proto.RpbSetBucketTypeReq -> EncodedRequest
+encodeRpbSetBucketType =
+  encode 32
+
+encodeRpbYokozunaIndexDelete :: Proto.RpbYokozunaIndexDeleteReq -> EncodedRequest
+encodeRpbYokozunaIndexDelete =
+  encode 57
+
+encodeRpbYokozunaIndexGet :: Proto.RpbYokozunaIndexGetReq -> EncodedRequest
+encodeRpbYokozunaIndexGet =
+  encode 54
+
+encodeRpbYokozunaIndexPut :: Proto.RpbYokozunaIndexPutReq -> EncodedRequest
+encodeRpbYokozunaIndexPut =
+  encode 56
+
+encodeRpbYokozunaSchemaGet :: Proto.RpbYokozunaSchemaGetReq -> EncodedRequest
+encodeRpbYokozunaSchemaGet =
+  encode 58
+
+encodeRpbYokozunaSchemaPut :: Proto.RpbYokozunaSchemaPutReq -> EncodedRequest
+encodeRpbYokozunaSchemaPut =
+  encode 60
+
+encode :: Proto.Message a => Word8 -> a -> EncodedRequest
+encode code (Proto.encodeMessage -> PS (ForeignPtr addr _) offset len) =
+  EncodedRequest
+    [ runST makeCodeByteArray
+    , runST makeRequestByteArray
+    ]
   where
-    go :: Proto.Message a => Word8 -> a -> EncodedRequest
-    go code (Proto.encodeMessage -> PS (ForeignPtr addr _) offset len) =
-      EncodedRequest
-        [ runST makeCodeByteArray
-        , runST makeRequestByteArray
-        ]
-      where
-        makeCodeByteArray :: ST s ByteArray
-        makeCodeByteArray = do
-          bytes <- newByteArray 1
-          writeByteArray bytes 0 code
-          unsafeFreezeByteArray bytes
+    makeCodeByteArray :: ST s ByteArray
+    makeCodeByteArray = do
+      bytes <- newByteArray 1
+      writeByteArray bytes 0 code
+      unsafeFreezeByteArray bytes
 
-        makeRequestByteArray :: ST s ByteArray
-        makeRequestByteArray = do
-          bytes <- newByteArray len
-          copyAddrToByteArray bytes 0 (Addr addr `plusAddr` offset) len
-          unsafeFreezeByteArray bytes
+    makeRequestByteArray :: ST s ByteArray
+    makeRequestByteArray = do
+      bytes <- newByteArray len
+      copyAddrToByteArray bytes 0 (Addr addr `plusAddr` offset) len
+      unsafeFreezeByteArray bytes
