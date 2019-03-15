@@ -74,13 +74,6 @@ data Error :: Op -> Type where
        Text
     -> Error 'PutSchemaOp
 
-  -- | Riak is overloaded.
-  --
-  -- TODO retry on overload
-  OverloadError ::
-       MayReturnOverload op ~ 'True
-    => Error op
-
   -- | The search failed. Typically, this means the query was malformed. Check
   -- the Solr error log, whose default location is @/var/log/riak/solr.log@.
   SearchFailedError ::
@@ -217,12 +210,6 @@ type family MayReturnInvalidNodes (op :: Op) :: Bool where
   MayReturnInvalidNodes 'UpdateCrdtOp         = 'True
   MayReturnInvalidNodes _                     = 'False
 
--- | @overload@
-type family MayReturnOverload (op :: Op) :: Bool where
-  MayReturnOverload 'GetOp    = 'True
-  MayReturnOverload 'PutOp    = 'True
-  MayReturnOverload _         = 'False
-
 isAllNodesDownError :: ByteString -> Bool
 isAllNodesDownError =
   (== "all_nodes_down")
@@ -276,8 +263,8 @@ isBucketTypeDoesNotExistError5 =
       Atto.string "{error," *> Atto.skipSpace
       Atto.string "no_type}" $> ()
 
-isDwValUnsatisfied :: ByteString -> Bool
-isDwValUnsatisfied =
+isDwValUnsatisfiedError :: ByteString -> Bool
+isDwValUnsatisfiedError =
   ByteString.isPrefixOf "{dw_val_unsatisfied"
 
 -- Can't delete index with associate buckets [{<<\"objects\">>,<<\"foo\">>},\n    {<<\"objects\">>,<<\"bar\">>}]
@@ -404,16 +391,16 @@ isOverloadError :: ByteString -> Bool
 isOverloadError =
   (== "overload")
 
-isPrValUnsatisfied :: ByteString -> Bool
-isPrValUnsatisfied =
+isPrValUnsatisfiedError :: ByteString -> Bool
+isPrValUnsatisfiedError =
   ByteString.isPrefixOf "{pr_val_unsatisfied"
 
-isPwValUnsatisfied :: ByteString -> Bool
-isPwValUnsatisfied =
+isPwValUnsatisfiedError :: ByteString -> Bool
+isPwValUnsatisfiedError =
   ByteString.isPrefixOf "{pw_val_unsatisfied"
 
-isRValUnsatisfied :: ByteString -> Bool
-isRValUnsatisfied =
+isRValUnsatisfiedError :: ByteString -> Bool
+isRValUnsatisfiedError =
   ByteString.isPrefixOf "{r_val_unsatisfied"
 
 isSchemaDoesNotExistError :: ByteString -> Bool
@@ -436,6 +423,6 @@ isUnknownMessageCodeError :: ByteString -> Bool
 isUnknownMessageCodeError =
   ByteString.isPrefixOf "Unknown message code:"
 
-isWValUnsatisfied :: ByteString -> Bool
-isWValUnsatisfied =
+isWValUnsatisfiedError :: ByteString -> Bool
+isWValUnsatisfiedError =
   ByteString.isPrefixOf "{w_val_unsatisfied"

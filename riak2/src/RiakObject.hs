@@ -14,7 +14,6 @@ import RiakSibling (Sibling(..))
 import qualified RiakBucket         as Bucket
 import qualified RiakGetOpts        as GetOpts
 import qualified RiakHandle         as Handle
-import qualified RiakHandleError    as HandleError
 import qualified RiakKey            as Key
 import qualified RiakProtoContent   as Proto.Content
 import qualified RiakPutOpts        as PutOpts
@@ -200,8 +199,6 @@ parseGetError request err
       InvalidNodesError
   | isKeyCannotBeZeroLengthError err =
       InvalidKeyError (Key.fromProto request)
-  | isOverloadError err =
-      OverloadError
   | otherwise =
       UnknownError (decodeUtf8 err)
 
@@ -314,8 +311,6 @@ parsePutError request err
       BucketTypeDoesNotExistError (request ^. Proto.type')
   | isInvalidNodesError0 err =
       InvalidNodesError
-  | isOverloadError err =
-      OverloadError
   | otherwise =
       UnknownError (decodeUtf8 err)
 

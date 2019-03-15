@@ -143,7 +143,6 @@ module Riak
   , MayReturnBucketTypeDoesNotExist
   , MayReturnIndexDoesNotExist
   , MayReturnInvalidNodes
-  , MayReturnOverload
   , NotfoundOk(..)
   , Object(..)
   , newObject

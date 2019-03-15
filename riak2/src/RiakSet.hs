@@ -17,11 +17,10 @@ import RiakHandle  (Handle)
 import RiakKey     (Key(..), isGeneratedKey, keyBucket)
 import RiakPutOpts (PutOpts)
 
-import qualified RiakGetOpts     as GetOpts
-import qualified RiakHandle      as Handle
-import qualified RiakHandleError as HandleError
-import qualified RiakKey         as Key
-import qualified RiakPutOpts     as PutOpts
+import qualified RiakGetOpts as GetOpts
+import qualified RiakHandle  as Handle
+import qualified RiakKey     as Key
+import qualified RiakPutOpts as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
 import Data.Generics.Product (field)

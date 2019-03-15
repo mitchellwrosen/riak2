@@ -30,7 +30,6 @@ module Riak.Error
   , MayReturnBucketTypeDoesNotExist
   , MayReturnIndexDoesNotExist
   , MayReturnInvalidNodes
-  , MayReturnOverload
   ) where
 
 import RiakError

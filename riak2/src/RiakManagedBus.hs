@@ -94,12 +94,12 @@ module RiakManagedBus
 import Libriak.Connection (ConnectionError)
 import Libriak.Request    (Request(..))
 import Libriak.Response   (DecodeError, Response)
-import RiakError          (isAllNodesDownError, isDwValUnsatisfied,
+import RiakError          (isAllNodesDownError, isDwValUnsatisfiedError,
                            isInsufficientVnodesError0,
-                           isInsufficientVnodesError1, isPrValUnsatisfied,
-                           isPwValUnsatisfied, isRValUnsatisfied,
-                           isTimeoutError, isUnknownMessageCodeError,
-                           isWValUnsatisfied)
+                           isInsufficientVnodesError1, isOverloadError,
+                           isPrValUnsatisfiedError, isPwValUnsatisfiedError,
+                           isRValUnsatisfiedError, isTimeoutError,
+                           isUnknownMessageCodeError, isWValUnsatisfiedError)
 import RiakSTM            (TCounter, decrTCounter, incrTCounter, newTCounter,
                            readTCounter)
 
@@ -1009,20 +1009,24 @@ updateCrdt bus@(ManagedBus { requestTimeout }) request = do
       (withHandle timeoutVar bus $ \timeoutVar handle ->
         Handle.updateCrdt timeoutVar handle request))
 
+-- TODO sleep for variable time depending on exact error?
+
 getReqShouldRetry :: ByteString -> Bool
 getReqShouldRetry err =
   isInsufficientVnodesError1 err ||
-  isPrValUnsatisfied err ||
-  isRValUnsatisfied err ||
+  isOverloadError err ||
+  isPrValUnsatisfiedError err ||
+  isRValUnsatisfiedError err ||
   isUnknownMessageCodeError err
 
 putReqShouldRetry :: ByteString -> Bool
 putReqShouldRetry err =
   isAllNodesDownError err ||
-  isDwValUnsatisfied err ||
-  isPwValUnsatisfied err ||
+  isDwValUnsatisfiedError err ||
+  isOverloadError err ||
+  isPwValUnsatisfiedError err ||
   isUnknownMessageCodeError err ||
-  isWValUnsatisfied err
+  isWValUnsatisfiedError err
 
 retrying ::
      forall r.
