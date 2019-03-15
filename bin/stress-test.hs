@@ -1,4 +1,4 @@
-{-# LANGUAGE LambdaCase, OverloadedStrings #-}
+{-# LANGUAGE LambdaCase, OverloadedStrings, ViewPatterns #-}
 
 import Riak
 
@@ -8,12 +8,18 @@ import Data.Default.Class (def)
 import GHC.Clock
 import Net.IPv4           (ipv4)
 import Socket.Stream.IPv4 (Endpoint(..))
+import System.Environment
 import System.Random
+import Text.Read          (readMaybe)
 
 import qualified Data.ByteString.Char8 as Latin1
 
 main :: IO ()
 main = do
+  [ readMaybe -> Just putThreads,
+    readMaybe -> Just getThreads,
+    readMaybe -> Just listThreads ] <- getArgs
+
   handle <-
     createHandle
       HandleConfig
@@ -22,7 +28,13 @@ main = do
         , idleTimeout = 1/4
         , requestTimeout = 1
         , retries = 0
-        , handlers = mempty -- EventHandlers print print print print
+        , handlers =
+            EventHandlers
+              { -- onSend = \msg -> putStrLn (">>> " ++ show msg)
+              --, onReceive = \msg -> putStrLn ("<<< " ++ show msg)
+                onConnectError = \ex -> putStrLn ("*** " ++ show ex)
+              , onConnectionError = \ex -> putStrLn ("*** " ++ show ex)
+              }
         }
 
   bucket <- Latin1.pack . show <$> getMonotonicTimeNSec
@@ -30,10 +42,6 @@ main = do
   doneVar <- newEmptyMVar
   readyVar <- newEmptyMVar
   goVar <- newEmptyMVar
-
-  let putThreads  = 100
-  let getThreads  = 100
-  let listThreads = 5
 
   replicateM_ putThreads $ forkIO $ do
     putMVar readyVar ()

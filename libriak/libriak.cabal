@@ -5,16 +5,21 @@ version: 0.1.0
 build-type: Simple
 
 library
+  -- TODO are any of these deps redundant?
   build-depends:
+    async,
     attoparsec,
     base ^>= 4.11 || ^>= 4.12,
     bytestring,
+    deepseq,
     foldl,
     lens,
     lens-labels,
+    nf,
     primitive,
     profunctors,
     proto-lens ^>= 0.4.0,
+    proto-lens-runtime,
     riak-protobuf ^>= 1.0.0,
     safe-exceptions,
     sockets ^>= 0.3.0,
@@ -28,6 +33,7 @@ library
     DeriveFunctor
     DerivingStrategies
     DuplicateRecordFields
+    FlexibleContexts
     GADTs
     GeneralizedNewtypeDeriving
     InstanceSigs

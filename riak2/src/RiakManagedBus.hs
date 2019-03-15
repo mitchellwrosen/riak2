@@ -92,7 +92,7 @@ module RiakManagedBus
   ) where
 
 import Libriak.Connection (ConnectionError)
-import Libriak.Request    (Request(..))
+import Libriak.Request    (Request)
 import Libriak.Response   (DecodeError, Response)
 import RiakError          (isAllNodesDownError, isDwValUnsatisfiedError,
                            isInsufficientVnodesError0,
@@ -166,9 +166,9 @@ data ManagedBusError :: Type where
 
 data EventHandlers
   = EventHandlers
-  { onSend :: forall code. Request code -> IO ()
+  { onSend :: Request -> IO ()
     -- ^ Called just prior to sending a request.
-  , onReceive :: forall code. Response code -> IO ()
+  , onReceive :: Response -> IO ()
     -- ^ Called just after receiving a response.
   , onConnectError :: ConnectException 'Uninterruptible -> IO ()
   , onConnectionError :: ConnectionError -> IO ()
@@ -431,7 +431,7 @@ connect
       Handle.EventHandlers
         { Handle.onSend = onSend handlers
         , Handle.onReceive = onReceive handlers
-        , Handle.onError = mempty -- FIXME
+        -- , Handle.onError = mempty -- FIXME
         }
 
 monitorHealth ::

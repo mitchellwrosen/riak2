@@ -32,44 +32,77 @@ module Libriak.Handle
   ) where
 
 import Libriak.Connection (Connection, ConnectionError(..))
-import Libriak.Request    (Request(..), encodeRequest)
-import Libriak.Response   (DecodeError, Response(..), decodeResponse,
-                           responseDone)
+import Libriak.Request
+import Libriak.Response
 
 import qualified Libriak.Connection as Connection
 
-import Control.Applicative     ((<|>))
-import Control.Concurrent.MVar (MVar, newMVar, withMVar)
+import Control.Applicative                ((<|>))
+import Control.Concurrent.Async
 import Control.Concurrent.STM
-import Control.Exception.Safe  (SomeException, catchAsync, throwIO)
-import Control.Foldl           (FoldM(..))
-import Control.Lens            ((^.))
-import Data.ByteString         (ByteString)
-import Data.Function           (on)
-import Data.IORef              (IORef, newIORef, readIORef, writeIORef)
-import Data.Kind               (Type)
-import Data.Profunctor         (lmap)
-import GHC.TypeLits            (KnownNat)
-import Socket.Stream.IPv4      (CloseException(..), ConnectException(..),
-                                Endpoint(..), Interruptibility(..))
+import Control.Foldl                      (FoldM(..))
+import Control.Lens                       ((^.))
+import Control.Monad                      (join)
+import Data.ByteString                    (ByteString)
+import Data.Function                      (on)
+import Data.Kind                          (Type)
+import Data.NF                            (NF, getNF, makeNF)
+import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
+import Socket.Stream.IPv4                 (CloseException, ConnectException(..),
+                                           Endpoint(..), Interruptibility(..))
 
+import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
 
+-- TODO use Chan instead of TBQueue/TQueue in Libriak.Handle?
+
 data Handle
   = Handle
-  { connVar :: TVar (Either Connection Connection)
-    -- ^ The connection. Starts out on the Right, but once a connection error
-    -- occurs, gets put on the Left permanently.
-  , sendLock :: MVar ()
-    -- ^ Lock acquired during sending a request.
-  , doneVarRef :: IORef (TMVar ())
+  { connection :: Connection
+  , stateVar :: TVar State
+  , sendAsync :: Async ()
+  , receiveAsync :: Async ()
+  , queue :: TBQueue Item
   , handlers :: EventHandlers
   }
 
 instance Eq Handle where
   (==) =
-    (==) `on` sendLock
+    (==) `on` stateVar
+
+data State
+  = Healthy
+  | Unhealthy
+  | Disconnected
+
+data Item :: Type where
+  Exchange ::
+       TVar Bool
+    -> NF EncodedRequest
+    -> TMVar (Either HandleError EncodedResponse)
+    -> Item
+
+  Stream ::
+       HasLens' response "done" Bool
+    => TVar Bool
+    -> NF EncodedRequest
+    -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+    -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+    -> Item
+
+data SentItem :: Type where
+  Exchange' ::
+       TVar Bool
+    -> TMVar (Either HandleError EncodedResponse)
+    -> SentItem
+
+  Stream' ::
+       HasLens' response "done" Bool
+    => TVar Bool
+    -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+    -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+    -> SentItem
 
 data HandleError :: Type where
   -- | The handle is permanently closed.
@@ -82,22 +115,25 @@ data HandleError :: Type where
 
 data EventHandlers
   = EventHandlers
-  { onSend :: forall code. Request code -> IO ()
-    -- ^ Called just prior to sending a request.
-  , onReceive :: forall code. Response code -> IO ()
-    -- ^ Called just after receiving a response.
-  , onError :: HandleError -> IO ()
+  { onSend :: Request -> IO ()
+    -- ^ Called just prior to enqueuing a request. Must not throw an exception.
+  , onReceive :: Response -> IO ()
+  --   -- ^ Called just after receiving a response.
+  -- -- , onError :: HandleError -> IO ()
   }
 
 instance Monoid EventHandlers where
-  mempty = EventHandlers mempty mempty mempty
+  mempty = EventHandlers mempty mempty -- mempty
   mappend = (<>)
 
 instance Semigroup EventHandlers where
-  EventHandlers a1 b1 c1 <> EventHandlers a2 b2 c2 =
-    EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2)
+  EventHandlers a1 b1 <> EventHandlers a2 b2 =
+    EventHandlers (a1 <> a2) (b1 <> b2) -- (c1 <> c2)
 
 -- | Acquire a handle.
+--
+-- This function must be called with asynchronous exceptions masked, and the
+-- caller must eventually call 'disconnect'.
 --
 -- /Throws/: This function will never throw an exception.
 connect ::
@@ -110,246 +146,533 @@ connect endpoint handlers =
       pure (Left err)
 
     Right connection -> do
-      connVar :: TVar (Either Connection Connection) <-
-        newTVarIO (Right connection)
+      stateVar :: TVar State <-
+        newTVarIO Healthy
 
-      sendLock :: MVar () <-
-        newMVar ()
+      streamingVar :: TVar Bool <-
+        newTVarIO False
 
-      doneVarRef :: IORef (TMVar ()) <-
-        newIORef =<< newTMVarIO ()
+      itemQueue :: TBQueue Item <-
+        newTBQueueIO (2^(14::Int))
+
+      sentItemQueue :: TQueue SentItem <-
+        newTQueueIO
+
+      sendAsync :: Async () <-
+        asyncWithUnmask $ \unmask ->
+          unmask
+            (sendThread
+              stateVar
+              streamingVar
+              itemQueue
+              sentItemQueue
+              connection)
+
+      receiveAsync :: Async () <-
+        asyncWithUnmask $ \unmask ->
+          unmask
+            (receiveThread
+              stateVar
+              streamingVar
+              sentItemQueue
+              connection)
 
       pure (Right Handle
-        { connVar = connVar
-        , sendLock = sendLock
-        , doneVarRef = doneVarRef
+        { connection = connection
+        , stateVar = stateVar
+        , sendAsync = sendAsync
+        , receiveAsync = receiveAsync
+        , queue = itemQueue
         , handlers = handlers
         })
 
+sendThread ::
+     TVar State
+  -> TVar Bool
+  -> TBQueue Item
+  -> TQueue SentItem
+  -> Connection
+  -> IO ()
+sendThread stateVar streamingVar itemQueue sentItemQueue connection =
+  loop
+
+  where
+    loop :: IO ()
+    loop =
+      join . atomically $
+        processItem
+        <|>
+        (pure () <$ returnIfNotHealthy stateVar)
+
+    processItem :: STM (IO ())
+    processItem =
+      sendItem <$>
+        readTBQueue itemQueue
+
+    sendItem :: Item -> IO ()
+    sendItem = \case
+      Exchange timeoutVar request responseVar ->
+        Connection.send connection (getNF request) >>= \case
+          Left err ->
+            atomically $ do
+              putTMVar
+                responseVar
+                (Left (HandleConnectionError err))
+
+              healthyToUnhealthy stateVar
+
+          Right () -> do
+            atomically
+              (writeTQueue sentItemQueue (Exchange' timeoutVar responseVar))
+
+            loop
+
+      Stream timeoutVar request decodeResponse responseQueue ->
+        Connection.send connection (getNF request) >>= \case
+          Left err ->
+            atomically $ do
+              writeTQueue
+                responseQueue
+                (Left (HandleConnectionError err))
+
+              healthyToUnhealthy stateVar
+
+          Right () -> do
+            atomically $ do
+              writeTVar streamingVar True
+
+              writeTQueue
+                sentItemQueue
+                (Stream'
+                  timeoutVar
+                  decodeResponse
+                  responseQueue)
+
+            join . atomically $
+              (readTVar streamingVar >>= \case
+                True -> retry
+                False -> pure loop)
+              <|>
+              (pure () <$ returnIfNotHealthy stateVar)
+
+receiveThread ::
+     TVar State
+  -> TVar Bool
+  -> TQueue SentItem
+  -> Connection
+  -> IO ()
+receiveThread stateVar streamingVar sentItemQueue connection =
+  loop
+
+  where
+    loop :: IO ()
+    loop =
+      join . atomically $
+        (handleItem <$> readTQueue sentItemQueue)
+        <|>
+        (pure () <$ returnIfNotHealthy stateVar)
+
+    handleItem :: SentItem -> IO ()
+    handleItem = \case
+      Exchange' timeoutVar responseVar ->
+        Connection.receive timeoutVar connection >>= \case
+          Left err ->
+            atomically $ do
+              putTMVar responseVar (Left (HandleConnectionError err))
+              writeTVar stateVar Disconnected
+
+          Right response -> do
+            atomically (putTMVar responseVar (Right response))
+            loop
+
+      Stream' timeoutVar decodeResponse responseQueue -> do
+        streamResponse timeoutVar decodeResponse responseQueue
+
+    streamResponse ::
+         forall response.
+         HasLens' response "done" Bool
+      => TVar Bool
+      -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+      -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+      -> IO ()
+    streamResponse timeoutVar decodeResponse responseQueue =
+      receiveLoop
+
+      where
+        receiveLoop :: IO ()
+        receiveLoop =
+          Connection.receive timeoutVar connection >>= \case
+            Left err ->
+              atomically $ do
+                writeTQueue responseQueue (Left (HandleConnectionError err))
+                writeTVar stateVar Disconnected
+
+            Right response ->
+              case decodeResponse response of
+                Left err ->
+                  -- Hrm, thread that called 'stream' might see 'Disconnected'
+                  -- before its own decode error... ;(
+                  atomically $ do
+                    writeTQueue responseQueue (Left (HandleDecodeError err))
+                    writeTVar stateVar Disconnected
+
+                Right (Left response) -> do
+                  atomically $ do
+                    writeTQueue responseQueue (Right (Left response))
+                    writeTVar streamingVar False
+                  loop
+
+                Right (Right response) -> do
+                  atomically (writeTQueue responseQueue (Right (Right response)))
+
+                  if response ^. Proto.done
+                    then do
+                      atomically (writeTVar streamingVar False)
+                      loop
+                    else
+                      receiveLoop
+
+healthyToUnhealthy :: TVar State -> STM ()
+healthyToUnhealthy stateVar =
+  readTVar stateVar >>= \case
+    Healthy -> writeTVar stateVar Unhealthy
+    Unhealthy -> pure ()
+    Disconnected -> pure ()
+
+returnIfNotHealthy :: TVar State -> STM ()
+returnIfNotHealthy stateVar =
+  readTVar stateVar >>= \case
+    Healthy -> retry
+    Unhealthy -> pure ()
+    Disconnected -> pure ()
+
+-- | Disconnect a handle if it's not already disconnected.
+--
+-- /Throws/: This function will never throw an exception.
 disconnect ::
      Handle
   -> IO (Either CloseException ())
-disconnect Handle { connVar } =
-  readTVarIO connVar >>=
-    either Connection.disconnect Connection.disconnect
+disconnect Handle { connection, sendAsync, receiveAsync, stateVar } =
+  join . atomically $
+    readTVar stateVar >>= \case
+      Healthy -> doDisconnect
+      Unhealthy -> doDisconnect
+      Disconnected -> pure (pure (Right ()))
+
+  where
+    doDisconnect :: STM (IO (Either CloseException ()))
+    doDisconnect = do
+      writeTVar stateVar Disconnected
+      pure $ do
+        wait sendAsync
+        wait receiveAsync
+        Connection.disconnect connection
 
 -- | Send a request and receive the response (a single message).
 exchange ::
-     KnownNat code
-  => TVar Bool
-  -> Handle -- ^
-  -> Request code -- ^
-  -> (Response code -> a) -- ^
-  -> IO (Either HandleError (Either ByteString a))
+     forall response.
+     TVar Bool
+  -> Handle
+  -> EncodedRequest
+  -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp response))
 exchange
     timeoutVar
-    handle@(Handle { connVar, doneVarRef, handlers, sendLock })
+    Handle { queue, stateVar }
     request
-    onSuccess =
+    fromResponse =
 
-  withConnection handle $ \connection -> do
-    -- Try sending, which either results in an error, or two empty TMVars: one
-    -- that will fill when it's our turn to receive, and one that we must fill
-    -- when we are done receiving.
-    sendResult :: Either HandleError (TMVar (), TMVar ()) <-
-      withMVar sendLock $ \() ->
-        send connection request handlers >>= \case
-          Left err ->
-            pure (Left (HandleConnectionError err))
+  readTVarIO stateVar >>= \case
+    Healthy -> do
+      responseVar :: TMVar (Either HandleError EncodedResponse) <-
+        newEmptyTMVarIO
 
-          Right () -> do
-            -- TODO Bug here, if we crash before executing this swap the next
-            -- thread that comes along will receive our response
-            doneVar <- newEmptyTMVarIO
-            prevDoneVar <- readIORef doneVarRef
-            writeIORef doneVarRef doneVar
-            pure (Right (prevDoneVar, doneVar))
+      atomically
+        (writeTBQueue
+          queue
+          (Exchange timeoutVar (makeNF request) responseVar))
 
-    case sendResult of
-      Left err ->
-        pure (Left err)
+      join . atomically $
+        (do
+          result :: Either HandleError EncodedResponse <-
+            readTMVar responseVar
 
-      Right (prevDoneVar, doneVar) -> do
-        -- It's a race: either a previous request fails, or everything goes well
-        -- and it finally becomes our turn to receive.
-        waitResult :: Maybe HandleError <-
-          atomically $ do
-            (Nothing <$ readTMVar prevDoneVar)
-            <|>
-            (readTVar connVar >>= \case
-              Left _ -> pure (Just HandleClosedError)
-              Right _ -> retry)
-
-        case waitResult of
-          Nothing ->
-            receive timeoutVar connection handlers >>= \case
+          pure $
+            case result of
               Left err ->
                 pure (Left err)
 
-              Right response -> do
-                atomically (putTMVar doneVar ())
-                pure (Right (onSuccess <$> response))
+              Right encodedResponse ->
+                case fromResponse encodedResponse of
+                  Left err -> do
+                    atomically (healthyToUnhealthy stateVar)
+                    pure (Left (HandleDecodeError err))
 
-          Just err ->
-            pure (Left err)
+                  Right (Left response) ->
+                    pure (Right (Left response))
+
+                  Right (Right response) ->
+                    pure (Right (Right response)))
+        <|>
+        (pure (Left HandleClosedError) <$ returnIfNotHealthy stateVar)
+
+    Unhealthy    -> pure (Left HandleClosedError)
+    Disconnected -> pure (Left HandleClosedError)
+
 
 -- | Send a request and stream the response (one or more messages).
 stream ::
-     forall code r.
-     KnownNat code
+     forall r response.
+     HasLens' response "done" Bool
   => TVar Bool
   -> Handle -- ^
-  -> Request code -- ^
-  -> FoldM IO (Response code) r
-  -> IO (Either HandleError (Either ByteString r))
+  -> EncodedRequest -- ^
+  -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
+  -> FoldM IO response r
+  -> IO (Either HandleError (Either Proto.RpbErrorResp r))
 stream
     timeoutVar
-    handle@(Handle { handlers, sendLock })
+    (Handle { queue, stateVar })
     request
+    decodeResponse
     (FoldM step (initial :: IO x) extract) =
 
-  withConnection handle $ \connection ->
-    -- Riak request handling state machine is odd. Streaming responses are
-    -- special; when one is active, no other requests can be serviced on this
-    -- socket.
-    --
-    -- So, hold a lock for the entirety of the request-response exchange, not
-    -- just during sending the request.
-    withMVar sendLock $ \() ->
-      send connection request handlers >>= \case
-        Left err ->
-          pure (Left (HandleConnectionError err))
+  readTVarIO stateVar >>= \case
+    Healthy -> do
+      responseQueue :: TQueue (Either HandleError (Either Proto.RpbErrorResp response)) <-
+        newTQueueIO
 
-        Right () ->
-          let
-            consume :: x -> IO (Either HandleError (Either ByteString r))
-            consume value =
-              receive timeoutVar connection handlers >>= \case
-                Left err ->
-                  pure (Left err)
+      atomically
+        (writeTBQueue
+          queue
+          (Stream
+            timeoutVar
+            (makeNF request)
+            decodeResponse
+            responseQueue))
 
-                Right (Left err) ->
-                  pure (Right (Left err))
+      processResponse responseQueue
 
-                Right (Right response) -> do
-                  newValue <- step value response
-                  if responseDone response
-                    then Right . Right <$> extract newValue
-                    else consume newValue
-          in
-            consume =<< initial
+    Unhealthy    -> pure (Left HandleClosedError)
+    Disconnected -> pure (Left HandleClosedError)
 
+  where
+    processResponse ::
+         TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+      -> IO (Either HandleError (Either Proto.RpbErrorResp r))
+    processResponse responseQueue =
+      initial >>= loop
+
+      where
+        loop :: x -> IO (Either HandleError (Either Proto.RpbErrorResp r))
+        loop acc =
+          join . atomically $
+            (do
+              response :: Either HandleError (Either Proto.RpbErrorResp response) <-
+                readTQueue responseQueue
+
+              pure $
+                case response of
+                  Left err ->
+                    pure (Left err)
+
+                  Right (Left response) ->
+                    pure (Right (Left response))
+
+                  Right (Right response) -> do
+                    acc' :: x <-
+                      step acc response
+
+                    if response ^. Proto.done
+                      then
+                        Right . Right <$>
+                          extract acc'
+
+                      else
+                        loop acc')
+            <|>
+            (pure (Left HandleClosedError) <$ returnIfNotHealthy stateVar)
 
 --------------------------------------------------------------------------------
 -- Riak API
 --------------------------------------------------------------------------------
+
+doExchange ::
+     (Response -> IO ())
+  -> (a -> Response)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp a))
+  -> IO (Either HandleError (Either ByteString a))
+doExchange onReceive toResponse action =
+  action >>= \case
+    Left err ->
+      pure (Left err)
+
+    Right (Left response) -> do
+      onReceive (RespRpbError response)
+      pure (Right (Left (response ^. Proto.errmsg)))
+
+    Right (Right response) -> do
+      onReceive (toResponse response)
+      pure (Right (Right response))
 
 delete ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbDelReq -- ^
   -> IO (Either HandleError (Either ByteString ()))
-delete timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbDel request)
-    (\(RespRpbDel _) -> ())
+delete timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbDel request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbDel
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbDel request)
+        decodeRpbDel))
 
 deleteIndex ::
      TVar Bool -- ^
-  -> Handle
-  -> Proto.RpbYokozunaIndexDeleteReq
+  -> Handle -- ^
+  -> Proto.RpbYokozunaIndexDeleteReq -- ^
   -> IO (Either HandleError (Either ByteString ()))
-deleteIndex timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbYokozunaIndexDelete request)
-    (\(RespRpbDel _) -> ())
+deleteIndex timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbYokozunaIndexDelete request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbDel
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbYokozunaIndexDelete request)
+        decodeRpbDel))
 
 get ::
      TVar Bool -- ^
-  -> Handle
-  -> Proto.RpbGetReq
+  -> Handle -- ^
+  -> Proto.RpbGetReq -- ^
   -> IO (Either HandleError (Either ByteString Proto.RpbGetResp))
-get timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbGet request)
-    (\(RespRpbGet response) -> response)
+get timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbGet request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbGet
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbGet request)
+      decodeRpbGet)
 
 getBucket ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbGetBucketReq -- ^
   -> IO (Either HandleError (Either ByteString Proto.RpbGetBucketResp))
-getBucket timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbGetBucket request)
-    (\(RespRpbGetBucket response) -> response)
+getBucket timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbGetBucket request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbGetBucket
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbGetBucket request)
+      decodeRpbGetBucket)
 
 getBucketType ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbGetBucketTypeReq -- ^
   -> IO (Either HandleError (Either ByteString Proto.RpbGetBucketResp))
-getBucketType timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbGetBucketType request)
-    (\(RespRpbGetBucket response) -> response)
+getBucketType timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbGetBucketType request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbGetBucket
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbGetBucketType request)
+      decodeRpbGetBucket)
 
 getCrdt ::
      TVar Bool -- ^
   -> Handle
   -> Proto.DtFetchReq
   -> IO (Either HandleError (Either ByteString Proto.DtFetchResp))
-getCrdt timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqDtFetch request)
-    (\(RespDtFetch response) -> response)
+getCrdt timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqDtFetch request)
+
+  doExchange
+    (onReceive handlers)
+    RespDtFetch
+    (exchange
+      timeoutVar
+      handle
+      (encodeDtFetch request)
+      decodeDtFetch)
 
 getIndex ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaIndexGetReq
   -> IO (Either HandleError (Either ByteString Proto.RpbYokozunaIndexGetResp))
-getIndex timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbYokozunaIndexGet request)
-    (\(RespRpbYokozunaIndexGet response) -> response)
+getIndex timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbYokozunaIndexGet request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbYokozunaIndexGet
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbYokozunaIndexGet request)
+      decodeRpbYokozunaIndexGet)
 
 getSchema ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaSchemaGetReq
   -> IO (Either HandleError (Either ByteString Proto.RpbYokozunaSchemaGetResp))
-getSchema timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbYokozunaSchemaGet request)
-    (\(RespRpbYokozunaSchemaGet response) -> response)
+getSchema timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbYokozunaSchemaGet request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbYokozunaSchemaGet
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbYokozunaSchemaGet request)
+      decodeRpbYokozunaSchemaGet)
 
 getServerInfo ::
      TVar Bool -- ^
   -> Handle
   -> IO (Either HandleError (Either ByteString Proto.RpbGetServerInfoResp))
-getServerInfo timeoutVar handle =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbGetServerInfo Proto.defMessage)
-    (\(RespRpbGetServerInfo response) -> response)
+getServerInfo timeoutVar handle@(Handle { handlers }) = do
+  onSend handlers (ReqRpbGetServerInfo request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbGetServerInfo
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbGetServerInfo request)
+      decodeRpbGetServerInfo)
+
+  where
+    request :: Proto.RpbGetServerInfoReq
+    request =
+      Proto.defMessage
 
 listBuckets ::
      TVar Bool
@@ -357,12 +680,46 @@ listBuckets ::
   -> Proto.RpbListBucketsReq
   -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either HandleError (Either ByteString r))
-listBuckets timeoutVar handle request responseFold =
-  stream
-    timeoutVar
-    handle
-    (ReqRpbListBuckets request)
-    (lmap (\(RespRpbListBuckets response) -> response) responseFold)
+listBuckets timeoutVar handle@(Handle { handlers }) request responseFold = do
+  onSend handlers (ReqRpbListBuckets request)
+
+  doStream
+    (onReceive handlers)
+    RespRpbListBuckets
+    (stream
+      timeoutVar
+      handle
+      (encodeRpbListBuckets request)
+      decodeRpbListBuckets)
+    responseFold
+
+doStream ::
+     forall a r.
+     (Response -> IO ())
+  -> (a -> Response)
+  -> (FoldM IO a r -> IO (Either HandleError (Either Proto.RpbErrorResp r)))
+  -> FoldM IO a r
+  -> IO (Either HandleError (Either ByteString r))
+doStream onResponse toResponse action responseFold =
+  action responseFold' >>= \case
+    Left err ->
+      pure (Left err)
+
+    Right (Left response) -> do
+      onResponse (RespRpbError response)
+      pure (Right (Left (response ^. Proto.errmsg)))
+
+    Right (Right result) ->
+      pure (Right (Right result))
+
+  where
+    responseFold' :: FoldM IO a r
+    responseFold' = do
+      Foldl.premapM
+        (\response -> do
+          onResponse (toResponse response)
+          pure response)
+        responseFold
 
 listKeys ::
      TVar Bool
@@ -370,12 +727,18 @@ listKeys ::
   -> Proto.RpbListKeysReq
   -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either HandleError (Either ByteString r))
-listKeys timeoutVar handle request responseFold =
-  stream
-    timeoutVar
-    handle
-    (ReqRpbListKeys request)
-    (lmap (\(RespRpbListKeys response) -> response) responseFold)
+listKeys timeoutVar handle@(Handle { handlers }) request responseFold = do
+  onSend handlers (ReqRpbListKeys request)
+
+  doStream
+    (onReceive handlers)
+    RespRpbListKeys
+    (stream
+      timeoutVar
+      handle
+      (encodeRpbListKeys request)
+      decodeRpbListKeys)
+    responseFold
 
 mapReduce ::
      TVar Bool
@@ -383,107 +746,164 @@ mapReduce ::
   -> Proto.RpbMapRedReq
   -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either HandleError (Either ByteString r))
-mapReduce timeoutVar handle request responseFold =
-  stream
-    timeoutVar
-    handle
-    (ReqRpbMapRed request)
-    (lmap (\(RespRpbMapRed response) -> response) responseFold)
+mapReduce timeoutVar handle@(Handle { handlers }) request responseFold = do
+  onSend handlers (ReqRpbMapRed request)
+
+  doStream
+    (onReceive handlers)
+    RespRpbMapRed
+    (stream
+      timeoutVar
+      handle
+      (encodeRpbMapRed request)
+      decodeRpbMapRed)
+    responseFold
 
 ping ::
      TVar Bool
   -> Handle
   -> IO (Either HandleError (Either ByteString ()))
-ping timeoutVar handle =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbPing Proto.defMessage)
-    (\(RespRpbPing _) -> ())
+ping timeoutVar handle@(Handle { handlers }) = do
+  onSend handlers (ReqRpbPing request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbPing
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbPing request)
+        decodeRpbPing))
+
+  where
+    request :: Proto.RpbPingReq
+    request =
+      Proto.defMessage
 
 put ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbPutReq
   -> IO (Either HandleError (Either ByteString Proto.RpbPutResp))
-put timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbPut request)
-    (\(RespRpbPut response) -> response)
+put timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbPut request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbPut
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbPut request)
+      decodeRpbPut)
 
 putIndex ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaIndexPutReq
   -> IO (Either HandleError (Either ByteString ()))
-putIndex timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbYokozunaIndexPut request)
-    (\(RespRpbPut _) -> ())
+putIndex timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbYokozunaIndexPut request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbPut
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbYokozunaIndexPut request)
+        decodeRpbPut))
 
 putSchema ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaSchemaPutReq
   -> IO (Either HandleError (Either ByteString ()))
-putSchema timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbYokozunaSchemaPut request)
-    (\(RespRpbPut _) -> ())
+putSchema timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbYokozunaSchemaPut request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbPut
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbYokozunaSchemaPut request)
+        decodeRpbPut))
 
 resetBucket ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbResetBucketReq
   -> IO (Either HandleError (Either ByteString ()))
-resetBucket timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbResetBucket request)
-    (\(RespRpbResetBucket _) -> ())
+resetBucket timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbResetBucket request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbResetBucket
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbResetBucket request)
+        decodeRpbResetBucket))
 
 setBucket ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbSetBucketReq
   -> IO (Either HandleError (Either ByteString ()))
-setBucket timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbSetBucket request)
-    (\(RespRpbSetBucket _) -> ())
+setBucket timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbSetBucket request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbSetBucket
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbSetBucket request)
+        decodeRpbSetBucket))
 
 setBucketType ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbSetBucketTypeReq
   -> IO (Either HandleError (Either ByteString ()))
-setBucketType timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbSetBucketType request)
-    (\(RespRpbSetBucket _) -> ())
+setBucketType timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbSetBucketType request)
+
+  (fmap.fmap) (() <$)
+    (doExchange
+      (onReceive handlers)
+      RespRpbSetBucket
+      (exchange
+        timeoutVar
+        handle
+        (encodeRpbSetBucketType request)
+        decodeRpbSetBucket))
 
 search ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbSearchQueryReq
   -> IO (Either HandleError (Either ByteString Proto.RpbSearchQueryResp))
-search timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqRpbSearchQuery request)
-    (\(RespRpbSearchQuery response) -> response)
+search timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqRpbSearchQuery request)
+
+  doExchange
+    (onReceive handlers)
+    RespRpbSearchQuery
+    (exchange
+      timeoutVar
+      handle
+      (encodeRpbSearchQuery request)
+      decodeRpbSearchQuery)
 
 secondaryIndex ::
      TVar Bool
@@ -491,92 +911,32 @@ secondaryIndex ::
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either HandleError (Either ByteString r))
-secondaryIndex timeoutVar handle request responseFold =
-  stream
-    timeoutVar
-    handle
-    (ReqRpbIndex request)
-    (lmap (\(RespRpbIndex response) -> response) responseFold)
+secondaryIndex timeoutVar handle@(Handle { handlers }) request responseFold = do
+  onSend handlers (ReqRpbIndex request)
+
+  doStream
+    (onReceive handlers)
+    RespRpbIndex
+    (stream
+      timeoutVar
+      handle
+      (encodeRpbIndex request)
+      decodeRpbIndex)
+    responseFold
 
 updateCrdt ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.DtUpdateReq -- ^
   -> IO (Either HandleError (Either ByteString Proto.DtUpdateResp))
-updateCrdt timeoutVar handle request =
-  exchange
-    timeoutVar
-    handle
-    (ReqDtUpdate request)
-    (\(RespDtUpdate response) -> response)
+updateCrdt timeoutVar handle@(Handle { handlers }) request = do
+  onSend handlers (ReqDtUpdate request)
 
-
-withConnection ::
-     forall a.
-     Handle
-  -> (Connection -> IO (Either HandleError a))
-  -> IO (Either HandleError a)
-withConnection Handle { connVar, handlers } callback =
-  readTVarIO connVar >>= \case
-    Left _ ->
-      pure (Left HandleClosedError)
-
-    Right connection ->
-      doCallback connection >>= \case
-        Left err -> do
-          markAsUnusable
-          onError handlers err
-          pure (Left err)
-
-        Right result ->
-          pure (Right result)
-
-  where
-    doCallback :: Connection -> IO (Either HandleError a)
-    doCallback connection =
-      callback connection `catchAsync` \ex -> do
-        markAsUnusable
-        throwIO (ex :: SomeException)
-
-    markAsUnusable :: IO ()
-    markAsUnusable =
-      atomically $
-        readTVar connVar >>= \case
-          Left _ -> pure ()
-          Right conn -> writeTVar connVar (Left conn)
-
-send ::
-     Connection
-  -> Request code
-  -> EventHandlers
-  -> IO (Either ConnectionError ())
-send connection request handlers = do
-  onSend handlers request
-  Connection.send connection (encodeRequest request)
-
-receive ::
-     forall code.
-     KnownNat code
-  => TVar Bool
-  -> Connection
-  -> EventHandlers
-  -> IO (Either HandleError (Either ByteString (Response code)))
-receive timeoutVar connection handlers = do
-  Connection.receive timeoutVar connection >>= \case
-    Left err ->
-      pure (Left (HandleConnectionError err))
-
-    Right bytes ->
-      case decodeResponse bytes of
-        Left err -> do
-          pure (Left (HandleDecodeError err))
-
-        Right (Left response) -> do
-          onReceive handlers response
-          case response of
-            RespRpbError resp ->
-              pure (Right (Left (resp ^. Proto.errmsg)))
-
-        Right (Right response) -> do
-          onReceive handlers response
-          pure (Right (Right response))
+  doExchange
+    (onReceive handlers)
+    RespDtUpdate
+    (exchange
+      timeoutVar
+      handle
+      (encodeDtUpdate request)
+      decodeDtUpdate)
