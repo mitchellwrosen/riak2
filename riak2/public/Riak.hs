@@ -126,6 +126,7 @@ module Riak
   , IndexName
   , makeIndexName
   , unsafeMakeIndexName
+  , unIndexName
   , IntIndexQuery(..)
   , Key(..)
   , keyBucketType

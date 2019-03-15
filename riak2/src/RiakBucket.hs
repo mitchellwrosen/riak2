@@ -364,7 +364,7 @@ setBucketIndex_ handle bucket index parseError = liftIO $
         & setProto bucket
         & Proto.props .~
             (Proto.defMessage
-              & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
+              & Proto.searchIndex .~ encodeUtf8 (_unIndexName index))
 
     fromResult ::
          Either HandleError (Either ByteString ())

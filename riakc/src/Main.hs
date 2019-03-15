@@ -38,6 +38,7 @@ import qualified Data.ByteString.Char8  as Latin1
 import qualified Data.HashMap.Strict    as HashMap
 import qualified Data.HashSet           as HashSet
 import qualified Data.List              as List
+import qualified Data.Riak.Proto        as Proto
 import qualified Data.Text              as Text
 import qualified Data.Text.IO           as Text
 import qualified Net.IPv4               as IPv4
@@ -345,7 +346,7 @@ getBucketParser =
               exitFailure
 
             Right props ->
-              print props
+              printSomeBucketProps props
 
         Right bucket ->
           getBucket handle bucket >>= \case
@@ -354,7 +355,96 @@ getBucketParser =
               exitFailure
 
             Right props ->
-              print props
+              printSomeBucketProps props
+
+      where
+        printSomeBucketProps :: SomeBucketProps -> IO ()
+        printSomeBucketProps = \case
+          SomeBucketProps
+              BucketProps { backend, conflictResolution, index, nodes,
+                            postcommitHooks, precommitHooks,
+                            pruneContextSettings, readQuorum, writeOnce,
+                            writeQuorum
+                          } -> do
+
+            printBackend backend
+            printConflictResolution conflictResolution
+            printIndex index
+            printNodes nodes
+            printPostcommitHooks postcommitHooks
+            printPrecommitHooks precommitHooks
+            printPruneContextSettings pruneContextSettings
+            printReadQuorum readQuorum
+            printWriteOnce writeOnce
+            printWriteQuorum writeQuorum
+
+          -- TODO riakc prettier bucket prop printing
+          SomeCounterBucketProps props -> print props
+          SomeHyperLogLogBucketProps props -> print props
+          SomeMapBucketProps props -> print props
+          SomeSetBucketProps props -> print props
+
+        printBackend :: Maybe Text -> IO ()
+        printBackend backend =
+          Text.putStrLn ("backend = " <> fromMaybe "" backend)
+
+        printConflictResolution :: ConflictResolution -> IO ()
+        printConflictResolution resolution =
+          Text.putStrLn
+            ("conflict resolution = " <>
+              case resolution of
+                ClientSideConflictResolution ->
+                  "client-side (siblings)"
+                TimestampBasedConflictResolution ->
+                  "timestamp-based (no siblings)"
+                LastWriteWinsConflictResolution ->
+                  "last-write-wins (no siblings)")
+
+        printIndex :: Maybe IndexName -> IO ()
+        printIndex index =
+          Text.putStrLn ("index = " <> maybe "" unIndexName index)
+
+        printNodes :: Natural -> IO ()
+        printNodes nodes =
+          Text.putStrLn ("nodes = " <> Text.pack (show nodes))
+
+        printPostcommitHooks :: [Proto.RpbCommitHook] -> IO ()
+        printPostcommitHooks hooks =
+          Text.putStrLn ("postcommit hooks = " <> Text.pack (show hooks))
+
+        printPrecommitHooks :: [Proto.RpbCommitHook] -> IO ()
+        printPrecommitHooks hooks =
+          Text.putStrLn ("precommit hooks = " <> Text.pack (show hooks))
+
+        printPruneContextSettings :: PruneContextSettings -> IO ()
+        printPruneContextSettings
+            PruneContextSettings { minAge, maxAge, minLength, maxLength } = do
+          Text.putStrLn ("prune.min_age = " <> Text.pack (show minAge))
+          Text.putStrLn ("prune.max_age = " <> Text.pack (show maxAge))
+          Text.putStrLn ("prune.min_length = " <> Text.pack (show minLength))
+          Text.putStrLn ("prune.max_length = " <> Text.pack (show maxLength))
+
+        printReadQuorum :: ReadQuorum -> IO ()
+        printReadQuorum ReadQuorum { nodes, notfoundOk, primary } = do
+          Text.putStrLn ("read.nodes = " <> Text.pack (show nodes))
+          Text.putStrLn
+            ("read.notfound = " <>
+              case notfoundOk of
+                NotfoundOk -> "ok"
+                NotfoundNotOk -> "not ok"
+                NotfoundNotOkBasic -> "not ok (basic quorum)")
+          Text.putStrLn ("read.primary = " <> Text.pack (show primary))
+
+        printWriteOnce :: Bool -> IO ()
+        printWriteOnce = \case
+          True -> Text.putStrLn "write_once = true"
+          False -> Text.putStrLn "write_ince = false"
+
+        printWriteQuorum :: WriteQuorum -> IO ()
+        printWriteQuorum WriteQuorum { durable, nodes, primary } = do
+          Text.putStrLn ("write.durable = " <> Text.pack (show durable))
+          Text.putStrLn ("write.nodes = " <> Text.pack (show nodes))
+          Text.putStrLn ("write.primary = " <> Text.pack (show primary))
 
 getCounterParser :: Parser (Handle -> IO ())
 getCounterParser =

@@ -1,5 +1,6 @@
 module RiakIndexName
   ( IndexName(..)
+  , unIndexName
   , makeIndexName
   , unsafeMakeIndexName
   , fromBucketProps
@@ -15,11 +16,19 @@ import qualified Data.Text       as Text
 -- | An valid index name contains ASCII characters in the range @32-127@, less
 -- the character '/'.
 newtype IndexName
-  = IndexName { unIndexName :: Text }
+  = IndexName { _unIndexName :: Text }
   deriving stock (Eq)
   deriving newtype (Show)
 
-makeIndexName :: Text -> Maybe IndexName
+unIndexName ::
+     IndexName -- ^
+  -> Text
+unIndexName =
+  _unIndexName
+
+makeIndexName ::
+     Text -- ^
+  -> Maybe IndexName
 makeIndexName name = do
   guard (Text.all valid name)
   pure (IndexName name)
@@ -29,7 +38,9 @@ makeIndexName name = do
     valid c =
       c >= '\32' && c <= '\127' && c /= '/'
 
-unsafeMakeIndexName :: Text -> IndexName
+unsafeMakeIndexName ::
+     Text -- ^
+  -> IndexName
 unsafeMakeIndexName =
   IndexName
 

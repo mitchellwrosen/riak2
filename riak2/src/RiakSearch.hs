@@ -75,7 +75,7 @@ search
     request =
       Proto.defMessage
         & Proto.fl .~ fieldList
-        & Proto.index .~ encodeUtf8 (unIndexName index)
+        & Proto.index .~ encodeUtf8 (_unIndexName index)
         & Proto.maybe'filter .~ filter
         & Proto.maybe'presort .~ presort
         & Proto.maybe'rows .~ rows

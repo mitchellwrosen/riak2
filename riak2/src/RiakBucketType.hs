@@ -298,7 +298,7 @@ setBucketTypeIndex_ handle bucketType index = liftIO $
       Proto.defMessage
         & Proto.props .~
             (Proto.defMessage
-              & Proto.searchIndex .~ encodeUtf8 (unIndexName index))
+              & Proto.searchIndex .~ encodeUtf8 (_unIndexName index))
         & Proto.type' .~ bucketType
 
 -- | Unset the index of a bucket type.

@@ -15,6 +15,7 @@ executable riakc
     lens,
     optparse-applicative,
     riak2,
+    riak-protobuf,
     sockets,
     split,
     text,
@@ -24,6 +25,7 @@ executable riakc
   default-extensions:
     DataKinds
     DuplicateRecordFields
+    FlexibleContexts
     GADTs
     LambdaCase
     OverloadedStrings

@@ -10,6 +10,7 @@ module Riak.Index
   , IndexName
   , makeIndexName
   , unsafeMakeIndexName
+  , unIndexName
   ) where
 
 import RiakIndex

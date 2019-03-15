@@ -66,7 +66,7 @@ toErlangTerm = \case
   MapReduceInputSearch index query ->
     Erlang.tuple3
       atomSearch
-      (ErlBinary (encodeUtf8 (unIndexName index)))
+      (ErlBinary (encodeUtf8 (_unIndexName index)))
       (ErlBinary query)
 
 intIndexQueryToErlangTerm :: IntIndexQuery -> ErlangTerm

@@ -177,7 +177,7 @@ putIndex_ handle index schema nodes timeout = do
       Proto.defMessage
         & Proto.index .~
             (Proto.defMessage
-              & Proto.name .~ encodeUtf8 (unIndexName index)
+              & Proto.name .~ encodeUtf8 (_unIndexName index)
               & Proto.maybe'nVal .~ (fromIntegral <$> nodes)
               & Proto.maybe'schema .~
                   (if schema == defaultSchema
@@ -228,7 +228,7 @@ deleteIndex ::
   -> IndexName -- ^
   -> m (Either DeleteIndexError Bool)
 deleteIndex handle name = liftIO $
-  fromResult <$> Handle.deleteIndex handle (encodeUtf8 (unIndexName name))
+  fromResult <$> Handle.deleteIndex handle (encodeUtf8 (_unIndexName name))
 
   where
     fromResult ::
