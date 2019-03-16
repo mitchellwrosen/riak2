@@ -104,6 +104,8 @@ parseGetIndexesError :: ByteString -> GetIndexError
 parseGetIndexesError err =
   UnknownError (decodeUtf8 err)
 
+-- TODO putIndexWith?
+
 -- | Put a Solr index.
 --
 -- +----------------------------------+----------------------------------------+

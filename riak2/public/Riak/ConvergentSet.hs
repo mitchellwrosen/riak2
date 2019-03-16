@@ -16,6 +16,9 @@ module Riak.ConvergentSet
     -- ** Operations
   , getSet
   , putSet
+    -- *** *With variants
+  , getSetWith
+  , putSetWith
   ) where
 
 import RiakSet

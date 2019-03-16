@@ -6,15 +6,22 @@ module Riak
     -- * Object operations
     -- ** Get object
   , get
+  , getWith
   , getHead
-  , getIfModified
+  , getHeadWith
+  , getIfModifiedWith
   , getHeadIfModified
+  , getHeadIfModifiedWith
     -- ** Put object
   , put
+  , putWith
   , putGet
+  , putGetWith
   , putGetHead
+  , putGetHeadWith
     -- ** Delete object
   , delete
+  , deleteWith
     -- * Convergent counter operations
   , getCounter
   , updateCounter

@@ -6,11 +6,12 @@
 module RiakHyperLogLog
   ( ConvergentHyperLogLog(..)
   , getHyperLogLog
+  , getHyperLogLogWith
   , updateHyperLogLog
+  , updateHyperLogLogWith
   ) where
 
-import RiakBucket  (Bucket(..))
-import RiakCrdt
+import RiakCrdt    (parseGetCrdtError)
 import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
@@ -24,6 +25,7 @@ import qualified RiakKey     as Key
 import qualified RiakPutOpts as PutOpts
 
 import Control.Lens       ((.~), (^.))
+import Data.Default.Class (def)
 import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto
@@ -52,9 +54,18 @@ getHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> m (Either GetHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
+getHyperLogLog handle key =
+  getHyperLogLogWith handle key def
+
+-- | 'getHyperLogLog' with options.
+getHyperLogLogWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetHyperLogLogError (Maybe (ConvergentHyperLogLog Word64)))
-getHyperLogLog handle key@(Key bucketType _ _) opts = liftIO $
+getHyperLogLogWith handle key@(Key bucketType _ _) opts = liftIO $
   fromResult <$> Handle.getCrdt handle request
 
   where
@@ -91,9 +102,21 @@ updateHyperLogLog ::
      MonadIO m
   => Handle -- ^
   -> ConvergentHyperLogLog [ByteString] -- ^
+  -> m (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64))
+updateHyperLogLog handle value =
+  updateHyperLogLogWith handle value def
+
+-- | 'updateHyperLogLog' with options.
+updateHyperLogLogWith ::
+     MonadIO m
+  => Handle -- ^
+  -> ConvergentHyperLogLog [ByteString] -- ^
   -> PutOpts -- ^
   -> m (Either UpdateHyperLogLogError (ConvergentHyperLogLog Word64))
-updateHyperLogLog handle (ConvergentHyperLogLog key value) opts = liftIO $
+updateHyperLogLogWith
+    handle
+    (ConvergentHyperLogLog key@(Key bucketType _ _) value)
+    opts = liftIO $
 
   fromResult <$> Handle.updateCrdt handle request
 
@@ -115,7 +138,7 @@ updateHyperLogLog handle (ConvergentHyperLogLog key value) opts = liftIO $
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseUpdateHyperLogLogError (key ^. keyBucket) err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -135,20 +158,19 @@ updateHyperLogLog handle (ConvergentHyperLogLog key value) opts = liftIO $
             response ^. Proto.hllValue
         }
 
-parseUpdateHyperLogLogError ::
-     Bucket
-  -> ByteString
-  -> Error 'UpdateCrdtOp
-parseUpdateHyperLogLogError bucket@(Bucket bucketType _) err
-  | isBucketMustBeAllowMultError err =
-      InvalidBucketError bucket
-  | isBucketTypeDoesNotExistError1 err =
-      BucketTypeDoesNotExistError bucketType
-  | isInvalidNodesError0 err =
-      InvalidNodesError
-  | isNonCounterOperationOnDefaultBucketError err =
-      InvalidBucketTypeError bucketType
-  | isOperationTypeIsHllButBucketTypeIsError err =
-      InvalidBucketTypeError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError ::
+         ByteString
+      -> Error 'UpdateCrdtOp
+    parseError err
+      | isBucketMustBeAllowMultError err =
+          InvalidBucketError (key ^. keyBucket)
+      | isBucketTypeDoesNotExistError1 err =
+          BucketTypeDoesNotExistError bucketType
+      | isInvalidNodesError0 err =
+          InvalidNodesError
+      | isNonCounterOperationOnDefaultBucketError err =
+          InvalidBucketTypeError bucketType
+      | isOperationTypeIsHllButBucketTypeIsError err =
+          InvalidBucketTypeError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)

@@ -224,7 +224,7 @@ deleteParser =
       -> Handle
       -> IO ()
     doDelete key context nodes quorum timeout handle =
-      delete handle object opts >>= \case
+      deleteWith handle object opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -282,7 +282,7 @@ getParser =
       -> Handle
       -> IO ()
     doGet key opts handle =
-      get handle key opts >>= \case
+      getWith handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -701,7 +701,7 @@ putParser =
       -> Handle
       -> IO ()
     doPut bucketOrKey val type' charset encoding indexes context opts handle =
-      put handle object opts >>= \case
+      putWith handle object opts >>= \case
         Left err -> do
           print err
           exitFailure

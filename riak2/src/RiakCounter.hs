@@ -1,7 +1,9 @@
 module RiakCounter
   ( ConvergentCounter(..)
   , getCounter
+  , getCounterWith
   , updateCounter
+  , updateCounterWith
   ) where
 
 import RiakCrdt
@@ -18,6 +20,7 @@ import qualified RiakKey     as Key
 import qualified RiakPutOpts as PutOpts
 
 import Control.Lens       ((.~), (^.))
+import Data.Default.Class (def)
 import Data.Text.Encoding (decodeUtf8)
 
 import qualified Data.Riak.Proto as Proto
@@ -40,9 +43,18 @@ getCounter ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> m (Either GetCounterError (Maybe ConvergentCounter))
+getCounter handle key =
+  getCounterWith handle key def
+
+-- | 'getCounter' with options.
+getCounterWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetCounterError (Maybe ConvergentCounter))
-getCounter handle key@(Key bucketType _ _) opts = liftIO $
+getCounterWith handle key@(Key bucketType _ _) opts = liftIO $
   fromResult <$> Handle.getCrdt handle request
 
   where
@@ -81,9 +93,21 @@ updateCounter ::
      MonadIO m
   => Handle -- ^
   -> ConvergentCounter -- ^ Counter update
+  -> m (Either UpdateCounterError ConvergentCounter)
+updateCounter handle value =
+  updateCounterWith handle value def
+
+-- | Update an eventually-convergent counter.
+--
+-- /Note/: Counters, unlike other convergent data types, represent their own
+-- update operation.
+updateCounterWith ::
+     MonadIO m
+  => Handle -- ^
+  -> ConvergentCounter -- ^ Counter update
   -> PutOpts -- ^
   -> m (Either UpdateCounterError ConvergentCounter)
-updateCounter handle (ConvergentCounter key@(Key bucketType _ _) value) opts = liftIO $
+updateCounterWith handle (ConvergentCounter key@(Key bucketType _ _) value) opts = liftIO $
   fromResult <$>
     Handle.updateCrdt handle request
 

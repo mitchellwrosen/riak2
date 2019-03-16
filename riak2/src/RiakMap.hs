@@ -4,7 +4,9 @@ module RiakMap
   , mapKey
   , mapValue
   , getMap
+  , getMapWith
   , putMap
+  , putMapWith
   ) where
 
 import RiakBucket      (Bucket(..))
@@ -25,6 +27,7 @@ import qualified RiakMapValue as MapValue
 import qualified RiakPutOpts  as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
+import Data.Default.Class    (def)
 import Data.Generics.Product (field)
 import Data.Text.Encoding    (decodeUtf8)
 
@@ -74,9 +77,18 @@ getMap ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> m (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
+getMap handle key =
+  getMapWith handle key def
+
+-- | 'getMap' with options.
+getMapWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetMapError (Maybe (ConvergentMap ConvergentMapValue)))
-getMap handle key@(Key bucketType _ _) opts = liftIO $
+getMapWith handle key@(Key bucketType _ _) opts = liftIO $
   fromResult <$> Handle.getCrdt handle request
 
   where
@@ -123,9 +135,18 @@ putMap ::
      MonadIO m
   => Handle -- ^
   -> ConvergentMap ConvergentMapValue -- ^
+  -> m (Either PutMapError (ConvergentMap ConvergentMapValue))
+putMap handle value =
+  putMapWith handle value def
+
+-- | 'putMap' with options.
+putMapWith ::
+     MonadIO m
+  => Handle -- ^
+  -> ConvergentMap ConvergentMapValue -- ^
   -> PutOpts
   -> m (Either PutMapError (ConvergentMap ConvergentMapValue))
-putMap
+putMapWith
     handle
     (ConvergentMap context key newValue oldValue)
     opts = liftIO $

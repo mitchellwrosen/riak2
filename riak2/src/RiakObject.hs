@@ -1,15 +1,14 @@
--- TODO add *With variants
-
 module RiakObject where
 
-import RiakContent (Content(..))
-import RiakContext (Context(..), emptyContext)
+import RiakContent     (Content(..))
+import RiakContext     (Context(..), emptyContext)
 import RiakError
-import RiakGetOpts (GetOpts)
-import RiakHandle  (Handle)
-import RiakKey     (Key(..))
-import RiakPutOpts (PutOpts)
-import RiakSibling (Sibling(..))
+import RiakGetOpts     (GetOpts)
+import RiakHandle      (Handle)
+import RiakHandleError (HandleError)
+import RiakKey         (Key(..))
+import RiakPutOpts     (PutOpts)
+import RiakSibling     (Sibling(..))
 
 import qualified RiakBucket         as Bucket
 import qualified RiakGetOpts        as GetOpts
@@ -21,6 +20,7 @@ import qualified RiakSecondaryIndex as SecondaryIndex
 import qualified RiakSibling        as Sibling
 
 import Control.Lens          ((.~), (^.))
+import Data.Default.Class    (def)
 import Data.Generics.Product (field)
 import Data.Text.Encoding    (decodeUtf8)
 
@@ -90,9 +90,18 @@ get ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> m (Either GetError (Object [Sibling ByteString]))
+get handle key =
+  getWith handle key def
+
+-- | 'get' with options.
+getWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetError (Object [Sibling ByteString]))
-get handle key opts = liftIO $
+getWith handle key opts = liftIO $
   (fmap.fmap)
     (fromGetResponse key)
     (doGet handle request)
@@ -104,15 +113,24 @@ get handle key opts = liftIO $
 
 -- | Get an object's metadata.
 --
--- If multiple siblings are returned, you should resolve them, then perform a
--- 'put'.
+-- If multiple siblings are returned, you should re-'get' the object, resolve
+-- them, then perform a 'put'.
 getHead ::
+     MonadIO m
+  => Handle -- ^
+  -> Key -- ^
+  -> m (Either GetError (Object [Sibling ()]))
+getHead handle key =
+  getHeadWith handle key def
+
+-- | 'getHead' with options.
+getHeadWith ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetError (Object [Sibling ()]))
-getHead handle key opts = liftIO $
+getHeadWith handle key opts = liftIO $
   (fmap.fmap)
     ((fmap.map) (() <$)  . fromGetResponse key)
     (doGet handle request)
@@ -130,9 +148,18 @@ getIfModified ::
      MonadIO m
   => Handle -- ^
   -> Object a -- ^
+  -> m (Either GetError (Maybe (Object [Sibling ByteString])))
+getIfModified handle object =
+  getIfModifiedWith handle object def
+
+-- | 'getIfModified' with options.
+getIfModifiedWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Object a -- ^
   -> GetOpts -- ^
   -> m (Either GetError (Maybe (Object [Sibling ByteString])))
-getIfModified handle Object { context, key } opts = liftIO $
+getIfModifiedWith handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     (\response ->
       if response ^. Proto.unchanged
@@ -148,15 +175,24 @@ getIfModified handle Object { context, key } opts = liftIO $
 
 -- | Get an object's metadata if it has been modified since the given version.
 --
--- If multiple siblings are returned, you should resolve them, then perform a
--- 'put'.
+-- If multiple siblings are returned, you should re-'get' the object, resolve
+-- them, then perform a 'put'.
 getHeadIfModified ::
+     MonadIO m
+  => Handle -- ^
+  -> Object a -- ^
+  -> m (Either GetError (Maybe (Object [Sibling ()])))
+getHeadIfModified handle object =
+  getHeadIfModifiedWith handle object def
+
+-- | 'getHeadIfModified' with options.
+getHeadIfModifiedWith ::
      MonadIO m
   => Handle -- ^
   -> Object a -- ^
   -> GetOpts -- ^
   -> m (Either GetError (Maybe (Object [Sibling ()])))
-getHeadIfModified handle Object { context, key } opts = liftIO $
+getHeadIfModifiedWith handle Object { context, key } opts = liftIO $
   (fmap.fmap)
     fromResponse
     (doGet handle request)
@@ -181,26 +217,29 @@ doGet handle request =
   fromResult <$> Handle.get handle request
 
   where
+    fromResult ::
+         Either [HandleError] (Either ByteString Proto.RpbGetResp)
+      -> Either GetError Proto.RpbGetResp
     fromResult = \case
       Left err ->
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseGetError request err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right response
 
-parseGetError :: Proto.RpbGetReq -> ByteString -> GetError
-parseGetError request err
-  | isBucketTypeDoesNotExistError0 err =
-      BucketTypeDoesNotExistError (request ^. Proto.type')
-  | isInvalidNodesError0 err =
-      InvalidNodesError
-  | isKeyCannotBeZeroLengthError err =
-      InvalidKeyError (Key.fromProto request)
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError :: ByteString -> GetError
+    parseError err
+      | isBucketTypeDoesNotExistError0 err =
+          BucketTypeDoesNotExistError (request ^. Proto.type')
+      | isInvalidNodesError0 err =
+          InvalidNodesError
+      | isKeyCannotBeZeroLengthError err =
+          InvalidKeyError (Key.fromProto request)
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 makeGetRequest :: Key -> GetOpts -> Proto.RpbGetReq
 makeGetRequest key opts =
@@ -212,11 +251,21 @@ makeGetRequest key opts =
 
 -- | Put an object and return its key.
 put ::
-     Handle -- ^
+     MonadIO m
+  => Handle -- ^
+  -> Object (Content ByteString) -- ^
+  -> m (Either PutError Key)
+put handle object =
+  putWith handle object def
+
+-- | 'put' with options.
+putWith ::
+     MonadIO m
+  => Handle -- ^
   -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
-  -> IO (Either PutError Key)
-put handle object opts =
+  -> m (Either PutError Key)
+putWith handle object opts = liftIO $
   (fmap.fmap)
     fromResponse
     (doPut handle request)
@@ -238,16 +287,22 @@ put handle object opts =
 --
 -- If multiple siblings are returned, you should resolve them, then perform a
 -- 'put'.
---
--- /Note/: The object(s) returned may be tombstones; check
--- 'Riak.Object.deleted'.
 putGet ::
+     MonadIO m
+  => Handle -- ^
+  -> Object (Content ByteString) -- ^
+  -> m (Either PutError (Object (NonEmpty (Sibling ByteString))))
+putGet handle object =
+  putGetWith handle object def
+
+-- | 'putGet' with options.
+putGetWith ::
      MonadIO m
   => Handle -- ^
   -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
   -> m (Either PutError (Object (NonEmpty (Sibling ByteString))))
-putGet handle object opts = liftIO $
+putGetWith handle object opts = liftIO $
   (fmap.fmap)
     (fromPutResponse (object ^. field @"key"))
     (doPut handle request)
@@ -266,9 +321,18 @@ putGetHead ::
      MonadIO m
   => Handle -- ^
   -> Object (Content ByteString) -- ^
+  -> m (Either PutError (Object (NonEmpty (Sibling ()))))
+putGetHead handle object =
+  putGetHeadWith handle object def
+
+-- | 'putGetHead' with options.
+putGetHeadWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Object (Content ByteString) -- ^
   -> PutOpts -- ^
   -> m (Either PutError (Object (NonEmpty (Sibling ()))))
-putGetHead handle object opts = liftIO $
+putGetHeadWith handle object opts = liftIO $
   (fmap.fmap)
     ((fmap.fmap) (() <$) . fromPutResponse (object ^. field @"key"))
     (doPut handle request)
@@ -287,26 +351,29 @@ doPut handle request =
   fromResult <$> Handle.put handle request
 
   where
+    fromResult ::
+         Either [HandleError] (Either ByteString Proto.RpbPutResp)
+      -> Either PutError Proto.RpbPutResp
     fromResult = \case
       Left err ->
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parsePutError request err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right response
 
-parsePutError :: Proto.RpbPutReq -> ByteString -> PutError
-parsePutError request err
-  | isBucketCannotBeZeroLengthError err =
-      InvalidBucketError (Bucket.fromProto request)
-  | isBucketTypeDoesNotExistError0 err =
-      BucketTypeDoesNotExistError (request ^. Proto.type')
-  | isInvalidNodesError0 err =
-      InvalidNodesError
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError :: ByteString -> PutError
+    parseError err
+      | isBucketCannotBeZeroLengthError err =
+          InvalidBucketError (Bucket.fromProto request)
+      | isBucketTypeDoesNotExistError0 err =
+          BucketTypeDoesNotExistError (request ^. Proto.type')
+      | isInvalidNodesError0 err =
+          InvalidNodesError
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 makePutRequest ::
      Object (Content ByteString)
@@ -337,9 +404,18 @@ delete ::
      MonadIO m
   => Handle -- ^
   -> Object a -- ^
+  -> m (Either PutError ())
+delete handle object =
+  deleteWith handle object def
+
+-- | 'delete' with options.
+deleteWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Object a -- ^
   -> PutOpts -- ^
   -> m (Either PutError ())
-delete handle Object { context, key } opts = liftIO $
+deleteWith handle Object { context, key } opts = liftIO $
   (() <$) <$> doPut handle request
 
   where

@@ -4,7 +4,9 @@ module RiakSet
   , setKey
   , setValue
   , getSet
+  , getSetWith
   , putSet
+  , putSetWith
   , toProto
   ) where
 
@@ -22,6 +24,7 @@ import qualified RiakKey     as Key
 import qualified RiakPutOpts as PutOpts
 
 import Control.Lens          (Lens', (.~), (^.))
+import Data.Default.Class    (def)
 import Data.Generics.Product (field)
 import Data.Text.Encoding    (decodeUtf8)
 
@@ -69,9 +72,18 @@ getSet ::
      MonadIO m
   => Handle -- ^
   -> Key -- ^
+  -> m (Either GetSetError (Maybe (ConvergentSet ByteString)))
+getSet handle key =
+  getSetWith handle key def
+
+-- | 'getSet' with options.
+getSetWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Key -- ^
   -> GetOpts -- ^
   -> m (Either GetSetError (Maybe (ConvergentSet ByteString)))
-getSet handle key@(Key bucketType _ _) opts = liftIO $
+getSetWith handle key@(Key bucketType _ _) opts = liftIO $
   fromResult <$> Handle.getCrdt handle request
 
   where
@@ -115,9 +127,18 @@ putSet ::
      MonadIO m
   => Handle -- ^
   -> ConvergentSet ByteString -- ^
-  -> PutOpts
   -> m (Either PutSetError (ConvergentSet ByteString))
-putSet
+putSet handle value =
+  putSetWith handle value def
+
+-- | 'putSet' with options.
+putSetWith ::
+     MonadIO m
+  => Handle -- ^
+  -> ConvergentSet ByteString -- ^
+  -> PutOpts -- ^
+  -> m (Either PutSetError (ConvergentSet ByteString))
+putSetWith
     handle
     (ConvergentSet context key@(Key bucketType _ _) newValue oldValue)
     opts = liftIO $

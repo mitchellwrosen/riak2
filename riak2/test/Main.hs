@@ -30,7 +30,8 @@ import RiakKey              (Key(..), generatedKey, keyBucket, keyBucketSegment,
 import RiakMap              (ConvergentMap, getMap, newMap, putMap)
 import RiakMapValue         (ConvergentMapValue, emptyMapValue)
 import RiakObject           (Object(..), delete, get, getHead, getIfModified,
-                             newObject, put, putGet, putGetHead)
+                             getWith, newObject, put, putGet, putGetHead,
+                             putWith)
 import RiakPing             (ping)
 import RiakPutOpts          (PutOpts(..))
 import RiakSchema           (defaultSchema)
@@ -237,7 +238,7 @@ riakBucketTests handle =
         let bucket = object ^. field @"key" . keyBucket
         idx <- randomByteString 32
         let object' = object & field @"content" . field @"indexes" .~ [BinaryIndex idx "x"]
-        put handle object' def `shouldReturnSatisfy` isRight
+        put handle object' `shouldReturnSatisfy` isRight
         queryBinaryIndex
           handle
           (BinaryIndexQuery { bucket = bucket, index = idx, minValue = "x", maxValue = "x" } )
@@ -248,7 +249,7 @@ riakBucketTests handle =
         let n = 10
         bucket <- randomObjectBucket
         replicateM_ n $
-          put handle (emptyObject (generatedKey bucket)) def `shouldReturnSatisfy` isRight
+          put handle (emptyObject (generatedKey bucket)) `shouldReturnSatisfy` isRight
         queryBinaryIndex
           handle
           (inBucket bucket)
@@ -275,7 +276,7 @@ riakBucketTests handle =
         let bucket = object ^. field @"key" . keyBucket
         idx <- randomByteString 32
         let object' = object & field @"content" . field @"indexes" .~ [IntIndex idx 1]
-        put handle object' def `shouldReturnSatisfy` isRight
+        put handle object' `shouldReturnSatisfy` isRight
         queryIntIndex
           handle
           (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
@@ -507,39 +508,39 @@ riakCounterTests handle =
   [ testGroup "getCounter"
     [ testCase "default bucket succeeds for some reason" $ do
         key <- randomDefaultKey
-        put handle (emptyObject key) def `shouldReturn` Right key
-        getCounter handle key def `shouldReturnSatisfy` isRightJust
+        put handle (emptyObject key) `shouldReturn` Right key
+        getCounter handle key `shouldReturnSatisfy` isRightJust
     ]
 
   , testGroup "updateCounter"
     [ testCase "empty bucket works for some reason" $ do
         key <- (keyBucketSegment .~ "") <$> randomCounterKey
-        updateCounter handle (ConvergentCounter key 1) def `shouldReturnSatisfy` isRight
+        updateCounter handle (ConvergentCounter key 1) `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
-          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "allow_mult=false (non-default)" $ do
           key <- randomNoSiblingsKey
-          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "hll bucket" $ do
           key <- randomHyperLogLogKey
-          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "map bucket" $ do
           key <- randomMapKey
-          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "set bucket" $ do
           key <- randomSetKey
-          updateCounter handle (ConvergentCounter key 1) def `shouldReturn`
+          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
     ]
@@ -550,39 +551,39 @@ riakHyperLogLogTests handle =
   [ testGroup "getHyperLogLog"
     [ testCase "non-hll bucket succeeds for some reason" $ do
         key <- randomDefaultKey
-        put handle (emptyObject key) def `shouldReturn` Right key
-        getHyperLogLog handle key def `shouldReturnSatisfy` isRightJust
+        put handle (emptyObject key) `shouldReturn` Right key
+        getHyperLogLog handle key `shouldReturnSatisfy` isRightJust
     ]
 
   , testGroup "updateHyperLogLog"
     [ testCase "empty bucket works for some reason" $ do
         key <- (keyBucketSegment .~ "") <$> randomHyperLogLogKey
-        updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturnSatisfy` isRight
+        updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
-          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) `shouldReturn`
             Left (InvalidBucketTypeError defaultBucketType)
 
       , testCase "allow_mult=false (non-default)" $ do
           key <- randomNoSiblingsKey
-          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "counter bucket" $ do
           key <- randomCounterKey
-          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "map bucket" $ do
           key <- randomMapKey
-          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "set bucket" $ do
           key <- randomSetKey
-          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) def `shouldReturn`
+          updateHyperLogLog handle (ConvergentHyperLogLog key ["a"]) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
     ]
@@ -625,39 +626,39 @@ riakMapTests handle =
   [ testGroup "getMap"
     [ testCase "non-map bucket succeeds for some reason" $ do
         key <- randomDefaultKey
-        put handle (emptyObject key) def `shouldReturn` Right key
-        getMap handle key def `shouldReturnSatisfy` isRightJust
+        put handle (emptyObject key) `shouldReturn` Right key
+        getMap handle key `shouldReturnSatisfy` isRightJust
     ]
 
   , testGroup "putMap"
     [ testCase "empty bucket works for some reason" $ do
         key <- (keyBucketSegment .~ "") <$> randomMapKey
-        putMap handle (emptyMap key) def `shouldReturnSatisfy` isRight
+        putMap handle (emptyMap key) `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
-          putMap handle (emptyMap key) def `shouldReturn`
+          putMap handle (emptyMap key) `shouldReturn`
             Left (InvalidBucketTypeError defaultBucketType)
 
       , testCase "allow_mult=false (non-default)" $ do
           key <- randomNoSiblingsKey
-          putMap handle (emptyMap key) def `shouldReturn`
+          putMap handle (emptyMap key) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "counter bucket" $ do
           key <- randomCounterKey
-          putMap handle (emptyMap key) def `shouldReturn`
+          putMap handle (emptyMap key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "hll bucket" $ do
           key <- randomHyperLogLogKey
-          putMap handle (emptyMap key) def `shouldReturn`
+          putMap handle (emptyMap key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "set bucket" $ do
           key <- randomSetKey
-          putMap handle (emptyMap key) def `shouldReturn`
+          putMap handle (emptyMap key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
     ]
@@ -668,14 +669,14 @@ riakObjectTests handle =
   [ testGroup "get"
     [ testCase "404" $ do
         key <- randomObjectKey
-        get handle key def >>= \case
+        get handle key >>= \case
           Right Object { content = [] } -> pure ()
           result -> assertFailure (show result)
 
     , testCase "success" $ do
         object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        get handle (object ^. field @"key") def >>= \case
+        put handle object `shouldReturnSatisfy` isRight
+        get handle (object ^. field @"key") >>= \case
           Right Object { content = [Sibling content] } ->
             (content ^. field @"value") `shouldBe`
               (object ^. field @"content" . field @"value")
@@ -684,50 +685,50 @@ riakObjectTests handle =
     , testGroup "failures"
       [ testCase "bucket type not found" $ do
           key@(Key bucketType _ _) <- randomKey
-          get handle key def `shouldReturn`
+          get handle key `shouldReturn`
             Left (BucketTypeDoesNotExistError bucketType)
 
       , testCase "invalid nval" $ do
           key <- randomObjectKey
-          get handle key (def { nodes = Just 4 }) `shouldReturn`
+          getWith handle key ((def :: GetOpts) { nodes = Just 4 }) `shouldReturn`
             Left InvalidNodesError
 
       , testCase "empty key" $ do
           Bucket bucketType bucket <- randomObjectBucket
           let key = Key bucketType bucket ""
-          get handle key def `shouldReturn` Left (InvalidKeyError key)
+          get handle key `shouldReturn` Left (InvalidKeyError key)
       ]
 
     , testGroup "getHead"
       [ testCase "404" $ do
           key <- randomObjectKey
-          getHead handle key def >>= \case
+          getHead handle key >>= \case
             Right Object { content = [] } -> pure ()
             result -> assertFailure (show result)
 
       , testCase "success" $ do
           object <- randomObject
-          put handle object def `shouldReturnSatisfy` isRight
-          getHead handle (object ^. field @"key") def `shouldReturnSatisfy` isRight
+          put handle object `shouldReturnSatisfy` isRight
+          getHead handle (object ^. field @"key") `shouldReturnSatisfy` isRight
       ]
 
     , testGroup "getIfModified"
       [ testCase "if modified (not modified)" $ do
           object <- randomObject
-          put handle object def `shouldReturnSatisfy` isRight
-          get handle (object ^. field @"key") def >>= \case
+          put handle object `shouldReturnSatisfy` isRight
+          get handle (object ^. field @"key") >>= \case
             Right object -> do
-              getIfModified handle object def `shouldReturnSatisfy` isRightNothing
+              getIfModified handle object `shouldReturnSatisfy` isRightNothing
             result -> assertFailure (show result)
 
       , testCase "if modified (modified)" $ do
           object <- randomObject
-          put handle object def `shouldReturnSatisfy` isRight
-          get handle (object ^. field @"key") def >>= \case
+          put handle object `shouldReturnSatisfy` isRight
+          get handle (object ^. field @"key") >>= \case
             Right object@(Object { content = [Sibling content] }) -> do
               let object' = object & field @"content" .~ content
-              _ <- put handle object' def
-              getIfModified handle object' def `shouldReturnSatisfy` isRightJust
+              _ <- put handle object'
+              getIfModified handle object' `shouldReturnSatisfy` isRightJust
             result -> assertFailure (show result)
       ]
     ]
@@ -735,22 +736,23 @@ riakObjectTests handle =
   , testGroup "put"
     [ testCase "generated key" $ do
         bucket <- randomObjectBucket
-        put handle (emptyObject (generatedKey bucket)) def `shouldReturnSatisfy` isRight
+        put handle (emptyObject (generatedKey bucket)) `shouldReturnSatisfy`
+          isRight
 
     , testGroup "failures"
       [ testCase "bucket type not found" $ do
           key@(Key bucketType _ _) <- randomKey
-          put handle (emptyObject key) def `shouldReturn`
+          put handle (emptyObject key) `shouldReturn`
             Left (BucketTypeDoesNotExistError bucketType)
 
       , testCase "empty bucket" $ do
           key <- Key defaultBucketType "" <$> randomByteString 32
-          put handle (emptyObject key) def `shouldReturn`
+          put handle (emptyObject key) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "invalid nval" $ do
           key <- randomObjectKey
-          put handle (emptyObject key) (def { nodes = Just 4 }) `shouldReturn`
+          putWith handle (emptyObject key) ((def :: PutOpts) { nodes = Just 4 }) `shouldReturn`
             Left InvalidNodesError
       ]
     ]
@@ -758,14 +760,14 @@ riakObjectTests handle =
   , testGroup "putGet"
     [ testCase "success" $ do
         object <- randomObject
-        putGet handle object def >>= \case
+        putGet handle object >>= \case
           Right Object { content = _:|[] } -> pure ()
           result -> assertFailure (show result)
 
     , testCase "siblings" $ do
         object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        putGet handle object def >>= \case
+        put handle object `shouldReturnSatisfy` isRight
+        putGet handle object >>= \case
           Right Object { content = _:|[_] } -> pure ()
           result -> assertFailure (show result)
     ]
@@ -773,14 +775,14 @@ riakObjectTests handle =
   , testGroup "putGetHead"
     [ testCase "success" $ do
         object  <- randomObject
-        putGetHead handle object def >>= \case
+        putGetHead handle object >>= \case
           Right Object { content = _:|[] } -> pure ()
           result -> assertFailure (show result)
 
     , testCase "siblings" $ do
         object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        putGetHead handle object def >>= \case
+        put handle object `shouldReturnSatisfy` isRight
+        putGetHead handle object >>= \case
           Right Object { content = _:|[_] } -> pure ()
           result -> assertFailure (show result)
     ]
@@ -788,22 +790,22 @@ riakObjectTests handle =
   , testGroup "delete"
     [ testCase "non-existent object" $ do
         object <- randomObject
-        delete handle object def `shouldReturn` Right ()
+        delete handle object `shouldReturn` Right ()
 
     , testCase "tombstone" $ do
         object <- randomObject
-        put handle object def `shouldReturnSatisfy` isRight
-        delete handle object { context = emptyContext } def `shouldReturn` Right ()
-        get handle (object ^. field @"key") def >>= \case
+        put handle object `shouldReturnSatisfy` isRight
+        delete handle object { context = emptyContext } `shouldReturn` Right ()
+        get handle (object ^. field @"key") >>= \case
           Right Object { content = [Tombstone _, Sibling _] } -> pure ()
           result -> assertFailure (show result)
 
     , testCase "no tombstone" $ do
         object <- randomObject
-        putGet handle object def >>= \case
+        putGet handle object >>= \case
           Right object' -> do
-            delete handle object' def `shouldReturn` Right ()
-            get handle (object' ^. field @"key") def >>= \case
+            delete handle object' `shouldReturn` Right ()
+            get handle (object' ^. field @"key") >>= \case
               Right Object { content = [] } -> pure ()
               result -> assertFailure (show result)
           result -> assertFailure (show result)
@@ -811,12 +813,12 @@ riakObjectTests handle =
     , testCase "empty key" $ do
         object <- randomObject
         let object' = object & field @"key" . keyKeySegment .~ ""
-        delete handle object' def `shouldReturn` Right ()
+        delete handle object' `shouldReturn` Right ()
 
     , testGroup "failures"
       [ testCase "empty bucket" $ do
           key <- Key defaultBucketType "" <$> randomByteString 32
-          delete handle (emptyObject key) def `shouldReturn`
+          delete handle (emptyObject key) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
       ]
     ]
@@ -841,39 +843,39 @@ riakSetTests handle =
   [ testGroup "getSet"
     [ testCase "non-set bucket succeeds for some reason" $ do
         key <- randomDefaultKey
-        put handle (emptyObject key) def `shouldReturn` Right key
-        getSet handle key def `shouldReturnSatisfy` isRightJust
+        put handle (emptyObject key) `shouldReturn` Right key
+        getSet handle key `shouldReturnSatisfy` isRightJust
     ]
 
   , testGroup "putSet"
     [ testCase "empty bucket works for some reason" $ do
         key <- (keyBucketSegment .~ "") <$> randomSetKey
-        putSet handle (emptySet key) def `shouldReturnSatisfy` isRight
+        putSet handle (emptySet key) `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
-          putSet handle (emptySet key) def `shouldReturn`
+          putSet handle (emptySet key) `shouldReturn`
             Left (InvalidBucketTypeError defaultBucketType)
 
       , testCase "allow_mult=false (non-default)" $ do
           key <- randomNoSiblingsKey
-          putSet handle (emptySet key) def `shouldReturn`
+          putSet handle (emptySet key) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "counter bucket" $ do
           key <- randomCounterKey
-          putSet handle (emptySet key) def `shouldReturn`
+          putSet handle (emptySet key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "hll bucket" $ do
           key <- randomHyperLogLogKey
-          putSet handle (emptySet key) def `shouldReturn`
+          putSet handle (emptySet key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "map bucket" $ do
           key <- randomMapKey
-          putSet handle (emptySet key) def `shouldReturn`
+          putSet handle (emptySet key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
     ]

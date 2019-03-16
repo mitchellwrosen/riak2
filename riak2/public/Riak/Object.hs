@@ -4,12 +4,21 @@ module Riak.Object
   , put
   , delete
     -- ** Get variants
+  , getWith
   , getHead
+  , getHeadWith
   , getIfModified
+  , getIfModifiedWith
   , getHeadIfModified
+  , getHeadIfModifiedWith
     -- ** Put variants
+  , putWith
   , putGet
+  , putGetWith
   , putGetHead
+  , putGetHeadWith
+    -- ** Delete variants
+  , deleteWith
     -- * Object
   , Object(..)
   , newObject
