@@ -9,7 +9,7 @@ module RiakSet
   ) where
 
 import RiakBucket  (Bucket(..))
-import RiakContext (Context(..), newContext)
+import RiakContext (Context(..), emptyContext)
 import RiakCrdt    (parseGetCrdtError)
 import RiakError
 import RiakGetOpts (GetOpts)
@@ -33,7 +33,7 @@ import qualified Data.Riak.Proto as Proto
 
 -- | An eventually-convergent set.
 --
--- Sets must be stored in a bucket type with the__@datatype = set@__ property.
+-- Sets must be stored in a bucket type with the @datatype = set@ property.
 data ConvergentSet a
   = ConvergentSet
   { _context :: Context
@@ -49,7 +49,7 @@ newSet ::
   -> ConvergentSet a
 newSet key contents =
   ConvergentSet
-    { _context = newContext
+    { _context = emptyContext
     , _key = key
     , _newValue = contents
     , _oldValue = HashSet.empty

@@ -13,7 +13,7 @@ import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
                              getMapBucketType, getSetBucketType, listBuckets,
                              setBucketTypeIndex, unsetBucketTypeIndex)
 import RiakContent          (Content, newContent)
-import RiakContext          (newContext)
+import RiakContext          (emptyContext)
 import RiakCounter          (ConvergentCounter(..), getCounter, updateCounter)
 import RiakError            (Error(..))
 import RiakGetOpts          (GetOpts(..))
@@ -793,7 +793,7 @@ riakObjectTests handle =
     , testCase "tombstone" $ do
         object <- randomObject
         put handle object def `shouldReturnSatisfy` isRight
-        delete handle object { context = newContext } def `shouldReturn` Right ()
+        delete handle object { context = emptyContext } def `shouldReturn` Right ()
         get handle (object ^. field @"key") def >>= \case
           Right Object { content = [Tombstone _, Sibling _] } -> pure ()
           result -> assertFailure (show result)

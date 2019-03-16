@@ -1,6 +1,6 @@
 module Riak.Context
   ( Context
-  , newContext
+  , emptyContext
   , unsafeMakeContext
   ) where
 

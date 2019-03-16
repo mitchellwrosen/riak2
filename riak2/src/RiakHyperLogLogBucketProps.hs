@@ -17,6 +17,7 @@ import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Riak.Proto as Proto
 
 
+-- | HyperLogLog bucket properties.
 data HyperLogLogBucketProps
   = HyperLogLogBucketProps
   { backend :: Maybe Text

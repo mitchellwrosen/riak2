@@ -72,10 +72,20 @@ getBucketType handle bucketType = liftIO $
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseGetBucketTypeError bucketType err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right (SomeBucketProps.fromProto (response ^. Proto.props))
+
+    parseError ::
+         ByteString
+      -> GetBucketTypeError
+    parseError err
+      | isBucketTypeDoesNotExistError3 err =
+          BucketTypeDoesNotExistError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)
+
 
 -- | Get a counter bucket type's properties.
 --
@@ -225,16 +235,6 @@ getSetBucketType handle bucketType =
       Right _ ->
         Left (InvalidBucketTypeError bucketType)
 
-parseGetBucketTypeError ::
-     BucketType
-  -> ByteString
-  -> GetBucketTypeError
-parseGetBucketTypeError bucketType err
-  | isBucketTypeDoesNotExistError3 err =
-      BucketTypeDoesNotExistError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
-
 coerceGetBucketError ::
      MayReturnBucketTypeDoesNotExist op ~ 'True
   => GetBucketError
@@ -287,7 +287,7 @@ setBucketTypeIndex_ handle bucketType index = liftIO $
       pure (Left (HandleError err))
 
     Right (Left err) ->
-      pure (Left (parseSetBucketTypeIndexError bucketType index err))
+      pure (Left (parseError err))
 
     Right (Right _) ->
       pure (Right ())
@@ -301,6 +301,19 @@ setBucketTypeIndex_ handle bucketType index = liftIO $
               & Proto.searchIndex .~ encodeUtf8 (_unIndexName index))
         & Proto.type' .~ bucketType
 
+    parseError ::
+         ByteString
+      -> SetBucketTypeIndexError
+    parseError err
+      | isBucketTypeDoesNotExistError2 err =
+          BucketTypeDoesNotExistError bucketType
+      | isIndexDoesNotExistError0 err =
+          IndexDoesNotExistError index
+      | isInvalidNodesError1 err =
+          InvalidNodesError
+      | otherwise =
+          UnknownError (decodeUtf8 err)
+
 -- | Unset the index of a bucket type.
 unsetBucketTypeIndex ::
      MonadIO m
@@ -309,21 +322,6 @@ unsetBucketTypeIndex ::
   -> m (Either SetBucketTypeIndexError ())
 unsetBucketTypeIndex handle bucketType =
   setBucketTypeIndex handle bucketType (IndexName "_dont_index_")
-
-parseSetBucketTypeIndexError ::
-     ByteString
-  -> IndexName
-  -> ByteString
-  -> SetBucketTypeIndexError
-parseSetBucketTypeIndexError bucketType index err
-  | isBucketTypeDoesNotExistError2 err =
-      BucketTypeDoesNotExistError bucketType
-  | isIndexDoesNotExistError0 err =
-      IndexDoesNotExistError index
-  | isInvalidNodesError1 err =
-      InvalidNodesError
-  | otherwise =
-      UnknownError (decodeUtf8 err)
 
 -- | List all of the buckets in a bucket type.
 --
@@ -334,6 +332,14 @@ parseSetBucketTypeIndexError bucketType index err
 -- production cluster.
 --
 -- /See also/: 'streamBuckets'
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 listBuckets ::
      MonadIO m
   => Handle -- ^
@@ -348,7 +354,16 @@ listBuckets handle bucketType =
 -- production cluster.
 --
 -- /See also/: 'listBuckets'
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 streamBuckets ::
+     forall m r.
      MonadIO m
   => Handle -- ^
   -> BucketType -- ^
@@ -359,12 +374,15 @@ streamBuckets handle bucketType bucketFold = liftIO $
     Handle.listBuckets handle request (makeResponseFold bucketType bucketFold)
 
   where
+    fromResult ::
+         Either [HandleError] (Either ByteString r)
+      -> Either ListBucketsError r
     fromResult = \case
       Left err ->
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseListBucketsError bucketType err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right response
@@ -376,12 +394,12 @@ streamBuckets handle bucketType bucketFold = liftIO $
         & Proto.type' .~ bucketType
         -- TODO stream buckets timeout
 
-parseListBucketsError :: ByteString -> ByteString -> ListBucketsError
-parseListBucketsError bucketType err
-  | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError :: ByteString -> ListBucketsError
+    parseError err
+      | isBucketTypeDoesNotExistError4 err =
+          BucketTypeDoesNotExistError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 makeResponseFold ::
      forall m r. Monad m

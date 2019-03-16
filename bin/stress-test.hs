@@ -29,9 +29,9 @@ main = do
         , requestTimeout = 1
         , retries = 0
         , handlers =
-            EventHandlers
+            mempty
               { -- onSend = \msg -> putStrLn (">>> " ++ show msg)
-              --, onReceive = \msg -> putStrLn ("<<< " ++ show msg)
+              -- , onReceive = \msg -> putStrLn ("<<< " ++ show msg)
                 onConnectError = \ex -> putStrLn ("*** " ++ show ex)
               , onConnectionError = \ex -> putStrLn ("*** " ++ show ex)
               }

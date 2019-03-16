@@ -32,7 +32,7 @@ import qualified Data.Riak.Proto as Proto
 -- | An eventually-convergent HyperLogLog, which provides an approximate
 -- cardinality of a set.
 --
--- HyperLogLogs must be stored in a bucket type with the __@datatype = hll@__
+-- HyperLogLogs must be stored in a bucket type with the @datatype = hll@
 -- property.
 --
 -- The @hllPrecision@ bucket type property controls the number of precision bits
@@ -87,8 +87,6 @@ getHyperLogLog handle key@(Key bucketType _ _) opts = liftIO $
         }
 
 -- | Update an eventually-convergent HyperLogLog.
---
--- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 updateHyperLogLog ::
      MonadIO m
   => Handle -- ^

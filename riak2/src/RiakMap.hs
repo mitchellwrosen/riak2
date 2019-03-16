@@ -1,15 +1,16 @@
 module RiakMap
-  ( getMap
-  , putMap
-    -- * Convergent map
-  , ConvergentMap
+  ( -- * Convergent map
+    ConvergentMap
   , newMap
   , mapKey
   , mapValue
+    -- ** Operations
+  , getMap
+  , putMap
   ) where
 
 import RiakBucket      (Bucket(..))
-import RiakContext     (Context(..), newContext)
+import RiakContext     (Context(..), emptyContext)
 import RiakCrdt        (parseGetCrdtError)
 import RiakError
 import RiakGetOpts     (GetOpts)
@@ -35,7 +36,7 @@ import qualified Data.Riak.Proto as Proto
 
 -- | An eventually-convergent map.
 --
--- Maps must be stored in a bucket type with the __@datatype = map@__ property.
+-- Maps must be stored in a bucket type with the @datatype = map@ property.
 data ConvergentMap a
   = ConvergentMap
   { _context :: Context
@@ -45,19 +46,23 @@ data ConvergentMap a
   } deriving stock (Eq, Functor, Generic, Show)
 
 -- | Create a new eventually-convergent map.
+--
+-- You should only use this function if you are creating a new map, and are
+-- certain it does not already exist.
 newMap ::
      Key -- ^
   -> ConvergentMapValue -- ^
   -> ConvergentMap ConvergentMapValue
 newMap key value =
   ConvergentMap
-    { _context = newContext
+    { _context = emptyContext
     , _key = key
     , _newValue = value
     , _oldValue = emptyMapValue
     }
 
 -- | A lens onto the key of an eventually-convergent map.
+-- TODO this should be a getter, not a lens
 mapKey :: Lens' (ConvergentMap a) Key
 mapKey =
   field @"_key"

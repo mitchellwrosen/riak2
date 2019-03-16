@@ -14,6 +14,7 @@ import Data.Time          (NominalDiffTime, secondsToNominalDiffTime)
 
 import qualified Data.Riak.Proto as Proto
 
+-- | Object bucket properties.
 data BucketProps
   = BucketProps
   { backend :: Maybe Text
@@ -31,19 +32,28 @@ data BucketProps
 -- | The conflict resolution strategy used by Riak, for normal KV (non-CRDT)
 -- objects.
 --
--- * 'ClientSideConflictResolution' means, in the presence of concurrent updates
---   (or updates lacking a causal context), Riak will create siblings that will
---   have to be collapsed into one value outside of Riak. This strategy is
---   highly recommended for most mutable data.
---
--- * 'TimestampBasedConflictResolution' uses objects' internal timestamps to
---    resolve conflicts. Timestamps are inherently unreliable; this strategy is
---    legacy and, in the author's opinion, less useful than
---    'LastWriteWinsConflictResolution' in all cases. Do not use it.
---
--- * 'LastWriteWinsConflictResolution', means Riak will always overwrite any
---   existing data, no matter what its internal timestamp is. This strategy is
---   useful for immutable data.
+-- +------------------------------------+--------------------------------------+
+-- | 'ClientSideConflictResolution'     | In the presence of concurrent        |
+-- |                                    | updates (or updates lacking a causal |
+-- |                                    | context), Riak will create siblings  |
+-- |                                    | that will have have to be collapsed  |
+-- |                                    | into one value outside of Riak. This |
+-- |                                    | strategy is highly recommended for   |
+-- |                                    | most cases.                          |
+-- +------------------------------------+--------------------------------------+
+-- | 'TimestampBasedConflictResolution' | Uses objects' internal timestamps to |
+-- |                                    | resolve conflicts. Timestamps are    |
+-- |                                    | inherently unreliable; this strategy |
+-- |                                    | is legacy and, in the author's       |
+-- |                                    | opinion, less useful than            |
+-- |                                    | last-write-wins in all cases. Do not |
+-- |                                    | use it.                              |
+-- +------------------------------------+--------------------------------------+
+-- | 'LastWriteWinsConflictResolution'  | Riak will always overwrite any       |
+-- |                                    | existing data, no matter what its    |
+-- |                                    | internal timestamp is. This strategy |
+-- |                                    | is useful for immutable data.        |
+-- +------------------------------------+--------------------------------------+
 data ConflictResolution
   = ClientSideConflictResolution
   | TimestampBasedConflictResolution
@@ -53,10 +63,13 @@ data ConflictResolution
 -- | To keep causal context storage requirements from growing arbitrarily large,
 -- Riak prunes causal context entries using the following algorithm:
 --
--- If the the causal context has /more than/ @minLength@ entries __and__ the
--- oldest entry is /older than/ @minAge@, then if there are /more tha/
--- @maxLength@ entries __or__ the oldest entry is /older than/ @maxAge@, prune
--- the oldest entry and repeat.
+-- If conditions @(1)@, @(2)@, and @(3)@ hold, prune the oldest entry and
+-- repeat.
+--
+-- * @(1)@ The the causal context has more than @minLength@ entries
+-- * @(2)@ The oldest entry is older than @minAge@
+-- * @(3)@ There are more than @maxLength@ entries /or/ the oldest entry is
+--   older than @maxAge@
 data PruneContextSettings
   = PruneContextSettings
   { minAge :: NominalDiffTime

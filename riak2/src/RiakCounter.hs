@@ -4,7 +4,6 @@ module RiakCounter
   , updateCounter
   ) where
 
-import RiakBucket  (Bucket(..))
 import RiakCrdt
 import RiakError
 import RiakGetOpts (GetOpts)
@@ -25,7 +24,7 @@ import qualified Data.Riak.Proto as Proto
 
 -- | An eventually-convergent counter.
 --
--- Counters must be stored in a bucket type with the __@datatype = counter@__
+-- Counters must be stored in a bucket type with the @datatype = counter@
 -- property.
 --
 -- /Note/: Counters do not contain a causal context, so it is not necessary to
@@ -78,15 +77,13 @@ getCounter handle key@(Key bucketType _ _) opts = liftIO $
 --
 -- /Note/: Counters, unlike other convergent data types, represent their own
 -- update operation.
---
--- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 updateCounter ::
      MonadIO m
   => Handle -- ^
   -> ConvergentCounter -- ^ Counter update
   -> PutOpts -- ^
   -> m (Either UpdateCounterError ConvergentCounter)
-updateCounter handle (ConvergentCounter key value) opts = liftIO $
+updateCounter handle (ConvergentCounter key@(Key bucketType _ _) value) opts = liftIO $
   fromResult <$>
     Handle.updateCrdt handle request
 
@@ -108,7 +105,7 @@ updateCounter handle (ConvergentCounter key value) opts = liftIO $
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseUpdateCounterError (key ^. keyBucket) err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -130,20 +127,19 @@ updateCounter handle (ConvergentCounter key value) opts = liftIO $
             response ^. Proto.counterValue
         }
 
-parseUpdateCounterError ::
-     Bucket
-  -> ByteString
-  -> Error 'UpdateCrdtOp
-parseUpdateCounterError bucket@(Bucket bucketType _) err
-  | isBucketTypeDoesNotExistError1 err =
-      BucketTypeDoesNotExistError bucketType
-  | isBucketMustBeAllowMultError err =
-      InvalidBucketError bucket
-  | isInvalidCounterBucketError err =
-      InvalidBucketError bucket
-  | isInvalidNodesError0 err =
-      InvalidNodesError
-  | isOperationTypeIsCounterButBucketTypeIsError err =
-      InvalidBucketTypeError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError ::
+         ByteString
+      -> Error 'UpdateCrdtOp
+    parseError err
+      | isBucketTypeDoesNotExistError1 err =
+          BucketTypeDoesNotExistError bucketType
+      | isBucketMustBeAllowMultError err =
+          InvalidBucketError (key ^. keyBucket)
+      | isInvalidCounterBucketError err =
+          InvalidBucketError (key ^. keyBucket)
+      | isInvalidNodesError0 err =
+          InvalidNodesError
+      | isOperationTypeIsCounterButBucketTypeIsError err =
+          InvalidBucketTypeError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)

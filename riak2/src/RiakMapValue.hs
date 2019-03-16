@@ -17,10 +17,17 @@ import qualified Data.HashSet        as HashSet
 import qualified Data.Riak.Proto     as Proto
 
 
--- | The map data.
+-- | Convergent map value.
 --
--- In Riak, map values are uniquely keyed by both a name and type (it is
--- possible to have both a counter and a flag at key @"foo"@, for example).
+-- In Riak, map values are keyed by both a name and type.
+--
+-- The 'Semigroup' instance mimics how Riak merges maps:
+--
+-- * Counters are added together.
+-- * Flags are anded together.
+-- * The right-hand register overwrites the left-hand register (mimicking
+--   "last write wins").
+-- * Sets are unioned.
 data ConvergentMapValue
   = ConvergentMapValue
   { counters :: HashMap ByteString Int64 -- ^ Counters
@@ -29,6 +36,38 @@ data ConvergentMapValue
   , registers :: HashMap ByteString ByteString -- ^ Registers
   , sets :: HashMap ByteString (HashSet ByteString) -- ^ Sets
   } deriving stock (Eq, Generic, Show)
+
+-- TODO test ConvergentMapValue monoid instance
+instance Monoid ConvergentMapValue where
+  mempty = emptyMapValue
+  mappend = (<>)
+
+instance Semigroup ConvergentMapValue where
+  ConvergentMapValue counters1 flags1 maps1 registers1 sets1 <>
+    ConvergentMapValue counters2 flags2 maps2 registers2 sets2 =
+
+    ConvergentMapValue counters3 flags3 maps3 registers3 sets3
+
+    where
+      counters3 :: HashMap ByteString Int64
+      counters3 =
+        HashMap.unionWith (+) counters1 counters2
+
+      flags3 :: HashMap ByteString Bool
+      flags3 =
+        HashMap.unionWith (&&) flags1 flags2
+
+      maps3 :: HashMap ByteString ConvergentMapValue
+      maps3 =
+        HashMap.unionWith (<>) maps1 maps2
+
+      registers3 :: HashMap ByteString ByteString
+      registers3 =
+        HashMap.unionWith (const id) registers1 registers2
+
+      sets3 :: HashMap ByteString (HashSet ByteString)
+      sets3 =
+        HashMap.unionWith HashSet.union sets1 sets2
 
 -- | An empty map value.
 emptyMapValue :: ConvergentMapValue

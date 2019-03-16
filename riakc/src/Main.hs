@@ -237,7 +237,7 @@ deleteParser =
         object =
           Object
             { content = ()
-            , context = fromMaybe newContext context
+            , context = fromMaybe emptyContext context
             , key = key
             }
 
@@ -723,7 +723,7 @@ putParser =
                   , type' = type'
                   }
             , context =
-                fromMaybe newContext context
+                fromMaybe emptyContext context
             , key =
                 case bucketOrKey of
                   Left bucket -> generatedKey bucket

@@ -79,6 +79,7 @@ module Riak
     -- * Types
   , BinaryIndexQuery(..)
   , inBucket
+  , keysBetween
   , Bucket(..)
   , bucketBucketType
   , bucketBucketSegment
@@ -89,7 +90,7 @@ module Riak
   , Content(..)
   , newContent
   , Context
-  , newContext
+  , emptyContext
   , unsafeMakeContext
   , ConvergentCounter(..)
   , ConvergentHyperLogLog(..)
@@ -177,6 +178,7 @@ module Riak
 #endif
   ) where
 
+import Riak.BinaryIndexQuery      (BinaryIndexQuery(..), keysBetween, inBucket)
 import Riak.Bucket
 import Riak.BucketProps           (BucketProps(..), ConflictResolution(..),
                                    CounterBucketProps(..),
@@ -195,6 +197,7 @@ import Riak.Error
 import Riak.Handle                (EventHandlers(..), Handle, HandleConfig(..),
                                    HandleError, createHandle)
 import Riak.Index
+import Riak.IntIndexQuery         (IntIndexQuery(..))
 import Riak.Key
 import Riak.MapReduce
 import Riak.Object
@@ -203,8 +206,6 @@ import Riak.Quorum                (NotfoundOk(..), Quorum(..), ReadQuorum(..),
 import Riak.Schema
 import Riak.Search
 import Riak.SecondaryIndex        (SecondaryIndex(..))
-import Riak.SecondaryIndexQuery   (BinaryIndexQuery(..), IntIndexQuery(..),
-                                   inBucket)
 import Riak.ServerInfo
 import Riak.Sibling
 import RiakPing

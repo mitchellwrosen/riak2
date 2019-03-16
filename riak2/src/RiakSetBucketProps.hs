@@ -17,6 +17,7 @@ import Data.Text.Encoding (decodeUtf8)
 import qualified Data.Riak.Proto as Proto
 
 
+-- | Set bucket properties.
 data SetBucketProps
   = SetBucketProps
   { backend :: Maybe Text

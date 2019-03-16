@@ -3,7 +3,7 @@
 module RiakObject where
 
 import RiakContent (Content(..))
-import RiakContext (Context(..), newContext)
+import RiakContext (Context(..), emptyContext)
 import RiakError
 import RiakGetOpts (GetOpts)
 import RiakHandle  (Handle)
@@ -44,7 +44,7 @@ newObject ::
 newObject key content =
   Object
     { content = content
-    , context = newContext
+    , context = emptyContext
     , key = key
     }
 
@@ -211,8 +211,6 @@ makeGetRequest key opts =
 
 
 -- | Put an object and return its key.
---
--- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 put ::
      Handle -- ^
   -> Object (Content ByteString) -- ^
@@ -243,8 +241,6 @@ put handle object opts =
 --
 -- /Note/: The object(s) returned may be tombstones; check
 -- 'Riak.Object.deleted'.
---
--- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 putGet ::
      MonadIO m
   => Handle -- ^
@@ -266,8 +262,6 @@ putGet handle object opts = liftIO $
 --
 -- If multiple siblings are returned, you should perform a 'get', resolve them,
 -- then perform a 'put'.
---
--- /See also/: 'Riak.Context.newContext', 'Riak.Key.generatedKey'
 putGetHead ::
      MonadIO m
   => Handle -- ^

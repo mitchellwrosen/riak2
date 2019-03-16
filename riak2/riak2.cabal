@@ -38,7 +38,7 @@ description:
   * "Riak.ConvergentMap"
   * "Riak.ConvergentSet"
   .
-  Key namespace types and operations:
+  Namespace types and operations:
   .
   * "Riak.BucketType"
   * "Riak.Bucket"
@@ -48,7 +48,8 @@ description:
   Secondary index types:
   .
   * "Riak.SecondaryIndex"
-  * "Riak.SecondaryIndexQuery"
+  * "Riak.BinaryIndexQuery"
+  * "Riak.IntIndexQuery"
   .
   Search types and operations:
   .
@@ -91,6 +92,7 @@ library
 
   exposed-modules:
     Riak
+    Riak.BinaryIndexQuery
     Riak.Bucket
     Riak.BucketProps
     Riak.BucketType
@@ -104,7 +106,7 @@ library
     Riak.Error
     Riak.Handle
     Riak.Index
-    Riak.SecondaryIndexQuery
+    Riak.IntIndexQuery
     Riak.Key
     Riak.MapReduce
     Riak.Object

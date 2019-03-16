@@ -1,6 +1,6 @@
 module RiakContext
   ( Context(..)
-  , newContext
+  , emptyContext
   , unsafeMakeContext
   ) where
 
@@ -9,21 +9,20 @@ import qualified Data.ByteString.Base64 as Base64
 import qualified Data.ByteString.Char8  as Latin1
 
 
--- | The opaque causal context attached to an object or data type.
+-- | The opaque causal context attached to every object.
 newtype Context
   = Context { unContext :: ByteString }
   deriving stock (Eq)
 
--- | base-64 encoded for for display purposes. The actual context is an opaque
--- binary blob.
+-- | base-64 encoded for for display purposes. The actual context is opaque.
 instance Show Context where
   show :: Context -> String
   show (Context context) =
     if ByteString.null context
-      then "<empty>"
+      then "<empty context>"
       else Latin1.unpack (Base64.encode context)
 
--- | The "new" context. Use this when writing an object or data type for the
+-- | The empty context. Use this when writing an object or data type for the
 -- first time.
 --
 -- Note that it is possible for two clients to simultaneously believe they are
@@ -38,14 +37,14 @@ instance Show Context where
 -- into one. This might go wrong (for example, the "register" data type uses a
 -- simple last-write-wins conflict resolution strategy), but is unavoidable for
 -- the very first write, without some out-of-band locking mechanism.
-newContext :: Context
-newContext =
+emptyContext :: Context
+emptyContext =
   Context ByteString.empty
 
 -- | Construct a context from an opaque binary blob.
 --
--- Unsafe in the sense that it is your responsibility to pass bytes that
--- originally came from Riak.
+-- This function is unsafe in the sense that it is your responsibility to pass
+-- bytes that originally came from Riak.
 unsafeMakeContext :: ByteString -> Context
 unsafeMakeContext =
   Context

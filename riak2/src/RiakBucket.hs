@@ -108,10 +108,21 @@ getBucket handle bucket@(Bucket bucketType _) = liftIO $
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseGetBucketError bucketType err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right (SomeBucketProps.fromProto (response ^. Proto.props))
+
+    parseError ::
+         MayReturnBucketTypeDoesNotExist op ~ 'True
+      => ByteString
+      -> Error op
+    parseError err
+      | isBucketTypeDoesNotExistError4 err =
+          BucketTypeDoesNotExistError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)
+
 
 
 -- | Get a counter bucket's properties.
@@ -262,17 +273,6 @@ getSetBucket handle bucket@(Bucket bucketType _) =
       Right _ ->
         Left (InvalidBucketTypeError bucketType)
 
-parseGetBucketError ::
-     MayReturnBucketTypeDoesNotExist op ~ 'True
-  => BucketType
-  -> ByteString
-  -> Error op
-parseGetBucketError bucketType err
-  | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
-
 -- | Set the index of a bucket.
 --
 -- +-------------------------------+-------------------------------------------+
@@ -299,22 +299,21 @@ setBucketIndex handle bucket@(Bucket bucketType _) index = liftIO $
     handle
     bucket
     index
-    (parseSetBucketIndexError bucketType index)
+    parseError
 
-parseSetBucketIndexError ::
-     ByteString
-  -> IndexName
-  -> ByteString
-  -> SetBucketIndexError
-parseSetBucketIndexError bucketType index err
-  | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
-  | isIndexDoesNotExistError0 err =
-      IndexDoesNotExistError index
-  | isInvalidNodesError1 err =
-      InvalidNodesError
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+  where
+    parseError ::
+         ByteString
+      -> SetBucketIndexError
+    parseError err
+      | isBucketTypeDoesNotExistError4 err =
+          BucketTypeDoesNotExistError bucketType
+      | isIndexDoesNotExistError0 err =
+          IndexDoesNotExistError index
+      | isInvalidNodesError1 err =
+          InvalidNodesError
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 -- | Unset the index of a bucket.
 --
@@ -335,17 +334,17 @@ unsetBucketIndex handle bucket@(Bucket bucketType _) = liftIO $
     handle
     bucket
     (IndexName "_dont_index_")
-    (parseUnsetBucketIndexError bucketType)
+    parseError
 
-parseUnsetBucketIndexError ::
-     ByteString
-  -> ByteString
-  -> UnsetBucketIndexError
-parseUnsetBucketIndexError bucketType err
-  | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+  where
+    parseError ::
+         ByteString
+      -> UnsetBucketIndexError
+    parseError err
+      | isBucketTypeDoesNotExistError4 err =
+          BucketTypeDoesNotExistError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 setBucketIndex_ ::
      forall op.
@@ -403,17 +402,28 @@ resetBucket handle (Bucket bucketType bucket) = liftIO $
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseResetBucketError err)
+        Left (parseError err)
 
       Right (Right _) ->
         Right ()
 
-parseResetBucketError :: ByteString -> ResetBucketError
-parseResetBucketError err
-  | otherwise =
+    parseError :: ByteString -> ResetBucketError
+    parseError err =
       UnknownError (decodeUtf8 err)
 
 -- | Perform a query on a binary secondary index.
+--
+-- +-------------------------------------+-------------------------------------+
+-- | Error                               | Meaning                             |
+-- +=====================================+=====================================+
+-- | 'BucketTypeDoesNotExistError'       | The bucket type does not exist. You |
+-- |                                     | must first create it using the      |
+-- |                                     | @riak-admin@ command-line tool.     |
+-- +-------------------------------------+-------------------------------------+
+-- | 'SecondaryIndexesNotSupportedError' | The bucket's backend does not       |
+-- |                                     | secondary indexes. Valid backends   |
+-- |                                     | are @leveldb@ and @memory@.         |
+-- +-------------------------------------+-------------------------------------+
 queryBinaryIndex ::
      MonadIO m
   => Handle -- ^
@@ -464,6 +474,18 @@ queryBinaryIndex
           Key bucketType bucket
 
 -- | Perform a query on a binary secondary index.
+--
+-- +-------------------------------------+-------------------------------------+
+-- | Error                               | Meaning                             |
+-- +=====================================+=====================================+
+-- | 'BucketTypeDoesNotExistError'       | The bucket type does not exist. You |
+-- |                                     | must first create it using the      |
+-- |                                     | @riak-admin@ command-line tool.     |
+-- +-------------------------------------+-------------------------------------+
+-- | 'SecondaryIndexesNotSupportedError' | The bucket's backend does not       |
+-- |                                     | secondary indexes. Valid backends   |
+-- |                                     | are @leveldb@ and @memory@.         |
+-- +-------------------------------------+-------------------------------------+
 queryBinaryIndexTerms ::
      MonadIO m
   => Handle -- ^
@@ -531,6 +553,18 @@ queryBinaryIndexTerms
       bucket
 
 -- | Perform a query on an integer secondary index.
+--
+-- +-------------------------------------+-------------------------------------+
+-- | Error                               | Meaning                             |
+-- +=====================================+=====================================+
+-- | 'BucketTypeDoesNotExistError'       | The bucket type does not exist. You |
+-- |                                     | must first create it using the      |
+-- |                                     | @riak-admin@ command-line tool.     |
+-- +-------------------------------------+-------------------------------------+
+-- | 'SecondaryIndexesNotSupportedError' | The bucket's backend does not       |
+-- |                                     | secondary indexes. Valid backends   |
+-- |                                     | are @leveldb@ and @memory@.         |
+-- +-------------------------------------+-------------------------------------+
 queryIntIndex ::
      MonadIO m
   => Handle -- ^
@@ -577,6 +611,18 @@ queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold
           Key bucketType bucket
 
 -- | Perform a query on an integer secondary index.
+--
+-- +-------------------------------------+-------------------------------------+
+-- | Error                               | Meaning                             |
+-- +=====================================+=====================================+
+-- | 'BucketTypeDoesNotExistError'       | The bucket type does not exist. You |
+-- |                                     | must first create it using the      |
+-- |                                     | @riak-admin@ command-line tool.     |
+-- +-------------------------------------+-------------------------------------+
+-- | 'SecondaryIndexesNotSupportedError' | The bucket's backend does not       |
+-- |                                     | secondary indexes. Valid backends   |
+-- |                                     | are @leveldb@ and @memory@.         |
+-- +-------------------------------------+-------------------------------------+
 queryIntIndexTerms ::
      MonadIO m
   => Handle -- ^
@@ -628,7 +674,7 @@ doIndex ::
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either (Error 'SecondaryIndexQueryOp) r)
-doIndex handle bucket =
+doIndex handle bucket@(Bucket bucketType _) =
   loop
 
   where
@@ -648,7 +694,7 @@ doIndex handle bucket =
           pure (Left (HandleError err))
 
         Right (Left err) ->
-          pure (Left (parseSecondaryIndexQueryError bucket err))
+          pure (Left (parseError err))
 
         Right (Right (nextResponseFold, continuation)) ->
           case continuation of
@@ -660,17 +706,16 @@ doIndex handle bucket =
                 (request & Proto.continuation .~ continuation)
                 nextResponseFold
 
-parseSecondaryIndexQueryError ::
-     Bucket
-  -> ByteString
-  -> Error 'SecondaryIndexQueryOp
-parseSecondaryIndexQueryError bucket@(Bucket bucketType _) err
-  | isBucketTypeDoesNotExistError5 err =
-      BucketTypeDoesNotExistError bucketType
-  | isSecondaryIndexesNotSupportedError err =
-      SecondaryIndexesNotSupportedError bucket
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError ::
+         ByteString
+      -> Error 'SecondaryIndexQueryOp
+    parseError err
+      | isBucketTypeDoesNotExistError5 err =
+          BucketTypeDoesNotExistError bucketType
+      | isSecondaryIndexesNotSupportedError err =
+          SecondaryIndexesNotSupportedError bucket
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 
 doIndexPage ::
@@ -706,6 +751,14 @@ doIndexPage handle request fold =
 -- 'Riak.SecondaryIndexQuery.inBucket' query.
 --
 -- /See also/: 'streamKeys'
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 listKeys ::
      MonadIO m
   => Handle -- ^
@@ -723,6 +776,14 @@ listKeys handle bucket =
 -- 'Riak.SecondaryIndexQuery.inBucket' query.
 --
 -- /See also/: 'listKeys'
+--
+-- +-------------------------------+-------------------------------------------+
+-- | Error                         | Meaning                                   |
+-- +===============================+===========================================+
+-- | 'BucketTypeDoesNotExistError' | The bucket type does not exist. You must  |
+-- |                               | first create it using the @riak-admin@    |
+-- |                               | command-line tool.                        |
+-- +-------------------------------+-------------------------------------------+
 streamKeys ::
      forall m r.
      MonadIO m
@@ -751,7 +812,7 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parseListKeysError bucketType err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right response
@@ -762,12 +823,12 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
         & setProto b
         -- TODO stream keys timeout
 
-parseListKeysError :: ByteString -> ByteString -> ListKeysError
-parseListKeysError bucketType err
-  | isBucketTypeDoesNotExistError4 err =
-      BucketTypeDoesNotExistError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)
+    parseError :: ByteString -> ListKeysError
+    parseError err
+      | isBucketTypeDoesNotExistError4 err =
+          BucketTypeDoesNotExistError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)
 
 fromProto ::
      ( HasLens' a "bucket" ByteString
