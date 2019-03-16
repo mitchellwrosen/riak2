@@ -15,7 +15,9 @@ module RiakBucket
   , queryBinaryIndex
   , queryBinaryIndexTerms
   , listKeys
+  , listKeysWith
   , streamKeys
+  , streamKeysWith
 
   , fromProto
   ) where
@@ -32,10 +34,11 @@ import RiakHyperLogLogBucketProps (HyperLogLogBucketProps)
 import RiakIndexName              (IndexName(..))
 import RiakIntIndexQuery          (IntIndexQuery(..))
 import RiakKey                    (Key(..))
+import RiakListKeysOpts           (ListKeysOpts(..))
 import RiakMapBucketProps         (MapBucketProps)
 import RiakSetBucketProps         (SetBucketProps)
 import RiakSomeBucketProps        (SomeBucketProps(..))
-import RiakUtils                  (bs2int, int2bs)
+import RiakUtils                  (bs2int, difftimeToMillis, int2bs)
 
 import qualified RiakBinaryIndexQuery as BinaryIndexQuery
 import qualified RiakBucketType       as BucketType
@@ -44,6 +47,7 @@ import qualified RiakSomeBucketProps  as SomeBucketProps
 
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       (Lens', folded, to, (.~), (^.))
+import Data.Default.Class                 (def)
 import Data.Profunctor                    (lmap)
 import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 import Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
@@ -765,7 +769,17 @@ listKeys ::
   -> Bucket -- ^
   -> m (Either ListKeysError [Key])
 listKeys handle bucket =
-  streamKeys handle bucket (Foldl.generalize Foldl.list)
+  streamKeysWith handle bucket (Foldl.generalize Foldl.list) def
+
+-- | 'listKeys' with options.
+listKeysWith ::
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> ListKeysOpts -- ^
+  -> m (Either ListKeysError [Key])
+listKeysWith handle bucket =
+  streamKeysWith handle bucket (Foldl.generalize Foldl.list)
 
 -- | Stream all of the keys in a bucket.
 --
@@ -791,7 +805,24 @@ streamKeys ::
   -> Bucket -- ^
   -> FoldM IO Key r -- ^
   -> m (Either ListKeysError r)
-streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
+streamKeys handle bucket responseFold =
+  streamKeysWith handle bucket responseFold def
+
+-- | 'streamKeys' with options.
+streamKeysWith ::
+     forall m r.
+     MonadIO m
+  => Handle -- ^
+  -> Bucket -- ^
+  -> FoldM IO Key r -- ^
+  -> ListKeysOpts -- ^
+  -> m (Either ListKeysError r)
+streamKeysWith
+    handle
+    b@(Bucket bucketType bucket)
+    keyFold
+    ListKeysOpts { timeout } = liftIO $
+
   fromResult <$> doRequest
 
   where
@@ -821,7 +852,7 @@ streamKeys handle b@(Bucket bucketType bucket) keyFold = liftIO $
     request =
       Proto.defMessage
         & setProto b
-        -- TODO stream keys timeout
+        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
 
     parseError :: ByteString -> ListKeysError
     parseError err

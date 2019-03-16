@@ -21,6 +21,9 @@ module Riak.Bucket
     -- * Full key traversals
   , listKeys
   , streamKeys
+    -- ** *With variants
+  , listKeysWith
+  , streamKeysWith
   ) where
 
 import RiakBucket

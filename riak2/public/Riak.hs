@@ -1,5 +1,7 @@
 {-# LANGUAGE CPP #-}
 
+-- TODO NominalDiffTime -> DiffTime
+
 module Riak
   ( -- * Handle
     createHandle
@@ -24,16 +26,24 @@ module Riak
   , deleteWith
     -- * Convergent counter operations
   , getCounter
+  , getCounterWith
   , updateCounter
+  , updateCounterWith
     -- * Convergent HyperLogLog operations
   , getHyperLogLog
+  , getHyperLogLogWith
   , updateHyperLogLog
+  , updateHyperLogLogWith
     -- * Convergent map operations
   , getMap
+  , getMapWith
   , putMap
+  , putMapWith
     -- * Convergent set operations
   , getSet
+  , getSetWith
   , putSet
+  , putSetWith
     -- * Bucket type operations
     -- ** Bucket type properties
   , getBucketType
@@ -45,7 +55,9 @@ module Riak
   , unsetBucketTypeIndex
     -- ** Full bucket traversals
   , listBuckets
+  , listBucketsWith
   , streamBuckets
+  , streamBucketsWith
     -- * Bucket operations
     -- ** Bucket properties
   , getBucket
@@ -63,7 +75,9 @@ module Riak
   , queryBinaryIndexTerms
     -- ** Full key traversals
   , listKeys
+  , listKeysWith
   , streamKeys
+  , streamKeysWith
     -- * MapReduce operations
   , mapReduceKeys
   , mapReduceBucket

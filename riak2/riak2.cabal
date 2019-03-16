@@ -208,6 +208,8 @@ library riak2-internal
     RiakIndex
     RiakIndexName
     RiakIntIndexQuery
+    RiakListBucketsOpts
+    RiakListKeysOpts
     RiakKey
     RiakManagedBus
     RiakMap

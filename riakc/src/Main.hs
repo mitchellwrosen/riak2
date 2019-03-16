@@ -464,7 +464,7 @@ getCounterParser =
       -> Handle
       -> IO ()
     doGetCounter key opts handle =
-      getCounter handle key opts >>= \case
+      getCounterWith handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -513,7 +513,7 @@ getMapParser =
       -> Handle
       -> IO ()
     doGetMap key opts handle =
-      getMap handle key opts >>= \case
+      getMapWith handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -597,7 +597,7 @@ getSetParser =
       -> Handle
       -> IO ()
     doGetSet key opts handle =
-      getSet handle key opts >>= \case
+      getSetWith handle key opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -623,6 +623,7 @@ infoParser =
       Right (Right (ServerInfo name version)) -> do
         Text.putStrLn (name <> " " <> version)
 
+-- TODO riakc list buckets/keys timeout
 listParser :: Parser (Handle -> IO ())
 listParser =
   doList
@@ -782,7 +783,7 @@ putSetParser =
           go (newSet (generatedKey bucket) HashSet.empty)
 
         Right key ->
-          getSet handle key getOpts >>= \case
+          getSetWith handle key getOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -803,7 +804,7 @@ putSetParser =
 
         go :: ConvergentSet ByteString -> IO ()
         go set =
-          putSet handle set' putOpts >>= \case
+          putSetWith handle set' putOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -838,7 +839,7 @@ putMapParser =
           go (newMap (generatedKey bucket) emptyMapValue)
 
         Right key ->
-          getMap handle key getOpts >>= \case
+          getMapWith handle key getOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -852,7 +853,7 @@ putMapParser =
       where
         go :: ConvergentMap ConvergentMapValue -> IO ()
         go oldMap =
-          putMap handle (oldMap & mapValue .~ value) putOpts >>= \case
+          putMapWith handle (oldMap & mapValue .~ value) putOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -1306,7 +1307,7 @@ updateCounterParser =
       -> Handle
       -> IO ()
     doUpdateCounter bucketOrKey amount nodes quorum timeout handle = do
-      updateCounter handle operation opts >>= \case
+      updateCounterWith handle operation opts >>= \case
         Left err -> do
           print err
           exitFailure

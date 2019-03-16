@@ -9,7 +9,9 @@ module RiakBucketType
   , setBucketTypeIndex
   , unsetBucketTypeIndex
   , listBuckets
+  , listBucketsWith
   , streamBuckets
+  , streamBucketsWith
 
   , coerceGetBucketError
   , fromProto
@@ -23,16 +25,18 @@ import RiakHandle                 (Handle)
 import RiakHandleError            (HandleError)
 import RiakHyperLogLogBucketProps (HyperLogLogBucketProps)
 import RiakIndexName              (IndexName(..))
+import RiakListBucketsOpts        (ListBucketsOpts(..))
 import RiakMapBucketProps         (MapBucketProps)
 import RiakSetBucketProps         (SetBucketProps)
-import RiakSomeBucketProps        (SomeBucketProps)
 import RiakSomeBucketProps        (SomeBucketProps(..))
+import RiakUtils                  (difftimeToMillis)
 
 import qualified RiakHandle          as Handle
 import qualified RiakSomeBucketProps as SomeBucketProps
 
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       (folded, to, (.~), (^.))
+import Data.Default.Class                 (def)
 import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 import Data.Text.Encoding                 (decodeUtf8, encodeUtf8)
 import Unsafe.Coerce                      (unsafeCoerce)
@@ -346,7 +350,17 @@ listBuckets ::
   -> BucketType -- ^
   -> m (Either ListBucketsError [Bucket])
 listBuckets handle bucketType =
-  streamBuckets handle bucketType (Foldl.generalize Foldl.list)
+  streamBucketsWith handle bucketType (Foldl.generalize Foldl.list) def
+
+-- | 'listBuckets' with options.
+listBucketsWith ::
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> ListBucketsOpts -- ^
+  -> m (Either ListBucketsError [Bucket])
+listBucketsWith handle bucketType =
+  streamBucketsWith handle bucketType (Foldl.generalize Foldl.list)
 
 -- | Stream all of the buckets in a bucket type.
 --
@@ -369,7 +383,24 @@ streamBuckets ::
   -> BucketType -- ^
   -> FoldM IO Bucket r -- ^
   -> m (Either ListBucketsError r)
-streamBuckets handle bucketType bucketFold = liftIO $
+streamBuckets handle bucketType bucketFold =
+  streamBucketsWith handle bucketType bucketFold def
+
+-- | 'streamBuckets' with options.
+streamBucketsWith ::
+     forall m r.
+     MonadIO m
+  => Handle -- ^
+  -> BucketType -- ^
+  -> FoldM IO Bucket r -- ^
+  -> ListBucketsOpts -- ^
+  -> m (Either ListBucketsError r)
+streamBucketsWith
+    handle
+    bucketType
+    bucketFold
+    ListBucketsOpts { timeout } = liftIO $
+
   fromResult <$>
     Handle.listBuckets handle request (makeResponseFold bucketType bucketFold)
 
@@ -390,9 +421,9 @@ streamBuckets handle bucketType bucketFold = liftIO $
     request :: Proto.RpbListBucketsReq
     request =
       Proto.defMessage
+        & Proto.maybe'timeout .~ (difftimeToMillis <$> timeout)
         & Proto.stream .~ True
         & Proto.type' .~ bucketType
-        -- TODO stream buckets timeout
 
     parseError :: ByteString -> ListBucketsError
     parseError err
