@@ -31,9 +31,9 @@ import qualified Data.Riak.Proto    as Proto
 
 data Object a
   = Object
-  { content :: a
-  , context :: Context -- ^ Causal context
-  , key :: Key -- ^ Key
+  { content :: a -- ^ Content (read-write)
+  , context :: Context -- ^ Causal context (read-only)
+  , key :: Key -- ^ Key (read-only)
   } deriving stock (Eq, Functor, Generic, Show)
 
 

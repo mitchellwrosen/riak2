@@ -31,8 +31,8 @@ import qualified Data.Riak.Proto as Proto
 -- read a counter before updating it.
 data ConvergentCounter
   = ConvergentCounter
-  { key :: Key -- ^
-  , value :: Int64 -- ^
+  { key :: Key -- ^ Key (read-only)
+  , value :: Int64 -- ^ Value (read-write)
   } deriving stock (Eq, Generic, Show)
 
 -- | Get an eventually-convergent counter.

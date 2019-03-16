@@ -1,10 +1,8 @@
 module RiakMap
-  ( -- * Convergent map
-    ConvergentMap
+  ( ConvergentMap
   , newMap
   , mapKey
   , mapValue
-    -- ** Operations
   , getMap
   , putMap
   ) where
@@ -61,11 +59,10 @@ newMap key value =
     , _oldValue = emptyMapValue
     }
 
--- | A lens onto the key of an eventually-convergent map.
--- TODO this should be a getter, not a lens
-mapKey :: Lens' (ConvergentMap a) Key
+-- | The key of an eventually-convergent map.
+mapKey :: ConvergentMap a -> Key
 mapKey =
-  field @"_key"
+  _key
 
 -- | A lens onto the value of an eventually-convergent map.
 mapValue :: Lens' (ConvergentMap a) a

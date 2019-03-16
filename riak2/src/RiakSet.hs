@@ -8,7 +8,6 @@ module RiakSet
   , toProto
   ) where
 
-import RiakBucket  (Bucket(..))
 import RiakContext (Context(..), emptyContext)
 import RiakCrdt    (parseGetCrdtError)
 import RiakError
@@ -55,10 +54,10 @@ newSet key contents =
     , _oldValue = HashSet.empty
     }
 
--- | A lens onto the key of an eventually-convergent set.
-setKey :: Lens' (ConvergentSet a) Key
+-- | The key of an eventually-convergent set.
+setKey :: ConvergentSet a -> Key
 setKey =
-  field @"_key"
+  _key
 
 -- | A lens onto the value of an eventually-convergent set.
 setValue :: Lens' (ConvergentSet a) (HashSet a)
@@ -120,7 +119,7 @@ putSet ::
   -> m (Either PutSetError (ConvergentSet ByteString))
 putSet
     handle
-    (ConvergentSet context key newValue oldValue)
+    (ConvergentSet context key@(Key bucketType _ _) newValue oldValue)
     opts = liftIO $
 
   fromResult <$> Handle.updateCrdt handle request
@@ -145,7 +144,7 @@ putSet
         Left (HandleError err)
 
       Right (Left err) ->
-        Left (parsePutSetError (key ^. keyBucket) err)
+        Left (parseError err)
 
       Right (Right response) ->
         Right (fromResponse response)
@@ -173,6 +172,23 @@ putSet
         value =
           HashSet.fromList (response ^. Proto.setValue)
 
+    parseError ::
+         ByteString
+      -> Error 'UpdateCrdtOp
+    parseError err
+      | isBucketMustBeAllowMultError err =
+          InvalidBucketError (key ^. keyBucket)
+      | isBucketTypeDoesNotExistError1 err =
+          BucketTypeDoesNotExistError bucketType
+      | isInvalidNodesError0 err =
+          InvalidNodesError
+      | isNonCounterOperationOnDefaultBucketError err =
+          InvalidBucketTypeError bucketType
+      | isOperationTypeIsSetButBucketTypeIsError err =
+          InvalidBucketTypeError bucketType
+      | otherwise =
+          UnknownError (decodeUtf8 err)
+
 toProto ::
      HashSet ByteString -- ^ New value
   -> HashSet ByteString -- ^ Old value
@@ -190,22 +206,3 @@ toProto newValue oldValue =
     removes :: [ByteString]
     removes =
       HashSet.toList (HashSet.difference oldValue newValue)
-
-
-parsePutSetError ::
-     Bucket
-  -> ByteString
-  -> Error 'UpdateCrdtOp
-parsePutSetError bucket@(Bucket bucketType _) err
-  | isBucketMustBeAllowMultError err =
-      InvalidBucketError bucket
-  | isBucketTypeDoesNotExistError1 err =
-      BucketTypeDoesNotExistError bucketType
-  | isInvalidNodesError0 err =
-      InvalidNodesError
-  | isNonCounterOperationOnDefaultBucketError err =
-      InvalidBucketTypeError bucketType
-  | isOperationTypeIsSetButBucketTypeIsError err =
-      InvalidBucketTypeError bucketType
-  | otherwise =
-      UnknownError (decodeUtf8 err)

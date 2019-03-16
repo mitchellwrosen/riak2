@@ -43,8 +43,8 @@ import qualified Data.Riak.Proto as Proto
 -- to read a HyperLogLog before updating it.
 data ConvergentHyperLogLog a
   = ConvergentHyperLogLog
-  { key :: Key -- ^
-  , value :: a -- ^
+  { key :: Key -- ^ Key (read-only)
+  , value :: a -- ^ Value (read-write)
   } deriving stock (Eq, Functor, Generic, Show)
 
 -- | Get an eventually-convergent HyperLogLog.
