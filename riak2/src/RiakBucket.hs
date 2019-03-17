@@ -439,11 +439,15 @@ queryBinaryIndex
     query@(BinaryIndexQuery { bucket, minValue, maxValue })
     keyFold = liftIO $
 
-  doIndex
-    handle
-    bucket
-    request
-    (Foldl.handlesM handler keyFold)
+  if minValue > maxValue
+    then
+      Right <$> Foldl.foldM keyFold []
+    else
+      doIndex
+        handle
+        bucket
+        request
+        (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
@@ -501,11 +505,15 @@ queryBinaryIndexTerms
     BinaryIndexQuery { bucket, index, minValue, maxValue }
     keyFold = liftIO $
 
-  doIndex
-    handle
-    bucket
-    request
-    (Foldl.handlesM handler keyFold)
+  if minValue > maxValue
+    then
+      Right <$> Foldl.foldM keyFold []
+    else
+      doIndex
+        handle
+        bucket
+        request
+        (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
@@ -543,15 +551,18 @@ queryBinaryIndexTerms
 
     handler :: Foldl.HandlerM IO Proto.RpbIndexResp (ByteString, Key)
     handler =
-      if index == builtinBucketIndex
-        then
-          Proto.keys .
-          folded .
-          to (\key -> (b, Key bucketType b key))
-        else
-          Proto.results .
-          folded .
-          to (\pair -> (pair ^. Proto.key, Key bucketType b (pair ^. Proto.value)))
+      if index == builtinBucketIndex then
+        Proto.keys .
+        folded .
+        to (\key -> (b, Key bucketType b key))
+      else if index == builtinKeyIndex then
+        Proto.keys .
+        folded .
+        to (\key -> (key, Key bucketType b key))
+      else
+        Proto.results .
+        folded .
+        to (\pair -> (pair ^. Proto.key, Key bucketType b (pair ^. Proto.value)))
 
     Bucket bucketType b =
       bucket
@@ -575,12 +586,20 @@ queryIntIndex ::
   -> IntIndexQuery -- ^
   -> FoldM IO Key r -- ^
   -> m (Either QueryIndexError r)
-queryIntIndex handle IntIndexQuery { bucket, index, minValue, maxValue } keyFold = liftIO $
-  doIndex
+queryIntIndex
     handle
-    bucket
-    request
-    (Foldl.handlesM handler keyFold)
+    IntIndexQuery { bucket, index, minValue, maxValue }
+    keyFold = liftIO $
+
+  if minValue > maxValue
+    then
+      Right <$> Foldl.foldM keyFold []
+    else
+      doIndex
+        handle
+        bucket
+        request
+        (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq
@@ -638,11 +657,15 @@ queryIntIndexTerms
     IntIndexQuery { bucket, index, minValue, maxValue }
     keyFold = liftIO $
 
-  doIndex
-    handle
-    bucket
-    request
-    (Foldl.handlesM handler keyFold)
+  if minValue > maxValue
+    then
+      Right <$> Foldl.foldM keyFold []
+    else
+      doIndex
+        handle
+        bucket
+        request
+        (Foldl.handlesM handler keyFold)
 
   where
     request :: Proto.RpbIndexReq

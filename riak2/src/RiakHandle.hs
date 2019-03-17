@@ -108,6 +108,7 @@ createHandle
     , handlers = handlers
     }
 
+-- TODO on failure, pick a different connection
 withManagedBus ::
      forall a.
      Handle

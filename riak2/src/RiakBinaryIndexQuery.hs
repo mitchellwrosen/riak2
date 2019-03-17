@@ -29,8 +29,8 @@ inBucket bucket@(Bucket _ b) =
 -- by its key.
 keysBetween ::
      Bucket -- ^
-  -> ByteString -- ^ Min key
-  -> ByteString -- ^ Max key
+  -> ByteString -- ^ Min key segment
+  -> ByteString -- ^ Max key segment
   -> BinaryIndexQuery
 keysBetween bucket minValue maxValue =
   BinaryIndexQuery

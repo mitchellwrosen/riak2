@@ -60,6 +60,14 @@ createBusPool
         , handlers = handlers
         }
 
+-- TODO allow different ways to select a connection than thread id
+--
+-- Some numbers:
+--
+-- hash thread id    5ns
+-- current time     20ns
+-- mwc-random       20ns
+-- random          185ns
 withManagedBus ::
      BusPool
   -> (ManagedBus -> IO a)

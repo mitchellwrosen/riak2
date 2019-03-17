@@ -2,11 +2,12 @@
 
 module Main where
 
-import RiakBinaryIndexQuery (BinaryIndexQuery(..), inBucket)
+import RiakBinaryIndexQuery (BinaryIndexQuery(..), inBucket, keysBetween)
 import RiakBucket           (Bucket(..), getBucket, getCounterBucket,
                              getHyperLogLogBucket, getMapBucket, getSetBucket,
-                             listKeys, queryBinaryIndex, queryIntIndex,
-                             resetBucket, setBucketIndex, unsetBucketIndex)
+                             listKeys, queryBinaryIndex, queryBinaryIndexTerms,
+                             queryIntIndex, resetBucket, setBucketIndex,
+                             unsetBucketIndex)
 import RiakBucketProps      (BucketProps(..))
 import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
                              getCounterBucketType, getHyperLogLogBucketType,
@@ -248,11 +249,94 @@ riakBucketTests handle =
           (inBucket bucket)
           (Foldl.generalize Foldl.length)
           `shouldReturn` Right n
+
+    , testCase "max > min" $ do
+        bucket <- Bucket defaultBucketType <$> randomByteString 32
+        idx <- randomByteString 32
+        queryBinaryIndex
+          handle
+          BinaryIndexQuery
+            { bucket = bucket
+            , index = idx
+            , minValue = "b"
+            , maxValue = "a"
+            }
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 0
+
     , testGroup "failures"
-      [ ]
+      [ testCase "bucket type does not exist" $ do
+          bucketType <- randomBucketType
+          let bucket = Bucket bucketType "a"
+          queryBinaryIndex
+            handle
+            (BinaryIndexQuery { bucket = bucket, index = "a", minValue = "a", maxValue = "a" })
+            (Foldl.generalize Foldl.length)
+            `shouldReturn` Left (BucketTypeDoesNotExistError bucketType)
+      ]
     ]
 
-  , testGroup "queryBinaryIndexTerms" [ ]
+  , testGroup "queryBinaryIndexTerms"
+    [ testCase "one-elem index" $ do
+        object <- randomObject
+        let bucket = object ^. field @"key" . keyBucket
+        idx <- randomByteString 32
+        let object' = object & field @"content" . field @"indexes" .~ [BinaryIndex idx "x"]
+        put handle object' `shouldReturnSatisfy` isRight
+        queryBinaryIndexTerms
+          handle
+          (BinaryIndexQuery { bucket = bucket, index = idx, minValue = "a", maxValue = "z" } )
+          (Foldl.generalize Foldl.list)
+          `shouldReturn` Right [("x", object ^. field @"key")]
+
+    , testCase "in bucket" $ do
+        let n = 10
+        bucket <- randomObjectBucket
+        replicateM_ n $
+          put handle (emptyObject (generatedKey bucket)) `shouldReturnSatisfy` isRight
+        queryBinaryIndexTerms
+          handle
+          (inBucket bucket)
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right n
+
+    , testCase "keys between" $ do
+        bucket <- randomByteString 32
+        put handle (emptyObject (Key defaultBucketType bucket "3")) `shouldReturnSatisfy` isRight
+        put handle (emptyObject (Key defaultBucketType bucket "4")) `shouldReturnSatisfy` isRight
+        put handle (emptyObject (Key defaultBucketType bucket "5")) `shouldReturnSatisfy` isRight
+        queryBinaryIndexTerms
+          handle
+          (keysBetween (Bucket defaultBucketType bucket) "1" "4")
+          (Foldl.generalize Foldl.list)
+          `shouldReturn` Right [("3", Key defaultBucketType bucket "3")
+                               ,("4", Key defaultBucketType bucket "4")]
+
+    , testCase "max > min" $ do
+        bucket <- Bucket defaultBucketType <$> randomByteString 32
+        idx <- randomByteString 32
+        queryBinaryIndexTerms
+          handle
+          BinaryIndexQuery
+            { bucket = bucket
+            , index = idx
+            , minValue = "b"
+            , maxValue = "a"
+            }
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 0
+
+    , testGroup "failures"
+      [ testCase "bucket type does not exist" $ do
+          bucketType <- randomBucketType
+          let bucket = Bucket bucketType "a"
+          queryBinaryIndexTerms
+            handle
+            (BinaryIndexQuery { bucket = bucket, index = "a", minValue = "a", maxValue = "a" })
+            (Foldl.generalize Foldl.length)
+            `shouldReturn` Left (BucketTypeDoesNotExistError bucketType)
+      ]
+    ]
 
   , testGroup "queryIntIndex"
     [ testCase "empty index" $ do
@@ -275,6 +359,20 @@ riakBucketTests handle =
           (IntIndexQuery { bucket = bucket, index = idx, minValue = 1, maxValue = 1 } )
           (Foldl.generalize Foldl.length)
           `shouldReturn` Right 1
+
+    , testCase "max > min" $ do
+        bucket <- Bucket defaultBucketType <$> randomByteString 32
+        idx <- randomByteString 32
+        queryIntIndex
+          handle
+          IntIndexQuery
+            { bucket = bucket
+            , index = idx
+            , minValue = 2
+            , maxValue = 1
+            }
+          (Foldl.generalize Foldl.length)
+          `shouldReturn` Right 0
 
     , testGroup "failures"
       [ testCase "bucket type does not exist" $ do
