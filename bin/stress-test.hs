@@ -13,6 +13,8 @@ import System.Random
 import Text.Read          (readMaybe)
 
 import qualified Data.ByteString.Char8 as Latin1
+import qualified Data.Text             as Text
+import qualified Data.Text.IO          as Text
 
 main :: IO ()
 main = do
@@ -32,7 +34,9 @@ main = do
             mempty
               { -- onSend = \msg -> putStrLn (">>> " ++ show msg)
               -- , onReceive = \msg -> putStrLn ("<<< " ++ show msg)
-                onConnectError = \ex -> putStrLn ("*** " ++ show ex)
+                onConnectFailure =
+                  \uuid ex ->
+                    Text.putStrLn ("[" <> uuid <> "] *** " <> Text.pack (show ex))
               , onConnectionError = \ex -> putStrLn ("*** " ++ show ex)
               }
         }
@@ -50,14 +54,9 @@ main = do
     replicateM_ 100 $ do
       key <- Latin1.pack . show <$> randomRIO (0::Int,999)
 
-      put
-        handle
-        (newObject
-          (Key defaultBucketType bucket key)
-          (newContent ""))
-        def >>= \case
-          Left err -> print err
-          Right _ -> pure ()
+      put handle (newObject (Key defaultBucketType bucket key) (newContent "")) >>= \case
+        Left err -> print err
+        Right _ -> pure ()
 
     putMVar doneVar ()
 
@@ -68,12 +67,9 @@ main = do
     replicateM_ 100 $ do
       key <- Latin1.pack . show <$> randomRIO (0::Int,999)
 
-      get
-        handle
-        (Key defaultBucketType bucket key)
-        def >>= \case
-          Left err -> print err
-          Right _ -> pure ()
+      get handle (Key defaultBucketType bucket key) >>= \case
+        Left err -> print err
+        Right _ -> pure ()
 
     putMVar doneVar ()
 

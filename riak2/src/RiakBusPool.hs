@@ -37,7 +37,7 @@ createBusPool
 
   pool :: Vector ManagedBus <-
     Vector.generateM
-      1 -- TODO configure bus pool size
+      256 -- TODO configure bus pool size
       (\uuid -> createManagedBus (makeManagedBusConfig uuid))
 
   pure BusPool

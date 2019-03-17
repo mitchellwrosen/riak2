@@ -141,6 +141,7 @@ library riak2-internal
     sockets,
     stm,
     text ^>= 1.2.3,
+    text-show,
     time,
     unordered-containers ^>= 0.2.9,
     vector,

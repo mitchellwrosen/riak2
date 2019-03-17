@@ -4,7 +4,6 @@ import Control.Concurrent      (forkIO)
 import Control.Concurrent.MVar
 import Control.Lens
 import Control.Monad           (join, replicateM_)
-import Data.Default.Class      (Default(..))
 import Data.Foldable           (asum)
 import GHC.Clock               (getMonotonicTime)
 import Net.IPv4                (ipv4)
@@ -137,7 +136,6 @@ riak2PingParser =
           (Riak.newObject
             (Riak.generatedKey (Riak.Bucket "default" "a"))
             (Riak.newContent ""))
-          def
       pure ()
 
 riakPingParser :: Opt.Parser (IO ())
