@@ -22,6 +22,8 @@ data BusPool
   { pool :: Vector ManagedBus
   }
 
+-- TODO bus pool config type
+
 -- | Create a bus pool.
 --
 -- /Throws/. This function will never throw an exception.
@@ -30,10 +32,12 @@ createBusPool ::
   -> Int -- ^ Health check interval (microseconds)
   -> Int -- ^ Idle timeout (microseconds)
   -> Int -- ^ Request timeout (microseconds)
+  -> Int -- ^ Connect timeout (microseconds)
   -> EventHandlers
   -> IO BusPool
 createBusPool
-    endpoint healthCheckInterval idleTimeout requestTimeout handlers = do
+    endpoint healthCheckInterval idleTimeout requestTimeout connectTimeout
+    handlers = do
 
   pool :: Vector ManagedBus <-
     Vector.generateM
@@ -52,6 +56,7 @@ createBusPool
         , healthCheckInterval = healthCheckInterval
         , idleTimeout = idleTimeout
         , requestTimeout = requestTimeout
+        , connectTimeout = connectTimeout
         , handlers = handlers
         }
 

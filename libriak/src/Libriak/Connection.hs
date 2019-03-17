@@ -58,15 +58,14 @@ data ConnectionError :: Type where
 -- | Acquire a connection.
 --
 -- /Throws/. This function will never throw an exception.
---
--- TODO interruptible connect
 withConnection ::
-     Endpoint
+     TVar Bool
+  -> Endpoint
   -> (Either CloseException () -> a -> IO b)
   -> (Connection -> IO a)
-  -> IO (Either (ConnectException 'Uninterruptible) b)
-withConnection endpoint onTeardown onSuccess =
-  Socket.withConnection endpoint onTeardown $ \connection -> do
+  -> IO (Either (ConnectException 'Interruptible) b)
+withConnection timeoutVar endpoint onTeardown onSuccess =
+  Socket.interruptibleWithConnection timeoutVar endpoint onTeardown $ \connection -> do
     sendBuffer :: MutableByteArray RealWorld <-
       newByteArray gSendBufferSize
 
@@ -79,10 +78,11 @@ withConnection endpoint onTeardown onSuccess =
 --
 -- /Throws/. This function will never throw an exception.
 connect ::
-     Endpoint
-  -> IO (Either (ConnectException 'Uninterruptible) Connection)
-connect endpoint =
-  Socket.connect endpoint >>= \case
+     TVar Bool
+  -> Endpoint
+  -> IO (Either (ConnectException 'Interruptible) Connection)
+connect timeoutVar endpoint =
+  Socket.interruptibleConnect timeoutVar endpoint >>= \case
     Left err ->
       pure (Left err)
 
@@ -228,8 +228,6 @@ sendall Connection { sendBuffer, connection } =
 -- This function currently isn't very smart, it first receives the length, then
 -- receives the packet. It would probably be better to use a buffer so we don't
 -- call receive so frequently on the underlying socket.
---
--- TODO benchmark receive
 receive ::
      TVar Bool
   -> Connection

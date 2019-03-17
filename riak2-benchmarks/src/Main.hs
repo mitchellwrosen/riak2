@@ -38,6 +38,7 @@ config =
     , Riak.healthCheckInterval = 1
     , Riak.idleTimeout = 10
     , Riak.requestTimeout = 5
+    , Riak.connectTimeout = 10
     , Riak.retries = 3
     , Riak.handlers = mempty
         -- Riak.EventHandlers

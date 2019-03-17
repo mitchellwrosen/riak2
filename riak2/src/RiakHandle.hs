@@ -61,6 +61,8 @@ data HandleConfig
     -- established, time spent waiting for Riak to become healthy, and time
     -- spent waiting for Riak to respond.
   , requestTimeout :: NominalDiffTime
+    -- | TODO document connectTimeout
+  , connectTimeout :: NominalDiffTime
     -- | The additional number of times to attempt a request if it results in a
     -- non-Riak error.
     --
@@ -88,8 +90,8 @@ createHandle ::
      HandleConfig
   -> IO Handle
 createHandle
-    HandleConfig { endpoint, handlers, healthCheckInterval, idleTimeout,
-                   retries, requestTimeout } = do
+    HandleConfig { connectTimeout, endpoint, handlers, healthCheckInterval,
+                   idleTimeout, retries, requestTimeout } = do
 
   pool :: BusPool <-
     createBusPool
@@ -97,6 +99,7 @@ createHandle
       (difftimeToMicros healthCheckInterval)
       (difftimeToMicros idleTimeout)
       (difftimeToMicros requestTimeout)
+      (difftimeToMicros connectTimeout)
       handlers
 
   pure Handle

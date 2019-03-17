@@ -39,8 +39,6 @@ import qualified Data.ProtoLens  as Proto
 import qualified Data.Riak.Proto as Proto
 
 
--- TODO request 33 is of riak_kv so handle unknown message code by retrying
-
 data Request :: Type where
   ReqDtFetch                :: Proto.DtFetchReq                -> Request
   ReqDtUpdate               :: Proto.DtUpdateReq               -> Request

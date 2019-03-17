@@ -44,6 +44,7 @@ import qualified Data.Riak.Proto        as Proto
 import qualified Data.Text              as Text
 import qualified Data.Text.IO           as Text
 import qualified Net.IPv4               as IPv4
+import qualified Options.Applicative    as Opt
 
 main :: IO ()
 main = do
@@ -77,6 +78,8 @@ main = do
             0
         , requestTimeout =
             5
+        , connectTimeout =
+            10
         , handlers =
             if verbose
               then
@@ -672,7 +675,10 @@ listParser =
 pingParser :: Parser (Handle -> IO ())
 pingParser =
   doPing
-    <$> option auto (help "Number of times to ping" <> metavar "N" <> short 'n')
+    <$> option
+          auto
+          (help "Number of times to ping" <> metavar "N" <> short 'n' <>
+            showDefault <> Opt.value 1)
 
   where
     doPing :: Int -> Handle -> IO ()

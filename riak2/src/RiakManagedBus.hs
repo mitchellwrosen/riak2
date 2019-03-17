@@ -122,6 +122,7 @@ data ManagedBus
   , healthCheckInterval :: Int
   , idleTimeout :: Int
   , requestTimeout :: Int
+  , connectTimeout :: Int
   , handlers :: EventHandlers
 
     -- See Note [State Machine]
@@ -149,8 +150,10 @@ data ManagedBusConfig
   { uuid :: Int
   , endpoint :: Endpoint
   , healthCheckInterval :: Int -- Microseconds
+  -- TODO reorder these
   , idleTimeout :: Int -- Microseconds
   , requestTimeout :: Int -- Microseconds
+  , connectTimeout :: Int -- Microseconds
   , handlers :: EventHandlers
   } deriving stock (Show)
 
@@ -167,7 +170,7 @@ data ManagedBusError :: Type where
 data EventHandlers
   = EventHandlers
   { onConnectAttempt :: Text -> IO ()
-  , onConnectFailure :: Text -> ConnectException 'Uninterruptible -> IO ()
+  , onConnectFailure :: Text -> ConnectException 'Interruptible -> IO ()
   , onConnectSuccess :: Text -> IO ()
 
   , onDisconnectAttempt :: Text -> IO ()
@@ -209,8 +212,8 @@ createManagedBus ::
      ManagedBusConfig
   -> IO ManagedBus
 createManagedBus
-    ManagedBusConfig { endpoint, handlers, healthCheckInterval, idleTimeout,
-                       requestTimeout, uuid
+    ManagedBusConfig { connectTimeout, endpoint, handlers, healthCheckInterval,
+                       idleTimeout, requestTimeout, uuid
                      } = do
 
   generationVar :: TVar Word64 <-
@@ -228,6 +231,7 @@ createManagedBus
     , healthCheckInterval = healthCheckInterval
     , idleTimeout = idleTimeout
     , requestTimeout = requestTimeout
+    , connectTimeout = connectTimeout
     , generationVar = generationVar
     , stateVar = stateVar
     , lastUsedRef = lastUsedRef
@@ -347,24 +351,27 @@ connect ::
   -> IO ()
 connect
     generation
-    managedBus@(ManagedBus { endpoint, handlers, healthCheckInterval,
-                             idleTimeout, stateVar, uuid })
+    managedBus@(ManagedBus { endpoint, connectTimeout, handlers,
+                             healthCheckInterval, idleTimeout, stateVar, uuid })
     = do
 
   debug uuid generation "connecting"
-  connectLoop 1
+  timeoutVar <- registerDelay connectTimeout
+  connectLoop timeoutVar 1
 
   where
     connectLoop ::
-         NominalDiffTime
+         TVar Bool
+      -> NominalDiffTime
       -> IO ()
-    connectLoop seconds = do
+    connectLoop timeoutVar seconds = do
       onConnectAttempt handlers ident
-      Handle.connect endpoint handleHandlers >>= \case
+
+      Handle.connect timeoutVar endpoint handleHandlers >>= \case
         Left err -> do
           onConnectFailure handlers ident err
           sleep seconds
-          connectLoop (seconds * 2)
+          connectLoop timeoutVar (seconds * 2)
 
         Right handle -> do
           onConnectSuccess handlers ident
@@ -379,7 +386,7 @@ connect
         Left _ -> do
           disconnect generation handle managedBus
           sleep seconds
-          connectLoop (seconds * 2)
+          connectLoop timeoutVar (seconds * 2)
 
         Right (Left _) -> do
           sleep seconds

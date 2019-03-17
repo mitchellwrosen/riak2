@@ -135,11 +135,12 @@ instance Semigroup EventHandlers where
 --
 -- /Throws/: This function will never throw an exception.
 connect ::
-     Endpoint
+     TVar Bool
+  -> Endpoint
   -> EventHandlers
-  -> IO (Either (ConnectException 'Uninterruptible) Handle)
-connect endpoint handlers =
-  Connection.connect endpoint >>= \case
+  -> IO (Either (ConnectException 'Interruptible) Handle)
+connect timeoutVar endpoint handlers =
+  Connection.connect timeoutVar endpoint >>= \case
     Left err ->
       pure (Left err)
 

@@ -68,19 +68,12 @@ main = do
     config :: HandleConfig
     config =
       HandleConfig
-        { endpoint =
-            Endpoint
-              { address = ipv4 127 0 0 1
-              , port = 8087
-              }
-        , retries =
-            3
-        , healthCheckInterval =
-            1
-        , idleTimeout =
-            30
-        , requestTimeout =
-            10
+        { endpoint = Endpoint (ipv4 127 0 0 1) 8087
+        , retries = 3
+        , healthCheckInterval = 1
+        , idleTimeout = 30
+        , requestTimeout = 10
+        , connectTimeout = 10
         , handlers =
             mempty
               -- { onSend = \req -> putStrLn (">>> " ++ show req)
