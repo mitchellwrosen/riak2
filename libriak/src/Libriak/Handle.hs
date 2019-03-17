@@ -55,8 +55,6 @@ import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
 
--- TODO use Chan instead of TBQueue/TQueue in Libriak.Handle?
-
 data Handle
   = Handle
   { connection :: Connection
@@ -310,8 +308,8 @@ receiveThread stateVar streamingVar sentItemQueue connection =
             Right response ->
               case decodeResponse response of
                 Left err ->
-                  -- Hrm, thread that called 'stream' might see 'Disconnected'
-                  -- before its own decode error... ;(
+                  -- TODO Hrm, thread that called 'stream' might see
+                  -- Disconnected before its own decode error... ;(
                   atomically $ do
                     writeTQueue responseQueue (Left (HandleDecodeError err))
                     writeTVar stateVar Disconnected

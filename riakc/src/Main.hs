@@ -9,6 +9,7 @@ import Riak
 
 import Control.Arrow         ((***))
 import Control.Lens          (view, (.~), (^.))
+import Control.Monad         (replicateM_)
 import Data.ByteString       (ByteString)
 import Data.Fixed            (Fixed(..))
 import Data.Foldable         (asum, for_, traverse_)
@@ -77,25 +78,30 @@ main = do
         , requestTimeout =
             5
         , handlers =
-            EventHandlers
-              { onSend =
-                  if verbose
-                    then \msg -> putStrLn (">>> " ++ show msg)
-                    else mempty
-              , onReceive =
-                  if verbose
-                    then \msg -> putStrLn ("<<< " ++ show msg)
-                    else mempty
-              ,
-                onConnectError =
-                  if verbose
-                    then \ex -> putStrLn ("*** " ++ show ex)
-                    else mempty
-              , onConnectionError =
-                  if verbose
-                    then \ex -> putStrLn ("*** " ++ show ex)
-                    else mempty
-              }
+            if verbose
+              then
+                EventHandlers
+                  { onConnectAttempt =
+                      \uuid -> Text.putStrLn ("// " <> uuid <> " connecting")
+                  , onConnectFailure =
+                      \uuid ex -> Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+                  , onConnectSuccess =
+                      \uuid -> Text.putStrLn ("// " <> uuid <> " connected")
+                  , onSend =
+                      \msg -> putStrLn ("// >>> " ++ show msg)
+                  , onReceive =
+                      \msg -> putStrLn ("// <<< " ++ show msg)
+                  , onConnectionError =
+                      \ex -> putStrLn ("// *** " ++ show ex)
+                  , onDisconnectAttempt =
+                      \uuid -> Text.putStrLn ("// " <> uuid <> " disconnecting")
+                  , onDisconnectFailure =
+                      \uuid ex -> Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+                  , onDisconnectSuccess =
+                      \uuid -> Text.putStrLn ("// " <> uuid <> " disconnected")
+                  }
+              else
+                mempty
         }
 
   createHandle config >>= run
@@ -665,18 +671,22 @@ listParser =
 
 pingParser :: Parser (Handle -> IO ())
 pingParser =
-  pure $ \handle ->
-    ping handle >>= \case
-      Left err -> do
-        print err
-        exitFailure
+  doPing
+    <$> option auto (help "Number of times to ping" <> metavar "N" <> short 'n')
 
-      Right (Left err) -> do
-        Text.putStrLn (decodeUtf8 err)
-        exitFailure
+  where
+    doPing :: Int -> Handle -> IO ()
+    doPing n handle =
+      replicateM_ n $
+        ping handle >>= \case
+          Left err ->
+            print err
 
-      Right (Right ()) ->
-        pure ()
+          Right (Left err) ->
+            Text.putStrLn (decodeUtf8 err)
+
+          Right (Right ()) ->
+            pure ()
 
 putParser :: Parser (Handle -> IO ())
 putParser =

@@ -57,6 +57,8 @@
 --   After disconnecting,
 --     ==> [Connecting]
 
+-- TODO Rename ManagedBus
+
 module RiakManagedBus
   ( ManagedBus
   , ManagedBusConfig(..)
@@ -172,9 +174,11 @@ data EventHandlers
   , onDisconnectFailure :: Text -> CloseException -> IO ()
   , onDisconnectSuccess :: Text -> IO ()
 
+    -- TODO uuid onSend/onReceive
   , onSend :: Request -> IO ()
   , onReceive :: Response -> IO ()
 
+    -- TODO use onConnectionError
   , onConnectionError :: ConnectionError -> IO ()
   }
 
