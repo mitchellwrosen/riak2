@@ -58,6 +58,9 @@
 --     ==> [Connecting]
 
 -- TODO Rename ManagedBus
+--
+-- TODO if request times out before it's even sent we don't have to close the
+-- socket
 
 module RiakManagedBus
   ( ManagedBus
@@ -183,19 +186,21 @@ data EventHandlers
 
     -- TODO use onConnectionError
   , onConnectionError :: ConnectionError -> IO ()
+
+  , onIdleTimeout :: Text -> IO ()
   }
 
 instance Monoid EventHandlers where
   mempty = EventHandlers mempty mempty mempty mempty mempty mempty mempty mempty
-                         mempty
+                         mempty mempty
   mappend = (<>)
 
 instance Semigroup EventHandlers where
-  EventHandlers a1 b1 c1 d1 e1 f1 g1 h1 i1 <>
-    EventHandlers a2 b2 c2 d2 e2 f2 g2 h2 i2 =
+  EventHandlers a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 <>
+    EventHandlers a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 =
 
     EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2)
-                  (f1 <> f2) (g1 <> g2) (h1 <> h2) (i1 <> i2)
+                  (f1 <> f2) (g1 <> g2) (h1 <> h2) (i1 <> i2) (j1 <> j2)
 
 instance Show EventHandlers where
   show _ =
@@ -291,7 +296,11 @@ withHandle
 
                     pure . void . forkIO $ do
                       debug uuid generation ("request failed: " ++ show err)
-                      disconnect generation handle managedBus
+                      disconnect
+                        Handle.hardDisconnect
+                        generation
+                        handle
+                        managedBus
 
                       atomically $ do
                         writeTVar generationVar (generation+1)
@@ -352,7 +361,8 @@ connect ::
 connect
     generation
     managedBus@(ManagedBus { endpoint, connectTimeout, handlers,
-                             healthCheckInterval, idleTimeout, stateVar, uuid })
+                             healthCheckInterval, idleTimeout, requestTimeout,
+                             stateVar, uuid })
     = do
 
   debug uuid generation "connecting"
@@ -380,11 +390,11 @@ connect
     pingLoop :: Handle.Handle -> NominalDiffTime -> IO ()
     pingLoop handle seconds = do
       timeoutVar :: TVar Bool <-
-        registerDelay pingTimeout
+        registerDelay requestTimeout
 
       Handle.ping timeoutVar handle >>= \case
         Left _ -> do
-          disconnect generation handle managedBus
+          disconnect Handle.hardDisconnect generation handle managedBus
           sleep seconds
           connectLoop timeoutVar (seconds * 2)
 
@@ -418,8 +428,8 @@ monitorHealth ::
   -> Word64
   -> IO ()
 monitorHealth
-     managedBus@(ManagedBus { generationVar, healthCheckInterval, stateVar,
-                              uuid })
+     managedBus@(ManagedBus { generationVar, healthCheckInterval,
+                              requestTimeout, stateVar, uuid })
      generation = do
 
   debug uuid generation "healthy"
@@ -436,7 +446,7 @@ monitorHealth
             Connected handle Healthy ->
               pure $ do
                 timeoutVar :: TVar Bool <-
-                  registerDelay pingTimeout
+                  registerDelay requestTimeout
 
                 result :: Either Handle.HandleError (Either ByteString ()) <-
                   Handle.ping timeoutVar handle
@@ -448,12 +458,19 @@ monitorHealth
                         readTVar stateVar >>= \case
                           Connected handle Healthy -> do
                             writeTVar stateVar Disconnecting
+
                             pure $ do
                               debug uuid generation ("health check failed: " ++ show err)
-                              disconnect generation handle managedBus
+                              disconnect
+                                Handle.hardDisconnect
+                                generation
+                                handle
+                                managedBus
+
                               atomically $ do
                                 writeTVar generationVar (generation+1)
                                 writeTVar stateVar Connecting
+
                               connect (generation+1) managedBus
 
                           Disconnecting ->
@@ -504,7 +521,7 @@ monitorHealth
             Connected handle Unhealthy ->
               pure $ do
                 timeoutVar :: TVar Bool <-
-                  registerDelay pingTimeout
+                  registerDelay requestTimeout
 
                 result :: Either Handle.HandleError (Either ByteString ()) <-
                   Handle.ping timeoutVar handle
@@ -519,10 +536,17 @@ monitorHealth
 
                             pure $ do
                               debug uuid generation ("ping failed: " ++ show err)
-                              disconnect generation handle managedBus
+
+                              disconnect
+                                Handle.hardDisconnect
+                                generation
+                                handle
+                                managedBus
+
                               atomically $ do
                                 writeTVar generationVar (generation+1)
                                 writeTVar stateVar Connecting
+
                               connect (generation+1) managedBus
 
                           Disconnecting ->
@@ -570,8 +594,8 @@ monitorUsage ::
   -> Word64
   -> IO ()
 monitorUsage
-    managedBus@(ManagedBus { generationVar, idleTimeout, lastUsedRef, stateVar,
-                             uuid })
+    managedBus@(ManagedBus { generationVar, handlers, idleTimeout, lastUsedRef,
+                             stateVar, uuid })
     generation =
 
   loop
@@ -612,8 +636,14 @@ monitorUsage
                       writeTVar stateVar Disconnecting
 
                       pure $ do
-                        debug uuid generation "idle timeout"
-                        disconnect generation handle managedBus
+                        onIdleTimeout handlers ident
+
+                        disconnect
+                          Handle.softDisconnect
+                          generation
+                          handle
+                          managedBus
+
                         atomically $ do
                           modifyTVar' generationVar (+1)
                           writeTVar stateVar Disconnected
@@ -641,14 +671,20 @@ monitorUsage
                 Connecting -> undefined
                 Disconnected -> undefined
 
+    ident :: Text
+    ident =
+      makeId uuid generation
+
 disconnect ::
-     Word64
+     (Handle.Handle -> IO (Either CloseException ()))
+  -> Word64
   -> Handle.Handle
   -> ManagedBus
   -> IO ()
-disconnect generation handle ManagedBus { handlers, uuid } = do
+disconnect doDisconnect generation handle ManagedBus { handlers, uuid } = do
   onDisconnectAttempt handlers ident
-  Handle.disconnect handle >>= \case
+
+  doDisconnect handle >>= \case
     Left err -> onDisconnectFailure handlers ident err
     Right () -> onDisconnectSuccess handlers ident
 
@@ -678,9 +714,6 @@ atomicallyIO :: STM (IO a) -> IO a
 atomicallyIO =
   join . atomically
 
-pingTimeout :: Int
-pingTimeout =
-  5*1000*1000
 
 --------------------------------------------------------------------------------
 -- Libriak.Handle wrappers

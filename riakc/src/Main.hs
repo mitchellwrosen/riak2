@@ -73,11 +73,11 @@ main = do
         , retries =
             0
         , healthCheckInterval =
-            0
+            1
         , idleTimeout =
-            0
+            1
         , requestTimeout =
-            5
+            30
         , connectTimeout =
             10
         , handlers =
@@ -90,18 +90,24 @@ main = do
                       \uuid ex -> Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
                   , onConnectSuccess =
                       \uuid -> Text.putStrLn ("// " <> uuid <> " connected")
-                  , onSend =
-                      \msg -> putStrLn ("// >>> " ++ show msg)
-                  , onReceive =
-                      \msg -> putStrLn ("// <<< " ++ show msg)
-                  , onConnectionError =
-                      \ex -> putStrLn ("// *** " ++ show ex)
+
                   , onDisconnectAttempt =
                       \uuid -> Text.putStrLn ("// " <> uuid <> " disconnecting")
                   , onDisconnectFailure =
                       \uuid ex -> Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
                   , onDisconnectSuccess =
                       \uuid -> Text.putStrLn ("// " <> uuid <> " disconnected")
+
+                  , onSend =
+                      \msg -> putStrLn ("// >>> " ++ show msg)
+                  , onReceive =
+                      \msg -> putStrLn ("// <<< " ++ show msg)
+
+                  , onConnectionError =
+                      \ex -> putStrLn ("// *** " ++ show ex)
+
+                  , onIdleTimeout =
+                      \uuid -> Text.putStrLn ("// " <> uuid <> " idle time out")
                   }
               else
                 mempty

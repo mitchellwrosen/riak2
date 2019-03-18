@@ -5,7 +5,8 @@ module Libriak.Handle
   , EventHandlers(..)
   , HandleError(..)
   , connect
-  , disconnect
+  , softDisconnect
+  , hardDisconnect
     -- * API
   , delete
   , deleteIndex
@@ -70,9 +71,26 @@ instance Eq Handle where
     (==) `on` stateVar
 
 data State
+  -- | The socket is connected and hasn't failed yet. Continue servicing
+  -- requests as normal.
   = Healthy
+  -- | Either a send failed, receive failed, or protobuf decode failed; in all
+  -- cases, the socket is deemed unusable. The only thing left to do is close
+  -- the file descriptor.
   | Unhealthy
-  | Disconnected
+  -- | The socket is (or is just about to be) disconnected, and its file
+  -- descriptor freed. The "hardness" is a useful signal to the background send
+  -- and receive threads, which are interested in knowing if they should
+  -- continue processing the already-enqueued requests or not.
+  | Disconnected Hardness
+
+data Hardness
+  -- | Stop accepting new requests, but do finish outstanding ones. The TVar
+  -- within is set to True by the send thread when all requests have been sent,
+  -- so the receive thread knows when to stop receiving.
+  = Soft (TVar Bool)
+  -- | Same, but don't bother finishing outstanding ones
+  | Hard
 
 data Item :: Type where
   Exchange ::
@@ -193,23 +211,38 @@ sendThread ::
   -> Connection
   -> IO ()
 sendThread stateVar streamingVar itemQueue sentItemQueue connection =
-  loop
+  healthyLoop
 
   where
-    loop :: IO ()
-    loop =
+    healthyLoop :: IO ()
+    healthyLoop =
       join . atomically $
-        processItem
+        readTVar stateVar >>= \case
+          Healthy ->
+            sendItem healthyLoop <$> readTBQueue itemQueue
+
+          -- Don't know if it's a hard or soft disconnect yet, so wait around
+          -- for 'disconnect' to be called.
+          Unhealthy ->
+            retry
+
+          Disconnected (Soft doneVar) ->
+            pure (flushingLoop doneVar)
+
+          Disconnected Hard ->
+            pure (pure ())
+
+    flushingLoop :: TVar Bool -> IO ()
+    flushingLoop doneVar =
+      join . atomically $
+        (sendItem (flushingLoop doneVar) <$> readTBQueue itemQueue)
         <|>
-        (pure () <$ returnIfNotHealthy stateVar)
+        (do
+          writeTVar doneVar True
+          pure (pure ()))
 
-    processItem :: STM (IO ())
-    processItem =
-      sendItem <$>
-        readTBQueue itemQueue
-
-    sendItem :: Item -> IO ()
-    sendItem = \case
+    sendItem :: IO () -> Item -> IO ()
+    sendItem next = \case
       Exchange timeoutVar request responseVar ->
         Connection.send connection (getNF request) >>= \case
           Left err ->
@@ -223,8 +256,7 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
           Right () -> do
             atomically
               (writeTQueue sentItemQueue (Exchange' timeoutVar responseVar))
-
-            loop
+            next
 
       Stream timeoutVar request decodeResponse responseQueue ->
         Connection.send connection (getNF request) >>= \case
@@ -248,11 +280,28 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
                   responseQueue)
 
             join . atomically $
-              (readTVar streamingVar >>= \case
-                True -> retry
-                False -> pure loop)
+              (healthyLoop <$ blockUntilFalse streamingVar)
               <|>
-              (pure () <$ returnIfNotHealthy stateVar)
+              (readTVar stateVar >>= \case
+                Healthy ->
+                  retry
+
+                Unhealthy ->
+                  retry
+
+                Disconnected (Soft doneVar) ->
+                  pure $
+                    join . atomically $
+                      (flushingLoop doneVar <$ blockUntilFalse streamingVar)
+
+                Disconnected Hard ->
+                  pure (pure ()))
+
+blockUntilFalse :: TVar Bool -> STM ()
+blockUntilFalse var =
+  readTVar var >>= \case
+    True -> retry
+    False -> pure ()
 
 receiveThread ::
      TVar State
@@ -261,40 +310,59 @@ receiveThread ::
   -> Connection
   -> IO ()
 receiveThread stateVar streamingVar sentItemQueue connection =
-  loop
+  healthyLoop
 
   where
-    loop :: IO ()
-    loop =
+    healthyLoop :: IO ()
+    healthyLoop =
       join . atomically $
-        (handleItem <$> readTQueue sentItemQueue)
-        <|>
-        (pure () <$ returnIfNotHealthy stateVar)
+        readTVar stateVar >>= \case
+          Healthy ->
+            handleItem healthyLoop <$> readTQueue sentItemQueue
 
-    handleItem :: SentItem -> IO ()
-    handleItem = \case
+          Unhealthy ->
+            retry
+
+          Disconnected (Soft doneVar) ->
+            pure (flushingLoop doneVar)
+
+          Disconnected Hard ->
+            pure (pure ())
+
+    flushingLoop :: TVar Bool -> IO ()
+    flushingLoop doneVar =
+      join . atomically $
+        (handleItem (flushingLoop doneVar) <$> readTQueue sentItemQueue)
+        <|>
+        (readTVar doneVar >>= \case
+          False -> retry
+          True -> pure (pure ()))
+
+    handleItem :: IO () -> SentItem -> IO ()
+    handleItem next = \case
       Exchange' timeoutVar responseVar ->
         Connection.receive timeoutVar connection >>= \case
           Left err ->
             atomically $ do
               putTMVar responseVar (Left (HandleConnectionError err))
-              writeTVar stateVar Disconnected
+              writeTVar stateVar Unhealthy
 
           Right response -> do
             atomically (putTMVar responseVar (Right response))
-            loop
+            next
 
       Stream' timeoutVar decodeResponse responseQueue -> do
-        streamResponse timeoutVar decodeResponse responseQueue
+        streamResponse next timeoutVar decodeResponse responseQueue
 
     streamResponse ::
          forall response.
          HasLens' response "done" Bool
-      => TVar Bool
+      => IO ()
+      -> TVar Bool
       -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
       -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
       -> IO ()
-    streamResponse timeoutVar decodeResponse responseQueue =
+    streamResponse next timeoutVar decodeResponse responseQueue =
       receiveLoop
 
       where
@@ -304,7 +372,7 @@ receiveThread stateVar streamingVar sentItemQueue connection =
             Left err ->
               atomically $ do
                 writeTQueue responseQueue (Left (HandleConnectionError err))
-                writeTVar stateVar Disconnected
+                healthyToUnhealthy stateVar
 
             Right response ->
               case decodeResponse response of
@@ -313,13 +381,13 @@ receiveThread stateVar streamingVar sentItemQueue connection =
                   -- Disconnected before its own decode error... ;(
                   atomically $ do
                     writeTQueue responseQueue (Left (HandleDecodeError err))
-                    writeTVar stateVar Disconnected
+                    healthyToUnhealthy stateVar
 
                 Right (Left response) -> do
                   atomically $ do
                     writeTQueue responseQueue (Right (Left response))
                     writeTVar streamingVar False
-                  loop
+                  next
 
                 Right (Right response) -> do
                   atomically (writeTQueue responseQueue (Right (Right response)))
@@ -327,7 +395,7 @@ receiveThread stateVar streamingVar sentItemQueue connection =
                   if response ^. Proto.done
                     then do
                       atomically (writeTVar streamingVar False)
-                      loop
+                      next
                     else
                       receiveLoop
 
@@ -336,36 +404,50 @@ healthyToUnhealthy stateVar =
   readTVar stateVar >>= \case
     Healthy -> writeTVar stateVar Unhealthy
     Unhealthy -> pure ()
-    Disconnected -> pure ()
+    Disconnected _ -> pure ()
 
-returnIfNotHealthy :: TVar State -> STM ()
-returnIfNotHealthy stateVar =
-  readTVar stateVar >>= \case
-    Healthy -> retry
-    Unhealthy -> pure ()
-    Disconnected -> pure ()
-
--- | Disconnect a handle if it's not already disconnected.
+-- | Wait for all in-flight requests to complete, then disconnect a handle.
+-- Idempotent.
 --
 -- /Throws/: This function will never throw an exception.
-disconnect ::
+softDisconnect ::
      Handle
   -> IO (Either CloseException ())
-disconnect Handle { connection, sendAsync, receiveAsync, stateVar } =
+softDisconnect handle@Handle { stateVar } = do
+  doneVar :: TVar Bool <-
+    newTVarIO False
+
   join . atomically $
     readTVar stateVar >>= \case
-      Healthy -> doDisconnect
-      Unhealthy -> doDisconnect
-      Disconnected -> pure (pure (Right ()))
+      Healthy -> disconnect handle (Soft doneVar)
+      Unhealthy -> disconnect handle (Soft doneVar)
+      Disconnected _ -> pure (pure (Right ()))
 
-  where
-    doDisconnect :: STM (IO (Either CloseException ()))
-    doDisconnect = do
-      writeTVar stateVar Disconnected
-      pure $ do
-        wait sendAsync
-        wait receiveAsync
-        Connection.disconnect connection
+-- | Disconnect a handle, regardless of if there are any in-flight requests.
+-- Idempotent.
+--
+-- /Throws/: This function will never throw an exception.
+hardDisconnect ::
+     Handle
+  -> IO (Either CloseException ())
+hardDisconnect handle@Handle { stateVar } =
+  join . atomically $
+    readTVar stateVar >>= \case
+      Healthy -> disconnect handle Hard
+      Unhealthy -> disconnect handle Hard
+      Disconnected _ -> pure (pure (Right ()))
+
+disconnect :: Handle -> Hardness -> STM (IO (Either CloseException ()))
+disconnect
+    Handle { connection, receiveAsync, sendAsync, stateVar }
+    hardness = do
+
+  writeTVar stateVar (Disconnected hardness)
+
+  pure $ do
+    wait sendAsync
+    wait receiveAsync
+    Connection.disconnect connection
 
 -- | Send a request and receive the response (a single message).
 exchange ::
@@ -413,10 +495,16 @@ exchange
                   Right (Right response) ->
                     pure (Right (Right response)))
         <|>
-        (pure (Left HandleClosedError) <$ returnIfNotHealthy stateVar)
+        (readTVar stateVar >>= \case
+          Disconnected Hard ->
+            pure (pure (Left HandleClosedError))
 
-    Unhealthy    -> pure (Left HandleClosedError)
-    Disconnected -> pure (Left HandleClosedError)
+          Healthy               -> retry
+          Unhealthy             -> retry
+          Disconnected (Soft _) -> retry)
+
+    Unhealthy      -> pure (Left HandleClosedError)
+    Disconnected _ -> pure (Left HandleClosedError)
 
 
 -- | Send a request and stream the response (one or more messages).
@@ -452,8 +540,8 @@ stream
 
       processResponse responseQueue
 
-    Unhealthy    -> pure (Left HandleClosedError)
-    Disconnected -> pure (Left HandleClosedError)
+    Unhealthy      -> pure (Left HandleClosedError)
+    Disconnected _ -> pure (Left HandleClosedError)
 
   where
     processResponse ::
@@ -490,7 +578,13 @@ stream
                       else
                         loop acc')
             <|>
-            (pure (Left HandleClosedError) <$ returnIfNotHealthy stateVar)
+            (readTVar stateVar >>= \case
+              Disconnected Hard ->
+                pure (pure (Left HandleClosedError))
+
+              Healthy               -> retry
+              Unhealthy             -> retry
+              Disconnected (Soft _) -> retry)
 
 --------------------------------------------------------------------------------
 -- Riak API
