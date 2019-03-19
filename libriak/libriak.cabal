@@ -82,3 +82,28 @@ benchmark ping
 
   type:
     exitcode-stdio-1.0
+
+benchmark send
+  build-depends:
+    base,
+    bytestring,
+    criterion,
+    deepseq,
+    ip,
+    lens,
+    libriak,
+    mwc-random,
+    sockets,
+
+  ghc-options:
+    -Wall
+    -O
+    -threaded
+    -rtsopts
+    "-with-rtsopts=-N2"
+
+  main-is:
+    benchmarks/Send.hs
+
+  type:
+    exitcode-stdio-1.0
