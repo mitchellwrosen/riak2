@@ -25,15 +25,12 @@ module Libriak.Request
   , encodeRpbYokozunaSchemaPut
   ) where
 
-import Control.DeepSeq          (NFData(..))
+import Control.DeepSeq          (NFData(..), deepseq)
 import Control.Monad.ST
 import Data.ByteString.Internal (ByteString(..))
 import Data.Kind                (Type)
-import Data.List                (foldl')
-import Data.Primitive.Addr
 import Data.Primitive.ByteArray
 import Data.Word                (Word8)
-import GHC.ForeignPtr           (ForeignPtr(..))
 
 import qualified Data.ProtoLens  as Proto
 import qualified Data.Riak.Proto as Proto
@@ -64,12 +61,12 @@ data Request :: Type where
   ReqRpbYokozunaSchemaPut   :: Proto.RpbYokozunaSchemaPutReq   -> Request
   deriving stock (Eq, Show)
 
-newtype EncodedRequest
-  = EncodedRequest { unEncodedRequest :: [ByteArray] }
+data EncodedRequest
+  = EncodedRequest ByteArray ByteString
 
 instance NFData EncodedRequest where
-  rnf (EncodedRequest xs) =
-    foldl' (\acc x -> x `seq` acc) () xs
+  rnf (EncodedRequest code bytes) =
+    code `seq` bytes `deepseq` ()
 
 encodeDtFetch :: Proto.DtFetchReq -> EncodedRequest
 encodeDtFetch =
@@ -160,20 +157,13 @@ encodeRpbYokozunaSchemaPut =
   encode 60
 
 encode :: Proto.Message a => Word8 -> a -> EncodedRequest
-encode code (Proto.encodeMessage -> PS (ForeignPtr addr _) offset len) =
+encode code request =
   EncodedRequest
-    [ runST makeCodeByteArray
-    , runST makeRequestByteArray
-    ]
+    (runST makeCodeByteArray)
+    (Proto.encodeMessage request)
   where
     makeCodeByteArray :: ST s ByteArray
     makeCodeByteArray = do
       bytes <- newByteArray 1
       writeByteArray bytes 0 code
-      unsafeFreezeByteArray bytes
-
-    makeRequestByteArray :: ST s ByteArray
-    makeRequestByteArray = do
-      bytes <- newByteArray len
-      copyAddrToByteArray bytes 0 (Addr addr `plusAddr` offset) len
       unsafeFreezeByteArray bytes

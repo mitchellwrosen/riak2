@@ -20,16 +20,18 @@ import Control.Monad.Primitive  (RealWorld)
 import Data.Bifunctor           (bimap, first)
 import Data.Coerce              (coerce)
 import Data.Kind                (Type)
+import Data.Primitive.Addr      (Addr(..), copyAddrToByteArray)
 import Data.Primitive.ByteArray
 import Data.Word                (Word32, byteSwap32)
 import GHC.ByteOrder            (ByteOrder(..), targetByteOrder)
 import GHC.Conc                 (TVar)
+import GHC.Ptr                  (Ptr(..))
 import Socket.Stream.IPv4       (CloseException(..), ConnectException(..),
                                  Endpoint(..), Interruptibility(..),
                                  ReceiveException(..), SendException(..))
 
-import qualified Socket.Stream.IPv4 as Socket
-
+import qualified Data.ByteString.Unsafe as ByteString
+import qualified Socket.Stream.IPv4     as Socket
 
 gSendBufferSize :: Int
 gSendBufferSize =
@@ -101,8 +103,7 @@ disconnect ::
 disconnect Connection { connection } =
   Socket.disconnect connection
 
--- | Send a length-prefixed payload, which is composed of arbitrarily-sized byte
--- array fragments. Sends as many bytes as possible (up to 4kb) per syscall.
+-- | Send a request.
 --
 -- /Throws/. This function will never throw an exception.
 --
@@ -111,117 +112,38 @@ send ::
      Connection -- ^ Connection
   -> EncodedRequest -- ^ Request
   -> IO (Either ConnectionError ())
-send conn (EncodedRequest payload) = do
-  lenBytes :: ByteArray <-
-    bigEndianWord32ByteArray (fromIntegral payloadLen)
+send Connection { connection, sendBuffer } (EncodedRequest code bytes) = do
+  ByteString.unsafeUseAsCStringLen bytes $ \(Ptr addr, len) -> do
+    lenBytes <- bigEndianWord32ByteArray (fromIntegral len + 1)
+    copyByteArray sendBuffer 0 lenBytes 0 4
+    copyByteArray sendBuffer 4 code 0 1
 
-  first fromSendException <$>
-    sendall conn (lenBytes : payload)
+    -- Happy path: fits in one send call
+    -- Unhappy path: send length + code, then send payload
+    if len <= gSendBufferSize - 5
+      then do
+        copyAddrToByteArray sendBuffer 5 (Addr addr) len
+        first fromSendException <$>
+          Socket.sendMutableByteArraySlice connection sendBuffer 0 (len + 5)
+      else
+        Socket.sendMutableByteArraySlice connection sendBuffer 0 5 >>= \case
+          Left err ->
+            pure (Left (fromSendException err))
+
+          Right () ->
+            Socket.sendAddr connection (Addr addr) len >>= \case
+              Left err ->
+                pure (Left (fromSendException err))
+
+              Right () ->
+                pure (Right ())
 
   where
-    payloadLen :: Int
-    payloadLen =
-      sum (map sizeofByteArray payload)
-
     bigEndianWord32ByteArray :: Word32 -> IO ByteArray
     bigEndianWord32ByteArray word = do
       bytes <- newByteArray 4
       writeByteArray bytes 0 (swap32 word)
       unsafeFreezeByteArray bytes
-
-sendall ::
-     Connection
-  -> [ByteArray]
-  -> IO (Either (SendException 'Uninterruptible) ())
-sendall Connection { sendBuffer, connection } =
-  loop 0
-
-  where
-    loop ::
-         Int
-      -> [ByteArray]
-      -> IO (Either (SendException 'Uninterruptible) ())
-    loop !buffered = \case
-      [] ->
-        Socket.sendMutableByteArraySlice connection sendBuffer 0 buffered
-
-      bytes : bytess ->
-        let
-          nbytes :: Int
-          nbytes =
-            sizeofByteArray bytes
-        in
-          case compare (buffered + nbytes) gSendBufferSize of
-            LT -> do
-              copyByteArray sendBuffer buffered bytes 0 nbytes
-              loop (buffered + nbytes) bytess
-
-            EQ -> do
-              copyByteArray sendBuffer buffered bytes 0 nbytes
-              loop 0 bytess
-
-            GT -> do
-              -- Running example:
-              --
-              -- We have a 100 byte buffer, 98 bytes are filled with 'X'. We
-              -- wish to send a 6 byte array 'ABCDEF'. So, we're going to buffer
-              -- 'AB' send the full buffer, then loop with the unsent 'CDEF'.
-
-              -- Running example:
-              --
-              -- bytesSent =
-              --   100 - 98 (2)
-              let
-                bytesSent :: Int
-                bytesSent =
-                  gSendBufferSize - buffered
-
-              -- Running example:
-              --
-              -- bytesUnsent =
-              --   6 - 2 (4)
-              let
-                bytesUnsent :: Int
-                bytesUnsent =
-                  nbytes - bytesSent
-
-              -- Running example:
-              --
-              -- mbytes <-
-              --   'A B C D E F'
-              mbytes :: MutableByteArray RealWorld <-
-                unsafeThawByteArray bytes
-
-              -- Running example:
-              --
-              -- sendBuffer <-
-              --   'X  X  X ...  X  A  B'
-              --    0  1  2     97 98 99
-              copyMutableByteArray
-                sendBuffer buffered mbytes 0 bytesSent
-
-              Socket.sendMutableByteArray connection sendBuffer >>= \case
-                Left err ->
-                  pure (Left err)
-
-                Right () -> do
-                  -- Running example:
-                  --
-                  -- mbytes <-
-                  --   'C D E F E F'
-                  moveByteArray mbytes 0 mbytes bytesSent bytesUnsent
-
-                  -- Running example:
-                  --
-                  -- munsent <-
-                  --   'C D E F'
-                  munsent :: MutableByteArray RealWorld <-
-                    resizeMutableByteArray mbytes bytesUnsent
-
-                  unsent :: ByteArray <-
-                    unsafeFreezeByteArray munsent
-
-                  loop 0 (unsent : bytess)
 
 -- | Receive a length-prefixed byte array.
 --

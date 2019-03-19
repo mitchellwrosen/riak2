@@ -35,7 +35,7 @@ endpoint =
 main :: IO ()
 main = do
   readyVar <- newEmptyMVar
-  forkIO (fakeRiakServer readyVar)
+  _ <- forkIO (fakeRiakServer readyVar)
   takeMVar readyVar
   timeoutVar <- newTVarIO False
   withConnection timeoutVar endpoint (\_ _ -> pure ()) doMain >>= \case
@@ -72,11 +72,12 @@ doMain conn = do
   where
     makeRequest :: MWC.GenIO -> IO Proto.RpbPutReq
     makeRequest gen = do
-      words <- replicateM 4000 (MWC.uniform gen)
+      bytes <- replicateM 4000 (MWC.uniform gen)
+
       pure $ Proto.defMessage
         & Proto.bucket .~ "bucket"
         & Proto.content .~ (Proto.defMessage
-            & Proto.value .~ ByteString.pack words)
+            & Proto.value .~ ByteString.pack bytes)
         & Proto.w .~ 1
         & Proto.dw .~ 1
         & Proto.nVal .~ 1
