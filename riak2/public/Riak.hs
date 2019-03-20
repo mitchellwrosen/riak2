@@ -130,6 +130,7 @@ module Riak
   , ErlangFunction(..)
   , ErlangFunctionId(..)
   , ErlangTerm(..)
+  , renderErlangTerm
   , Error(..)
   , EventHandlers(..)
   , DeleteIndexError

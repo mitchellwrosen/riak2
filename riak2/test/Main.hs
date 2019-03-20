@@ -21,6 +21,7 @@ import Test.Tasty.HUnit
 import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
+import qualified Data.Text.IO          as Text
 
 main :: IO ()
 main = do
@@ -733,6 +734,7 @@ riakMapReduceTests handle =
               True
           ]
           (Foldl.mapM_ print) >>= print
+          -- (Foldl.mapM_ (Text.putStrLn . renderErlangTerm . view (field @"result"))) >>= print
     ]
   ]
 

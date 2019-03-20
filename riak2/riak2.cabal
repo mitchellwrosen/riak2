@@ -137,6 +137,7 @@ library riak2-internal
     lens ^>= 4.17,
     lens-labels,
     libriak,
+    prettyprinter,
     profunctors ^>= 5.3,
     proto-lens-runtime,
     safe-exceptions,

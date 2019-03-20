@@ -4,6 +4,8 @@
 
 module RiakErlangTerm
   ( ErlangTerm(..)
+  , renderErlangTerm
+
   , build
   , decode
   , decodeIO
@@ -21,14 +23,17 @@ import Data.Bits
 import Data.ByteString.Builder    (Builder)
 import Data.Int
 import Data.Text.Encoding         (decodeUtf8, encodeUtf8)
+import Data.Text.Prettyprint.Doc  (Pretty(..))
 import Data.Vector                (Vector)
 
-import qualified Data.Attoparsec.ByteString as Atto
-import qualified Data.ByteString            as ByteString
-import qualified Data.ByteString.Builder    as Builder
-import qualified Data.ByteString.Lazy       as LazyByteString
-import qualified Data.Text                  as Text
-import qualified Data.Vector                as Vector
+import qualified Data.Attoparsec.ByteString            as Atto
+import qualified Data.ByteString                       as ByteString
+import qualified Data.ByteString.Builder               as Builder
+import qualified Data.ByteString.Lazy                  as LazyByteString
+import qualified Data.Text                             as Text
+import qualified Data.Text.Prettyprint.Doc             as Pretty
+import qualified Data.Text.Prettyprint.Doc.Render.Text as Pretty
+import qualified Data.Vector                           as Vector
 
 
 -- TODO ErlSmallAtomUtf8
@@ -56,8 +61,54 @@ data ErlangTerm
   | ErlSmallInteger Word8
   | ErlSmallTuple (Vector ErlangTerm)
   -- ErlString ByteString
-  deriving (Eq, Show)
+  deriving stock (Eq, Show)
 
+instance Pretty ErlangTerm where
+  pretty :: ErlangTerm -> Pretty.Doc ann
+  pretty = \case
+    ErlAtom atom ->
+      pretty atom
+
+    ErlAtomUtf8 atom ->
+      pretty atom
+
+    ErlBinary binary ->
+      "<<" <> pretty (show binary) <> ">>"
+
+    ErlInteger n ->
+      pretty n
+
+    ErlList elems ErlNil ->
+      pretty (Vector.toList elems)
+
+    ErlList elems lastElem ->
+      Pretty.group
+        (Pretty.encloseSep
+          (Pretty.flatAlt "[ " "[")
+          (Pretty.line <> "| " <> pretty lastElem <> Pretty.flatAlt " ]" "]")
+          ", "
+          (map pretty (Vector.toList elems)))
+
+    ErlNil ->
+      "[]"
+
+    ErlSmallBig n ->
+      pretty n
+
+    ErlSmallInteger n ->
+      pretty n
+
+    ErlSmallTuple elems ->
+      Pretty.group
+        (Pretty.encloseSep
+          (Pretty.flatAlt "{ " "{")
+          (Pretty.flatAlt " }" "}")
+          ", "
+          (map pretty (Vector.toList elems)))
+
+renderErlangTerm :: ErlangTerm -> Text
+renderErlangTerm =
+  Pretty.renderStrict . Pretty.layoutPretty Pretty.defaultLayoutOptions . pretty
 
 build :: ErlangTerm -> ByteString
 build =
