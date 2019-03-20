@@ -255,37 +255,41 @@ withHandle ::
 withHandle
     timeoutVar
     managedBus@(ManagedBus { generationVar, lastUsedRef, stateVar, uuid })
-    callback = do
+    callback =
 
-  -- Mask because if we transition from Disconnected to Connected, we *must*
-  -- successfully fork the connect thread
-  uninterruptibleMask $ \unmask ->
-    atomicallyIO $ do
-      generation :: Word64 <-
-        readTVar generationVar
-
-      readTVar stateVar >>= \case
-        Disconnected -> do
-          writeTVar stateVar Connecting
-          pure $ do
-            void (forkIO (connect generation managedBus))
-            unmask (connectingWait generation)
-
-        Connected handle Healthy ->
-          pure (unmask (withHealthyHandle generation handle))
-
-        Connecting ->
-          pure (unmask (connectingWait generation))
-
-        Connected _ Unhealthy ->
-          pure (unmask (unhealthyWait generation))
-
-        Disconnecting ->
-          pure (unmask (disconnectingWait generation))
+  mainLoop
 
   where
+    mainLoop :: IO (Either ManagedBusError a)
+    mainLoop =
+      -- Mask because if we transition from Disconnected to Connected, we *must*
+      -- successfully fork the connect thread
+      uninterruptibleMask $ \unmask ->
+        atomicallyIO $ do
+          generation :: Word64 <-
+            readTVar generationVar
+
+          readTVar stateVar >>= \case
+            Disconnected -> do
+              writeTVar stateVar Connecting
+              pure $ do
+                void (forkIO (connect generation managedBus))
+                unmask (connectingWait generation)
+
+            Connected handle Healthy ->
+              pure (unmask (withHealthyHandle generation handle))
+
+            Connecting ->
+              pure (unmask (connectingWait generation))
+
+            Connected _ Unhealthy ->
+              pure (unmask (unhealthyWait generation))
+
+            Disconnecting ->
+              pure (unmask (disconnectingWait generation))
+
     withHealthyHandle ::
-         Word64
+        Word64
       -> Handle.Handle
       -> IO (Either ManagedBusError a)
     withHealthyHandle generation handle = do
@@ -325,8 +329,8 @@ withHandle
                   Connecting -> undefined
 
           -- Wait for us to transition off of a healthy status before
-          -- returning, so that the client may immediately retry (and hit a
-          -- 'wait', rather than this same code path)
+          -- returning, so that the caller may immediately retry and not hit
+          -- this same code path.
           atomically $ do
             actualGen <- readTVar generationVar
             if actualGen == generation
@@ -353,7 +357,7 @@ withHandle
               retry
 
             Connected _ Healthy ->
-              pure (withHandle timeoutVar managedBus callback)
+              pure mainLoop
 
             Connected _ Unhealthy ->
               pure (unhealthyWait generation)
@@ -375,7 +379,7 @@ withHandle
               retry
 
             Connected _ Healthy ->
-              pure (withHandle timeoutVar managedBus callback)
+              pure mainLoop
 
             Disconnecting ->
               pure (disconnectingWait generation)
@@ -393,7 +397,7 @@ withHandle
         (readTVar generationVar >>= \generation' ->
           if generation == generation'
             then retry
-            else pure (withHandle timeoutVar managedBus callback))
+            else pure mainLoop)
 
     blockUntilRequestTimeout :: STM (IO (Either ManagedBusError a))
     blockUntilRequestTimeout =
@@ -402,14 +406,14 @@ withHandle
         True -> pure (pure (Left ManagedBusTimeoutError))
 
     retryIfNewGeneration ::
-         Word64
+        Word64
       -> STM (IO (Either ManagedBusError a))
       -> STM (IO (Either ManagedBusError a))
     retryIfNewGeneration expectedGen action = do
       actualGen <- readTVar generationVar
       if actualGen == expectedGen
         then action
-        else pure (withHandle timeoutVar managedBus callback)
+        else pure mainLoop
 
     fromHandleError :: Handle.HandleError -> ManagedBusError
     fromHandleError = \case
@@ -418,6 +422,7 @@ withHandle
       Handle.HandleDecodeError     err -> ManagedBusDecodeError     err
 
 -- TODO give up if bus gc'd
+-- TODO does it matter that async exceptions are masked here?
 connect ::
      Word64 -- Invariant: this is what's in generationVar
   -> ManagedBus
@@ -517,10 +522,7 @@ monitorHealth
                 timeoutVar :: TVar Bool <-
                   registerDelay requestTimeout
 
-                result :: Either Handle.HandleError (Either ByteString ()) <-
-                  Handle.ping timeoutVar handle
-
-                case result of
+                Handle.ping timeoutVar handle >>= \case
                   Left err ->
                     atomicallyIO $
                       whenGen generation generationVar $
@@ -575,8 +577,10 @@ monitorHealth
                   "health check failed: " ++ show err ++ ", pinging until healthy"
                 pingLoop 1
 
+            Disconnecting ->
+              pure (pure ())
+
             Disconnected -> undefined
-            Disconnecting -> undefined
             Connecting -> undefined
             Connected _ Unhealthy -> undefined
 
@@ -592,10 +596,8 @@ monitorHealth
                 timeoutVar :: TVar Bool <-
                   registerDelay requestTimeout
 
-                result :: Either Handle.HandleError (Either ByteString ()) <-
-                  Handle.ping timeoutVar handle
-
-                case result of
+                -- TODO share code with monitorLoop
+                Handle.ping timeoutVar handle >>= \case
                   Left err ->
                     atomicallyIO $
                       whenGen generation generationVar $
@@ -682,10 +684,14 @@ monitorUsage
         <|>
         (whenGen generation generationVar $
           readTVar stateVar >>= \case
-            Connected _ Healthy -> retry
-            Connected _ Unhealthy -> pure handleUnhealthy
+            Connected _ Healthy ->
+              retry
 
-            Disconnecting -> pure (pure ()) -- Should this be undefined?
+            Connected _ Unhealthy ->
+              pure handleUnhealthy
+
+            Disconnecting ->
+              pure (pure ())
 
             Disconnected -> undefined
             Connecting -> undefined)
@@ -693,8 +699,11 @@ monitorUsage
       where
         handleTimer :: IO ()
         handleTimer = do
-          now <- getMonotonicTimeNSec
-          lastUsed <- readIORef lastUsedRef
+          now :: Word64 <-
+            getMonotonicTimeNSec
+
+          lastUsed :: Word64 <-
+            readIORef lastUsedRef
 
           if now - lastUsed > fromIntegral (idleTimeout * 1000)
             then
@@ -717,7 +726,8 @@ monitorUsage
                           writeTVar generationVar (generation+1)
                           writeTVar stateVar Disconnected
 
-                    Disconnecting -> pure (pure ())
+                    Disconnecting ->
+                      pure (pure ())
 
                     Connecting -> undefined
                     Disconnected -> undefined
@@ -733,9 +743,14 @@ monitorUsage
           atomicallyIO $
             whenGen generation generationVar $
               readTVar stateVar >>= \case
-                Connected _ Healthy -> pure loop
-                Connected _ Unhealthy -> retry
-                Disconnecting -> pure (pure ())
+                Connected _ Healthy ->
+                  pure loop
+
+                Connected _ Unhealthy ->
+                  retry
+
+                Disconnecting ->
+                  pure (pure ())
 
                 Connecting -> undefined
                 Disconnected -> undefined

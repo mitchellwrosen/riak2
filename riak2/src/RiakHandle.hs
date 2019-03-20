@@ -55,6 +55,9 @@ data HandleConfig
     -- | How often to perform a health check on each underlying connection. Use
     -- @0@ to disable.
   , healthCheckInterval :: NominalDiffTime
+    -- | Approximately how long to leave an unused socket connected before
+    -- closing it. A background thread will wake every @idleTimeout/2@ seconds
+    -- to close idle connections.
   , idleTimeout :: NominalDiffTime
     -- | How long to wait for a successful response from Riak before timing out.
     -- This includes the time spent waiting for a successful connection to be
