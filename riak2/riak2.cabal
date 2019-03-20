@@ -102,6 +102,8 @@ library
     Riak.ConvergentHyperLogLog
     Riak.ConvergentMap
     Riak.ConvergentSet
+    Riak.ErlangFunction
+    Riak.ErlangFunctionId
     Riak.ErlangTerm
     Riak.Error
     Riak.Handle
@@ -200,6 +202,7 @@ library riak2-internal
     RiakCounterBucketProps
     RiakDebug
     RiakErlangFunction
+    RiakErlangFunctionId
     RiakErlangTerm
     RiakError
     RiakGetOpts
@@ -217,7 +220,6 @@ library riak2-internal
     RiakMap
     RiakMapBucketProps
     RiakMapReduce
-    RiakMapReduceFunction
     RiakMapReducePhase
     RiakMapReduceResult
     RiakMapValue
@@ -278,7 +280,7 @@ test-suite tests
     lens,
     libriak,
     random,
-    riak2-internal,
+    riak2,
     sockets,
     tasty,
     tasty-hunit,

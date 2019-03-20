@@ -10,9 +10,7 @@ module Riak.MapReduce
   , mapReduceIntIndex
   , mapReduceSearch
   , MapReducePhase(..)
-  , MapReduceFunction(..)
   ) where
 
 import RiakMapReduce
-import RiakMapReduceFunction
 import RiakMapReducePhase

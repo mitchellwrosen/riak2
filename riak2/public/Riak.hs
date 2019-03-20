@@ -11,6 +11,7 @@ module Riak
   , getWith
   , getHead
   , getHeadWith
+  , getIfModified
   , getIfModifiedWith
   , getHeadIfModified
   , getHeadIfModifiedWith
@@ -126,6 +127,8 @@ module Riak
   , setKey
   , setValue
   , CounterBucketProps(..)
+  , ErlangFunction(..)
+  , ErlangFunctionId(..)
   , ErlangTerm(..)
   , Error(..)
   , EventHandlers(..)
@@ -160,7 +163,6 @@ module Riak
   , ListKeysError
   , MapBucketProps(..)
   , MapReduceBucketError
-  , MapReduceFunction(..)
   , MapReducePhase(..)
   , MayReturnBucketTypeDoesNotExist
   , MayReturnIndexDoesNotExist
@@ -199,7 +201,7 @@ module Riak
 #endif
   ) where
 
-import Riak.BinaryIndexQuery      (BinaryIndexQuery(..), keysBetween, inBucket)
+import Riak.BinaryIndexQuery      (BinaryIndexQuery(..), inBucket, keysBetween)
 import Riak.Bucket
 import Riak.BucketProps           (BucketProps(..), ConflictResolution(..),
                                    CounterBucketProps(..),
@@ -213,6 +215,8 @@ import Riak.ConvergentCounter
 import Riak.ConvergentHyperLogLog
 import Riak.ConvergentMap
 import Riak.ConvergentSet
+import Riak.ErlangFunction
+import Riak.ErlangFunctionId
 import Riak.ErlangTerm
 import Riak.Error
 import Riak.Handle                (EventHandlers(..), Handle, HandleConfig(..),

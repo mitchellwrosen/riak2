@@ -2,46 +2,7 @@
 
 module Main where
 
-import RiakBinaryIndexQuery (BinaryIndexQuery(..), inBucket, keysBetween)
-import RiakBucket           (Bucket(..), getBucket, getCounterBucket,
-                             getHyperLogLogBucket, getMapBucket, getSetBucket,
-                             listKeys, queryBinaryIndex, queryBinaryIndexTerms,
-                             queryIntIndex, resetBucket, setBucketIndex,
-                             unsetBucketIndex)
-import RiakBucketProps      (BucketProps(..))
-import RiakBucketType       (BucketType, defaultBucketType, getBucketType,
-                             getCounterBucketType, getHyperLogLogBucketType,
-                             getMapBucketType, getSetBucketType, listBuckets,
-                             setBucketTypeIndex, unsetBucketTypeIndex)
-import RiakContent          (Content, newContent)
-import RiakContext          (emptyContext)
-import RiakCounter          (ConvergentCounter(..), getCounter, updateCounter)
-import RiakError            (Error(..))
-import RiakGetOpts          (GetOpts(..))
-import RiakHandle           (EventHandlers(..), Handle, HandleConfig(..),
-                             createHandle)
-import RiakHandleError      (HandleError)
-import RiakHyperLogLog      (ConvergentHyperLogLog(..), getHyperLogLog,
-                             updateHyperLogLog)
-import RiakIndex            (Index, deleteIndex, putIndex)
-import RiakIndexName        (IndexName, unsafeMakeIndexName)
-import RiakIntIndexQuery    (IntIndexQuery(..))
-import RiakKey              (Key(..), generatedKey, keyBucket, keyBucketSegment,
-                             keyBucketType, keyKeySegment)
-import RiakMap              (ConvergentMap, getMap, newMap, putMap)
-import RiakMapReduce        (mapReduceKeys)
-import RiakMapValue         (ConvergentMapValue, emptyMapValue)
-import RiakObject           (Object(..), delete, get, getHead, getIfModified,
-                             getWith, newObject, put, putGet, putGetHead,
-                             putWith)
-import RiakPing             (ping)
-import RiakPutOpts          (PutOpts(..))
-import RiakSchema           (defaultSchema)
-import RiakSecondaryIndex   (SecondaryIndex(..))
-import RiakServerInfo       (ServerInfo(..), getServerInfo)
-import RiakSet              (ConvergentSet, getSet, newSet, putSet)
-import RiakSibling          (Sibling(..))
-import RiakSomeBucketProps  (SomeBucketProps(..))
+import Riak
 
 import Control.Lens
 import Control.Monad
@@ -766,7 +727,11 @@ riakMapReduceTests handle =
         mapReduceKeys
           handle
           [key]
-          []
+          [ MapPhase
+              (CompiledFunction (ErlangFunctionId "riak_kv_mapreduce" "map_identity"))
+              (ErlAtomUtf8 "none")
+              True
+          ]
           (Foldl.mapM_ print) >>= print
     ]
   ]
