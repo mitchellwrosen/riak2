@@ -15,10 +15,11 @@
 --   If the connect succeeds,
 --     ==> [Foreground Health Checking]
 --
---   If the connect fails,
---     ==> [Connecting]
+--   If the connect times out per 'connectTimeout' setting,
+--     ==> [Disconnected]
 --
---   TODO eventually stop trying to connect
+--   If the connect fails for any other reason,
+--     ==> [Connecting]
 --
 -- [Foreground Health Checking]
 --   We are either attempting to successfully ping the server for the first
@@ -61,6 +62,8 @@
 --
 -- TODO if request times out before it's even sent we don't have to close the
 -- socket
+--
+-- TODO replace undefined with more informative "state machine error"
 
 module RiakManagedBus
   ( ManagedBus
@@ -111,7 +114,7 @@ import Control.Foldl          (FoldM)
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
 import GHC.Conc               (registerDelay)
-import Socket.Stream.IPv4     (CloseException, ConnectException, Endpoint,
+import Socket.Stream.IPv4     (CloseException, ConnectException(..), Endpoint,
                                Interruptibility(..))
 
 import qualified Data.Riak.Proto as Proto
@@ -252,27 +255,33 @@ withHandle ::
 withHandle
     timeoutVar
     managedBus@(ManagedBus { generationVar, lastUsedRef, stateVar, uuid })
-    callback =
+    callback = do
 
   -- Mask because if we transition from Disconnected to Connected, we *must*
   -- successfully fork the connect thread
   uninterruptibleMask $ \unmask ->
     atomicallyIO $ do
+      generation :: Word64 <-
+        readTVar generationVar
+
       readTVar stateVar >>= \case
         Disconnected -> do
           writeTVar stateVar Connecting
-          generation <- readTVar generationVar
           pure $ do
             void (forkIO (connect generation managedBus))
-            unmask wait
+            unmask (connectingWait generation)
 
-        Connected handle Healthy -> do
-          generation <- readTVar generationVar
+        Connected handle Healthy ->
           pure (unmask (withHealthyHandle generation handle))
 
-        Connecting            -> pure (unmask wait)
-        Connected _ Unhealthy -> pure (unmask wait)
-        Disconnecting         -> pure (unmask wait)
+        Connecting ->
+          pure (unmask (connectingWait generation))
+
+        Connected _ Unhealthy ->
+          pure (unmask (unhealthyWait generation))
+
+        Disconnecting ->
+          pure (unmask (disconnectingWait generation))
 
   where
     withHealthyHandle ::
@@ -296,6 +305,7 @@ withHandle
 
                     pure . void . forkIO $ do
                       debug uuid generation ("request failed: " ++ show err)
+
                       disconnect
                         Handle.hardDisconnect
                         generation
@@ -332,20 +342,74 @@ withHandle
         Right result ->
           pure (Right result)
 
-    wait :: IO (Either ManagedBusError a)
-    wait =
+    connectingWait :: Word64 -> IO (Either ManagedBusError a)
+    connectingWait generation =
       atomicallyIO $
-        (readTVar timeoutVar >>= \case
-          False -> retry
-          True  -> pure (pure (Left ManagedBusTimeoutError)))
+        blockUntilRequestTimeout
         <|>
-        (readTVar stateVar >>= \case
-          Connected _ Healthy   -> pure (withHandle timeoutVar managedBus callback)
-          Disconnected          -> pure (withHandle timeoutVar managedBus callback)
+        (retryIfNewGeneration generation $
+          readTVar stateVar >>= \case
+            Connecting ->
+              retry
 
-          Connecting            -> retry
-          Connected _ Unhealthy -> retry
-          Disconnecting         -> retry)
+            Connected _ Healthy ->
+              pure (withHandle timeoutVar managedBus callback)
+
+            Connected _ Unhealthy ->
+              pure (unhealthyWait generation)
+
+            Disconnecting ->
+              pure (disconnectingWait generation)
+
+            Disconnected ->
+              pure (pure (Left ManagedBusTimeoutError)))
+
+    unhealthyWait :: Word64 -> IO (Either ManagedBusError a)
+    unhealthyWait generation =
+      atomicallyIO $
+        blockUntilRequestTimeout
+        <|>
+        (retryIfNewGeneration generation $
+          readTVar stateVar >>= \case
+            Connected _ Unhealthy ->
+              retry
+
+            Connected _ Healthy ->
+              pure (withHandle timeoutVar managedBus callback)
+
+            Disconnecting ->
+              pure (disconnectingWait generation)
+
+            Connecting -> undefined
+            Disconnected -> undefined)
+
+    disconnectingWait :: Word64 -> IO (Either ManagedBusError a)
+    disconnectingWait generation =
+      atomicallyIO $
+        blockUntilRequestTimeout
+        <|>
+        -- 'Disconnecting N' can either transition to 'Connecting N+1' or
+        -- 'Disconnected N+1'. We just need to wait until either happens.
+        (readTVar generationVar >>= \generation' ->
+          if generation == generation'
+            then retry
+            else pure (withHandle timeoutVar managedBus callback))
+
+    blockUntilRequestTimeout :: STM (IO (Either ManagedBusError a))
+    blockUntilRequestTimeout =
+      readTVar timeoutVar >>= \case
+        False -> retry
+        True -> pure (pure (Left ManagedBusTimeoutError))
+
+    retryIfNewGeneration ::
+         Word64
+      -> STM (IO (Either ManagedBusError a))
+      -> STM (IO (Either ManagedBusError a))
+    retryIfNewGeneration expectedGen action = do
+      actualGen <- readTVar generationVar
+      if actualGen == expectedGen
+        then action
+        else pure (withHandle timeoutVar managedBus callback)
 
     fromHandleError :: Handle.HandleError -> ManagedBusError
     fromHandleError = \case
@@ -365,7 +429,6 @@ connect
                              stateVar, uuid })
     = do
 
-  debug uuid generation "connecting"
   timeoutVar <- registerDelay connectTimeout
   connectLoop timeoutVar 1
 
@@ -380,8 +443,14 @@ connect
       Handle.connect timeoutVar endpoint handleHandlers >>= \case
         Left err -> do
           onConnectFailure handlers ident err
-          sleep seconds
-          connectLoop timeoutVar (seconds * 2)
+
+          case err of
+            ConnectInterrupted ->
+              atomically (writeTVar stateVar Disconnected)
+
+            _ -> do
+              sleep seconds
+              connectLoop timeoutVar (seconds * 2)
 
         Right handle -> do
           onConnectSuccess handlers ident
@@ -645,7 +714,7 @@ monitorUsage
                           managedBus
 
                         atomically $ do
-                          modifyTVar' generationVar (+1)
+                          writeTVar generationVar (generation+1)
                           writeTVar stateVar Disconnected
 
                     Disconnecting -> pure (pure ())
@@ -886,7 +955,7 @@ ping bus@(ManagedBus { requestTimeout }) = do
   retrying
     timeoutVar
     isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
+    (withHandle timeoutVar bus $ \timeoutVar handle -> do
       Handle.ping timeoutVar handle)
 
 put ::
@@ -1054,7 +1123,7 @@ retrying_ timeoutVar shouldRetry action =
 
   where
     loop :: Int -> IO (Either ManagedBusError (Either ByteString r))
-    loop sleepMicros =
+    loop sleepMicros = do
       action >>= \case
         Right (Left err) | shouldRetry err -> do
           sleepVar :: TVar Bool <-
@@ -1097,8 +1166,10 @@ translateTimeout = \case
 --   * {Connecting N}          if request arrives
 --
 -- * {Connecting N}
---   * {Connecting N}          if connect fails or initial ping fails
+--   * {Connecting N}          if connect fails (non-timeout) or initial ping
+--                             fails
 --   * {Connected-Healthy N}   if initial ping succeeds
+--   * {Disconnected N}        if connect times out per 'connectTimeout'
 --
 -- * {Connected-Healthy N}
 --   * {Connected-Unhealthy N} if background ping fails (Riak error)

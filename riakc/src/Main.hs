@@ -75,7 +75,7 @@ main = do
         , healthCheckInterval =
             1
         , idleTimeout =
-            1
+            60
         , requestTimeout =
             30
         , connectTimeout =
