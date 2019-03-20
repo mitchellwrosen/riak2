@@ -29,6 +29,7 @@ import RiakIntIndexQuery    (IntIndexQuery(..))
 import RiakKey              (Key(..), generatedKey, keyBucket, keyBucketSegment,
                              keyBucketType, keyKeySegment)
 import RiakMap              (ConvergentMap, getMap, newMap, putMap)
+import RiakMapReduce        (mapReduceKeys)
 import RiakMapValue         (ConvergentMapValue, emptyMapValue)
 import RiakObject           (Object(..), delete, get, getHead, getIfModified,
                              getWith, newObject, put, putGet, putGetHead,
@@ -77,9 +78,9 @@ main = do
         , connectTimeout = 10
         , handlers =
             mempty
-              -- { onSend = \req -> putStrLn (">>> " ++ show req)
-              -- , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
-              -- }
+              { onSend = \req -> putStrLn (">>> " ++ show req)
+              , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
+              }
         }
 
 integrationTests :: Handle -> [TestTree]
@@ -90,6 +91,7 @@ integrationTests handle =
   , testGroup "RiakHyperLogLog" (riakHyperLogLogTests handle)
   , testGroup "RiakIndex" (riakIndexTests handle)
   , testGroup "RiakMap" (riakMapTests handle)
+  , testGroup "RiakMapReduce" (riakMapReduceTests handle)
   , testGroup "RiakObject" (riakObjectTests handle)
   , testGroup "RiakPing" (riakPingTests handle)
   , testGroup "RiakServerInfo" (riakServerInfoTests handle)
@@ -752,6 +754,20 @@ riakMapTests handle =
           putMap handle (emptyMap key) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
+    ]
+  ]
+
+riakMapReduceTests :: Handle -> [TestTree]
+riakMapReduceTests handle =
+  [ testGroup "mapReduceKeys"
+    [ testCase "success" $ do
+        key <- randomObjectKey
+        put handle (emptyObject key) `shouldReturnSatisfy` isRight
+        mapReduceKeys
+          handle
+          [key]
+          []
+          (Foldl.mapM_ print) >>= print
     ]
   ]
 

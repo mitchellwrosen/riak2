@@ -1,5 +1,6 @@
 -- TODO add modfun mapreduce
--- TODO better map reduce fold types
+-- TODO mapreduce actually takes a list of inputs
+-- TODO mapreduce key filter
 
 module RiakMapReduce
   ( mapReduceKeys
@@ -21,6 +22,7 @@ import RiakIntIndexQuery    (IntIndexQuery)
 import RiakKey              (Key)
 import RiakMapReduceInput   (MapReduceInput(..))
 import RiakMapReducePhase   (MapReducePhase(..))
+import RiakMapReduceResult  (MapReduceResult(..))
 
 import qualified RiakErlangTerm     as ErlangTerm
 import qualified RiakHandle         as Handle
@@ -28,9 +30,12 @@ import qualified RiakMapReduceInput as MapReduceInput
 import qualified RiakMapReducePhase as MapReducePhase
 
 import Control.Foldl      (FoldM)
-import Control.Lens       ((.~))
+import Control.Lens       ((.~), (^.))
+import Data.Functor.Const (Const(..))
+import Data.Monoid        (Dual(..))
 import Data.Text.Encoding (decodeUtf8)
 
+import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 import qualified Data.Vector     as Vector
 
@@ -44,7 +49,7 @@ mapReduceKeys ::
   => Handle -- ^
   -> [Key] -- ^
   -> [MapReducePhase] -- ^
-  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> FoldM IO MapReduceResult r -- ^
   -> m (Either [HandleError] (Either ByteString r))
 mapReduceKeys handle keys phases responseFold = liftIO $
   doMapReduce handle (MapReduceInputKeys keys) phases responseFold
@@ -64,7 +69,7 @@ mapReduceBucket ::
   => Handle -- ^
   -> Bucket -- ^
   -> [MapReducePhase] -- ^
-  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> FoldM IO MapReduceResult r -- ^
   -> m (Either MapReduceBucketError r)
 mapReduceBucket handle bucket phases responseFold = liftIO $
   fromResponse <$>
@@ -97,7 +102,7 @@ mapReduceBinaryIndex ::
   => Handle -- ^
   -> BinaryIndexQuery -- ^
   -> [MapReducePhase] -- ^
-  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> FoldM IO MapReduceResult r -- ^
   -> m (Either MapReduceBinaryIndexError r)
 mapReduceBinaryIndex handle query phases responseFold = liftIO $
   fromResponse <$>
@@ -131,7 +136,7 @@ mapReduceIntIndex ::
   => Handle -- ^
   -> IntIndexQuery -- ^
   -> [MapReducePhase] -- ^
-  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> FoldM IO MapReduceResult r -- ^
   -> m (Either MapReduceIntIndexError r)
 mapReduceIntIndex handle query phases responseFold = liftIO $
   fromResponse <$>
@@ -159,14 +164,13 @@ parseMapReduceIntIndexError err =
 --
 -- -- TODO test mapReduceSearch
 -- -- TODO MapReduceSearchError
--- -- TODO oops, for mapReduceSearch UnknownMessageCode might refer to yokozuna
 mapReduceSearch ::
      MonadIO m
   => Handle -- ^
   -> IndexName -- ^
   -> ByteString -- ^ Search query
   -> [MapReducePhase] -- ^
-  -> FoldM IO Proto.RpbMapRedResp r -- ^
+  -> FoldM IO MapReduceResult r -- ^
   -> m (Either [HandleError] (Either ByteString r))
 mapReduceSearch handle index query phases responseFold = liftIO $
   doMapReduce handle (MapReduceInputSearch index query) phases responseFold
@@ -175,13 +179,13 @@ doMapReduce ::
      Handle
   -> MapReduceInput
   -> [MapReducePhase]
-  -> FoldM IO Proto.RpbMapRedResp r
+  -> FoldM IO MapReduceResult r
   -> IO (Either [HandleError] (Either ByteString r))
 doMapReduce handle input phases responseFold =
   Handle.mapReduce
     handle
     request
-    responseFold
+    (Foldl.handlesM handler responseFold)
 
   where
     request :: Proto.RpbMapRedReq
@@ -189,6 +193,26 @@ doMapReduce handle input phases responseFold =
       Proto.defMessage
         & Proto.contentType .~ "application/x-erlang-binary"
         & Proto.request .~ ErlangTerm.build (makeMapReduceErlangTerm input phases)
+
+    handler :: Foldl.HandlerM IO Proto.RpbMapRedResp MapReduceResult
+    handler f response =
+      case response ^. Proto.maybe'response of
+        Nothing ->
+          mempty
+
+        Just bytes ->
+          Const $ Dual $ Foldl.EndoM $ \x -> do
+            term :: ErlangTerm <-
+              ErlangTerm.decodeIO bytes
+
+            Foldl.appEndoM
+              (getDual
+                (getConst
+                  (f MapReduceResult
+                    { phase = fromIntegral (response ^. Proto.phase)
+                    , result = term
+                    })))
+              x
 
 -- [{inputs, Inputs}, {query, Query}, {timeout, Timeout}]
 --

@@ -199,6 +199,7 @@ library riak2-internal
     RiakCounter
     RiakCounterBucketProps
     RiakDebug
+    RiakErlangFunction
     RiakErlangTerm
     RiakError
     RiakGetOpts
@@ -218,6 +219,7 @@ library riak2-internal
     RiakMapReduce
     RiakMapReduceFunction
     RiakMapReducePhase
+    RiakMapReduceResult
     RiakMapValue
     RiakObject
     RiakPing

@@ -6,6 +6,7 @@ module RiakErlangTerm
   ( ErlangTerm(..)
   , build
   , decode
+  , decodeIO
     -- ** Smart constructors
   , bool
   , tuple2
@@ -118,9 +119,16 @@ build_ =
 
 decode :: ByteString -> Either String ErlangTerm
 decode =
-  Atto.parseOnly $ do
-    _ <- Atto.word8 131
-    parser
+  Atto.parseOnly (Atto.word8 131 *> parser <* Atto.endOfInput)
+
+decodeIO :: ByteString -> IO ErlangTerm
+decodeIO bytes =
+  case decode bytes of
+    Left err ->
+      error err -- TODO erlang term decode error
+
+    Right term ->
+      pure term
 
 parser :: Parser ErlangTerm
 parser =

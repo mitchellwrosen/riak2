@@ -1,18 +1,19 @@
 module RiakMapReduceFunction where
 
 import RiakErlangTerm (ErlangTerm(..))
+import RiakErlangFunction (ErlangFunction(..))
 
 import qualified RiakErlangTerm as ErlangTerm
 
 
 data MapReduceFunction
-  = MapReduceFunctionCompiled Text Text
+  = MapReduceFunctionCompiled ErlangFunction
   | MapReduceFunctionInterpreted ByteString
   deriving stock (Show)
 
 toErlangTerm :: MapReduceFunction -> ErlangTerm
 toErlangTerm = \case
-  MapReduceFunctionCompiled modul fun ->
+  MapReduceFunctionCompiled (ErlangFunction modul fun) ->
     ErlangTerm.tuple3
       (ErlAtomUtf8 "modfun")
       (ErlAtomUtf8 modul)
