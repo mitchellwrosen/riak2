@@ -1,3 +1,10 @@
+-- TODO listKeys -> getKeys
+-- TODO listBuckets -> getBuckets
+--
+-- TODO 2i paginationSort, termRegex, coverContext
+--
+-- TODO parse disallow listing error
+
 module RiakBucket
   ( Bucket(..)
   , bucketBucketType

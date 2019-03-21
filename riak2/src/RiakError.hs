@@ -1,5 +1,7 @@
 -- TODO more exhausive zero-length bucket/key coverage
 
+-- TODO NonEmpty handle errors
+
 module RiakError where
 
 import RiakBucketInternal     (Bucket(..))
@@ -109,6 +111,7 @@ data Op
   | ListBucketsOp
   | ListKeysOp
   | MapReduceBucketOp
+  | MapReduceKeysOp
   | MapReduceSecondaryIndexOp
   | PutIndexOp
   | PutOp
@@ -144,6 +147,7 @@ type ListKeysError                 = Error 'ListKeysOp
 type MapReduceBinaryIndexError     = Error 'MapReduceSecondaryIndexOp
 type MapReduceBucketError          = Error 'MapReduceBucketOp
 type MapReduceIntIndexError        = Error 'MapReduceSecondaryIndexOp
+type MapReduceKeysError            = Error 'MapReduceKeysOp
 type PutError                      = Error 'PutOp
 type PutIndexError                 = Error 'PutIndexOp
 type PutMapError                   = Error 'UpdateCrdtOp

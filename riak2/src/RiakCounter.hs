@@ -1,3 +1,5 @@
+-- TODO incrCounter(By), decrCounter(By) ?
+
 module RiakCounter
   ( ConvergentCounter(..)
   , getCounter

@@ -2,6 +2,9 @@
 
 -- TODO riakc get-hll
 -- TODO fix riakc put crdt (--nodes, --timeout overlap)
+--
+-- TODO riakc --help has (COMMAND | COMMAND | COMMAND) output...
+-- TODO riakc <command> --help shows top-level help
 
 module Main where
 
@@ -65,21 +68,12 @@ main = do
     config :: HandleConfig
     config =
       HandleConfig
-        { endpoint =
-            Endpoint
-              { address = host
-              , port = port
-              }
-        , retries =
-            0
-        , healthCheckInterval =
-            1
-        , idleTimeout =
-            60
-        , requestTimeout =
-            30
-        , connectTimeout =
-            10
+        { endpoint = Endpoint host port
+        , retries = 0
+        , healthCheckInterval = 1
+        , idleTimeout = 60
+        , requestTimeout = 30
+        , connectTimeout = 10
         , handlers =
             if verbose
               then
@@ -116,6 +110,7 @@ main = do
   createHandle config >>= run
 
   where
+    -- TODO riakc use --host / --port instead of env var
     parseHost :: IO (IPv4, Word16)
     parseHost =
       lookupEnv "RIAKC_HOST" >>= \case
@@ -194,9 +189,10 @@ commandParser =
 
     , hsubparser
         (mconcat
-          [ commandGroup "Search"
+          [ commandGroup "Search / Aggregate"
           , command "list" (info listParser (progDesc "List buckets or keys"))
           , command "query" (info queryParser (progDesc "Perform a secondary index query"))
+          , command "mapreduce-bucket" (info mapReduceBucketParser (progDesc "Perform a MapReduce job over all objects in a bucket"))
           , command "search" (info searchParser (progDesc "Perform a search"))
           , hidden
           ])
@@ -677,6 +673,32 @@ listParser =
         printKey :: Key -> IO ()
         printKey (Key _ _ key) =
           Text.putStrLn (decodeUtf8 key)
+
+mapReduceBucketParser :: Parser (Handle -> IO ())
+mapReduceBucketParser =
+  doMapReduceBucket
+    <$> bucketArgument
+    <*> many mapReducePhaseOption
+
+  where
+    doMapReduceBucket ::
+         Bucket
+      -> [MapReducePhase]
+      -> Handle
+      -> IO ()
+    doMapReduceBucket bucket phases handle =
+      mapReduceBucket
+        handle
+        bucket
+        phases
+        (Foldl.mapM_ print) >>= \case
+
+        Left err -> do
+          print err
+          exitFailure
+
+        Right () ->
+          pure ()
 
 pingParser :: Parser (Handle -> IO ())
 pingParser =
@@ -1438,6 +1460,31 @@ indexNameArgument =
 keyArgument :: Parser Key
 keyArgument =
   argument (eitherReader parseKey) keyMod
+
+-- TODO riakc better MapReducePhase parsing
+mapReducePhaseOption :: Parser MapReducePhase
+mapReducePhaseOption =
+  mapPhaseOption -- <|> reducePhaseOption
+
+  where
+    mapPhaseOption :: Parser MapReducePhase
+    mapPhaseOption =
+      option
+        (eitherReader parseMapPhase)
+        (help "Map phase" <> long "map" <> metavar "MODULE:FUNCTION")
+
+    parseMapPhase :: String -> Either String MapReducePhase
+    parseMapPhase string =
+      case splitOn ":" string of
+        [ modul, fun ] ->
+          Right
+            (MapPhase
+              (CompiledFunction (ErlangFunctionId (Text.pack modul) (Text.pack fun)))
+              (ErlAtomUtf8 "none")
+              True)
+
+        _ ->
+          Left "Expected: module:function"
 
 nodesOption :: Parser Natural
 nodesOption =

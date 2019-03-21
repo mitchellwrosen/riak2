@@ -19,6 +19,8 @@ This package contain low-level Riak bindings:
 * A [`Connection`](./libriak-internal/src/Libriak/Internal/Connection.hs) socket
   wrapper capable of sending and receiving length-prefixed packets.
 
+// TODO update libriak readme description
+
 They are intended to be a moderately usable interface to Riak, fully faithful to
 the exposed protobuf API. If you want to build a high level Riak library, you
 should be happy building it on top of `libriak`.

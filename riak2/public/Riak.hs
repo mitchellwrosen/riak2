@@ -165,6 +165,7 @@ module Riak
   , MapBucketProps(..)
   , MapReduceBucketError
   , MapReducePhase(..)
+  , MapReduceResult(..)
   , MayReturnBucketTypeDoesNotExist
   , MayReturnIndexDoesNotExist
   , MayReturnInvalidNodes

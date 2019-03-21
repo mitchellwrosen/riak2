@@ -1,3 +1,5 @@
+-- TODO per-request retries setting
+
 module RiakHandle
   ( Handle(..)
   , HandleConfig(..)

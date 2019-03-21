@@ -286,6 +286,7 @@ test-suite tests
     tasty,
     tasty-hunit,
     text,
+    vector,
 
   default-extensions:
     DataKinds

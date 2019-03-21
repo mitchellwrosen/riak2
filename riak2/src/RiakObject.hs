@@ -1,3 +1,6 @@
+-- TODO multiget?
+-- TODO multiput?
+
 module RiakObject where
 
 import RiakContent     (Content(..))

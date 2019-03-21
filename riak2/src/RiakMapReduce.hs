@@ -1,5 +1,4 @@
 -- TODO add modfun mapreduce
--- TODO mapreduce actually takes a list of inputs
 -- TODO mapreduce key filter
 
 module RiakMapReduce
@@ -41,18 +40,34 @@ import qualified Data.Vector     as Vector
 
 
 -- | Perform a MapReduce job over a list of keys.
---
--- TODO test mapReduceKeys
--- TODO MapReduceKeysError
 mapReduceKeys ::
      MonadIO m
   => Handle -- ^
   -> [Key] -- ^
   -> [MapReducePhase] -- ^
   -> FoldM IO MapReduceResult r -- ^
-  -> m (Either [HandleError] (Either ByteString r))
+  -> m (Either MapReduceKeysError r)
 mapReduceKeys handle keys phases responseFold = liftIO $
-  doMapReduce handle (MapReduceInputKeys keys) phases responseFold
+  fromResponse <$>
+    doMapReduce handle (MapReduceInputKeys keys) phases responseFold
+
+  where
+    fromResponse ::
+         Either [HandleError] (Either ByteString r)
+      -> Either MapReduceKeysError r
+    fromResponse = \case
+      Left err ->
+        Left (HandleError err)
+
+      Right (Left err) ->
+        Left (parseError err)
+
+      Right (Right result) ->
+        Right result
+
+    parseError :: ByteString -> MapReduceKeysError
+    parseError err =
+      UnknownError (decodeUtf8 err)
 
 -- | Perform a MapReduce job over all keys in a bucket.
 --

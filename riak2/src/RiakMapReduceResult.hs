@@ -7,4 +7,4 @@ data MapReduceResult
   = MapReduceResult
   { phase :: Natural
   , result :: ErlangTerm
-  } deriving stock (Generic, Show)
+  } deriving stock (Eq, Generic, Show)

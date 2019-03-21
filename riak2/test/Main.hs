@@ -21,7 +21,7 @@ import Test.Tasty.HUnit
 import qualified Control.Foldl         as Foldl
 import qualified Data.ByteString.Char8 as Latin1
 import qualified Data.Text             as Text
-import qualified Data.Text.IO          as Text
+import qualified Data.Vector           as Vector
 
 main :: IO ()
 main = do
@@ -40,9 +40,9 @@ main = do
         , connectTimeout = 10
         , handlers =
             mempty
-              { onSend = \req -> putStrLn (">>> " ++ show req)
-              , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
-              }
+              -- { onSend = \req -> putStrLn (">>> " ++ show req)
+              -- , onReceive = \resp -> putStrLn ("<<< " ++ show resp)
+              -- }
         }
 
 integrationTests :: Handle -> [TestTree]
@@ -724,17 +724,13 @@ riakMapReduceTests handle =
   [ testGroup "mapReduceKeys"
     [ testCase "success" $ do
         key <- randomObjectKey
-        put handle (emptyObject key) `shouldReturnSatisfy` isRight
-        mapReduceKeys
-          handle
-          [key]
-          [ MapPhase
-              (CompiledFunction (ErlangFunctionId "riak_kv_mapreduce" "map_identity"))
-              (ErlAtomUtf8 "none")
-              True
-          ]
-          (Foldl.mapM_ print) >>= print
-          -- (Foldl.mapM_ (Text.putStrLn . renderErlangTerm . view (field @"result"))) >>= print
+        value <- randomByteString 32
+        put handle (newObject key (newContent value)) `shouldReturnSatisfy` isRight
+        mapReduceKeys handle [key] [mapPhaseObjectValue] (Foldl.generalize Foldl.list) `shouldReturn`
+          Right [MapReduceResult
+            { phase = 0
+            , result = ErlList (Vector.fromList [ErlBinary value]) ErlNil
+            }]
     ]
   ]
 
@@ -1141,6 +1137,13 @@ emptySet key =
 emptyContent :: Content ByteString
 emptyContent =
   newContent mempty
+
+mapPhaseObjectValue :: MapReducePhase
+mapPhaseObjectValue =
+  MapPhase
+    (CompiledFunction (ErlangFunctionId "riak_kv_mapreduce" "map_object_value"))
+    (ErlAtomUtf8 "none")
+    True
 
 randomBucket :: IO Bucket
 randomBucket =
