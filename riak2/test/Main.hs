@@ -721,7 +721,29 @@ riakMapTests handle =
 
 riakMapReduceTests :: Handle -> [TestTree]
 riakMapReduceTests handle =
-  [ testGroup "mapReduceKeys"
+  [ testGroup "mapReduceBucket"
+    [ testCase "default bucket" $ do
+        key <- randomDefaultKey
+        value <- randomByteString 32
+        put handle (newObject key (newContent value)) `shouldReturnSatisfy` isRight
+        mapReduceBucket handle (key ^. keyBucket) [mapPhaseObjectValue] (Foldl.generalize Foldl.list) `shouldReturn`
+          Right [MapReduceResult
+            { phase = 0
+            , result = ErlList (Vector.fromList [ErlBinary value]) ErlNil
+            }]
+
+    , testCase "non-default bucket" $ do
+        key <- randomObjectKey
+        value <- randomByteString 32
+        put handle (newObject key (newContent value)) `shouldReturnSatisfy` isRight
+        mapReduceBucket handle (key ^. keyBucket) [mapPhaseObjectValue] (Foldl.generalize Foldl.list) `shouldReturn`
+          Right [MapReduceResult
+            { phase = 0
+            , result = ErlList (Vector.fromList [ErlBinary value]) ErlNil
+            }]
+    ]
+
+  , testGroup "mapReduceKeys"
     [ testCase "success" $ do
         key <- randomObjectKey
         value <- randomByteString 32

@@ -5,6 +5,7 @@ module RiakMapReduceInput
 
 import RiakBinaryIndexQuery (BinaryIndexQuery(..))
 import RiakBucket           (Bucket(..))
+import RiakBucketType       (defaultBucketType)
 import RiakErlangTerm       (ErlangTerm(..))
 import RiakIndexName        (IndexName(..))
 import RiakIntIndexQuery    (IntIndexQuery(..))
@@ -88,7 +89,9 @@ binaryIndexQueryToErlangTerm query@(BinaryIndexQuery { bucket, minValue, maxValu
 -- {T, B}
 bucketToErlangTerm :: Bucket -> ErlangTerm
 bucketToErlangTerm (Bucket bucketType bucket) =
-  Erlang.tuple2 (ErlBinary bucketType) (ErlBinary bucket)
+  if bucketType == defaultBucketType
+    then ErlBinary bucket
+    else Erlang.tuple2 (ErlBinary bucketType) (ErlBinary bucket)
 
 -- {index, {Type, Bucket}, Index, Key}
 exactQueryToErlangTerm :: Bucket -> ByteString -> ByteString -> ErlangTerm
