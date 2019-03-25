@@ -37,7 +37,7 @@ import qualified RiakBusPool    as BusPool
 import qualified RiakManagedBus as ManagedBus
 
 import Control.Foldl      (FoldM)
-import Control.Lens       ((.~))
+import Control.Lens       ((.~), (^.))
 import Data.Time          (NominalDiffTime)
 import Socket.Stream.IPv4 (Endpoint)
 
@@ -117,7 +117,7 @@ createHandle
 withManagedBus ::
      forall a.
      Handle
-  -> (ManagedBus -> IO (Either ManagedBusError (Either ByteString a)))
+  -> (ManagedBus -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a)))
   -> IO (Either [HandleError] (Either ByteString a))
 withManagedBus Handle { pool, retries } action =
   BusPool.withManagedBus pool go
@@ -154,8 +154,11 @@ withManagedBus Handle { pool, retries } action =
                 Left (ManagedBusDecodeError err) ->
                   loop (HandleDecodeError err : errs) (attempts+1)
 
-                Right response ->
-                  pure (Right response)
+                Right (Left response) ->
+                  pure (Right (Left (response ^. Proto.errmsg)))
+
+                Right (Right response) ->
+                  pure (Right (Right response))
 
 deleteIndex ::
      Handle
@@ -163,7 +166,8 @@ deleteIndex ::
   -> IO (Either [HandleError] (Either ByteString ()))
 deleteIndex handle name =
   withManagedBus handle $ \bus ->
-    ManagedBus.deleteIndex bus request
+    (fmap.fmap) (() <$)
+      (ManagedBus.deleteIndex bus request)
 
   where
     request :: Proto.RpbYokozunaIndexDeleteReq
@@ -274,7 +278,9 @@ ping ::
      Handle
   -> IO (Either [HandleError] (Either ByteString ()))
 ping handle =
-  withManagedBus handle ManagedBus.ping
+  withManagedBus handle $ \bus ->
+    (fmap.fmap) (() <$)
+      (ManagedBus.ping bus)
 
 put ::
      Handle
@@ -290,7 +296,8 @@ putIndex ::
   -> IO (Either [HandleError] (Either ByteString ()))
 putIndex handle request =
   withManagedBus handle $ \bus ->
-    ManagedBus.putIndex bus request
+    (fmap.fmap) (() <$)
+      (ManagedBus.putIndex bus request)
 
 putSchema ::
      Handle
@@ -298,7 +305,8 @@ putSchema ::
   -> IO (Either [HandleError] (Either ByteString ()))
 putSchema handle schema =
   withManagedBus handle $ \bus ->
-    ManagedBus.putSchema bus request
+    (fmap.fmap) (() <$)
+      (ManagedBus.putSchema bus request)
 
   where
     request :: Proto.RpbYokozunaSchemaPutReq
@@ -312,7 +320,8 @@ resetBucket ::
   -> IO (Either [HandleError] (Either ByteString ()))
 resetBucket handle request =
   withManagedBus handle $ \bus ->
-    ManagedBus.resetBucket bus request
+    (fmap.fmap) (() <$)
+      (ManagedBus.resetBucket bus request)
 
 setBucket ::
      Handle
@@ -320,7 +329,8 @@ setBucket ::
   -> IO (Either [HandleError] (Either ByteString ()))
 setBucket handle request =
   withManagedBus handle $ \bus ->
-    ManagedBus.setBucket bus request
+    (fmap.fmap) (() <$)
+      (ManagedBus.setBucket bus request)
 
 setBucketType ::
      Handle
@@ -328,7 +338,8 @@ setBucketType ::
   -> IO (Either [HandleError] (Either ByteString ()))
 setBucketType handle request =
   withManagedBus handle $ \bus ->
-    ManagedBus.setBucketType bus request
+    (fmap.fmap) (() <$)
+      (ManagedBus.setBucketType bus request)
 
 search ::
      Handle

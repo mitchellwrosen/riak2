@@ -111,6 +111,7 @@ import qualified RiakDebug      as Debug
 import Control.Concurrent.STM
 import Control.Exception.Safe (uninterruptibleMask, uninterruptibleMask_)
 import Control.Foldl          (FoldM)
+import Control.Lens           ((^.))
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
 import GHC.Conc               (registerDelay)
@@ -445,7 +446,7 @@ connect
     connectLoop timeoutVar seconds = do
       onConnectAttempt handlers ident
 
-      Handle.connect timeoutVar endpoint handleHandlers >>= \case
+      Handle.connect timeoutVar endpoint >>= \case
         Left err -> do
           onConnectFailure handlers ident err
 
@@ -484,14 +485,6 @@ connect
 
           when (idleTimeout > 0)
             (void (forkIO (monitorUsage managedBus generation)))
-
-    handleHandlers :: Handle.EventHandlers
-    handleHandlers =
-      Handle.EventHandlers
-        { Handle.onSend = onSend handlers
-        , Handle.onReceive = onReceive handlers
-        -- , Handle.onError = mempty -- FIXME
-        }
 
     ident :: Text
     ident =
@@ -564,7 +557,7 @@ monitorHealth
             Connecting -> undefined
             Connected _ Unhealthy -> undefined
 
-    maybePingLoop :: ByteString -> IO ()
+    maybePingLoop :: Proto.RpbErrorResp -> IO ()
     maybePingLoop err =
       atomicallyIO $
         whenGen generation generationVar $
@@ -806,7 +799,7 @@ atomicallyIO =
 deleteIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexDeleteReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbDelResp))
 deleteIndex bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -820,7 +813,7 @@ deleteIndex bus@(ManagedBus { requestTimeout }) request = do
 get ::
      ManagedBus
   -> Proto.RpbGetReq
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetResp))
 get bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -835,7 +828,7 @@ get bus@(ManagedBus { requestTimeout }) request = do
 getBucket ::
      ManagedBus -- ^
   -> Proto.RpbGetBucketReq -- ^
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetBucketResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetBucketResp))
 getBucket bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -849,7 +842,7 @@ getBucket bus@(ManagedBus { requestTimeout }) request = do
 getBucketType ::
      ManagedBus -- ^
   -> Proto.RpbGetBucketTypeReq -- ^
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetBucketResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetBucketResp))
 getBucketType bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -863,7 +856,7 @@ getBucketType bus@(ManagedBus { requestTimeout }) request = do
 getCrdt ::
      ManagedBus
   -> Proto.DtFetchReq
-  -> IO (Either ManagedBusError (Either ByteString Proto.DtFetchResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.DtFetchResp))
 getCrdt bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -877,7 +870,7 @@ getCrdt bus@(ManagedBus { requestTimeout }) request = do
 getIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexGetReq
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbYokozunaIndexGetResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbYokozunaIndexGetResp))
 getIndex bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -891,7 +884,7 @@ getIndex bus@(ManagedBus { requestTimeout }) request = do
 getSchema ::
      ManagedBus
   -> Proto.RpbYokozunaSchemaGetReq
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbYokozunaSchemaGetResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbYokozunaSchemaGetResp))
 getSchema bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -904,7 +897,7 @@ getSchema bus@(ManagedBus { requestTimeout }) request = do
 
 getServerInfo ::
      ManagedBus
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbGetServerInfoResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetServerInfoResp))
 getServerInfo bus@(ManagedBus { requestTimeout }) = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -919,7 +912,7 @@ listBuckets ::
      ManagedBus
   -> Proto.RpbListBucketsReq
   -> FoldM IO Proto.RpbListBucketsResp r
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
 listBuckets bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -934,7 +927,7 @@ listKeys ::
      ManagedBus
   -> Proto.RpbListKeysReq
   -> FoldM IO Proto.RpbListKeysResp r
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
 listKeys bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -949,7 +942,7 @@ mapReduce ::
      ManagedBus
   -> Proto.RpbMapRedReq
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
 mapReduce bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -962,7 +955,7 @@ mapReduce bus@(ManagedBus { requestTimeout }) request responseFold = do
 
 ping ::
      ManagedBus
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPingResp))
 ping bus@(ManagedBus { requestTimeout }) = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -976,7 +969,7 @@ ping bus@(ManagedBus { requestTimeout }) = do
 put ::
      ManagedBus
   -> Proto.RpbPutReq
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbPutResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPutResp))
 put bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -991,7 +984,7 @@ put bus@(ManagedBus { requestTimeout }) request = do
 putIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexPutReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPutResp))
 putIndex bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1005,7 +998,7 @@ putIndex bus@(ManagedBus { requestTimeout }) request = do
 putSchema ::
      ManagedBus
   -> Proto.RpbYokozunaSchemaPutReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPutResp))
 putSchema bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1019,7 +1012,7 @@ putSchema bus@(ManagedBus { requestTimeout }) request = do
 resetBucket ::
      ManagedBus
   -> Proto.RpbResetBucketReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbResetBucketResp))
 resetBucket bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1033,7 +1026,7 @@ resetBucket bus@(ManagedBus { requestTimeout }) request = do
 setBucket ::
      ManagedBus
   -> Proto.RpbSetBucketReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbSetBucketResp))
 setBucket bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1044,7 +1037,7 @@ setBucket bus@(ManagedBus { requestTimeout }) request = do
 setBucketType ::
      ManagedBus
   -> Proto.RpbSetBucketTypeReq
-  -> IO (Either ManagedBusError (Either ByteString ()))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbSetBucketResp))
 setBucketType bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1055,7 +1048,7 @@ setBucketType bus@(ManagedBus { requestTimeout }) request = do
 search ::
      ManagedBus
   -> Proto.RpbSearchQueryReq
-  -> IO (Either ManagedBusError (Either ByteString Proto.RpbSearchQueryResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbSearchQueryResp))
 search bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1070,7 +1063,7 @@ secondaryIndex ::
      ManagedBus
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
 secondaryIndex bus@(ManagedBus { requestTimeout }) request responseFold = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1086,7 +1079,7 @@ secondaryIndex bus@(ManagedBus { requestTimeout }) request responseFold = do
 updateCrdt ::
      ManagedBus -- ^
   -> Proto.DtUpdateReq -- ^
-  -> IO (Either ManagedBusError (Either ByteString Proto.DtUpdateResp))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.DtUpdateResp))
 updateCrdt bus@(ManagedBus { requestTimeout }) request = do
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
@@ -1121,8 +1114,8 @@ retrying ::
      forall r.
      TVar Bool
   -> (ByteString -> Bool)
-  -> IO (Either ManagedBusError (Either ByteString r))
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
 retrying timeoutVar shouldRetry action =
   retrying_ timeoutVar shouldRetry action (1*1000*1000)
 
@@ -1130,17 +1123,17 @@ retrying_ ::
      forall r.
      TVar Bool
   -> (ByteString -> Bool)
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
   -> Int
-  -> IO (Either ManagedBusError (Either ByteString r))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
 retrying_ timeoutVar shouldRetry action =
   loop
 
   where
-    loop :: Int -> IO (Either ManagedBusError (Either ByteString r))
+    loop :: Int -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
     loop sleepMicros = do
       action >>= \case
-        Right (Left err) | shouldRetry err -> do
+        Right (Left err) | shouldRetry (err ^. Proto.errmsg) -> do
           sleepVar :: TVar Bool <-
             registerDelay sleepMicros
 
@@ -1158,10 +1151,10 @@ retrying_ timeoutVar shouldRetry action =
 
 -- Translate "timeout" error to a managed bus timeout.
 translateTimeout ::
-     Either ManagedBusError (Either ByteString r)
-  -> Either ManagedBusError (Either ByteString r)
+     Either ManagedBusError (Either Proto.RpbErrorResp r)
+  -> Either ManagedBusError (Either Proto.RpbErrorResp r)
 translateTimeout = \case
-  Right (Left err) | isTimeoutError err ->
+  Right (Left err) | isTimeoutError (err ^. Proto.errmsg) ->
     Left ManagedBusTimeoutError
 
   result ->

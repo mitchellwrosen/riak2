@@ -2,7 +2,6 @@
 
 module Libriak.Handle
   ( Handle
-  , EventHandlers(..)
   , HandleError(..)
   , connect
   , softDisconnect
@@ -44,7 +43,6 @@ import Control.Concurrent.STM
 import Control.Foldl                      (FoldM(..))
 import Control.Lens                       ((^.))
 import Control.Monad                      (join)
-import Data.ByteString                    (ByteString)
 import Data.Function                      (on)
 import Data.Kind                          (Type)
 import Data.NF                            (NF, getNF, makeNF)
@@ -52,7 +50,6 @@ import Data.ProtoLens.Runtime.Lens.Labels (HasLens')
 import Socket.Stream.IPv4                 (CloseException, ConnectException(..),
                                            Endpoint(..), Interruptibility(..))
 
-import qualified Control.Foldl   as Foldl
 import qualified Data.Riak.Proto as Proto
 
 
@@ -63,7 +60,6 @@ data Handle
   , sendAsync :: Async ()
   , receiveAsync :: Async ()
   , queue :: TBQueue Item
-  , handlers :: EventHandlers
   }
 
 instance Eq Handle where
@@ -129,23 +125,6 @@ data HandleError :: Type where
   HandleDecodeError :: DecodeError -> HandleError
   deriving stock (Show)
 
-data EventHandlers
-  = EventHandlers
-  { onSend :: Request -> IO ()
-    -- ^ Called just prior to enqueuing a request. Must not throw an exception.
-  , onReceive :: Response -> IO ()
-  --   -- ^ Called just after receiving a response.
-  -- -- , onError :: HandleError -> IO ()
-  }
-
-instance Monoid EventHandlers where
-  mempty = EventHandlers mempty mempty -- mempty
-  mappend = (<>)
-
-instance Semigroup EventHandlers where
-  EventHandlers a1 b1 <> EventHandlers a2 b2 =
-    EventHandlers (a1 <> a2) (b1 <> b2) -- (c1 <> c2)
-
 -- | Acquire a handle.
 --
 -- This function must be called with asynchronous exceptions masked, and the
@@ -155,9 +134,8 @@ instance Semigroup EventHandlers where
 connect ::
      TVar Bool
   -> Endpoint
-  -> EventHandlers
   -> IO (Either (ConnectException 'Interruptible) Handle)
-connect timeoutVar endpoint handlers =
+connect timeoutVar endpoint =
   Connection.connect timeoutVar endpoint >>= \case
     Left err ->
       pure (Left err)
@@ -200,7 +178,6 @@ connect timeoutVar endpoint handlers =
         , sendAsync = sendAsync
         , receiveAsync = receiveAsync
         , queue = itemQueue
-        , handlers = handlers
         })
 
 sendThread ::
@@ -590,446 +567,268 @@ stream
 -- Riak API
 --------------------------------------------------------------------------------
 
-doExchange ::
-     (Response -> IO ())
-  -> (a -> Response)
-  -> IO (Either HandleError (Either Proto.RpbErrorResp a))
-  -> IO (Either HandleError (Either ByteString a))
-doExchange onReceive toResponse action =
-  action >>= \case
-    Left err ->
-      pure (Left err)
-
-    Right (Left response) -> do
-      onReceive (RespRpbError response)
-      pure (Right (Left (response ^. Proto.errmsg)))
-
-    Right (Right response) -> do
-      onReceive (toResponse response)
-      pure (Right (Right response))
-
 delete ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbDelReq -- ^
-  -> IO (Either HandleError (Either ByteString ()))
-delete timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbDel request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbDel
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbDel request)
-        decodeRpbDel))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbDelResp))
+delete timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbDel request)
+    decodeRpbDel
 
 deleteIndex ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbYokozunaIndexDeleteReq -- ^
-  -> IO (Either HandleError (Either ByteString ()))
-deleteIndex timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbYokozunaIndexDelete request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbDel
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbYokozunaIndexDelete request)
-        decodeRpbDel))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbDelResp))
+deleteIndex timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbYokozunaIndexDelete request)
+    decodeRpbDel
 
 get ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbGetReq -- ^
-  -> IO (Either HandleError (Either ByteString Proto.RpbGetResp))
-get timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbGet request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbGet
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbGet request)
-      decodeRpbGet)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbGetResp))
+get timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbGet request)
+    decodeRpbGet
 
 getBucket ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbGetBucketReq -- ^
-  -> IO (Either HandleError (Either ByteString Proto.RpbGetBucketResp))
-getBucket timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbGetBucket request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbGetBucket
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbGetBucket request)
-      decodeRpbGetBucket)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbGetBucketResp))
+getBucket timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbGetBucket request)
+    decodeRpbGetBucket
 
 getBucketType ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.RpbGetBucketTypeReq -- ^
-  -> IO (Either HandleError (Either ByteString Proto.RpbGetBucketResp))
-getBucketType timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbGetBucketType request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbGetBucket
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbGetBucketType request)
-      decodeRpbGetBucket)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbGetBucketResp))
+getBucketType timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbGetBucketType request)
+    decodeRpbGetBucket
 
 getCrdt ::
      TVar Bool -- ^
   -> Handle
   -> Proto.DtFetchReq
-  -> IO (Either HandleError (Either ByteString Proto.DtFetchResp))
-getCrdt timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqDtFetch request)
-
-  doExchange
-    (onReceive handlers)
-    RespDtFetch
-    (exchange
-      timeoutVar
-      handle
-      (encodeDtFetch request)
-      decodeDtFetch)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.DtFetchResp))
+getCrdt timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeDtFetch request)
+    decodeDtFetch
 
 getIndex ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaIndexGetReq
-  -> IO (Either HandleError (Either ByteString Proto.RpbYokozunaIndexGetResp))
-getIndex timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbYokozunaIndexGet request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbYokozunaIndexGet
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbYokozunaIndexGet request)
-      decodeRpbYokozunaIndexGet)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbYokozunaIndexGetResp))
+getIndex timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbYokozunaIndexGet request)
+    decodeRpbYokozunaIndexGet
 
 getSchema ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaSchemaGetReq
-  -> IO (Either HandleError (Either ByteString Proto.RpbYokozunaSchemaGetResp))
-getSchema timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbYokozunaSchemaGet request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbYokozunaSchemaGet
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbYokozunaSchemaGet request)
-      decodeRpbYokozunaSchemaGet)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbYokozunaSchemaGetResp))
+getSchema timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbYokozunaSchemaGet request)
+    decodeRpbYokozunaSchemaGet
 
 getServerInfo ::
      TVar Bool -- ^
   -> Handle
-  -> IO (Either HandleError (Either ByteString Proto.RpbGetServerInfoResp))
-getServerInfo timeoutVar handle@(Handle { handlers }) = do
-  onSend handlers (ReqRpbGetServerInfo request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbGetServerInfo
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbGetServerInfo request)
-      decodeRpbGetServerInfo)
-
-  where
-    request :: Proto.RpbGetServerInfoReq
-    request =
-      Proto.defMessage
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbGetServerInfoResp))
+getServerInfo timeoutVar handle =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbGetServerInfo Proto.defMessage)
+    decodeRpbGetServerInfo
 
 listBuckets ::
      TVar Bool
   -> Handle
   -> Proto.RpbListBucketsReq
   -> FoldM IO Proto.RpbListBucketsResp r
-  -> IO (Either HandleError (Either ByteString r))
-listBuckets timeoutVar handle@(Handle { handlers }) request responseFold = do
-  onSend handlers (ReqRpbListBuckets request)
-
-  doStream
-    (onReceive handlers)
-    RespRpbListBuckets
-    (stream
-      timeoutVar
-      handle
-      (encodeRpbListBuckets request)
-      decodeRpbListBuckets)
-    responseFold
-
-doStream ::
-     forall a r.
-     (Response -> IO ())
-  -> (a -> Response)
-  -> (FoldM IO a r -> IO (Either HandleError (Either Proto.RpbErrorResp r)))
-  -> FoldM IO a r
-  -> IO (Either HandleError (Either ByteString r))
-doStream onResponse toResponse action responseFold =
-  action responseFold' >>= \case
-    Left err ->
-      pure (Left err)
-
-    Right (Left response) -> do
-      onResponse (RespRpbError response)
-      pure (Right (Left (response ^. Proto.errmsg)))
-
-    Right (Right result) ->
-      pure (Right (Right result))
-
-  where
-    responseFold' :: FoldM IO a r
-    responseFold' = do
-      Foldl.premapM
-        (\response -> do
-          onResponse (toResponse response)
-          pure response)
-        responseFold
+  -> IO (Either HandleError (Either Proto.RpbErrorResp r))
+listBuckets timeoutVar handle request =
+  stream
+    timeoutVar
+    handle
+    (encodeRpbListBuckets request)
+    decodeRpbListBuckets
 
 listKeys ::
      TVar Bool
   -> Handle
   -> Proto.RpbListKeysReq
   -> FoldM IO Proto.RpbListKeysResp r
-  -> IO (Either HandleError (Either ByteString r))
-listKeys timeoutVar handle@(Handle { handlers }) request responseFold = do
-  onSend handlers (ReqRpbListKeys request)
-
-  doStream
-    (onReceive handlers)
-    RespRpbListKeys
-    (stream
-      timeoutVar
-      handle
-      (encodeRpbListKeys request)
-      decodeRpbListKeys)
-    responseFold
+  -> IO (Either HandleError (Either Proto.RpbErrorResp r))
+listKeys timeoutVar handle request =
+  stream
+    timeoutVar
+    handle
+    (encodeRpbListKeys request)
+    decodeRpbListKeys
 
 mapReduce ::
      TVar Bool
   -> Handle
   -> Proto.RpbMapRedReq
   -> FoldM IO Proto.RpbMapRedResp r
-  -> IO (Either HandleError (Either ByteString r))
-mapReduce timeoutVar handle@(Handle { handlers }) request responseFold = do
-  onSend handlers (ReqRpbMapRed request)
-
-  doStream
-    (onReceive handlers)
-    RespRpbMapRed
-    (stream
-      timeoutVar
-      handle
-      (encodeRpbMapRed request)
-      decodeRpbMapRed)
-    responseFold
+  -> IO (Either HandleError (Either Proto.RpbErrorResp r))
+mapReduce timeoutVar handle request =
+  stream
+    timeoutVar
+    handle
+    (encodeRpbMapRed request)
+    decodeRpbMapRed
 
 ping ::
      TVar Bool
   -> Handle
-  -> IO (Either HandleError (Either ByteString ()))
-ping timeoutVar handle@(Handle { handlers }) = do
-  onSend handlers (ReqRpbPing request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbPing
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbPing request)
-        decodeRpbPing))
-
-  where
-    request :: Proto.RpbPingReq
-    request =
-      Proto.defMessage
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbPingResp))
+ping timeoutVar handle =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbPing Proto.defMessage)
+    decodeRpbPing
 
 put ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbPutReq
-  -> IO (Either HandleError (Either ByteString Proto.RpbPutResp))
-put timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbPut request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbPut
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbPut request)
-      decodeRpbPut)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbPutResp))
+put timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbPut request)
+    decodeRpbPut
 
 putIndex ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaIndexPutReq
-  -> IO (Either HandleError (Either ByteString ()))
-putIndex timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbYokozunaIndexPut request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbPut
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbYokozunaIndexPut request)
-        decodeRpbPut))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbPutResp))
+putIndex timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbYokozunaIndexPut request)
+    decodeRpbPut
 
 putSchema ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbYokozunaSchemaPutReq
-  -> IO (Either HandleError (Either ByteString ()))
-putSchema timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbYokozunaSchemaPut request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbPut
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbYokozunaSchemaPut request)
-        decodeRpbPut))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbPutResp))
+putSchema timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbYokozunaSchemaPut request)
+    decodeRpbPut
 
 resetBucket ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbResetBucketReq
-  -> IO (Either HandleError (Either ByteString ()))
-resetBucket timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbResetBucket request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbResetBucket
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbResetBucket request)
-        decodeRpbResetBucket))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbResetBucketResp))
+resetBucket timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbResetBucket request)
+    decodeRpbResetBucket
 
 setBucket ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbSetBucketReq
-  -> IO (Either HandleError (Either ByteString ()))
-setBucket timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbSetBucket request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbSetBucket
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbSetBucket request)
-        decodeRpbSetBucket))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbSetBucketResp))
+setBucket timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbSetBucket request)
+    decodeRpbSetBucket
 
 setBucketType ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbSetBucketTypeReq
-  -> IO (Either HandleError (Either ByteString ()))
-setBucketType timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbSetBucketType request)
-
-  (fmap.fmap) (() <$)
-    (doExchange
-      (onReceive handlers)
-      RespRpbSetBucket
-      (exchange
-        timeoutVar
-        handle
-        (encodeRpbSetBucketType request)
-        decodeRpbSetBucket))
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbSetBucketResp))
+setBucketType timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbSetBucketType request)
+    decodeRpbSetBucket
 
 search ::
      TVar Bool -- ^
   -> Handle
   -> Proto.RpbSearchQueryReq
-  -> IO (Either HandleError (Either ByteString Proto.RpbSearchQueryResp))
-search timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqRpbSearchQuery request)
-
-  doExchange
-    (onReceive handlers)
-    RespRpbSearchQuery
-    (exchange
-      timeoutVar
-      handle
-      (encodeRpbSearchQuery request)
-      decodeRpbSearchQuery)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.RpbSearchQueryResp))
+search timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeRpbSearchQuery request)
+    decodeRpbSearchQuery
 
 secondaryIndex ::
      TVar Bool
   -> Handle
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
-  -> IO (Either HandleError (Either ByteString r))
-secondaryIndex timeoutVar handle@(Handle { handlers }) request responseFold = do
-  onSend handlers (ReqRpbIndex request)
-
-  doStream
-    (onReceive handlers)
-    RespRpbIndex
-    (stream
-      timeoutVar
-      handle
-      (encodeRpbIndex request)
-      decodeRpbIndex)
-    responseFold
+  -> IO (Either HandleError (Either Proto.RpbErrorResp r))
+secondaryIndex timeoutVar handle request =
+  stream
+    timeoutVar
+    handle
+    (encodeRpbIndex request)
+    decodeRpbIndex
 
 updateCrdt ::
      TVar Bool -- ^
   -> Handle -- ^
   -> Proto.DtUpdateReq -- ^
-  -> IO (Either HandleError (Either ByteString Proto.DtUpdateResp))
-updateCrdt timeoutVar handle@(Handle { handlers }) request = do
-  onSend handlers (ReqDtUpdate request)
-
-  doExchange
-    (onReceive handlers)
-    RespDtUpdate
-    (exchange
-      timeoutVar
-      handle
-      (encodeDtUpdate request)
-      decodeDtUpdate)
+  -> IO (Either HandleError (Either Proto.RpbErrorResp Proto.DtUpdateResp))
+updateCrdt timeoutVar handle request =
+  exchange
+    timeoutVar
+    handle
+    (encodeDtUpdate request)
+    decodeDtUpdate
