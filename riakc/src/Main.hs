@@ -11,6 +11,7 @@ module Main where
 import Riak
 
 import Control.Arrow         ((***))
+import Control.Concurrent    (threadDelay)
 import Control.Lens          (view, (.~), (^.))
 import Control.Monad         (replicateM_)
 import Data.ByteString       (ByteString)
@@ -93,9 +94,9 @@ main = do
                       \uuid -> Text.putStrLn ("// " <> uuid <> " disconnected")
 
                   , onSend =
-                      \msg -> putStrLn ("// >>> " ++ show msg)
+                      \uuid msg -> Text.putStrLn ("// " <> uuid <> " >>> " <> Text.pack (show msg))
                   , onReceive =
-                      \msg -> putStrLn ("// <<< " ++ show msg)
+                      \uuid msg -> Text.putStrLn ("// " <> uuid <> " <<< " <> Text.pack (show msg))
 
                   , onConnectionError =
                       \ex -> putStrLn ("// *** " ++ show ex)
@@ -711,7 +712,7 @@ pingParser =
   where
     doPing :: Int -> Handle -> IO ()
     doPing n handle =
-      replicateM_ n $
+      replicateM_ n $ do
         ping handle >>= \case
           Left err ->
             print err
@@ -721,6 +722,8 @@ pingParser =
 
           Right (Right ()) ->
             pure ()
+
+        threadDelay (1*1000*1000)
 
 putParser :: Parser (Handle -> IO ())
 putParser =

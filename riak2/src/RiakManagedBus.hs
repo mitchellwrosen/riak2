@@ -64,9 +64,12 @@
 -- socket
 --
 -- TODO replace undefined with more informative "state machine error"
+--
+-- TODO why is timeoutVar threaded?
 
 module RiakManagedBus
   ( ManagedBus
+  , BusId
   , ManagedBusConfig(..)
   , EventHandlers(..)
   , ManagedBusError(..)
@@ -96,8 +99,7 @@ module RiakManagedBus
   ) where
 
 import Libriak.Connection (ConnectionError)
-import Libriak.Request    (Request)
-import Libriak.Response   (DecodeError, Response)
+import Libriak.Response   (DecodeError)
 import RiakError          (isAllNodesDownError, isDwValUnsatisfiedError,
                            isInsufficientVnodesError0,
                            isInsufficientVnodesError1, isOverloadError,
@@ -110,7 +112,7 @@ import qualified RiakDebug      as Debug
 
 import Control.Concurrent.STM
 import Control.Exception.Safe (uninterruptibleMask, uninterruptibleMask_)
-import Control.Foldl          (FoldM)
+import Control.Foldl          (FoldM(..))
 import Control.Lens           ((^.))
 import Data.Fixed             (Fixed(..))
 import Data.Time.Clock        (NominalDiffTime, nominalDiffTimeToSeconds)
@@ -139,6 +141,9 @@ data ManagedBus
   , lastUsedRef :: IORef Word64
     -- ^ The last time the bus was used.
   }
+
+type BusId
+  = Text
 
 data State :: Type where
   Disconnected :: State
@@ -176,22 +181,22 @@ data ManagedBusError :: Type where
 
 data EventHandlers
   = EventHandlers
-  { onConnectAttempt :: Text -> IO ()
-  , onConnectFailure :: Text -> ConnectException 'Interruptible -> IO ()
-  , onConnectSuccess :: Text -> IO ()
+  { onConnectAttempt :: BusId -> IO ()
+  , onConnectFailure :: BusId -> ConnectException 'Interruptible -> IO ()
+  , onConnectSuccess :: BusId -> IO ()
 
-  , onDisconnectAttempt :: Text -> IO ()
-  , onDisconnectFailure :: Text -> CloseException -> IO ()
-  , onDisconnectSuccess :: Text -> IO ()
+    -- TODO add disconnect reason argument
+  , onDisconnectAttempt :: BusId -> IO ()
+  , onDisconnectFailure :: BusId -> CloseException -> IO ()
+  , onDisconnectSuccess :: BusId -> IO ()
 
-    -- TODO uuid onSend/onReceive
-  , onSend :: Request -> IO ()
-  , onReceive :: Response -> IO ()
+  , onSend :: forall a. (Proto.Message a, Show a) => Text -> a -> IO ()
+  , onReceive :: forall a. (Proto.Message a, Show a) => Text -> a -> IO ()
 
     -- TODO use onConnectionError
   , onConnectionError :: ConnectionError -> IO ()
 
-  , onIdleTimeout :: Text -> IO ()
+  , onIdleTimeout :: BusId -> IO ()
   }
 
 instance Monoid EventHandlers where
@@ -251,8 +256,11 @@ withHandle ::
      forall a.
      TVar Bool
   -> ManagedBus
-  -> (TVar Bool -> Handle.Handle -> IO (Either Handle.HandleError a))
-  -> IO (Either ManagedBusError a)
+  -> ( BusId
+    -> TVar Bool
+    -> Handle.Handle
+    -> IO (Either Handle.HandleError (Either Proto.RpbErrorResp a)))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
 withHandle
     timeoutVar
     managedBus@(ManagedBus { generationVar, lastUsedRef, stateVar, uuid })
@@ -261,7 +269,7 @@ withHandle
   mainLoop
 
   where
-    mainLoop :: IO (Either ManagedBusError a)
+    mainLoop :: IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
     mainLoop =
       -- Mask because if we transition from Disconnected to Connected, we *must*
       -- successfully fork the connect thread
@@ -290,14 +298,14 @@ withHandle
               pure (unmask (disconnectingWait generation))
 
     withHealthyHandle ::
-        Word64
+         Word64
       -> Handle.Handle
-      -> IO (Either ManagedBusError a)
+      -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
     withHealthyHandle generation handle = do
       writeIORef lastUsedRef =<<
         getMonotonicTimeNSec
 
-      callback timeoutVar handle >>= \case
+      callback (makeId uuid generation) timeoutVar handle >>= \case
         Left err -> do
           -- Mask because if we transition from Connected to Disconnecting,
           -- we *must* sucessfully fork the connect thread
@@ -347,7 +355,9 @@ withHandle
         Right result ->
           pure (Right result)
 
-    connectingWait :: Word64 -> IO (Either ManagedBusError a)
+    connectingWait ::
+         Word64
+      -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
     connectingWait generation =
       atomicallyIO $
         blockUntilRequestTimeout
@@ -369,7 +379,9 @@ withHandle
             Disconnected ->
               pure (pure (Left ManagedBusTimeoutError)))
 
-    unhealthyWait :: Word64 -> IO (Either ManagedBusError a)
+    unhealthyWait ::
+         Word64
+      -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
     unhealthyWait generation =
       atomicallyIO $
         blockUntilRequestTimeout
@@ -388,7 +400,9 @@ withHandle
             Connecting -> undefined
             Disconnected -> undefined)
 
-    disconnectingWait :: Word64 -> IO (Either ManagedBusError a)
+    disconnectingWait ::
+         Word64
+      -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
     disconnectingWait generation =
       atomicallyIO $
         blockUntilRequestTimeout
@@ -400,16 +414,17 @@ withHandle
             then retry
             else pure mainLoop)
 
-    blockUntilRequestTimeout :: STM (IO (Either ManagedBusError a))
+    blockUntilRequestTimeout ::
+         STM (IO (Either ManagedBusError (Either Proto.RpbErrorResp a)))
     blockUntilRequestTimeout =
       readTVar timeoutVar >>= \case
         False -> retry
         True -> pure (pure (Left ManagedBusTimeoutError))
 
     retryIfNewGeneration ::
-        Word64
-      -> STM (IO (Either ManagedBusError a))
-      -> STM (IO (Either ManagedBusError a))
+         Word64
+      -> STM (IO (Either ManagedBusError (Either Proto.RpbErrorResp a)))
+      -> STM (IO (Either ManagedBusError (Either Proto.RpbErrorResp a)))
     retryIfNewGeneration expectedGen action = do
       actualGen <- readTVar generationVar
       if actualGen == expectedGen
@@ -796,300 +811,253 @@ atomicallyIO =
 -- Libriak.Handle wrappers
 --------------------------------------------------------------------------------
 
-deleteIndex ::
-     ManagedBus
-  -> Proto.RpbYokozunaIndexDeleteReq
-  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbDelResp))
-deleteIndex bus@(ManagedBus { requestTimeout }) request = do
+exchange ::
+     ( Proto.Message a
+     , Proto.Message b
+     , Show a
+     , Show b
+     )
+  => ManagedBus
+  -> a
+  -> (ByteString -> Bool)
+  -> ( TVar Bool
+    -> Handle.Handle
+    -> a
+    -> IO (Either Handle.HandleError (Either Proto.RpbErrorResp b)))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp b))
+exchange
+    bus@(ManagedBus { handlers, requestTimeout })
+    request
+    shouldRetry
+    performRequest = do
+
   timeoutVar :: TVar Bool <-
     registerDelay requestTimeout
 
   retrying
     timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.deleteIndex timeoutVar handle request)
+    shouldRetry
+    (withHandle timeoutVar bus $ \ident timeoutVar handle -> do
+      onSend handlers ident request
+
+      performRequest timeoutVar handle request >>= \case
+        Left err ->
+          pure (Left err)
+
+        Right response -> do
+          either (onReceive handlers ident) (onReceive handlers ident) response
+          pure (Right response))
+
+stream ::
+     forall a b r.
+     ( Proto.Message a
+     , Proto.Message b
+     , Show a
+     , Show b
+     )
+  => ManagedBus
+  -> a
+  -> FoldM IO b r
+  -> (ByteString -> Bool)
+  -> ( TVar Bool
+    -> Handle.Handle
+    -> a
+    -> FoldM IO b r
+    -> IO (Either Handle.HandleError (Either Proto.RpbErrorResp r)))
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
+stream
+    bus@(ManagedBus { handlers, requestTimeout })
+    request
+    (FoldM step initial extract)
+    shouldRetry
+    performRequest = do
+
+  timeoutVar :: TVar Bool <-
+    registerDelay requestTimeout
+
+  retrying
+    timeoutVar
+    shouldRetry
+    (withHandle timeoutVar bus $ \ident timeoutVar handle -> do
+      onSend handlers ident request
+      performRequest timeoutVar handle request (responseFold ident))
+
+  where
+    responseFold :: BusId -> FoldM IO b r
+    responseFold ident =
+      FoldM
+        (\acc response -> do
+          onReceive handlers ident response
+          step acc response)
+        initial
+        extract
+
+deleteIndex ::
+     ManagedBus
+  -> Proto.RpbYokozunaIndexDeleteReq
+  -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbDelResp))
+deleteIndex bus request =
+  exchange bus request isUnknownMessageCodeError Handle.deleteIndex
 
 get ::
      ManagedBus
   -> Proto.RpbGetReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetResp))
-get bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    getReqShouldRetry
-    (translateTimeout <$>
-      (withHandle timeoutVar bus $ \timeoutVar handle ->
-        Handle.get timeoutVar handle request))
+get bus request =
+  translateTimeout <$>
+    exchange bus request getReqShouldRetry Handle.get
 
 getBucket ::
      ManagedBus -- ^
   -> Proto.RpbGetBucketReq -- ^
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetBucketResp))
-getBucket bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.getBucket timeoutVar handle request)
+getBucket bus request = do
+  exchange bus request isUnknownMessageCodeError Handle.getBucket
 
 getBucketType ::
      ManagedBus -- ^
   -> Proto.RpbGetBucketTypeReq -- ^
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetBucketResp))
-getBucketType bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.getBucketType timeoutVar handle request)
+getBucketType bus request =
+  exchange bus request isUnknownMessageCodeError Handle.getBucketType
 
 getCrdt ::
      ManagedBus
   -> Proto.DtFetchReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.DtFetchResp))
-getCrdt bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    getReqShouldRetry
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.getCrdt timeoutVar handle request)
+getCrdt bus request =
+  exchange bus request getReqShouldRetry Handle.getCrdt
 
 getIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexGetReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbYokozunaIndexGetResp))
-getIndex bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.getIndex timeoutVar handle request)
+getIndex bus request =
+  exchange bus request isUnknownMessageCodeError Handle.getIndex
 
 getSchema ::
      ManagedBus
   -> Proto.RpbYokozunaSchemaGetReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbYokozunaSchemaGetResp))
-getSchema bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.getSchema timeoutVar handle request)
+getSchema bus request =
+  exchange bus request isUnknownMessageCodeError Handle.getSchema
 
 getServerInfo ::
      ManagedBus
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbGetServerInfoResp))
-getServerInfo bus@(ManagedBus { requestTimeout }) = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
+getServerInfo bus =
+  exchange
+    bus
+    (Proto.defMessage :: Proto.RpbGetServerInfoReq)
     isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.getServerInfo timeoutVar handle)
+    (\timeoutVar handle _ -> Handle.getServerInfo timeoutVar handle)
 
 listBuckets ::
      ManagedBus
   -> Proto.RpbListBucketsReq
   -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
-listBuckets bus@(ManagedBus { requestTimeout }) request responseFold = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.listBuckets timeoutVar handle request responseFold)
+listBuckets bus request responseFold =
+  stream bus request responseFold isUnknownMessageCodeError Handle.listBuckets
 
 listKeys ::
      ManagedBus
   -> Proto.RpbListKeysReq
   -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
-listKeys bus@(ManagedBus { requestTimeout }) request responseFold = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.listKeys timeoutVar handle request responseFold)
+listKeys bus request responseFold =
+  stream bus request responseFold isUnknownMessageCodeError Handle.listKeys
 
 mapReduce ::
      ManagedBus
   -> Proto.RpbMapRedReq
   -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
-mapReduce bus@(ManagedBus { requestTimeout }) request responseFold = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.mapReduce timeoutVar handle request responseFold)
+mapReduce bus request responseFold =
+  stream bus request responseFold isUnknownMessageCodeError Handle.mapReduce
 
 ping ::
      ManagedBus
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPingResp))
-ping bus@(ManagedBus { requestTimeout }) = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
+ping bus =
+  exchange
+    bus
+    (Proto.defMessage :: Proto.RpbPingReq)
     isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle -> do
-      Handle.ping timeoutVar handle)
+    (\timeoutVar handle _ -> Handle.ping timeoutVar handle)
 
 put ::
      ManagedBus
   -> Proto.RpbPutReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPutResp))
-put bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    putReqShouldRetry
-    (translateTimeout <$>
-      (withHandle timeoutVar bus $ \timeoutVar handle ->
-        Handle.put timeoutVar handle request))
+put bus request =
+  translateTimeout <$>
+    exchange bus request putReqShouldRetry Handle.put
 
 putIndex ::
      ManagedBus
   -> Proto.RpbYokozunaIndexPutReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPutResp))
-putIndex bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.putIndex timeoutVar handle request)
+putIndex bus request =
+  exchange bus request isUnknownMessageCodeError Handle.putIndex
 
 putSchema ::
      ManagedBus
   -> Proto.RpbYokozunaSchemaPutReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbPutResp))
-putSchema bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.putSchema timeoutVar handle request)
+putSchema bus request =
+  exchange bus request isUnknownMessageCodeError Handle.putSchema
 
 resetBucket ::
      ManagedBus
   -> Proto.RpbResetBucketReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbResetBucketResp))
-resetBucket bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.resetBucket timeoutVar handle request)
+resetBucket bus request =
+  exchange bus request isUnknownMessageCodeError Handle.resetBucket
 
 setBucket ::
      ManagedBus
   -> Proto.RpbSetBucketReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbSetBucketResp))
-setBucket bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.setBucket timeoutVar handle request
+setBucket bus request =
+  -- TODO can we see UnknownMessageCode on setBucket(Type)?
+  exchange bus request (const False) Handle.setBucket
 
 setBucketType ::
      ManagedBus
   -> Proto.RpbSetBucketTypeReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbSetBucketResp))
-setBucketType bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  withHandle timeoutVar bus $ \timeoutVar handle ->
-    Handle.setBucketType timeoutVar handle request
+setBucketType bus request =
+  exchange bus request (const False) Handle.setBucketType
 
 search ::
      ManagedBus
   -> Proto.RpbSearchQueryReq
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.RpbSearchQueryResp))
-search bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    isUnknownMessageCodeError
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.search timeoutVar handle request)
+search bus request =
+  exchange bus request isUnknownMessageCodeError Handle.search
 
 secondaryIndex ::
      ManagedBus
   -> Proto.RpbIndexReq
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp r))
-secondaryIndex bus@(ManagedBus { requestTimeout }) request responseFold = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
+secondaryIndex bus request responseFold =
+  stream bus request responseFold shouldRetry Handle.secondaryIndex
 
-  retrying
-    timeoutVar
-    (\err ->
+  where
+    shouldRetry :: ByteString -> Bool
+    shouldRetry err =
       isInsufficientVnodesError0 err ||
-      isUnknownMessageCodeError err)
-    (withHandle timeoutVar bus $ \timeoutVar handle ->
-      Handle.secondaryIndex timeoutVar handle request responseFold)
+      isUnknownMessageCodeError err
 
 updateCrdt ::
      ManagedBus -- ^
   -> Proto.DtUpdateReq -- ^
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp Proto.DtUpdateResp))
-updateCrdt bus@(ManagedBus { requestTimeout }) request = do
-  timeoutVar :: TVar Bool <-
-    registerDelay requestTimeout
-
-  retrying
-    timeoutVar
-    putReqShouldRetry
-    (translateTimeout <$>
-      (withHandle timeoutVar bus $ \timeoutVar handle ->
-        Handle.updateCrdt timeoutVar handle request))
+updateCrdt bus request =
+  translateTimeout <$>
+    exchange bus request putReqShouldRetry Handle.updateCrdt
 
 -- TODO sleep for variable time depending on exact error?
 

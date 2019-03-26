@@ -1,6 +1,6 @@
 module Libriak.Request
-  ( Request(..)
-  , EncodedRequest(..)
+  ( -- Request(..)
+    EncodedRequest(..)
   , encodeDtFetch
   , encodeDtUpdate
   , encodeRpbDel
