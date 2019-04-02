@@ -13,7 +13,7 @@ import Riak
 import Control.Arrow         ((***))
 import Control.Concurrent    (threadDelay)
 import Control.Lens          (view, (.~), (^.))
-import Control.Monad         (replicateM_)
+import Control.Monad         (when)
 import Data.ByteString       (ByteString)
 import Data.Fixed            (Fixed(..))
 import Data.Foldable         (asum, for_, traverse_)
@@ -712,7 +712,7 @@ pingParser =
   where
     doPing :: Int -> Handle -> IO ()
     doPing n handle =
-      replicateM_ n $ do
+      for_ [1..n] $ \i -> do
         ping handle >>= \case
           Left err ->
             print err
@@ -723,7 +723,7 @@ pingParser =
           Right (Right ()) ->
             pure ()
 
-        threadDelay (1*1000*1000)
+        when (i /= n) (threadDelay (1*1000*1000))
 
 putParser :: Parser (Handle -> IO ())
 putParser =
