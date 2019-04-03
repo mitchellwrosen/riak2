@@ -196,6 +196,7 @@ library riak2-internal
     RiakBucket
     RiakBucketProps
     RiakBucketType
+    RiakBus
     RiakBusPool
     RiakContent
     RiakContext
@@ -214,10 +215,9 @@ library riak2-internal
     RiakIndex
     RiakIndexName
     RiakIntIndexQuery
+    RiakKey
     RiakListBucketsOpts
     RiakListKeysOpts
-    RiakKey
-    RiakManagedBus
     RiakMap
     RiakMapBucketProps
     RiakMapReduce

@@ -28,13 +28,13 @@ module RiakHandle
   , updateCrdt
   ) where
 
+import RiakBus         (Bus, BusError(..), EventHandlers(..))
 import RiakBusPool     (BusPool, createBusPool)
 import RiakHandleError (HandleError(..))
-import RiakManagedBus  (EventHandlers(..), ManagedBus, ManagedBusError(..))
 import RiakUtils       (difftimeToMicros)
 
-import qualified RiakBusPool    as BusPool
-import qualified RiakManagedBus as ManagedBus
+import qualified RiakBus     as Bus
+import qualified RiakBusPool as BusPool
 
 import Control.Foldl      (FoldM)
 import Control.Lens       ((.~), (^.))
@@ -114,16 +114,16 @@ createHandle
     }
 
 -- TODO on failure, pick a different connection
-withManagedBus ::
+withBus ::
      forall a.
      Handle
-  -> (ManagedBus -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a)))
+  -> (Bus -> IO (Either BusError (Either Proto.RpbErrorResp a)))
   -> IO (Either [HandleError] (Either ByteString a))
-withManagedBus Handle { pool, retries } action =
-  BusPool.withManagedBus pool go
+withBus Handle { pool, retries } action =
+  BusPool.withBus pool go
 
   where
-    go :: ManagedBus -> IO (Either [HandleError] (Either ByteString a))
+    go :: Bus -> IO (Either [HandleError] (Either ByteString a))
     go bus =
       loop [] 0
 
@@ -139,19 +139,19 @@ withManagedBus Handle { pool, retries } action =
 
             else
               action bus >>= \case
-                Left ManagedBusTimeoutError ->
+                Left BusTimeoutError ->
                   loop (HandleTimeoutError : errs) (attempts+1)
 
                 -- Ignore pipeline error, it wasn't our fault
-                Left ManagedBusPipelineError ->
+                Left BusPipelineError ->
                   loop errs attempts
 
-                Left (ManagedBusConnectionError err) ->
+                Left (BusConnectionError err) ->
                   loop (HandleConnectionError err : errs) (attempts+1)
 
                 -- Weird to treat a decode error (very unexpected) like a
                 -- connection error (expected)
-                Left (ManagedBusDecodeError err) ->
+                Left (BusDecodeError err) ->
                   loop (HandleDecodeError err : errs) (attempts+1)
 
                 Right (Left response) ->
@@ -165,9 +165,9 @@ deleteIndex ::
   -> ByteString
   -> IO (Either [HandleError] (Either ByteString ()))
 deleteIndex handle name =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.deleteIndex bus request)
+      (Bus.deleteIndex bus request)
 
   where
     request :: Proto.RpbYokozunaIndexDeleteReq
@@ -180,24 +180,24 @@ get ::
   -> Proto.RpbGetReq
   -> IO (Either [HandleError] (Either ByteString Proto.RpbGetResp))
 get handle request =
-  withManagedBus handle $ \bus ->
-    ManagedBus.get bus request
+  withBus handle $ \bus ->
+    Bus.get bus request
 
 getBucket ::
      Handle -- ^
   -> Proto.RpbGetBucketReq -- ^
   -> IO (Either [HandleError] (Either ByteString Proto.RpbGetBucketResp))
 getBucket handle request =
-  withManagedBus handle $ \bus ->
-    ManagedBus.getBucket bus request
+  withBus handle $ \bus ->
+    Bus.getBucket bus request
 
 getBucketType ::
      Handle -- ^
   -> ByteString -- ^ Bucket type
   -> IO (Either [HandleError] (Either ByteString Proto.RpbGetBucketResp))
 getBucketType handle bucketType =
-  withManagedBus handle $ \bus ->
-    ManagedBus.getBucketType bus request
+  withBus handle $ \bus ->
+    Bus.getBucketType bus request
 
   where
     request :: Proto.RpbGetBucketTypeReq
@@ -210,16 +210,16 @@ getCrdt ::
   -> Proto.DtFetchReq
   -> IO (Either [HandleError] (Either ByteString Proto.DtFetchResp))
 getCrdt handle request =
-  withManagedBus handle $ \bus ->
-    ManagedBus.getCrdt bus request
+  withBus handle $ \bus ->
+    Bus.getCrdt bus request
 
 getIndex ::
      Handle
   -> Maybe ByteString
   -> IO (Either [HandleError] (Either ByteString Proto.RpbYokozunaIndexGetResp))
 getIndex handle name =
-  withManagedBus handle $ \bus ->
-    ManagedBus.getIndex bus request
+  withBus handle $ \bus ->
+    Bus.getIndex bus request
 
   where
     request :: Proto.RpbYokozunaIndexGetReq
@@ -232,8 +232,8 @@ getSchema ::
   -> ByteString
   -> IO (Either [HandleError] (Either ByteString Proto.RpbYokozunaSchemaGetResp))
 getSchema handle name =
-  withManagedBus handle $ \bus ->
-    ManagedBus.getSchema bus request
+  withBus handle $ \bus ->
+    Bus.getSchema bus request
 
   where
     request :: Proto.RpbYokozunaSchemaGetReq
@@ -245,7 +245,7 @@ getServerInfo ::
      Handle
   -> IO (Either [HandleError] (Either ByteString Proto.RpbGetServerInfoResp))
 getServerInfo handle =
-  withManagedBus handle ManagedBus.getServerInfo
+  withBus handle Bus.getServerInfo
 
 listBuckets ::
      Handle
@@ -253,8 +253,8 @@ listBuckets ::
   -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either [HandleError] (Either ByteString r))
 listBuckets handle request responseFold =
-  withManagedBus handle $ \bus ->
-    ManagedBus.listBuckets bus request responseFold
+  withBus handle $ \bus ->
+    Bus.listBuckets bus request responseFold
 
 listKeys ::
      Handle
@@ -262,8 +262,8 @@ listKeys ::
   -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either [HandleError] (Either ByteString r))
 listKeys handle request responseFold =
-  withManagedBus handle $ \bus ->
-    ManagedBus.listKeys bus request responseFold
+  withBus handle $ \bus ->
+    Bus.listKeys bus request responseFold
 
 mapReduce ::
      Handle
@@ -271,42 +271,42 @@ mapReduce ::
   -> FoldM IO Proto.RpbMapRedResp r
   -> IO (Either [HandleError] (Either ByteString r))
 mapReduce handle request responseFold =
-  withManagedBus handle $ \bus ->
-    ManagedBus.mapReduce bus request responseFold
+  withBus handle $ \bus ->
+    Bus.mapReduce bus request responseFold
 
 ping ::
      Handle
   -> IO (Either [HandleError] (Either ByteString ()))
 ping handle =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.ping bus)
+      (Bus.ping bus)
 
 put ::
      Handle
   -> Proto.RpbPutReq
   -> IO (Either [HandleError] (Either ByteString Proto.RpbPutResp))
 put handle request =
-  withManagedBus handle $ \bus ->
-    ManagedBus.put bus request
+  withBus handle $ \bus ->
+    Bus.put bus request
 
 putIndex ::
      Handle
   -> Proto.RpbYokozunaIndexPutReq
   -> IO (Either [HandleError] (Either ByteString ()))
 putIndex handle request =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.putIndex bus request)
+      (Bus.putIndex bus request)
 
 putSchema ::
      Handle
   -> Proto.RpbYokozunaSchema
   -> IO (Either [HandleError] (Either ByteString ()))
 putSchema handle schema =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.putSchema bus request)
+      (Bus.putSchema bus request)
 
   where
     request :: Proto.RpbYokozunaSchemaPutReq
@@ -319,35 +319,35 @@ resetBucket ::
   -> Proto.RpbResetBucketReq
   -> IO (Either [HandleError] (Either ByteString ()))
 resetBucket handle request =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.resetBucket bus request)
+      (Bus.resetBucket bus request)
 
 setBucket ::
      Handle
   -> Proto.RpbSetBucketReq
   -> IO (Either [HandleError] (Either ByteString ()))
 setBucket handle request =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.setBucket bus request)
+      (Bus.setBucket bus request)
 
 setBucketType ::
      Handle
   -> Proto.RpbSetBucketTypeReq
   -> IO (Either [HandleError] (Either ByteString ()))
 setBucketType handle request =
-  withManagedBus handle $ \bus ->
+  withBus handle $ \bus ->
     (fmap.fmap) (() <$)
-      (ManagedBus.setBucketType bus request)
+      (Bus.setBucketType bus request)
 
 search ::
      Handle
   -> Proto.RpbSearchQueryReq
   -> IO (Either [HandleError] (Either ByteString Proto.RpbSearchQueryResp))
 search handle request =
-  withManagedBus handle $ \bus ->
-    ManagedBus.search bus request
+  withBus handle $ \bus ->
+    Bus.search bus request
 
 secondaryIndex ::
      Handle
@@ -355,13 +355,13 @@ secondaryIndex ::
   -> FoldM IO Proto.RpbIndexResp r
   -> IO (Either [HandleError] (Either ByteString r))
 secondaryIndex handle request responseFold =
-  withManagedBus handle $ \bus ->
-    ManagedBus.secondaryIndex bus request responseFold
+  withBus handle $ \bus ->
+    Bus.secondaryIndex bus request responseFold
 
 updateCrdt ::
      Handle -- ^
   -> Proto.DtUpdateReq -- ^
   -> IO (Either [HandleError] (Either ByteString Proto.DtUpdateResp))
 updateCrdt handle request =
-  withManagedBus handle $ \bus ->
-    ManagedBus.updateCrdt bus request
+  withBus handle $ \bus ->
+    Bus.updateCrdt bus request

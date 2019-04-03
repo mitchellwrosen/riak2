@@ -1,13 +1,12 @@
--- | A pool of managed buses.
+-- | A pool of buses.
 
 module RiakBusPool
   ( BusPool
   , createBusPool
-  , withManagedBus
+  , withBus
   ) where
 
-import RiakManagedBus (EventHandlers, ManagedBus, ManagedBusConfig(..),
-                       createManagedBus)
+import RiakBus (Bus, BusConfig(..), EventHandlers, createBus)
 
 import Data.Hashable      (hash)
 import Data.Vector        (Vector, (!))
@@ -19,7 +18,7 @@ import qualified Data.Vector as Vector
 -- TODO pool finalizer
 data BusPool
   = BusPool
-  { pool :: Vector ManagedBus
+  { pool :: Vector Bus
   }
 
 -- TODO bus pool config type
@@ -39,18 +38,18 @@ createBusPool
     endpoint healthCheckInterval idleTimeout requestTimeout connectTimeout
     handlers = do
 
-  pool :: Vector ManagedBus <-
+  pool :: Vector Bus <-
     Vector.generateM
       256 -- TODO configure bus pool size
-      (\uuid -> createManagedBus (makeManagedBusConfig uuid))
+      (\uuid -> createBus (makeBusConfig uuid))
 
   pure BusPool
     { pool = pool }
 
   where
-    makeManagedBusConfig :: Int -> ManagedBusConfig
-    makeManagedBusConfig uuid =
-      ManagedBusConfig
+    makeBusConfig :: Int -> BusConfig
+    makeBusConfig uuid =
+      BusConfig
         { uuid = uuid
         , endpoint = endpoint
         , healthCheckInterval = healthCheckInterval
@@ -68,11 +67,11 @@ createBusPool
 -- current time     20ns
 -- mwc-random       20ns
 -- random          185ns
-withManagedBus ::
+withBus ::
      BusPool
-  -> (ManagedBus -> IO a)
+  -> (Bus -> IO a)
   -> IO a
-withManagedBus BusPool { pool } callback = do
+withBus BusPool { pool } callback = do
   threadId :: ThreadId <-
     myThreadId
 
