@@ -13,6 +13,8 @@ executable riakc
     generic-lens,
     ip,
     lens,
+    -- TODO dont depend on libriak from riakc
+    libriak,
     optparse-applicative,
     riak2,
     riak-protobuf,

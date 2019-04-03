@@ -1,10 +1,13 @@
 module Riak.Handle
   ( Handle
   , HandleConfig(..)
-  , EventHandlers(..)
   , HandleError(..)
+  , DecodeError(..)
+  , DisconnectReason(..)
+  , EventHandlers(..)
   , createHandle
   ) where
 
+import Libriak.Response (DecodeError(..))
 import RiakHandle
-import RiakHandleError (HandleError(..))
+import RiakHandleError  (HandleError(..))

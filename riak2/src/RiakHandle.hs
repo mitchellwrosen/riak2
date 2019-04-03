@@ -3,6 +3,7 @@
 module RiakHandle
   ( Handle(..)
   , HandleConfig(..)
+  , DisconnectReason(..)
   , EventHandlers(..)
   , createHandle
   , deleteIndex
@@ -28,13 +29,15 @@ module RiakHandle
   , updateCrdt
   ) where
 
-import RiakBus         (Bus, BusError(..), EventHandlers(..))
+import RiakBus         (Bus, BusError(..), DisconnectReason(..),
+                        EventHandlers(..))
 import RiakBusPool     (BusPool, createBusPool)
 import RiakHandleError (HandleError(..))
 import RiakUtils       (difftimeToMicros)
 
-import qualified RiakBus     as Bus
-import qualified RiakBusPool as BusPool
+import qualified RiakBus         as Bus
+import qualified RiakBusPool     as BusPool
+import qualified RiakHandleError as HandleError
 
 import Control.Foldl      (FoldM)
 import Control.Lens       ((.~), (^.))
@@ -147,7 +150,7 @@ withBus Handle { pool, retries } action =
                   loop errs attempts
 
                 Left (BusConnectionError err) ->
-                  loop (HandleConnectionError err : errs) (attempts+1)
+                  loop (HandleError.fromConnectionError err : errs) (attempts+1)
 
                 -- Weird to treat a decode error (very unexpected) like a
                 -- connection error (expected)

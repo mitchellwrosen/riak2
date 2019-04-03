@@ -133,7 +133,9 @@ module Riak
   , renderErlangTerm
   , Error(..)
   , EventHandlers(..)
+  , DecodeError(..)
   , DeleteIndexError
+  , DisconnectReason(..)
   , GetBucketError
   , GetBucketTypeError
   , GetCounterError
@@ -221,8 +223,9 @@ import Riak.ErlangFunction
 import Riak.ErlangFunctionId
 import Riak.ErlangTerm
 import Riak.Error
-import Riak.Handle                (EventHandlers(..), Handle, HandleConfig(..),
-                                   HandleError, createHandle)
+import Riak.Handle                (DecodeError(..), DisconnectReason(..),
+                                   EventHandlers(..), Handle, HandleConfig(..),
+                                   HandleError(..), createHandle)
 import Riak.Index
 import Riak.IntIndexQuery         (IntIndexQuery(..))
 import Riak.Key

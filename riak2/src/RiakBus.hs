@@ -58,9 +58,6 @@
 --   After disconnecting,
 --     ==> [Connecting]
 
--- TODO if request times out before it's even sent we don't have to close the
--- socket
---
 -- TODO replace undefined with more informative "state machine error"
 
 module RiakBus
@@ -68,6 +65,7 @@ module RiakBus
   , BusId
   , BusConfig(..)
   , BusError(..)
+  , DisconnectReason(..)
   , EventHandlers(..)
   , createBus
     -- * API
@@ -166,7 +164,9 @@ data BusConfig
   } deriving stock (Show)
 
 data BusError :: Type where
-  -- | The bus timed out waiting to become ready to accept requests.
+  -- | A "graceful" timeout occurred: either the request timed out before it was
+  -- even made, or Riak responded with a "timeout" error. The bus is still fine
+  -- to use.
   BusTimeoutError :: BusError
   BusPipelineError :: BusError
   -- | A connection error occurred during a send or receive.
@@ -175,14 +175,18 @@ data BusError :: Type where
   BusDecodeError :: DecodeError -> BusError
   deriving stock (Show)
 
+data DisconnectReason
+  = DisconnectDueToIdleTimeout
+  -- TODO flatten handle errors here
+  | DisconnectDueToHandleError Handle.HandleError
+
 data EventHandlers
   = EventHandlers
   { onConnectAttempt :: BusId -> IO ()
   , onConnectFailure :: BusId -> ConnectException 'Interruptible -> IO ()
   , onConnectSuccess :: BusId -> IO ()
 
-    -- TODO add disconnect reason argument
-  , onDisconnectAttempt :: BusId -> IO ()
+  , onDisconnectAttempt :: BusId -> DisconnectReason -> IO ()
   , onDisconnectFailure :: BusId -> CloseException -> IO ()
   , onDisconnectSuccess :: BusId -> IO ()
 
@@ -312,12 +316,11 @@ withHandle
                     writeTVar stateVar Disconnecting
 
                     pure . void . forkIO $ do
-                      debug uuid generation ("request failed: " ++ show err)
-
                       disconnect
                         Handle.hardDisconnect
                         generation
                         handle
+                        (DisconnectDueToHandleError err)
                         bus
 
                       atomically $ do
@@ -477,9 +480,16 @@ connect
         registerDelay requestTimeout
 
       Handle.ping timeoutVar handle >>= \case
-        Left _ -> do
-          disconnect Handle.hardDisconnect generation handle bus
+        Left err -> do
+          disconnect
+            Handle.hardDisconnect
+            generation
+            handle
+            (DisconnectDueToHandleError err)
+            bus
+
           sleep seconds
+
           connectLoop timeoutVar (seconds * 2)
 
         Right (Left _) -> do
@@ -533,11 +543,11 @@ monitorHealth
                             writeTVar stateVar Disconnecting
 
                             pure $ do
-                              debug uuid generation ("health check failed: " ++ show err)
                               disconnect
                                 Handle.hardDisconnect
                                 generation
                                 handle
+                                (DisconnectDueToHandleError err)
                                 bus
 
                               atomically $ do
@@ -608,12 +618,11 @@ monitorHealth
                             writeTVar stateVar Disconnecting
 
                             pure $ do
-                              debug uuid generation ("ping failed: " ++ show err)
-
                               disconnect
                                 Handle.hardDisconnect
                                 generation
                                 handle
+                                (DisconnectDueToHandleError err)
                                 bus
 
                               atomically $ do
@@ -722,6 +731,7 @@ monitorUsage
                           Handle.softDisconnect
                           generation
                           handle
+                          DisconnectDueToIdleTimeout
                           bus
 
                         atomically $ do
@@ -765,10 +775,11 @@ disconnect ::
      (Handle.Handle -> IO (Either CloseException ()))
   -> Word64
   -> Handle.Handle
+  -> DisconnectReason
   -> Bus
   -> IO ()
-disconnect doDisconnect generation handle Bus { handlers, uuid } = do
-  onDisconnectAttempt handlers ident
+disconnect doDisconnect generation handle reason Bus { handlers, uuid } = do
+  onDisconnectAttempt handlers ident reason
 
   doDisconnect handle >>= \case
     Left err -> onDisconnectFailure handlers ident err

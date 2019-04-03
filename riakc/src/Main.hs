@@ -10,6 +10,9 @@ module Main where
 
 import Riak
 
+import qualified Libriak.Connection as Libriak (ConnectionError(..))
+import qualified Libriak.Handle     as Libriak (HandleError(..))
+
 import Control.Arrow         ((***))
 import Control.Concurrent    (threadDelay)
 import Control.Lens          (view, (.~), (^.))
@@ -80,29 +83,45 @@ main = do
               then
                 EventHandlers
                   { onConnectAttempt =
-                      \uuid -> Text.putStrLn ("// " <> uuid <> " connecting")
+                      \uuid ->
+                        Text.putStrLn ("// " <> uuid <> " connecting")
+
                   , onConnectFailure =
-                      \uuid ex -> Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+                      \uuid ex ->
+                        Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+
                   , onConnectSuccess =
-                      \uuid -> Text.putStrLn ("// " <> uuid <> " connected")
+                      \uuid ->
+                        Text.putStrLn ("// " <> uuid <> " connected")
 
                   , onDisconnectAttempt =
-                      \uuid -> Text.putStrLn ("// " <> uuid <> " disconnecting")
+                      \uuid reason ->
+                        Text.putStrLn $
+                          "// " <> uuid <> " disconnecting (" <>
+                            renderDisconnectReason reason <> ")"
+
                   , onDisconnectFailure =
-                      \uuid ex -> Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+                      \uuid ex ->
+                        Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+
                   , onDisconnectSuccess =
-                      \uuid -> Text.putStrLn ("// " <> uuid <> " disconnected")
+                      \uuid ->
+                        Text.putStrLn ("// " <> uuid <> " disconnected")
 
                   , onSend =
-                      \uuid msg -> Text.putStrLn ("// " <> uuid <> " >>> " <> Text.pack (show msg))
+                      \uuid msg ->
+                        Text.putStrLn ("// " <> uuid <> " >>> " <> Text.pack (show msg))
                   , onReceive =
-                      \uuid msg -> Text.putStrLn ("// " <> uuid <> " <<< " <> Text.pack (show msg))
+                      \uuid msg ->
+                        Text.putStrLn ("// " <> uuid <> " <<< " <> Text.pack (show msg))
 
                   , onConnectionError =
-                      \ex -> putStrLn ("// *** " ++ show ex)
+                      \ex ->
+                        putStrLn ("// *** " ++ show ex)
 
                   , onIdleTimeout =
-                      \uuid -> Text.putStrLn ("// " <> uuid <> " idle time out")
+                      \uuid ->
+                        Text.putStrLn ("// " <> uuid <> " idle time out")
                   }
               else
                 mempty
@@ -141,6 +160,35 @@ main = do
     localhost :: IPv4
     localhost =
       ipv4 127 0 0 1
+
+    renderDisconnectReason :: DisconnectReason -> Text
+    renderDisconnectReason = \case
+      DisconnectDueToIdleTimeout ->
+        "idle timeout"
+      DisconnectDueToHandleError err ->
+        renderHandleError err
+
+    renderHandleError :: Libriak.HandleError -> Text
+    renderHandleError = \case
+      Libriak.HandleClosedError ->
+        "handle closed"
+      Libriak.HandleConnectionError Libriak.LocalShutdown ->
+        "local shutdown"
+      Libriak.HandleConnectionError Libriak.RemoteReset ->
+        "remote reset"
+      Libriak.HandleConnectionError Libriak.RemoteShutdown ->
+        "remote shutdown"
+      Libriak.HandleConnectionError Libriak.RemoteTimeout ->
+        "request timeout"
+      Libriak.HandleDecodeError err ->
+        renderDecodeError err
+
+    renderDecodeError :: DecodeError -> Text
+    renderDecodeError = \case
+      ProtobufDecodeError{} ->
+        "decode error"
+      UnexpectedResponse{} ->
+        "unexpected message code"
 
 nodeParser :: Parser (IPv4, Word16)
 nodeParser =
