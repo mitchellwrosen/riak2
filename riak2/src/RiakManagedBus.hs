@@ -64,8 +64,6 @@
 -- socket
 --
 -- TODO replace undefined with more informative "state machine error"
---
--- TODO why is timeoutVar threaded?
 
 module RiakManagedBus
   ( ManagedBus
@@ -257,7 +255,6 @@ withHandle ::
      TVar Bool
   -> ManagedBus
   -> ( BusId
-    -> TVar Bool
     -> Handle.Handle
     -> IO (Either Handle.HandleError (Either Proto.RpbErrorResp a)))
   -> IO (Either ManagedBusError (Either Proto.RpbErrorResp a))
@@ -305,7 +302,7 @@ withHandle
       writeIORef lastUsedRef =<<
         getMonotonicTimeNSec
 
-      callback (makeId uuid generation) timeoutVar handle >>= \case
+      callback (makeId uuid generation) handle >>= \case
         Left err -> do
           -- Mask because if we transition from Connected to Disconnecting,
           -- we *must* sucessfully fork the connect thread
@@ -837,7 +834,7 @@ exchange
   retrying
     timeoutVar
     shouldRetry
-    (withHandle timeoutVar bus $ \ident timeoutVar handle -> do
+    (withHandle timeoutVar bus $ \ident handle -> do
       onSend handlers ident request
 
       performRequest timeoutVar handle request >>= \case
@@ -878,7 +875,7 @@ stream
   retrying
     timeoutVar
     shouldRetry
-    (withHandle timeoutVar bus $ \ident timeoutVar handle -> do
+    (withHandle timeoutVar bus $ \ident handle -> do
       onSend handlers ident request
       performRequest timeoutVar handle request (responseFold ident))
 
