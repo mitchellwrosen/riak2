@@ -115,10 +115,6 @@ main = do
                       \uuid msg ->
                         Text.putStrLn ("// " <> uuid <> " <<< " <> Text.pack (show msg))
 
-                  , onConnectionError =
-                      \ex ->
-                        putStrLn ("// *** " ++ show ex)
-
                   , onIdleTimeout =
                       \uuid ->
                         Text.putStrLn ("// " <> uuid <> " idle time out")

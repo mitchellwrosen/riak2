@@ -193,23 +193,20 @@ data EventHandlers
   , onSend :: forall a. (Proto.Message a, Show a) => Text -> a -> IO ()
   , onReceive :: forall a. (Proto.Message a, Show a) => Text -> a -> IO ()
 
-    -- TODO use onConnectionError
-  , onConnectionError :: ConnectionError -> IO ()
-
   , onIdleTimeout :: BusId -> IO ()
   }
 
 instance Monoid EventHandlers where
   mempty = EventHandlers mempty mempty mempty mempty mempty mempty mempty mempty
-                         mempty mempty
+                         mempty
   mappend = (<>)
 
 instance Semigroup EventHandlers where
-  EventHandlers a1 b1 c1 d1 e1 f1 g1 h1 i1 j1 <>
-    EventHandlers a2 b2 c2 d2 e2 f2 g2 h2 i2 j2 =
+  EventHandlers a1 b1 c1 d1 e1 f1 g1 h1 i1 <>
+    EventHandlers a2 b2 c2 d2 e2 f2 g2 h2 i2 =
 
     EventHandlers (a1 <> a2) (b1 <> b2) (c1 <> c2) (d1 <> d2) (e1 <> e2)
-                  (f1 <> f2) (g1 <> g2) (h1 <> h2) (i1 <> i2) (j1 <> j2)
+                  (f1 <> f2) (g1 <> g2) (h1 <> h2) (i1 <> i2)
 
 instance Show EventHandlers where
   show _ =
