@@ -371,6 +371,11 @@ isNonCounterOperationOnDefaultBucketError :: ByteString -> Bool
 isNonCounterOperationOnDefaultBucketError =
   (== "\"non-counter operation on default bucket\"")
 
+-- | https://github.com/basho/yokozuna/blob/e15fe64f9ef9318c0cc21754f3dfdd073d2dc77d/include/yokozuna.hrl#L212
+isNotEnoughNodesAreUpToServiceThisRequestError :: ByteString -> Bool
+isNotEnoughNodesAreUpToServiceThisRequestError =
+  (== "Not enough nodes are up to service this request.")
+
 isNotfoundError :: ByteString -> Bool
 isNotfoundError =
   (== "notfound")
@@ -411,8 +416,8 @@ isSchemaDoesNotExistError :: ByteString -> Bool
 isSchemaDoesNotExistError =
   (== "Schema not found")
 
-isSearchFailedError :: ByteString -> Bool
-isSearchFailedError =
+isQueryUnsuccessfulCheckTheLogsError :: ByteString -> Bool
+isQueryUnsuccessfulCheckTheLogsError =
   (== "Query unsuccessful check the logs.")
 
 isSecondaryIndexesNotSupportedError :: ByteString -> Bool

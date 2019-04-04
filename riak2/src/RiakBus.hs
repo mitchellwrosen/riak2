@@ -96,10 +96,12 @@ import Libriak.Connection (ConnectionError)
 import Libriak.Response   (DecodeError)
 import RiakError          (isAllNodesDownError, isDwValUnsatisfiedError,
                            isInsufficientVnodesError0,
-                           isInsufficientVnodesError1, isOverloadError,
-                           isPrValUnsatisfiedError, isPwValUnsatisfiedError,
-                           isRValUnsatisfiedError, isTimeoutError,
-                           isUnknownMessageCodeError, isWValUnsatisfiedError)
+                           isInsufficientVnodesError1,
+                           isNotEnoughNodesAreUpToServiceThisRequestError,
+                           isOverloadError, isPrValUnsatisfiedError,
+                           isPwValUnsatisfiedError, isRValUnsatisfiedError,
+                           isTimeoutError, isUnknownMessageCodeError,
+                           isWValUnsatisfiedError)
 
 import qualified Libriak.Handle as Handle
 import qualified RiakDebug      as Debug
@@ -1037,7 +1039,13 @@ search ::
   -> Proto.RpbSearchQueryReq
   -> IO (Either BusError (Either Proto.RpbErrorResp Proto.RpbSearchQueryResp))
 search bus request =
-  exchange bus request isUnknownMessageCodeError Handle.search
+  exchange
+    bus
+    request
+    (\err ->
+      isNotEnoughNodesAreUpToServiceThisRequestError err ||
+      isUnknownMessageCodeError err)
+    Handle.search
 
 secondaryIndex ::
      Bus

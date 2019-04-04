@@ -99,7 +99,7 @@ parseSearchError :: IndexName -> ByteString -> SearchError
 parseSearchError index err
   | isIndexDoesNotExistError1 err =
       IndexDoesNotExistError index
-  | isSearchFailedError err =
+  | isQueryUnsuccessfulCheckTheLogsError err =
       SearchFailedError
   | otherwise =
       UnknownError (decodeUtf8 err)
