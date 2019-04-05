@@ -962,7 +962,13 @@ listBuckets ::
   -> FoldM IO Proto.RpbListBucketsResp r
   -> IO (Either BusError (Either Proto.RpbErrorResp r))
 listBuckets bus request responseFold =
-  stream bus request responseFold isUnknownMessageCodeError Handle.listBuckets
+  translateTimeout <$>
+    stream
+      bus
+      request
+      responseFold
+      isUnknownMessageCodeError
+      Handle.listBuckets
 
 listKeys ::
      Bus
@@ -970,7 +976,13 @@ listKeys ::
   -> FoldM IO Proto.RpbListKeysResp r
   -> IO (Either BusError (Either Proto.RpbErrorResp r))
 listKeys bus request responseFold =
-  stream bus request responseFold isUnknownMessageCodeError Handle.listKeys
+  translateTimeout <$>
+    stream
+      bus
+      request
+      responseFold
+      isUnknownMessageCodeError
+      Handle.listKeys
 
 mapReduce ::
      Bus
