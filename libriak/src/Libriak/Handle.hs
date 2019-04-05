@@ -100,7 +100,8 @@ data Item :: Type where
     => TVar Bool
     -> NF EncodedRequest
     -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
-    -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+    -> TMVar HandleError
+    -> TQueue (Either Proto.RpbErrorResp response)
     -> Item
 
 data SentItem :: Type where
@@ -113,7 +114,8 @@ data SentItem :: Type where
        HasLens' response "done" Bool
     => TVar Bool
     -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
-    -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+    -> TMVar HandleError
+    -> TQueue (Either Proto.RpbErrorResp response)
     -> SentItem
 
 data HandleError :: Type where
@@ -235,14 +237,11 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
               (writeTQueue sentItemQueue (Exchange' timeoutVar responseVar))
             next
 
-      Stream timeoutVar request decodeResponse responseQueue ->
+      Stream timeoutVar request decodeResponse errorVar responseQueue ->
         Connection.send connection (getNF request) >>= \case
           Left err ->
             atomically $ do
-              writeTQueue
-                responseQueue
-                (Left (HandleConnectionError err))
-
+              putTMVar errorVar (HandleConnectionError err)
               healthyToUnhealthy stateVar
 
           Right () -> do
@@ -254,6 +253,7 @@ sendThread stateVar streamingVar itemQueue sentItemQueue connection =
                 (Stream'
                   timeoutVar
                   decodeResponse
+                  errorVar
                   responseQueue)
 
             join . atomically $
@@ -328,8 +328,8 @@ receiveThread stateVar streamingVar sentItemQueue connection =
             atomically (putTMVar responseVar (Right response))
             next
 
-      Stream' timeoutVar decodeResponse responseQueue -> do
-        streamResponse next timeoutVar decodeResponse responseQueue
+      Stream' timeoutVar decodeResponse errorVar responseQueue -> do
+        streamResponse next timeoutVar decodeResponse errorVar responseQueue
 
     streamResponse ::
          forall response.
@@ -337,9 +337,10 @@ receiveThread stateVar streamingVar sentItemQueue connection =
       => IO ()
       -> TVar Bool
       -> (EncodedResponse -> Either DecodeError (Either Proto.RpbErrorResp response))
-      -> TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+      -> TMVar HandleError
+      -> TQueue (Either Proto.RpbErrorResp response)
       -> IO ()
-    streamResponse next timeoutVar decodeResponse responseQueue =
+    streamResponse next timeoutVar decodeResponse errorVar responseQueue =
       receiveLoop
 
       where
@@ -348,26 +349,24 @@ receiveThread stateVar streamingVar sentItemQueue connection =
           Connection.receive timeoutVar connection >>= \case
             Left err ->
               atomically $ do
-                writeTQueue responseQueue (Left (HandleConnectionError err))
+                putTMVar errorVar (HandleConnectionError err)
                 healthyToUnhealthy stateVar
 
             Right response ->
               case decodeResponse response of
                 Left err ->
-                  -- TODO Hrm, thread that called 'stream' might see
-                  -- Disconnected before its own decode error... ;(
                   atomically $ do
-                    writeTQueue responseQueue (Left (HandleDecodeError err))
+                    putTMVar errorVar (HandleDecodeError err)
                     healthyToUnhealthy stateVar
 
                 Right (Left response) -> do
                   atomically $ do
-                    writeTQueue responseQueue (Right (Left response))
+                    writeTQueue responseQueue (Left response)
                     writeTVar streamingVar False
                   next
 
                 Right (Right response) -> do
-                  atomically (writeTQueue responseQueue (Right (Right response)))
+                  atomically (writeTQueue responseQueue (Right response))
 
                   if response ^. Proto.done
                     then do
@@ -503,7 +502,10 @@ stream
 
   readTVarIO stateVar >>= \case
     Healthy -> do
-      responseQueue :: TQueue (Either HandleError (Either Proto.RpbErrorResp response)) <-
+      errorVar :: TMVar HandleError <-
+        newEmptyTMVarIO
+
+      responseQueue :: TQueue (Either Proto.RpbErrorResp response) <-
         newTQueueIO
 
       atomically
@@ -513,37 +515,39 @@ stream
             timeoutVar
             (makeNF request)
             decodeResponse
+            errorVar
             responseQueue))
 
-      processResponse responseQueue
+      processResponse errorVar responseQueue
 
     Unhealthy      -> pure (Left HandleClosedError)
     Disconnected _ -> pure (Left HandleClosedError)
 
   where
     processResponse ::
-         TQueue (Either HandleError (Either Proto.RpbErrorResp response))
+         TMVar HandleError
+      -> TQueue (Either Proto.RpbErrorResp response)
       -> IO (Either HandleError (Either Proto.RpbErrorResp r))
-    processResponse responseQueue =
+    processResponse errorVar responseQueue =
       initial >>= loop
 
       where
         loop :: x -> IO (Either HandleError (Either Proto.RpbErrorResp r))
         loop acc =
           join . atomically $
+            (pure . Left <$>
+              readTMVar errorVar)
+            <|>
             (do
-              response :: Either HandleError (Either Proto.RpbErrorResp response) <-
+              response :: Either Proto.RpbErrorResp response <-
                 readTQueue responseQueue
 
               pure $
                 case response of
-                  Left err ->
-                    pure (Left err)
-
-                  Right (Left response) ->
+                  Left response ->
                     pure (Right (Left response))
 
-                  Right (Right response) -> do
+                  Right response -> do
                     acc' :: x <-
                       step acc response
 
