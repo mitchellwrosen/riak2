@@ -164,7 +164,9 @@ module Riak
   , keyKeySegment
   , generatedKey
   , ListBucketsError
+  , ListBucketsOpts(..)
   , ListKeysError
+  , ListKeysOpts(..)
   , MapBucketProps(..)
   , MapReduceBucketError
   , MapReducePhase(..)

@@ -25,6 +25,7 @@ module RiakBucket
   , listKeysWith
   , streamKeys
   , streamKeysWith
+  , ListKeysOpts(..)
 
   , fromProto
   ) where

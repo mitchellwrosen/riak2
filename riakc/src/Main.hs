@@ -722,21 +722,22 @@ infoParser =
       Right (Right (ServerInfo name version)) -> do
         Text.putStrLn (name <> " " <> version)
 
--- TODO riakc list buckets/keys timeout
 listParser :: Parser (Handle -> IO ())
 listParser =
   doList
     <$> bucketTypeOrBucketArgument
+    <*> optional timeoutOption
 
   where
     doList ::
          Either BucketType Bucket
+      -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doList bucketTypeOrBucket handle =
+    doList bucketTypeOrBucket timeout handle =
       case bucketTypeOrBucket of
         Left bucketType ->
-          streamBuckets handle bucketType (Foldl.mapM_ printBucket) >>= \case
+          streamBucketsWith handle bucketType (Foldl.mapM_ printBucket) listBucketsOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -745,7 +746,7 @@ listParser =
               pure ()
 
         Right bucket ->
-          streamKeys handle bucket (Foldl.mapM_ printKey) >>= \case
+          streamKeysWith handle bucket (Foldl.mapM_ printKey) listKeysOpts >>= \case
             Left err -> do
               print err
               exitFailure
@@ -754,6 +755,18 @@ listParser =
               pure ()
 
       where
+        listBucketsOpts :: ListBucketsOpts
+        listBucketsOpts =
+          ListBucketsOpts
+            { timeout = timeout
+            }
+
+        listKeysOpts :: ListKeysOpts
+        listKeysOpts =
+          ListKeysOpts
+            { timeout = timeout
+            }
+
         printBucket :: Bucket -> IO ()
         printBucket (Bucket _ bucket) =
           Text.putStrLn (decodeUtf8 bucket)

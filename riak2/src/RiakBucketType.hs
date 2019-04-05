@@ -12,6 +12,7 @@ module RiakBucketType
   , listBucketsWith
   , streamBuckets
   , streamBucketsWith
+  , ListBucketsOpts(..)
 
   , coerceGetBucketError
   , fromProto

@@ -14,6 +14,7 @@ module Riak.BucketType
     -- * Full key traversals
   , listBuckets
   , streamBuckets
+  , ListBucketsOpts(..)
     -- ** *With variants
   , listBucketsWith
   , streamBucketsWith

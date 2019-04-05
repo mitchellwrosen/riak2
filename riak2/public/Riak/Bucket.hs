@@ -21,6 +21,7 @@ module Riak.Bucket
     -- * Full key traversals
   , listKeys
   , streamKeys
+  , ListKeysOpts(..)
     -- ** *With variants
   , listKeysWith
   , streamKeysWith
