@@ -413,6 +413,7 @@ getBucketParser =
 
             printBackend backend
             printConflictResolution conflictResolution
+            printDatatype ""
             printIndex index
             printNodes nodes
             printPostcommitHooks postcommitHooks
@@ -422,11 +423,63 @@ getBucketParser =
             printWriteOnce writeOnce
             printWriteQuorum writeQuorum
 
-          -- TODO riakc prettier bucket prop printing
-          SomeCounterBucketProps props -> print props
-          SomeHyperLogLogBucketProps props -> print props
-          SomeMapBucketProps props -> print props
-          SomeSetBucketProps props -> print props
+          SomeCounterBucketProps
+              CounterBucketProps { backend, index, nodes, postcommitHooks,
+                                   precommitHooks, readQuorum, writeQuorum
+                                 } -> do
+
+            printBackend backend
+            printDatatype "counter"
+            printIndex index
+            printNodes nodes
+            printPostcommitHooks postcommitHooks
+            printPrecommitHooks precommitHooks
+            printReadQuorum readQuorum
+            printWriteQuorum writeQuorum
+
+          SomeHyperLogLogBucketProps
+              HyperLogLogBucketProps { backend, index, nodes, postcommitHooks,
+                                       precision, precommitHooks, readQuorum,
+                                       writeQuorum
+                                     } -> do
+
+            printBackend backend
+            printDatatype "hll"
+            printIndex index
+            printNodes nodes
+            printPostcommitHooks postcommitHooks
+            printPrecision precision
+            printPrecommitHooks precommitHooks
+            printReadQuorum readQuorum
+            printWriteQuorum writeQuorum
+
+          SomeMapBucketProps
+              MapBucketProps { backend, index, nodes, postcommitHooks,
+                               precommitHooks, readQuorum, writeQuorum
+                             } -> do
+
+            printBackend backend
+            printDatatype "map"
+            printIndex index
+            printNodes nodes
+            printPostcommitHooks postcommitHooks
+            printPrecommitHooks precommitHooks
+            printReadQuorum readQuorum
+            printWriteQuorum writeQuorum
+
+          SomeSetBucketProps
+              SetBucketProps { backend, index, nodes, postcommitHooks,
+                               precommitHooks, readQuorum, writeQuorum
+                             } -> do
+
+            printBackend backend
+            printDatatype "set"
+            printIndex index
+            printNodes nodes
+            printPostcommitHooks postcommitHooks
+            printPrecommitHooks precommitHooks
+            printReadQuorum readQuorum
+            printWriteQuorum writeQuorum
 
         printBackend :: Maybe Text -> IO ()
         printBackend backend =
@@ -435,7 +488,7 @@ getBucketParser =
         printConflictResolution :: ConflictResolution -> IO ()
         printConflictResolution resolution =
           Text.putStrLn
-            ("conflict resolution = " <>
+            ("conflict_resolution = " <>
               case resolution of
                 ClientSideConflictResolution ->
                   "client-side (siblings)"
@@ -443,6 +496,10 @@ getBucketParser =
                   "timestamp-based (no siblings)"
                 LastWriteWinsConflictResolution ->
                   "last-write-wins (no siblings)")
+
+        printDatatype :: Text -> IO ()
+        printDatatype s =
+          Text.putStrLn ("datatype = " <> s)
 
         printIndex :: Maybe IndexName -> IO ()
         printIndex index =
@@ -455,6 +512,10 @@ getBucketParser =
         printPostcommitHooks :: [Proto.RpbCommitHook] -> IO ()
         printPostcommitHooks hooks =
           Text.putStrLn ("postcommit hooks = " <> Text.pack (show hooks))
+
+        printPrecision :: Natural -> IO ()
+        printPrecision n =
+          Text.putStrLn ("precision = " <> Text.pack (show n) <> " bits")
 
         printPrecommitHooks :: [Proto.RpbCommitHook] -> IO ()
         printPrecommitHooks hooks =
@@ -482,7 +543,7 @@ getBucketParser =
         printWriteOnce :: Bool -> IO ()
         printWriteOnce = \case
           True -> Text.putStrLn "write_once = true"
-          False -> Text.putStrLn "write_ince = false"
+          False -> Text.putStrLn "write_once = false"
 
         printWriteQuorum :: WriteQuorum -> IO ()
         printWriteQuorum WriteQuorum { durable, nodes, primary } = do
