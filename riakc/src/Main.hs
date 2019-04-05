@@ -597,8 +597,13 @@ getIndexParser =
               print err
               exitFailure
 
-            Right index ->
-              print index
+            Right Nothing ->
+              putStrLn "Not found"
+
+            Right (Just Index { name, nodes, schema }) -> do
+              Text.putStrLn ("name = " <> unIndexName name)
+              Text.putStrLn ("nodes = " <> Text.pack (show nodes))
+              Text.putStrLn ("schema = " <> schema)
 
 getMapParser :: Parser (Handle -> IO ())
 getMapParser =
