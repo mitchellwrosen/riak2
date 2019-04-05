@@ -2,14 +2,24 @@ packages:
   libriak,
   riak2,
   riak2-benchmarks,
-  riakc,
-  ../riak-haskell-client,
-  ../riak-haskell-client/protobuf
+  riakc
 
 source-repository-package
   type: git
   location: https://github.com/kcsongor/generic-lens.git
   tag: cf20ae3a0f27d25edf97c79b6635f7c79c9bc941
+
+source-repository-package
+  type: git
+  location: https://github.com/riak-haskell-client/riak-haskell-client.git
+  subdir: riak
+  tag: 66b8fab1a02893e882d46c50526efc98d42229ff
+
+source-repository-package
+  type: git
+  location: https://github.com/riak-haskell-client/riak-haskell-client.git
+  subdir: protobuf
+  tag: 66b8fab1a02893e882d46c50526efc98d42229ff
 
 allow-newer:
   directory:time
