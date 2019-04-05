@@ -19,7 +19,7 @@ import Control.Lens          (view, (.~), (^.))
 import Control.Monad         (when)
 import Data.ByteString       (ByteString)
 import Data.Fixed            (Fixed(..))
-import Data.Foldable         (asum, for_, traverse_)
+import Data.Foldable         (asum, fold, for_, traverse_)
 import Data.Function         ((&))
 import Data.Generics.Product (field)
 import Data.HashMap.Strict   (HashMap)
@@ -35,7 +35,6 @@ import Net.IPv4              (IPv4, ipv4)
 import Numeric.Natural       (Natural)
 import Options.Applicative   hiding (UnknownError, infoParser)
 import Socket.Stream.IPv4    (Endpoint(..))
-import System.Environment    (lookupEnv)
 import System.Exit           (exitFailure)
 import Text.Printf           (printf)
 import Text.Read             (readMaybe)
@@ -55,16 +54,15 @@ import qualified Options.Applicative    as Opt
 
 main :: IO ()
 main = do
-  (host, port) <-
-    parseHost
-
-  (verbose, run) <-
+  (verbose, host, port, run) <-
     (customExecParser
       (prefs (showHelpOnEmpty <> showHelpOnError))
       (info
         (helper <*>
-          ((,)
+          ((,,,)
             <$> verboseParser
+            <*> hostParser
+            <*> portParser
             <*> commandParser))
         (progDesc "Riak command-line client")))
 
@@ -84,40 +82,40 @@ main = do
                 EventHandlers
                   { onConnectAttempt =
                       \uuid ->
-                        Text.putStrLn ("// " <> uuid <> " connecting")
+                        Text.putStrLn ("-- " <> uuid <> " connecting")
 
                   , onConnectFailure =
                       \uuid ex ->
-                        Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+                        Text.putStrLn ("-- " <> uuid <> " " <> Text.pack (show ex))
 
                   , onConnectSuccess =
                       \uuid ->
-                        Text.putStrLn ("// " <> uuid <> " connected")
+                        Text.putStrLn ("-- " <> uuid <> " connected")
 
                   , onDisconnectAttempt =
                       \uuid reason ->
                         Text.putStrLn $
-                          "// " <> uuid <> " disconnecting (" <>
+                          "-- " <> uuid <> " disconnecting (" <>
                             renderDisconnectReason reason <> ")"
 
                   , onDisconnectFailure =
                       \uuid ex ->
-                        Text.putStrLn ("// " <> uuid <> " " <> Text.pack (show ex))
+                        Text.putStrLn ("-- " <> uuid <> " " <> Text.pack (show ex))
 
                   , onDisconnectSuccess =
                       \uuid ->
-                        Text.putStrLn ("// " <> uuid <> " disconnected")
+                        Text.putStrLn ("-- " <> uuid <> " disconnected")
 
                   , onSend =
                       \uuid msg ->
-                        Text.putStrLn ("// " <> uuid <> " >>> " <> Text.pack (show msg))
+                        Text.putStrLn ("-- " <> uuid <> " >>> " <> Text.pack (show msg))
                   , onReceive =
                       \uuid msg ->
-                        Text.putStrLn ("// " <> uuid <> " <<< " <> Text.pack (show msg))
+                        Text.putStrLn ("-- " <> uuid <> " <<< " <> Text.pack (show msg))
 
                   , onIdleTimeout =
                       \uuid ->
-                        Text.putStrLn ("// " <> uuid <> " idle time out")
+                        Text.putStrLn ("-- " <> uuid <> " idle time out")
                   }
               else
                 mempty
@@ -126,37 +124,6 @@ main = do
   createHandle config >>= run
 
   where
-    -- TODO riakc use --host / --port instead of env var
-    parseHost :: IO (IPv4, Word16)
-    parseHost =
-      lookupEnv "RIAKC_HOST" >>= \case
-        Nothing ->
-          pure (localhost, 8087)
-
-        Just string ->
-          case span (/= ':') string of
-            (mkHost -> Just host, mkPort -> Just port) ->
-              pure (host, port)
-            _ -> do
-              putStrLn "$RIAKC_HOST expected 'host' or 'host:port'"
-              exitFailure
-
-    mkHost :: String -> Maybe IPv4
-    mkHost = \case
-      "" -> Just localhost
-      "localhost" -> Just localhost
-      host -> IPv4.decode (Text.pack host)
-
-    mkPort :: String -> Maybe Word16
-    mkPort = \case
-      "" -> Just 8087
-      ':' : port -> readMaybe port
-      _ -> Nothing
-
-    localhost :: IPv4
-    localhost =
-      ipv4 127 0 0 1
-
     renderDisconnectReason :: DisconnectReason -> Text
     renderDisconnectReason = \case
       DisconnectDueToIdleTimeout ->
@@ -186,30 +153,45 @@ main = do
       UnexpectedResponse{} ->
         "unexpected message code"
 
-nodeParser :: Parser (IPv4, Word16)
-nodeParser =
-  argument
-    (eitherReader parseNode)
-    (help "Riak node, e.g. localhost:8087" <> metavar "NODE")
+hostParser :: Parser IPv4
+hostParser =
+  option
+    (eitherReader parseHost)
+    (fold
+      [ help "Host"
+      , long "host"
+      , metavar "IPv4"
+      , showDefaultWith (\_ -> "127.0.0.1")
+      , Opt.value localhost
+      ])
 
   where
-    parseNode :: String -> Either String (IPv4, Word16)
-    parseNode s =
-      maybe (Left "Expected: 'host' or 'host:port'") Right $ do
-        case span (/= ':') s of
-          (mkHost -> Just host, ':':port) ->
-            case port of
-              [] -> pure (host, 8087)
-              _ -> (host,) <$> readMaybe port
-          (mkHost -> Just host, []) ->
-            pure (host, 8087)
-          _ ->
-            Nothing
+    parseHost :: String -> Either String IPv4
+    parseHost = \case
+      "localhost" ->
+        Right localhost
 
-    mkHost :: String -> Maybe IPv4
-    mkHost = \case
-      "" -> Just (ipv4 127 0 0 1)
-      host -> IPv4.decode (Text.pack host)
+      host ->
+        host
+          & Text.pack
+          & IPv4.decode
+          & maybe (Left "Invalid IPv4 address") Right
+
+    localhost :: IPv4
+    localhost =
+      ipv4 127 0 0 1
+
+portParser :: Parser Word16
+portParser =
+  option
+    auto
+    (fold
+      [ help "Port"
+      , long "port"
+      , metavar "PORT"
+      , showDefault
+      , Opt.value 8087
+      ])
 
 verboseParser :: Parser Bool
 verboseParser =
