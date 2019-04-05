@@ -1,11 +1,12 @@
 module Riak.Index
   ( -- * Index
-    getIndex
+    Index(..)
+  , getIndex
   , getIndexes
   , putIndex
+  , putIndexWith
   , PutIndexOpts(..)
   , deleteIndex
-  , Index(..)
     -- * Index name
   , IndexName
   , makeIndexName

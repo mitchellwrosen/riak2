@@ -784,8 +784,6 @@ doIndexPage handle request fold =
 -- /Note/: If your backend supports secondary indexes, it is faster to use the
 -- 'Riak.SecondaryIndexQuery.inBucket' query.
 --
--- /See also/: 'streamKeys'
---
 -- +-------------------------------+-------------------------------------------+
 -- | Error                         | Meaning                                   |
 -- +===============================+===========================================+
@@ -818,8 +816,6 @@ listKeysWith handle bucket =
 --
 -- /Note/: If your backend supports secondary indexes, it is faster to use the
 -- 'Riak.SecondaryIndexQuery.inBucket' query.
---
--- /See also/: 'listKeys'
 --
 -- +-------------------------------+-------------------------------------------+
 -- | Error                         | Meaning                                   |

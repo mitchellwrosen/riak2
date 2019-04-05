@@ -3,6 +3,7 @@ module RiakIndex
   , getIndex
   , getIndexes
   , putIndex
+  , putIndexWith
   , PutIndexOpts(..)
   , deleteIndex
   ) where
@@ -28,8 +29,6 @@ import qualified Data.Riak.Proto as Proto
 -- @nodes@ is necessary for query plan calculation, and indicates the number of
 -- nodes that each bucket with which this index is associated with is replicated
 -- to.
---
--- /See also/: Riak.BucketType.setBucketTypeIndex
 data Index
   = Index
   { name :: IndexName
@@ -104,8 +103,6 @@ parseGetIndexesError :: ByteString -> GetIndexError
 parseGetIndexesError err =
   UnknownError (decodeUtf8 err)
 
--- TODO putIndexWith?
-
 -- | Put a Solr index.
 --
 -- +----------------------------------+----------------------------------------+
@@ -132,9 +129,19 @@ putIndex ::
   => Handle -- ^
   -> IndexName -- ^ Index name
   -> Text -- ^ Schema name
+  -> m (Either PutIndexError ())
+putIndex handle index schema =
+  putIndexWith handle index schema def
+
+-- | 'putIndex' with options.
+putIndexWith ::
+     MonadIO m
+  => Handle -- ^
+  -> IndexName -- ^ Index name
+  -> Text -- ^ Schema name
   -> PutIndexOpts -- ^
   -> m (Either PutIndexError ())
-putIndex handle index schema (PutIndexOpts nodes timeout) =
+putIndexWith handle index schema (PutIndexOpts nodes timeout) =
   if nodes == Just 0
     then pure (Left InvalidNodesError)
     else liftIO (putIndex_ handle index schema nodes timeout)

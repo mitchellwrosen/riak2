@@ -879,7 +879,7 @@ putIndexParser =
       -> Handle
       -> IO ()
     doPutIndex index nodes schema handle =
-      putIndex handle index (fromMaybe defaultSchema schema) opts >>= \case
+      putIndexWith handle index (fromMaybe defaultSchema schema) opts >>= \case
         Left err -> do
           print err
           exitFailure

@@ -94,6 +94,7 @@ module Riak
   , getIndex
   , getIndexes
   , putIndex
+  , putIndexWith
   , deleteIndex
     -- * Server info
   , ping

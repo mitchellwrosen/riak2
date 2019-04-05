@@ -263,8 +263,6 @@ coerceGetBucketError =
 --
 -- /Note/: If search is not enabled, Riak does not complain if you associate a
 -- bucket type with an index that does exist.
---
--- /See also/: 'Riak.Index.putIndex'
 setBucketTypeIndex ::
      MonadIO m
   => Handle -- ^
@@ -335,8 +333,6 @@ unsetBucketTypeIndex handle bucketType =
 -- /Note/: This is an extremely expensive operation, and should not be used on a
 -- production cluster.
 --
--- /See also/: 'streamBuckets'
---
 -- +-------------------------------+-------------------------------------------+
 -- | Error                         | Meaning                                   |
 -- +===============================+===========================================+
@@ -366,8 +362,6 @@ listBucketsWith handle bucketType =
 --
 -- /Note/: This is an extremely expensive operation, and should not be used on a
 -- production cluster.
---
--- /See also/: 'listBuckets'
 --
 -- +-------------------------------+-------------------------------------------+
 -- | Error                         | Meaning                                   |
