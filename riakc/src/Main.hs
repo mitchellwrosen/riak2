@@ -204,14 +204,14 @@ commandParser =
         (mconcat
           [ commandGroup "Key/value"
           , command "delete" (info deleteParser (progDesc "Delete an object"))
+          , command "incr-counter" (info incrementCounterParser (progDesc "Increment a convergent counter"))
           , command "get" (info getParser (progDesc "Get an object"))
-          , command "get-counter" (info getCounterParser (progDesc "Get a counter"))
-          , command "get-map" (info getMapParser (progDesc "Get a map"))
-          , command "get-set" (info getSetParser (progDesc "Get a set"))
+          , command "get-counter" (info getCounterParser (progDesc "Get a convergent counter"))
+          , command "get-map" (info getMapParser (progDesc "Get a convergent map"))
+          , command "get-set" (info getSetParser (progDesc "Get a convergent set"))
           , command "put" (info putParser (progDesc "Put an object"))
-          , command "put-map" (info putMapParser (progDesc "Put a map"))
-          , command "put-set" (info putSetParser (progDesc "Put a set"))
-          , command "update-counter" (info updateCounterParser (progDesc "Update a counter"))
+          , command "put-map" (info putMapParser (progDesc "Put a convergent map"))
+          , command "put-set" (info putSetParser (progDesc "Put a convergent set"))
           ])
 
     , hsubparser
@@ -1436,9 +1436,9 @@ setBucketIndexParser =
             Right () ->
               pure ()
 
-updateCounterParser :: Parser (Handle -> IO ())
-updateCounterParser =
-  doUpdateCounter
+incrementCounterParser :: Parser (Handle -> IO ())
+incrementCounterParser =
+  doIncrementCounter
     <$> bucketOrKeyArgument
     <*> amountArgument
     <*> optional nodesOption
@@ -1450,7 +1450,7 @@ updateCounterParser =
     amountArgument =
       argument auto (help "Amount" <> metavar "AMOUNT")
 
-    doUpdateCounter ::
+    doIncrementCounter ::
          Either Bucket Key
       -> Int64
       -> Maybe Natural
@@ -1458,8 +1458,8 @@ updateCounterParser =
       -> Maybe NominalDiffTime
       -> Handle
       -> IO ()
-    doUpdateCounter bucketOrKey amount nodes quorum timeout handle = do
-      updateCounterWith handle operation opts >>= \case
+    doIncrementCounter bucketOrKey amount nodes quorum timeout handle = do
+      incrementCounterWith handle key amount opts >>= \case
         Left err -> do
           print err
           exitFailure
@@ -1468,16 +1468,11 @@ updateCounterParser =
           print val
 
       where
-        operation :: ConvergentCounter
-        operation =
-          ConvergentCounter
-            { key =
-                case bucketOrKey of
-                  Left bucket -> generatedKey bucket
-                  Right key -> key
-            , value =
-                amount
-            }
+        key :: Key
+        key =
+          case bucketOrKey of
+            Left bucket -> generatedKey bucket
+            Right key -> key
 
         opts :: PutOpts
         opts =

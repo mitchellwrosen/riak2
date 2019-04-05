@@ -142,6 +142,7 @@ type GetSchemaError                = Error 'GetSchemaOp
 type GetSetBucketError             = Error 'GetBucketOp
 type GetSetBucketTypeError         = Error 'GetBucketOp
 type GetSetError                   = Error 'GetCrdtOp
+type IncrementCounterError         = Error 'UpdateCrdtOp
 type ListBucketsError              = Error 'ListBucketsOp
 type ListKeysError                 = Error 'ListKeysOp
 type MapReduceBinaryIndexError     = Error 'MapReduceSecondaryIndexOp
@@ -159,7 +160,6 @@ type SearchError                   = Error 'SearchOp
 type SetBucketIndexError           = Error 'SetBucketIndexOp
 type SetBucketTypeIndexError       = Error 'SetBucketTypeIndexOp
 type UnsetBucketIndexError         = Error 'UnsetBucketIndexOp
-type UpdateCounterError            = Error 'UpdateCrdtOp
 type UpdateHyperLogLogError        = Error 'UpdateCrdtOp
 
 type family MayReturnBucketTypeDoesNotExist (op :: Op) :: Bool where

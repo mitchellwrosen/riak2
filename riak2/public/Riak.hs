@@ -28,8 +28,8 @@ module Riak
     -- * Convergent counter operations
   , getCounter
   , getCounterWith
-  , updateCounter
-  , updateCounterWith
+  , incrementCounter
+  , incrementCounterWith
     -- * Convergent HyperLogLog operations
   , getHyperLogLog
   , getHyperLogLogWith
@@ -151,6 +151,7 @@ module Riak
   , HandleConfig(..)
   , HandleError(..)
   , HyperLogLogBucketProps(..)
+  , IncrementCounterError
   , Index(..)
   , IndexName
   , makeIndexName
@@ -200,7 +201,6 @@ module Riak
   , SetBucketTypeIndexError
   , Sibling(..)
   , SomeBucketProps(..)
-  , UpdateCounterError
   , UpdateHyperLogLogError
   , WriteQuorum(..)
 #ifdef DEBUG

@@ -13,6 +13,7 @@ module Riak.Error
   , GetMapError
   , GetSchemaError
   , GetSetError
+  , IncrementCounterError
   , ListBucketsError
   , ListKeysError
   , MapReduceBucketError
@@ -24,7 +25,6 @@ module Riak.Error
   , QueryIndexError
   , SearchError
   , SetBucketTypeIndexError
-  , UpdateCounterError
   , UpdateHyperLogLogError
     -- * Internal type families
   , MayReturnBucketTypeDoesNotExist

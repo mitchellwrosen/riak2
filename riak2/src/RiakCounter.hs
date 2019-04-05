@@ -4,8 +4,8 @@ module RiakCounter
   ( ConvergentCounter(..)
   , getCounter
   , getCounterWith
-  , updateCounter
-  , updateCounterWith
+  , incrementCounter
+  , incrementCounterWith
   ) where
 
 import RiakCrdt
@@ -87,29 +87,25 @@ getCounterWith handle key@(Key bucketType _ _) opts = liftIO $
         , value = crdt ^. Proto.counterValue
         }
 
--- | Update an eventually-convergent counter.
---
--- /Note/: Counters, unlike other convergent data types, represent their own
--- update operation.
-updateCounter ::
+-- | Increment an eventually-convergent counter.
+incrementCounter ::
      MonadIO m
   => Handle -- ^
-  -> ConvergentCounter -- ^ Counter update
-  -> m (Either UpdateCounterError ConvergentCounter)
-updateCounter handle value =
-  updateCounterWith handle value def
+  -> Key -- ^
+  -> Int64
+  -> m (Either IncrementCounterError ConvergentCounter)
+incrementCounter handle key value =
+  incrementCounterWith handle key value def
 
--- | Update an eventually-convergent counter.
---
--- /Note/: Counters, unlike other convergent data types, represent their own
--- update operation.
-updateCounterWith ::
+-- | 'incrementCounter' with options.
+incrementCounterWith ::
      MonadIO m
   => Handle -- ^
-  -> ConvergentCounter -- ^ Counter update
+  -> Key -- ^
+  -> Int64 -- ^
   -> PutOpts -- ^
-  -> m (Either UpdateCounterError ConvergentCounter)
-updateCounterWith handle (ConvergentCounter key@(Key bucketType _ _) value) opts = liftIO $
+  -> m (Either IncrementCounterError ConvergentCounter)
+incrementCounterWith handle key@(Key bucketType _ _) value opts = liftIO $
   fromResult <$>
     Handle.updateCrdt handle request
 

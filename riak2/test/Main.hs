@@ -567,35 +567,35 @@ riakCounterTests handle =
         getCounter handle key `shouldReturnSatisfy` isRightJust
     ]
 
-  , testGroup "updateCounter"
+  , testGroup "incrementCounter"
     [ testCase "empty bucket works for some reason" $ do
         key <- (keyBucketSegment .~ "") <$> randomCounterKey
-        updateCounter handle (ConvergentCounter key 1) `shouldReturnSatisfy` isRight
+        incrementCounter handle (ConvergentCounter key 1) `shouldReturnSatisfy` isRight
 
     , testGroup "failures"
       [ testCase "default bucket" $ do
           key <- randomDefaultKey
-          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
+          incrementCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "allow_mult=false (non-default)" $ do
           key <- randomNoSiblingsKey
-          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
+          incrementCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketError (key ^. keyBucket))
 
       , testCase "hll bucket" $ do
           key <- randomHyperLogLogKey
-          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
+          incrementCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "map bucket" $ do
           key <- randomMapKey
-          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
+          incrementCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
 
       , testCase "set bucket" $ do
           key <- randomSetKey
-          updateCounter handle (ConvergentCounter key 1) `shouldReturn`
+          incrementCounter handle (ConvergentCounter key 1) `shouldReturn`
             Left (InvalidBucketTypeError (key ^. keyBucketType))
       ]
     ]

@@ -1,10 +1,10 @@
 module Riak.ConvergentCounter
   ( ConvergentCounter(..)
   , getCounter
-  , updateCounter
+  , incrementCounter
     -- ** *With variants
   , getCounterWith
-  , updateCounterWith
+  , incrementCounterWith
   ) where
 
 import RiakCounter
